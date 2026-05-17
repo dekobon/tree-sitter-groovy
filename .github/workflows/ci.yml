@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - .github/workflows/**
+      - grammar.js
+      - src/**
+      - test/**
+      - bindings/**
+      - queries/**
+      - binding.gyp
+      - package.json
+      - package-lock.json
+      - eslint.config.mjs
+      - Cargo.toml
+      - Cargo.lock
+      - go.mod
+      - go.sum
+      - pyproject.toml
+      - setup.py
+      - Package.swift
+      - tree-sitter.json
+  pull_request:
+    paths: *paths
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint source code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: Run tests
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve tree-sitter-cli version from package-lock.json
+        id: ts-cli
+        shell: bash
+        run: |-
+          version=$(jq -r '.packages["node_modules/tree-sitter-cli"].version' package-lock.json)
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "tree-sitter-cli not found in package-lock.json" >&2
+            exit 1
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "tree-sitter-cli version '$version' is not a valid SemVer string" >&2
+            exit 1
+          fi
+          printf 'ref=v%s\n' "$version" >> "$GITHUB_OUTPUT"
+      - uses: tree-sitter/setup-action/cli@v2
+        with:
+          tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
+      - uses: tree-sitter/parser-test-action@v2
+        with:
+          generate: true
+          test-parser: true
+          test-rust: true
+          rust-version: "1.85"
+          # test-node: true
+
+  fuzz:
+    name: Fuzz parser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Check for scanner changes
+        id: scanner-changes
+        run: |-
+          if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            printf 'changed=false\n' >> "$GITHUB_OUTPUT"
+          elif git diff --quiet HEAD^ -- src/scanner.c; then
+            printf 'changed=false\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'changed=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: tree-sitter/fuzz-action@v4
+        if: steps.scanner-changes.outputs.changed == 'true'

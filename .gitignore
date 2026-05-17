@@ -1,0 +1,33 @@
+# Tree-sitter / Node build outputs
+build/
+node_modules/
+parser
+*.wasm
+
+# Rust build outputs
+target/
+
+# Python build outputs
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+.eggs/
+
+# Compiled grammar artifacts
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Claude Code worktrees and local settings
+.claude/worktrees/
+.claude/settings.local.json

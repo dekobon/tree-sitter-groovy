@@ -1,0 +1,3 @@
+# Corpus tests will land here per SPECIFICATION.md §8.
+# One file per operator family: operators-elvis.txt, operators-safe-nav.txt, …
+# Plus regressions.txt anchoring murtaza64 issues + dekobon #246 / #247.
