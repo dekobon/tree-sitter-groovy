@@ -15,6 +15,7 @@ and the Apache Groovy reference grammar
 `GroovyLexer.g4`) — both files retrieved 2026-05-17.
 
 Revision history:
+
 - v1 (initial draft) — section structure, all operators from issue
   #247, all murtaza64 open issues, external-scanner sketch.
 - v2 (this revision) — corrected precedence levels to match Apache
@@ -330,17 +331,23 @@ tree shape:
 
 ```text
 (method_invocation
-  object: (subscript_expression
-            object: (identifier "stepImplementations")
-            index:  (field_access object: … field: …))
+  function: (subscript_expression
+              object: (identifier "stepImplementations")
+              index:  (field_access object: … field: …))
   arguments: (argument_list (identifier "ctx")))
 ```
 
-This works automatically if `method_invocation`'s `object` field
+This works automatically if `method_invocation`'s `function` field
 accepts any `postfix_expression` (which includes subscripts), rather
 than only an `identifier`. The amaanq grammar's `method_invocation`
-uses `primary_expression` for the object slot, which suffices. The
+uses `primary_expression` for the callee slot, which suffices. The
 spec inherits that breadth and explicitly tests this case.
+
+Field name is `function:` (not `name:` or `object:`) because the
+callee may be any `_expression` — identifier, field-access,
+subscript, or spread-dot — and `name:` / `object:` each describe
+only a subset of those shapes. All §8 corpus snippets and the
+`queries/groovy/highlights.scm` patterns use this field name.
 
 #### 3.2.2 `!instanceof` and `!in` — lexer trailing-context rule
 
@@ -894,12 +901,12 @@ flight (ternary, map item, switch case).
 ### 6.6 Block comment scanner
 
 A single token `BLOCK_COMMENT` (or `GROOVYDOC_COMMENT` when the open
-sequence is `/**`) matches the entire comment. This fixes murtaza64
-#16: the regex `seq('/**', token.immediate(/[*\n\s]+/), …)` in
-murtaza64's grammar requires at least one whitespace character after
-`/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`) both
-fail. A scanner-driven token simply consumes from the opener to the
-matching `*/` regardless of intermediate content.
+sequence is `/**`) matches the entire comment. This fixes
+murtaza64 #16: the regex `seq('/**', token.immediate(/[*\n\s]+/), …)`
+in murtaza64's grammar requires at least one whitespace character
+after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
+both fail. A scanner-driven token simply consumes from the opener to
+the matching `*/` regardless of intermediate content.
 
 ---
 
@@ -1040,7 +1047,7 @@ f(*args)
 (source_file
   (expression_statement
     (method_invocation
-      name: (identifier)
+      function: (identifier)
       arguments: (argument_list
         (spread_arguments value: (identifier))))))
 
@@ -1055,7 +1062,7 @@ items*.size()
 (source_file
   (expression_statement
     (method_invocation
-      object: (spread_dot_expression
+      function: (spread_dot_expression
         object: (identifier)
         property: (identifier))
       arguments: (argument_list))))
@@ -1247,14 +1254,14 @@ try {
 
 (source_file
   (try_statement
-    body: (block (expression_statement (method_invocation name: (identifier) arguments: (argument_list))))
+    body: (block (expression_statement (method_invocation function: (identifier) arguments: (argument_list))))
     (catch_clause
       parameter: (catch_formal_parameter
         type: (multi_type
           (type_identifier)
           (type_identifier))
         name: (identifier))
-      body: (block (expression_statement (method_invocation name: (identifier) arguments: (argument_list (identifier))))))))
+      body: (block (expression_statement (method_invocation function: (identifier) arguments: (argument_list (identifier))))))))
 
 =========================================================
 dekobon #246 — Elvis as elvis_expression, not ternary
@@ -1316,7 +1323,7 @@ for (i in 0..<n) { f(i) }
     value: (range_expression
       start: (number_literal)
       end: (identifier))
-    body: (block (expression_statement (method_invocation name: (identifier) arguments: (argument_list (identifier)))))))
+    body: (block (expression_statement (method_invocation function: (identifier) arguments: (argument_list (identifier)))))))
 ```
 
 ### 8.3 Stress / real-world corpus
