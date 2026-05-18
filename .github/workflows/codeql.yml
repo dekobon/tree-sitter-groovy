@@ -1,0 +1,88 @@
+name: CodeQL
+
+# Intentionally has no `paths:` filter (unlike ci.yml): CodeQL needs to
+# run on every push/PR to keep the default-branch SARIF history
+# continuous, even for doc-only changes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly run so the database stays fresh even on quiet weeks.
+    - cron: "23 4 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: c-cpp
+            os: ubuntu-latest
+            build-mode: manual
+          - language: javascript-typescript
+            os: ubuntu-latest
+            build-mode: none
+          - language: python
+            os: ubuntu-latest
+            build-mode: none
+          - language: go
+            os: ubuntu-latest
+            build-mode: autobuild
+          - language: rust
+            os: ubuntu-latest
+            build-mode: manual
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: security-and-quality
+
+      - name: Set up Rust toolchain
+        if: matrix.language == 'rust'
+        # Pinned to SHA: this workflow has `security-events: write`, so
+        # any third-party action runs with elevated privilege.
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: "1.85"
+
+      - name: Cache Rust dependencies
+        if: matrix.language == 'rust'
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+
+      - name: Build Rust binding
+        if: matrix.language == 'rust'
+        run: cargo build --all-targets --locked
+
+      - name: Build C scanner
+        if: matrix.language == 'c-cpp'
+        run: |-
+          # Only the hand-written scanner is in scope (parser.c is
+          # ignored via the CodeQL config). Compile it standalone so
+          # CodeQL has a trace to extract.
+          cc -c -fPIC -Isrc src/scanner.c -o /tmp/scanner.o
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
