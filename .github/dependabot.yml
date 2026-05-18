@@ -1,0 +1,108 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - javascript
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Any tree-sitter-cli bump (major, minor, or patch) requires
+      # regenerating src/parser.c with the new CLI and committing the
+      # result alongside the lockfile change. Dependabot only touches
+      # package-lock.json, so its PRs would land with a stale parser.c
+      # and break CI. Bump this dependency manually via `make version`
+      # or `npx tree-sitter generate` after editing package.json.
+      - dependency-name: tree-sitter-cli
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - rust
+    groups:
+      cargo-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - go
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - python
+    groups:
+      pip-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - swift
