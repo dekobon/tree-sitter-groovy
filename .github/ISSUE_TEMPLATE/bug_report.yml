@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a parsing or highlighting bug
+labels: [bug]
+body:
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Groovy snippet
+      description: >-
+        Minimal Groovy code that triggers the bug.
+      render: groovy
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected parse tree
+      description: >-
+        The S-expression or highlight result you expect.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual parse tree
+      description: >-
+        The S-expression or highlight result you see. Include any
+        ERROR or MISSING nodes.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: tree-sitter-groovy version
+      placeholder: "0.1.0"
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >-
+        Editor, tree-sitter CLI version, OS, or anything else relevant.

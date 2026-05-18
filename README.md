@@ -1,6 +1,9 @@
 # tree-sitter-groovy
 
 [![CI](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml/badge.svg)](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/tree-sitter-groovy)](https://www.npmjs.com/package/tree-sitter-groovy)
+[![crates.io](https://img.shields.io/crates/v/tree-sitter-groovy)](https://crates.io/crates/tree-sitter-groovy)
+[![PyPI](https://img.shields.io/pypi/v/tree-sitter-groovy)](https://pypi.org/project/tree-sitter-groovy/)
 
 Tree-sitter grammar for [Apache Groovy](https://groovy-lang.org/) —
 the JVM scripting language used in Jenkins pipelines, Gradle build
@@ -26,8 +29,10 @@ The full design is in [`SPECIFICATION.md`](SPECIFICATION.md).
 
 ## Status
 
-Early development. Repository skeleton is in place; `grammar.js` and
-`src/scanner.c` are being implemented against the specification.
+Fully functional Groovy 2.x--4.x parser with complete operator
+coverage, GString interpolation, generics, closures, command chains,
+and six language bindings. See [Known limitations](#known-limitations)
+for deferred items.
 
 ## Operator coverage
 
@@ -95,14 +100,29 @@ parser.set_language(&language.into()).expect("Error loading Groovy parser");
 let tree = parser.parse(source, None).unwrap();
 ```
 
+## Known limitations
+
+These are documented in detail in
+[`docs/divergences-from-spec.md`](docs/divergences-from-spec.md).
+
+- **Groovy 5 contextual keywords** (`val`, `async`, `await`, `defer`)
+  are not yet exposed as keyword tokens. They parse as plain
+  identifiers, matching Groovy 2.x--4.x compiler behavior.
+- **Typed local declarations require an initializer** -- `String x`
+  is ambiguous with `String(x)` (method call). Use `String x = ...`
+  or `def x` instead.
+- **Leading-operator line continuation** -- `a\n+ b` greedily joins
+  as `a + b` rather than splitting into two statements. Idiomatic
+  Groovy places continuation operators at the end of the previous
+  line.
+
 ## Contributing
 
-See [`AGENTS.md`](AGENTS.md) for project conventions (commit messages,
-versioning, validation gates) and
-[`SPECIFICATION.md`](SPECIFICATION.md) for grammar design decisions.
-
-When fixing a bug, add a regression test under `test/corpus/` that
-would catch it if reintroduced.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to build, test, and
+submit changes. [`AGENTS.md`](AGENTS.md) covers project conventions
+(commit messages, versioning, validation gates) and
+[`SPECIFICATION.md`](SPECIFICATION.md) is the authoritative grammar
+design document.
 
 ## License
 

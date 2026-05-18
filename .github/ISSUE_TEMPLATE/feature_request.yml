@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new grammar rule, query capture, or binding feature
+labels: [enhancement]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: >-
+        What Groovy syntax or feature is missing or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Example Groovy code
+      description: >-
+        A code sample that should parse but doesn't, or that produces
+        the wrong tree shape.
+      render: groovy
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: >-
+        What parse tree or highlight result should this produce?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: >-
+        Links to the Apache Groovy spec, related issues, or editor
+        integration details.
