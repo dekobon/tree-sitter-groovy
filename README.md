@@ -73,6 +73,49 @@ for nested regex highlighting.
 Recognized file extensions: `.groovy`, `.gradle`, `.gvy`, `.gy`, and
 `Jenkinsfile`.
 
+### Filetype detection
+
+The repo ships `ftdetect/groovy.lua` and `ftplugin/groovy.lua` for
+Neovim. Neovim's built-in filetype detection already maps `*.groovy`,
+`*.gradle`, and the bare filename `Jenkinsfile` to filetype `groovy`;
+the shipped `ftdetect/groovy.lua` fills the gaps by mapping:
+
+- `*.gvy` and `*.gy` — declared in `tree-sitter.json` but not in
+  Neovim's defaults.
+- `*.jenkinsfile` — uncommon (the canonical name is `Jenkinsfile`) but
+  declared in `tree-sitter.json` and used by some teams as an
+  editor-detection hook.
+- `Jenkinsfile.*` variants (`Jenkinsfile.ci`, `Jenkinsfile.release`,
+  …) — common in repos with multiple pipelines, not handled by
+  Neovim's built-in detection.
+
+The existing `ftplugin/groovy.lua` then calls `vim.treesitter.start()`.
+Highlighting only renders once the parser binary and
+`queries/groovy/highlights.scm` are registered with `nvim-treesitter`
+(or equivalent) — without that, the `start()` call is a no-op and the
+buffer falls back to non-treesitter highlighting.
+
+For files that don't match any of those (e.g. a hand-named
+`build-pipeline` with no extension), opt in with one of:
+
+- **Modeline** at the top of the file:
+  `// vim: set filetype=groovy :`
+- **Per-project autocmd** in `.nvim.lua` (sourced after `:cd` into the
+  project via Neovim's `'exrc'`). Note `vim.fn.getcwd()` is evaluated
+  when the autocmd is *defined*, so this snippet belongs in a
+  per-project config, not a global `init.lua`:
+
+  ```lua
+  vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
+    pattern = vim.fn.getcwd() .. "/jenkins/*",
+    callback = function() vim.bo.filetype = "groovy" end,
+  })
+  ```
+
+Other editors follow the same pattern: rely on built-in detection for
+the common extensions and override per-directory or via a header
+comment for the rest.
+
 ## Building
 
 ```bash
