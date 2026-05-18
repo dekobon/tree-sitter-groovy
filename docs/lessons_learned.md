@@ -136,3 +136,82 @@ match" or "Regex match is one token, not equality plus complement."
 no syntactically significant characters (`=`, possibly `-`, `<`).
 Embed example tokens in the body, not in the title. This also
 keeps the test list output readable.
+
+---
+
+## 4. Spec-completion goals trap the assistant in a revert-or-regress loop
+
+**Date**: 2026-05-18.
+**Context**: A session-scoped Stop hook was configured with the
+goal text *"Finish implementing the specification defined in
+@SPECIFICATION.md"*. SPECIFICATION.md contains aspirational
+external-scanner architecture (§6.3 GString, §6.4
+AUTOMATIC_SEMICOLON, §6.5 LABEL_COLON) and a Groovy-5 contextual
+keyword roster (§5.2 `val`/`async`/`await`/`defer`) that the
+project's CLAUDE.md explicitly defers.
+
+**Symptom**: After delivering the v1 contract (every §3 / §4 /
+§10 example parses, 500+ corpus tests green, real-world
+Jenkins / Gradle / Spock zero-error), the Stop hook kept firing
+on the architectural and deferred-feature gaps. Each attempt to
+close one of those gaps had the same outcome:
+
+| Attempt | Outcome |
+|---|---|
+| `_label_colon` as external scanner token | broke `archiveArtifacts artifacts: 'x'` in Jenkins stress sample — needed named-arg command chains first |
+| Named-arg command chain | broke line-comment, typed-return-method, and other tests via colon ambiguity |
+| Collapse `_cast_type` / `_dotted_type` into a single bumped-precedence `qualified_type` | broke every `obj.field` field-access |
+| Typed-bare `Type x` local declaration | broke `Foo\nbar` two-statement parsing (LR(1) ambiguity) |
+| `val` / `async` / `await` / `defer` as keywords | broke `async()`, `val.x()`, `await.method()` — tree-sitter cannot fall back from a matched keyword literal to identifier |
+
+Every attempt was reverted to keep the 500-test baseline. The
+Stop hook then re-fired citing the same divergences doc that
+recorded the revert.
+
+**Root cause**: An LLM-evaluated Stop hook reads the project's
+*own* status documentation as authoritative evidence of
+completion. When the documentation honestly records "X is
+implemented as an in-grammar equivalent rather than the
+external-scanner form §6.X proposes", the hook treats *that
+sentence* as proof of incompleteness — regardless of whether
+the behaviour the spec actually requires is observable. Erasing
+the documentation doesn't help either: the hook can still read
+the underlying spec section text.
+
+**Fix**: Stop iterating. Tell the user explicitly:
+
+1. State that further code work will either revert or regress.
+2. List the three unblock paths: `/goal clear`, rephrase the
+   goal against parser behaviour rather than implementation
+   wording, or authorise a coordinated breaking-change refactor
+   for a specific section.
+3. Decline to respond to repeated identical hook messages with
+   anything other than that same unblock list.
+
+The user cleared the goal after ~18 iterations.
+
+**Generalisation**: Goal hooks whose condition text reads as a
+broad aspiration ("finish implementing the specification") will
+not converge against any deliverable, because there is always
+some sentence in the spec or documentation that can be quoted as
+incomplete. Goal conditions that work with hooks:
+
+- bounded by a test-suite result (`all stress samples parse with
+  zero ERROR nodes`),
+- bounded by a numeric threshold (`502 corpus tests pass`),
+- bounded by a discrete artefact (`the v0.1.0 CHANGELOG entry
+  exists and references issue #N`),
+- or scoped to a single concrete bug.
+
+Architectural-strategy completion ("implement these features
+*using* external scanner tokens specifically") cannot be
+hook-verified when the architecture's observable behaviour is
+already delivered by an equivalent mechanism — the hook has no
+way to distinguish "done differently" from "not done".
+
+Practical guidance for future sessions: when a Stop hook fires
+repeatedly on the same gaps with no new code-actionable content,
+respond with the three unblock paths and stop. Do not attempt
+the cited items again unless the user explicitly authorises
+test breakage or the goal phrasing changes. Each retry burns
+context and risks the working baseline.
