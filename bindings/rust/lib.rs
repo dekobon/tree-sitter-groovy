@@ -38,6 +38,9 @@ pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_groov
 /// [`node-types.json`]: https://tree-sitter.github.io/tree-sitter/using-parsers#static-node-types
 pub const NODE_TYPES: &str = include_str!("../../src/node-types.json");
 
+/// The content of the [`highlights.scm`][] query for this grammar.
+///
+/// [`highlights.scm`]: https://tree-sitter.github.io/tree-sitter/syntax-highlighting#highlights
 pub const HIGHLIGHTS_QUERY: &str = include_str!("../../queries/groovy/highlights.scm");
 
 #[cfg(test)]

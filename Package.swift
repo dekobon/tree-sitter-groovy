@@ -17,7 +17,7 @@ let package = Package(
                     "Cargo.toml",
                     "Makefile",
                     "binding.gyp",
-                    "bindings/c",
+                    "bindings/c/tree-sitter-groovy.pc.in",
                     "bindings/go",
                     "bindings/node",
                     "bindings/python",
@@ -44,7 +44,11 @@ let package = Package(
                 resources: [
                     .copy("queries")
                 ],
-                publicHeadersPath: "bindings/swift",
+                // Single source of truth for the public header is
+                // bindings/c/tree-sitter-groovy.h. The Swift target
+                // re-exports it via this publicHeadersPath instead
+                // of carrying its own copy.
+                publicHeadersPath: "bindings/c",
                 cSettings: [.headerSearchPath("src")]),
         .testTarget(name: "TreeSitterGroovyTests",
                     dependencies: [

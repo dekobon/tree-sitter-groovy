@@ -13,14 +13,19 @@ build = "bindings/rust/build.rs"
 include = [
   "LICENSE-APACHE",
   "LICENSE-MIT",
-  "bindings/rust/*",
+  "bindings/rust/**",
   "grammar.js",
   "queries/*",
   "src/*",
+  "test/stress/**",
 ]
 
 [lib]
 path = "bindings/rust/lib.rs"
+
+[[test]]
+name = "parse_stress"
+path = "bindings/rust/tests/parse_stress.rs"
 
 [dependencies]
 tree-sitter-language = "0.1.7"
@@ -30,3 +35,12 @@ cc = "1.2"
 
 [dev-dependencies]
 tree-sitter = "0.25"
+
+# Lint posture. No crate-wide allows — additional allows go at file or
+# function level so the carve-out stays visible at the affected site
+# rather than weakening the whole crate.
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
