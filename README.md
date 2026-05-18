@@ -1,6 +1,7 @@
 # tree-sitter-groovy
 
 [![CI](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml/badge.svg)](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/codeql.yml/badge.svg)](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/codeql.yml)
 [![npm](https://img.shields.io/npm/v/tree-sitter-groovy)](https://www.npmjs.com/package/tree-sitter-groovy)
 [![crates.io](https://img.shields.io/crates/v/tree-sitter-groovy)](https://crates.io/crates/tree-sitter-groovy)
 [![PyPI](https://img.shields.io/pypi/v/tree-sitter-groovy)](https://pypi.org/project/tree-sitter-groovy/)
