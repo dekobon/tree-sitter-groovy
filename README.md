@@ -125,12 +125,13 @@ submit changes. [`AGENTS.md`](AGENTS.md) covers project conventions
 [`SPECIFICATION.md`](SPECIFICATION.md) is the authoritative grammar
 design document.
 
+## Acknowledgements
+
+We are grateful for the work done in the [murtaza64/tree-sitter-groovy](https://github.com/murtaza64/tree-sitter-groovy)
+and [amaanq/tree-sitter-groovy](https://github.com/amaanq/tree-sitter-groovy). These projects served as inspiration
+for some of the approaches in this project
+
 ## License
 
 Dual-licensed under [Apache License 2.0](LICENSE-APACHE) or
-[MIT](LICENSE-MIT), at your option. Copyright Elijah Zupancic.
-
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in this project by you, as defined in the
-Apache-2.0 license, shall be dual-licensed as above, without any
-additional terms or conditions.
+[MIT](LICENSE-MIT).
