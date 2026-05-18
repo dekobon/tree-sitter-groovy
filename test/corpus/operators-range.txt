@@ -1,0 +1,83 @@
+==================
+Inclusive range
+==================
+
+a..b
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (identifier)
+      end: (identifier))))
+
+==================
+Exclusive-right range
+==================
+
+a..<b
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (identifier)
+      end: (identifier))))
+
+==================
+Exclusive-left range
+==================
+
+a<..b
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (identifier)
+      end: (identifier))))
+
+==================
+Exclusive both range
+==================
+
+a<..<b
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (identifier)
+      end: (identifier))))
+
+==================
+Range with number literals
+==================
+
+0..10
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (number_literal)
+      end: (number_literal))))
+
+==================
+Exclusive range on numbers (dekobon #247 anchor)
+==================
+
+0..<n
+
+---
+
+(source_file
+  (expression_statement
+    (range_expression
+      start: (number_literal)
+      end: (identifier))))

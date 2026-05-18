@@ -1,0 +1,89 @@
+==================
+Parenthesised type cast
+==================
+
+(String) x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier))))
+
+==================
+Type cast with literal value
+==================
+
+(int) 3.14
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (number_literal))))
+
+==================
+Type cast with field access value
+==================
+
+(Foo) obj.field
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier)))))
+
+==================
+Type cast then method call
+==================
+
+(Foo) obj.method()
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (method_invocation
+        function: (field_access
+          object: (identifier)
+          field: (identifier))
+        arguments: (argument_list)))))
+
+==================
+Type cast with unary operand
+==================
+
+(int) -x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (unary_expression
+        operand: (identifier)))))
+
+==================
+Parens around bare identifier is parenthesized_expression
+==================
+
+(x)
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))

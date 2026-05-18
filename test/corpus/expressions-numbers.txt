@@ -1,0 +1,175 @@
+==================
+Decimal integer
+==================
+
+42
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Decimal zero
+==================
+
+0
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Decimal int with underscores
+==================
+
+1_000_000
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Long literal with suffix L
+==================
+
+42L
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Integer suffix I
+==================
+
+42i
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+BigInteger suffix G
+==================
+
+123G
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Hex literal
+==================
+
+0xCAFEBABE
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Hex with separators and suffix
+==================
+
+0xDEAD_BEEFL
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Binary literal
+==================
+
+0b1010_1010
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Float literal with dot
+==================
+
+3.14
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Float with explicit D suffix
+==================
+
+3.14d
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Float with F suffix
+==================
+
+3.14F
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+BigDecimal G suffix
+==================
+
+3.14G
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Scientific without dot
+==================
+
+1e10
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Scientific with dot and signed exponent
+==================
+
+1.5e-7
+
+---
+
+(source_file
+  (expression_statement (number_literal)))
+
+==================
+Underscores around scientific
+==================
+
+1_000.5e+1_0
+
+---
+
+(source_file
+  (expression_statement (number_literal)))

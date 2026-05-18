@@ -1,0 +1,57 @@
+==================
+Identity ===
+==================
+
+a === b
+
+---
+
+(source_file
+  (expression_statement
+    (identity_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Non-identity !==
+==================
+
+a !== b
+
+---
+
+(source_file
+  (expression_statement
+    (identity_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Identity disambiguates from equality
+==================
+
+a == b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Identity vs equality side by side
+==================
+
+a === b == c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identity_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))

@@ -1,0 +1,94 @@
+==================
+New with no args
+==================
+
+new Foo()
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+New with single arg
+==================
+
+new Foo(x)
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list (identifier)))))
+
+==================
+New with multiple args
+==================
+
+new Point(1, 2)
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (number_literal)
+        (number_literal)))))
+
+==================
+New chained with field access
+==================
+
+new Foo().bar
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))
+      field: (identifier))))
+
+==================
+New chained with method call
+==================
+
+new Foo().bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+New passed as argument
+==================
+
+print(new Foo())
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))))))

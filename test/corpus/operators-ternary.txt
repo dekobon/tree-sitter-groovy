@@ -1,0 +1,84 @@
+==================
+Ternary at top level
+==================
+
+a ? b : c
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (identifier)
+      alternative: (identifier))))
+
+==================
+Ternary with literals
+==================
+
+flag ? 1 : 0
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal))))
+
+==================
+Nested ternary on alternative side
+==================
+
+a ? b : c ? d : e
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (identifier)
+      alternative: (ternary_expression
+        condition: (identifier)
+        consequence: (identifier)
+        alternative: (identifier)))))
+
+==================
+Elvis nests inside ternary middle slot (Apache precedence tiebreak)
+==================
+
+a ? b ?: c : d
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (elvis_expression
+        value: (identifier)
+        default: (identifier))
+      alternative: (identifier))))
+
+==================
+Ternary inside list literal
+==================
+
+[a ? b : c, d ? e : f]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (ternary_expression
+        condition: (identifier)
+        consequence: (identifier)
+        alternative: (identifier))
+      (ternary_expression
+        condition: (identifier)
+        consequence: (identifier)
+        alternative: (identifier)))))

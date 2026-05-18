@@ -1,0 +1,114 @@
+==================
+Bare annotation on class
+==================
+
+@Override
+class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name (identifier)))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation with string argument
+==================
+
+@SuppressWarnings("unchecked")
+class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name (identifier))
+      arguments: (argument_list (string_literal)))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation with named argument
+==================
+
+@Foo(key = "value")
+class Bar { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (string_literal))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Qualified-name annotation
+==================
+
+@a.b.Foo
+class Bar { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)
+        (identifier)
+        (identifier)))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Stacked annotations on class
+==================
+
+@A
+@B
+class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name (identifier)))
+    (annotation
+      name: (qualified_name (identifier)))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation on method inside class
+==================
+
+class Foo {
+    @Override
+    def equals(other) { other }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter name: (identifier)))
+        body: (block
+          (expression_statement (identifier)))))))

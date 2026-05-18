@@ -1,0 +1,63 @@
+==================
+Safe navigation single
+==================
+
+obj?.field
+
+---
+
+(source_file
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (identifier))))
+
+==================
+Safe navigation chained
+==================
+
+obj?.field?.other
+
+---
+
+(source_file
+  (expression_statement
+    (safe_navigation_expression
+      object: (safe_navigation_expression
+        object: (identifier)
+        property: (identifier))
+      property: (identifier))))
+
+==================
+Safe navigation method call
+==================
+
+obj?.method()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (safe_navigation_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list))))
+
+==================
+Safe navigation mixed with dot
+==================
+
+a.b?.c.d
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (safe_navigation_expression
+        object: (field_access
+          object: (identifier)
+          field: (identifier))
+        property: (identifier))
+      field: (identifier))))

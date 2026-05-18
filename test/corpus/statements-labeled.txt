@@ -1,0 +1,77 @@
+==================
+Simple labeled statement
+==================
+
+outer: foo
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement (identifier))))
+
+==================
+Labeled while loop
+==================
+
+outer: while (cond) { foo() }
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (while_statement
+      condition: (identifier)
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Labeled for loop with labeled break
+==================
+
+outer: for (i in xs) {
+    break outer
+}
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (for_in_statement
+      variable: (identifier)
+      value: (identifier)
+      body: (block
+        (break_statement
+          label: (identifier))))))
+
+==================
+Labeled nested loops
+==================
+
+outer: for (i in xs) inner: for (j in ys) f(i, j)
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (for_in_statement
+      variable: (identifier)
+      value: (identifier)
+      body: (labeled_statement
+        label: (identifier)
+        statement: (for_in_statement
+          variable: (identifier)
+          value: (identifier)
+          body: (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (identifier)
+                (identifier)))))))))

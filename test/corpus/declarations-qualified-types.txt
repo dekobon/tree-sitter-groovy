@@ -1,0 +1,55 @@
+==================
+Qualified type in cast
+==================
+
+(java.util.List) x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      value: (identifier))))
+
+==================
+Array of qualified type
+==================
+
+(java.util.List[]) x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (array_type
+        (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      value: (identifier))))
+
+==================
+Qualified-type parameter in method
+==================
+
+def consume(java.util.List xs) { xs }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        name: (identifier)))
+    body: (block
+      (expression_statement (identifier)))))

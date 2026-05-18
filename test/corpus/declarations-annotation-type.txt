@@ -1,0 +1,46 @@
+==================
+Empty annotation type
+==================
+
+@interface Marker { }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation type with one method
+==================
+
+@interface Foo {
+    def value()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+Annotation type with annotation on the type itself
+==================
+
+@Target
+@interface Foo { }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    (annotation
+      name: (qualified_name (identifier)))
+    name: (identifier)
+    body: (class_body)))

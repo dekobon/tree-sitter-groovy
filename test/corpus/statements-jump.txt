@@ -1,0 +1,175 @@
+==================
+Bare return
+==================
+
+return
+
+---
+
+(source_file
+  (return_statement))
+
+==================
+Return with value
+==================
+
+return x
+
+---
+
+(source_file
+  (return_statement (identifier)))
+
+==================
+Return with expression
+==================
+
+return a + b
+
+---
+
+(source_file
+  (return_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bare break
+==================
+
+break
+
+---
+
+(source_file
+  (break_statement))
+
+==================
+Break with label
+==================
+
+break outer
+
+---
+
+(source_file
+  (break_statement
+    label: (identifier)))
+
+==================
+Bare continue
+==================
+
+continue
+
+---
+
+(source_file
+  (continue_statement))
+
+==================
+Continue with label
+==================
+
+continue inner
+
+---
+
+(source_file
+  (continue_statement
+    label: (identifier)))
+
+==================
+Throw
+==================
+
+throw new Exception()
+
+---
+
+(source_file
+  (throw_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+Throw with simple identifier
+==================
+
+throw e
+
+---
+
+(source_file
+  (throw_statement
+    (identifier)))
+
+==================
+Assert
+==================
+
+assert x
+
+---
+
+(source_file
+  (assert_statement
+    (identifier)))
+
+==================
+Assert with message
+==================
+
+assert x == 1 : 'x must be one'
+
+---
+
+(source_file
+  (assert_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    message: (string_literal)))
+
+==================
+Do while
+==================
+
+do { foo } while (cond)
+
+---
+
+(source_file
+  (do_while_statement
+    body: (block
+      (expression_statement (identifier)))
+    condition: (identifier)))
+
+==================
+Do while with single statement body
+==================
+
+do foo while (cond)
+
+---
+
+(source_file
+  (do_while_statement
+    body: (expression_statement (identifier))
+    condition: (identifier)))
+
+==================
+Return inside if
+==================
+
+if (x) return y
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (return_statement
+      (identifier))))

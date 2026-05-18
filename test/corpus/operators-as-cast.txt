@@ -1,0 +1,74 @@
+==================
+as cast on identifier
+==================
+
+x as String
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (type_identifier))))
+
+==================
+as cast on literal
+==================
+
+42 as Long
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (number_literal)
+      type: (type_identifier))))
+
+==================
+as cast on list
+==================
+
+[1, 2] as Set
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (list_literal
+        (number_literal)
+        (number_literal))
+      type: (type_identifier))))
+
+==================
+as cast on closure
+==================
+
+{ a -> a } as Comparator
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (closure
+        (closure_parameters
+          (closure_parameter name: (identifier)))
+        (expression_statement (identifier)))
+      type: (type_identifier))))
+
+==================
+C-style cast and as-cast both yield type_identifier
+==================
+
+(String) x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier))))

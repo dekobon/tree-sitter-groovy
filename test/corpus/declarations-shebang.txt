@@ -1,0 +1,40 @@
+==================
+Shebang only
+==================
+
+#!/usr/bin/env groovy
+
+---
+
+(source_file
+  (shebang))
+
+==================
+Shebang plus code
+==================
+
+#!/usr/bin/env groovy
+def x = 5
+
+---
+
+(source_file
+  (shebang)
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+Code with no shebang still parses
+==================
+
+def x = 5
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))

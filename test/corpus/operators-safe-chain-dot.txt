@@ -1,0 +1,57 @@
+==================
+Safe chain dot single
+==================
+
+obj??.field
+
+---
+
+(source_file
+  (expression_statement
+    (safe_chain_dot_expression
+      object: (identifier)
+      property: (identifier))))
+
+==================
+Safe chain dot chained
+==================
+
+a??.b??.c
+
+---
+
+(source_file
+  (expression_statement
+    (safe_chain_dot_expression
+      object: (safe_chain_dot_expression
+        object: (identifier)
+        property: (identifier))
+      property: (identifier))))
+
+==================
+Safe chain dot distinguished from safe navigation
+==================
+
+a?.b
+
+---
+
+(source_file
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (identifier))))
+
+==================
+Safe chain dot distinguished from Elvis
+==================
+
+a?:b
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (identifier))))

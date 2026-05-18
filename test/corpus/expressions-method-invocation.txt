@@ -1,0 +1,196 @@
+==================
+Simple call no args
+==================
+
+f()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Call with one argument
+==================
+
+f(x)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list (identifier)))))
+
+==================
+Call with multiple arguments
+==================
+
+f(a, b, c)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)
+        (identifier)))))
+
+==================
+Call with literal arguments
+==================
+
+print(1, 'hello', null)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)
+        (string_literal)
+        (null_literal)))))
+
+==================
+Call with trailing comma
+==================
+
+f(a, b,)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)))))
+
+==================
+Call with named argument
+==================
+
+f(key: value)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (identifier))))))
+
+==================
+Call with mixed positional and named arguments
+==================
+
+f(a, key: value, b)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (named_argument key: (identifier) value: (identifier))
+        (identifier)))))
+
+==================
+Chained calls
+==================
+
+f()()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      arguments: (argument_list))))
+
+==================
+Subscript chained with call (spec §3.2.1)
+==================
+
+stepImplementations[Platform](ctx)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      arguments: (argument_list (identifier)))))
+
+==================
+Call with expression arguments
+==================
+
+f(a + b, c * d)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (identifier)
+          right: (identifier))
+        (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+Method invocation binds tighter than additive
+==================
+
+f(a) + b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier)))
+      right: (identifier))))
+
+==================
+Nested calls in arguments
+==================
+
+f(g(x))
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier)))))))

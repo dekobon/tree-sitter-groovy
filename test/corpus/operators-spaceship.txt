@@ -1,0 +1,55 @@
+==================
+Spaceship on identifiers
+==================
+
+a <=> b
+
+---
+
+(source_file
+  (expression_statement
+    (spaceship_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Spaceship on number literals
+==================
+
+1 <=> 2
+
+---
+
+(source_file
+  (expression_statement
+    (spaceship_expression
+      left: (number_literal)
+      right: (number_literal))))
+
+==================
+Spaceship distinguished from <=
+==================
+
+a <= b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Spaceship inside list literal
+==================
+
+[a <=> b, c <=> d]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (spaceship_expression left: (identifier) right: (identifier))
+      (spaceship_expression left: (identifier) right: (identifier)))))

@@ -1,0 +1,244 @@
+==================
+Try catch
+==================
+
+try { risky() } catch (Exception e) { handle(e) }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list (identifier))))))))
+
+==================
+Try finally
+==================
+
+try { foo() } finally { cleanup() }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (finally_clause
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Try catch finally
+==================
+
+try { foo() } catch (E e) { handle() } finally { cleanup() }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))
+    (finally_clause
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Multiple catch clauses
+==================
+
+try { foo() } catch (A e) { a() } catch (B e) { b() }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Multi-catch (murtaza64 #39 anchor)
+==================
+
+try { risky() } catch (IOException | RuntimeException e) { handle(e) }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (multi_type
+          (type_identifier)
+          (type_identifier))
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list (identifier))))))))
+
+==================
+Multi-catch three types
+==================
+
+try { a() } catch (A | B | C e) { f() }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (multi_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Try with resource
+==================
+
+try (Foo f = open()) { f }
+
+---
+
+(source_file
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Try with multiple resources
+==================
+
+try (Foo a = mk(); Bar b = mk()) { a }
+
+---
+
+(source_file
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Try with resource and catch
+==================
+
+try (Foo f = open()) { use(f) } catch (E e) { handle(e) }
+
+---
+
+(source_file
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier)))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list (identifier))))))))

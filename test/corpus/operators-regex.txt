@@ -1,0 +1,70 @@
+==================
+Regex find with string pattern
+==================
+
+s =~ '[a-z]+'
+
+---
+
+(source_file
+  (expression_statement
+    (regex_find_expression
+      subject: (identifier)
+      pattern: (string_literal))))
+
+==================
+Regex match with string pattern
+==================
+
+s ==~ '^abc$'
+
+---
+
+(source_file
+  (expression_statement
+    (regex_match_expression
+      subject: (identifier)
+      pattern: (string_literal))))
+
+==================
+Find vs match are distinct node kinds
+==================
+
+x =~ p
+
+---
+
+(source_file
+  (expression_statement
+    (regex_find_expression
+      subject: (identifier)
+      pattern: (identifier))))
+
+==================
+Regex match is one token, not equality plus complement
+==================
+
+a ==~ b
+
+---
+
+(source_file
+  (expression_statement
+    (regex_match_expression
+      subject: (identifier)
+      pattern: (identifier))))
+
+==================
+Equality plus unary complement with intervening space
+==================
+
+a == ~b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (identifier)))))

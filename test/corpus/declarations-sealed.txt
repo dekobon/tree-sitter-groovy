@@ -1,0 +1,72 @@
+==================
+Sealed class
+==================
+
+sealed class Shape { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Sealed class with permits
+==================
+
+sealed class Shape permits Circle, Square { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Non-sealed class
+==================
+
+non-sealed class Circle { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Sealed interface
+==================
+
+sealed interface I permits A, B { }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Sealed trait
+==================
+
+sealed trait T permits A { }
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body)))

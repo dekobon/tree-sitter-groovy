@@ -1,0 +1,74 @@
+==================
+Record no components
+==================
+
+record R()
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components)))
+
+==================
+Record with one component
+==================
+
+record Point(int x)
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))))
+
+==================
+Record with multiple components
+==================
+
+record Point(int x, int y)
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier))
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))))
+
+==================
+Record with body
+==================
+
+record Point(int x, int y) {
+    def manhattan() { x }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier))
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (identifier)))))))

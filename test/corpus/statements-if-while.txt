@@ -1,0 +1,153 @@
+==================
+If statement with block
+==================
+
+if (x) { foo }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement (identifier)))))
+
+==================
+If statement with single statement body
+==================
+
+if (x) foo
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement (identifier))))
+
+==================
+If else
+==================
+
+if (x) { foo } else { bar }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement (identifier)))
+    alternative: (block
+      (expression_statement (identifier)))))
+
+==================
+If else with single statement branches
+==================
+
+if (x) foo else bar
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement (identifier))
+    alternative: (expression_statement (identifier))))
+
+==================
+If else if else chain
+==================
+
+if (a) x else if (b) y else z
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement (identifier))
+    alternative: (if_statement
+      condition: (identifier)
+      consequence: (expression_statement (identifier))
+      alternative: (expression_statement (identifier)))))
+
+==================
+If with complex condition
+==================
+
+if (a < b && c) foo
+
+---
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))
+    consequence: (expression_statement (identifier))))
+
+==================
+While loop with block
+==================
+
+while (cond) { body }
+
+---
+
+(source_file
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+While loop with single statement body
+==================
+
+while (cond) action
+
+---
+
+(source_file
+  (while_statement
+    condition: (identifier)
+    body: (expression_statement (identifier))))
+
+==================
+While with method call as condition
+==================
+
+while (iter.hasNext()) consume()
+
+---
+
+(source_file
+  (while_statement
+    condition: (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list))
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+Nested if inside while
+==================
+
+while (a) { if (b) c }
+
+---
+
+(source_file
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (expression_statement (identifier))))))

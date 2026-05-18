@@ -1,0 +1,41 @@
+==================
+Direct field access
+==================
+
+obj.@field
+
+---
+
+(source_file
+  (expression_statement
+    (direct_field_access_expression
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Direct field access bypasses getter
+==================
+
+bean.@property
+
+---
+
+(source_file
+  (expression_statement
+    (direct_field_access_expression
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Direct field access distinguished from regular dot
+==================
+
+obj.field
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))

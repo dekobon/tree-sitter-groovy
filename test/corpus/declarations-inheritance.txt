@@ -1,0 +1,130 @@
+==================
+Class extends superclass
+==================
+
+class Sub extends Super { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Class implements single interface
+==================
+
+class Foo implements Comparable { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (super_interfaces
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Class implements multiple interfaces
+==================
+
+class Foo implements A, B, C { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (super_interfaces
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Class extends and implements
+==================
+
+class Sub extends Super implements I, J { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    (super_interfaces
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Interface extends multiple
+==================
+
+interface I extends A, B { }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    (extends_interfaces
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Trait extends single interface
+==================
+
+trait T extends Other { }
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    (extends_interfaces
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Sealed class permits with extends
+==================
+
+sealed class S extends Base permits A, B { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    (permits_clause
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Public abstract class with extends
+==================
+
+public abstract class A extends B implements I { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    (super_interfaces
+      (type_identifier))
+    body: (class_body)))

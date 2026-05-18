@@ -1,0 +1,97 @@
+==================
+Postfix increment
+==================
+
+x++
+
+---
+
+(source_file
+  (expression_statement
+    (update_expression
+      operand: (identifier))))
+
+==================
+Postfix decrement
+==================
+
+x--
+
+---
+
+(source_file
+  (expression_statement
+    (update_expression
+      operand: (identifier))))
+
+==================
+Prefix increment
+==================
+
+++x
+
+---
+
+(source_file
+  (expression_statement
+    (unary_update_expression
+      operand: (identifier))))
+
+==================
+Prefix decrement
+==================
+
+--x
+
+---
+
+(source_file
+  (expression_statement
+    (unary_update_expression
+      operand: (identifier))))
+
+==================
+Postfix increment on subscript
+==================
+
+a[i]++
+
+---
+
+(source_file
+  (expression_statement
+    (update_expression
+      operand: (subscript_expression
+        object: (identifier)
+        index: (identifier)))))
+
+==================
+Postfix increment combined with binary
+==================
+
+x++ + y
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (update_expression
+        operand: (identifier))
+      right: (identifier))))
+
+==================
+Postfix increment passed as argument
+==================
+
+f(i++)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (update_expression
+          operand: (identifier))))))

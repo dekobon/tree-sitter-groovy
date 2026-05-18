@@ -1,0 +1,121 @@
+==================
+Public class
+==================
+
+public class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Abstract class
+==================
+
+abstract class Shape { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Public final class
+==================
+
+public final class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Static def method
+==================
+
+class C {
+    static def helper() { 1 }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (number_literal)))))))
+
+==================
+Private final method with type
+==================
+
+class C {
+    private final String name() { 'x' }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (string_literal)))))))
+
+==================
+Public static void main
+==================
+
+public static void main(String[] args) { foo(args) }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (array_type
+          (type_identifier))
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier)))))))
+
+==================
+Modifiers after annotations
+==================
+
+@Override
+public final String toString() { name }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name (identifier)))
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement (identifier)))))

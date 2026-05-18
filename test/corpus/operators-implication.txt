@@ -1,0 +1,57 @@
+==================
+Logical implication
+==================
+
+a ==> b
+
+---
+
+(source_file
+  (expression_statement
+    (logical_implication_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Implication right-associative chain
+==================
+
+a ==> b ==> c
+
+---
+
+(source_file
+  (expression_statement
+    (logical_implication_expression
+      left: (identifier)
+      right: (logical_implication_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Implication distinguished from identity
+==================
+
+a === b
+
+---
+
+(source_file
+  (expression_statement
+    (identity_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Implication distinguished from regex match
+==================
+
+a ==~ b
+
+---
+
+(source_file
+  (expression_statement
+    (regex_match_expression
+      subject: (identifier)
+      pattern: (identifier))))

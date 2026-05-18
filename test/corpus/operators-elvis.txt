@@ -1,0 +1,75 @@
+==================
+Elvis at top level
+==================
+
+a ?: b
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (identifier))))
+
+==================
+Elvis with literals
+==================
+
+x ?: 0
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (number_literal))))
+
+==================
+Elvis right-associative chain (dekobon #246 anchor)
+==================
+
+a ?: b ?: c
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (elvis_expression
+        value: (identifier)
+        default: (identifier)))))
+
+==================
+Elvis longer chain
+==================
+
+a ?: b ?: c ?: d
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (elvis_expression
+        value: (identifier)
+        default: (elvis_expression
+          value: (identifier)
+          default: (identifier))))))
+
+==================
+Elvis inside list literal
+==================
+
+[a ?: b, c ?: d]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (elvis_expression value: (identifier) default: (identifier))
+      (elvis_expression value: (identifier) default: (identifier)))))

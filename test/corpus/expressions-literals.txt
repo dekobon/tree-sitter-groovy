@@ -1,0 +1,54 @@
+==================
+Boolean true
+==================
+
+true
+
+---
+
+(source_file
+  (expression_statement (boolean_literal)))
+
+==================
+Boolean false
+==================
+
+false
+
+---
+
+(source_file
+  (expression_statement (boolean_literal)))
+
+==================
+Null
+==================
+
+null
+
+---
+
+(source_file
+  (expression_statement (null_literal)))
+
+==================
+Identifier resembling keyword prefix
+==================
+
+trueish
+
+---
+
+(source_file
+  (expression_statement (identifier)))
+
+==================
+Identifier resembling null prefix
+==================
+
+nullable
+
+---
+
+(source_file
+  (expression_statement (identifier)))

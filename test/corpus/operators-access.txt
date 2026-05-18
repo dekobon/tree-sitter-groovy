@@ -1,0 +1,61 @@
+==================
+Plain field access
+==================
+
+obj.field
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Chained field access
+==================
+
+a.b.c
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))))
+
+==================
+Method call via field access
+==================
+
+obj.method()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+Method call with args via field access
+==================
+
+obj.method(arg)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list (identifier)))))

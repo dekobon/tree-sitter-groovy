@@ -1,0 +1,211 @@
+; Per-issue regression corpus per SPECIFICATION.md §8.2. Every
+; closed bug from the source-grammar projects gets one pinned
+; S-expression here so a future grammar edit that breaks the
+; closure surfaces as a single localised test failure.
+;
+; Cross-reference notes:
+; - The murtaza64 #5 (juxt_function_call) anchor is pending: it
+;   requires command-chain support which is not yet implemented.
+
+==================
+murtaza64 #16 empty groovydoc and block comment
+==================
+
+/**/
+def a = 1
+/***/
+def b = 2
+/* */
+def c = 3
+
+---
+
+(source_file
+  (groovydoc_comment)
+  (local_variable_declaration
+    (variable_declarator name: (identifier) value: (number_literal)))
+  (groovydoc_comment)
+  (local_variable_declaration
+    (variable_declarator name: (identifier) value: (number_literal)))
+  (block_comment)
+  (local_variable_declaration
+    (variable_declarator name: (identifier) value: (number_literal))))
+
+==================
+murtaza64 #22 multi-assignment
+==================
+
+def (a, b) = [1, 2]
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator name: (identifier))
+    (variable_declarator name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (number_literal))))
+
+==================
+murtaza64 #36 enum and arrow switch
+==================
+
+enum Color { R, G, B }
+
+def toS(c) {
+    switch (c) {
+        case Color.R -> 'r'
+        case Color.G -> 'g'
+        case Color.B -> 'b'
+    }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter name: (identifier)))
+    body: (block
+      (expression_statement
+        (switch_expression
+          value: (identifier)
+          body: (switch_block
+            (switch_arrow_case
+              value: (field_access
+                object: (identifier)
+                field: (identifier))
+              body: (expression_statement (string_literal)))
+            (switch_arrow_case
+              value: (field_access
+                object: (identifier)
+                field: (identifier))
+              body: (expression_statement (string_literal)))
+            (switch_arrow_case
+              value: (field_access
+                object: (identifier)
+                field: (identifier))
+              body: (expression_statement (string_literal)))))))))
+
+==================
+murtaza64 #37 pipeline followed by definition
+==================
+
+pipeline {}
+def foo = 5
+
+---
+
+(source_file
+  (pipeline_statement
+    body: (closure))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+murtaza64 #39 multi-catch
+==================
+
+try {
+    risky()
+} catch (IOException | RuntimeException e) {
+    handle(e)
+}
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (multi_type
+          (type_identifier)
+          (type_identifier))
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list (identifier))))))))
+
+==================
+dekobon 246 elvis as elvis_expression not ternary
+==================
+
+def pick(a, b, c) {
+    return a ?: b ?: c
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter name: (identifier))
+      (formal_parameter name: (identifier))
+      (formal_parameter name: (identifier)))
+    body: (block
+      (return_statement
+        (elvis_expression
+          value: (identifier)
+          default: (elvis_expression
+            value: (identifier)
+            default: (identifier)))))))
+
+==================
+dekobon 247 trait declaration
+==================
+
+trait Greeter {
+    def greet() {
+        "hello"
+    }
+}
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (string_literal)))))))
+
+==================
+dekobon 247 exclusive range
+==================
+
+for (i in 0..<n) { f(i) }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (range_expression
+      start: (number_literal)
+      end: (identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier)))))))

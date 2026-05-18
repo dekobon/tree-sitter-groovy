@@ -1,0 +1,93 @@
+==================
+Bare pipeline block
+==================
+
+pipeline { }
+
+---
+
+(source_file
+  (pipeline_statement
+    body: (closure)))
+
+==================
+Pipeline followed by def (murtaza64 #37 anchor)
+==================
+
+pipeline {}
+def foo = 5
+
+---
+
+(source_file
+  (pipeline_statement
+    body: (closure))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+Pipeline with parenthesised body content
+==================
+
+pipeline {
+    agent(any)
+    stages({
+        stage('build', {
+            steps({ sh('make') })
+        })
+    })
+}
+
+---
+
+(source_file
+  (pipeline_statement
+    body: (closure
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier))))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (closure
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list
+                    (string_literal)
+                    (closure
+                      (expression_statement
+                        (method_invocation
+                          function: (identifier)
+                          arguments: (argument_list
+                            (closure
+                              (expression_statement
+                                (method_invocation
+                                  function: (identifier)
+                                  arguments: (argument_list (string_literal)))))))))))))))))))
+
+==================
+Pipeline between other statements
+==================
+
+def before = 1
+pipeline { }
+def after = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (pipeline_statement
+    body: (closure))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))

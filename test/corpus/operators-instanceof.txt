@@ -1,0 +1,60 @@
+==================
+instanceof on identifier
+==================
+
+x instanceof String
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier))))
+
+==================
+not-instanceof
+==================
+
+x !instanceof String
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier))))
+
+==================
+instanceof in conditional
+==================
+
+x instanceof Foo ? a : b
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (instanceof_expression
+        value: (identifier)
+        type: (type_identifier))
+      consequence: (identifier)
+      alternative: (identifier))))
+
+==================
+instanceof on field access
+==================
+
+obj.field instanceof Number
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (field_access
+        object: (identifier)
+        field: (identifier))
+      type: (type_identifier))))

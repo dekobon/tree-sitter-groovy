@@ -1,0 +1,224 @@
+==================
+Method with throws clause
+==================
+
+def risky() throws IOException { foo() }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    (throws_clause
+      (type_identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+Method with multi-throw
+==================
+
+def risky() throws IOException, SQLException { foo() }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    (throws_clause
+      (type_identifier)
+      (type_identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+Parameter with default value
+==================
+
+def greet(name = 'world') { name }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)
+        default: (string_literal)))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Parameter with type and default
+==================
+
+def f(String s = 'hi') { s }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)
+        default: (string_literal)))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Mixed positional and defaulted parameters
+==================
+
+def f(a, b = 2, c = 3) { a }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter name: (identifier))
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal))
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal)))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Varargs parameter
+==================
+
+def collect(String... args) { args }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (varargs_type
+          (type_identifier))
+        name: (identifier)))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Method with throws and varargs
+==================
+
+def fmt(String fmt, Object... args) throws Exception { fmt }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        type: (varargs_type
+          (type_identifier))
+        name: (identifier)))
+    (throws_clause
+      (type_identifier))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Typed return method
+==================
+
+String greet() { 'hi' }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement (string_literal)))))
+
+==================
+Typed return with typed parameters
+==================
+
+int add(int a, int b) { a + b }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter type: (type_identifier) name: (identifier))
+      (formal_parameter type: (type_identifier) name: (identifier)))
+    body: (block
+      (expression_statement
+        (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+Typed-return abstract method (no body)
+==================
+
+interface I {
+    String name()
+    int count()
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+Typed-return method with throws
+==================
+
+void doIt() throws Exception { foo() }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    (throws_clause
+      (type_identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))

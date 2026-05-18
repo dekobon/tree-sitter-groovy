@@ -1,0 +1,122 @@
+==================
+Empty closure
+==================
+
+{ }
+
+---
+
+(source_file
+  (expression_statement (closure)))
+
+==================
+Closure with single statement body
+==================
+
+{ x }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (expression_statement (identifier)))))
+
+==================
+Closure with explicit empty parameter list
+==================
+
+{ -> }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters))))
+
+==================
+Closure with one parameter
+==================
+
+{ a -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter name: (identifier)))
+      (expression_statement (identifier)))))
+
+==================
+Closure with multiple parameters
+==================
+
+{ a, b, c -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter name: (identifier))
+        (closure_parameter name: (identifier))
+        (closure_parameter name: (identifier)))
+      (expression_statement (identifier)))))
+
+==================
+Closure with multiple statements in body
+==================
+
+{ a b c }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (expression_statement (identifier))
+      (expression_statement (identifier))
+      (expression_statement (identifier)))))
+
+==================
+Closure as list element
+==================
+
+[{ a -> a }, { b -> b }]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (closure
+        (closure_parameters
+          (closure_parameter name: (identifier)))
+        (expression_statement (identifier)))
+      (closure
+        (closure_parameters
+          (closure_parameter name: (identifier)))
+        (expression_statement (identifier))))))
+
+==================
+Nested closure
+==================
+
+{ a -> { b -> a } }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter name: (identifier)))
+      (expression_statement
+        (closure
+          (closure_parameters
+            (closure_parameter name: (identifier)))
+          (expression_statement (identifier)))))))

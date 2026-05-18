@@ -1,0 +1,114 @@
+; Apache precedence tiebreaks per SPECIFICATION.md §8.1.
+; Each case below pins the cross-tier parse where two operators
+; with the same level (or adjacent levels) compete.
+
+==================
+Range and shift share the same level — left assoc wins
+==================
+
+0..n<<1
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (range_expression
+        start: (number_literal)
+        end: (identifier))
+      right: (number_literal))))
+
+==================
+Ternary and Elvis share the conditional level
+==================
+
+a ? b ?: c : d
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (elvis_expression
+        value: (identifier)
+        default: (identifier))
+      alternative: (identifier))))
+
+==================
+Elvis is right-associative
+==================
+
+a ?: b ?: c
+
+---
+
+(source_file
+  (expression_statement
+    (elvis_expression
+      value: (identifier)
+      default: (elvis_expression
+        value: (identifier)
+        default: (identifier)))))
+
+==================
+Logical implication is right-associative
+==================
+
+a ==> b ==> c
+
+---
+
+(source_file
+  (expression_statement
+    (logical_implication_expression
+      left: (identifier)
+      right: (logical_implication_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Power is right-associative
+==================
+
+1 ** 2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (number_literal)
+      right: (power_expression
+        left: (number_literal)
+        right: (number_literal)))))
+
+==================
+Unary plus and minus are looser than power
+==================
+
+-2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (power_expression
+        left: (number_literal)
+        right: (number_literal)))))
+
+==================
+Bitwise complement is tighter than power
+==================
+
+~2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (unary_expression
+        operand: (number_literal))
+      right: (number_literal))))

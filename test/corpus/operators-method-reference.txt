@@ -1,0 +1,59 @@
+==================
+Method reference on class
+==================
+
+String::length
+
+---
+
+(source_file
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier))))
+
+==================
+Method reference on instance
+==================
+
+obj::method
+
+---
+
+(source_file
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier))))
+
+==================
+Constructor reference
+==================
+
+Foo::new
+
+---
+
+(source_file
+  (expression_statement
+    (method_reference_expression
+      target: (identifier))))
+
+==================
+Method reference passed as argument
+==================
+
+list.stream(String::length)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (method_reference_expression
+          target: (identifier)
+          name: (identifier))))))

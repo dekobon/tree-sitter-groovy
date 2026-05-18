@@ -1,0 +1,183 @@
+==================
+def variable with initializer
+==================
+
+def x = 5
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+var variable with initializer
+==================
+
+var y = 'hello'
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal))))
+
+==================
+def with no initializer
+==================
+
+def x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier))))
+
+==================
+def multiple variables on one line
+==================
+
+def a = 1, b = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+def with expression initializer
+==================
+
+def total = a + b * c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (identifier)
+        right: (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+def with closure initializer
+==================
+
+def f = { x -> x }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter name: (identifier)))
+        (expression_statement (identifier))))))
+
+==================
+Multi-assignment (murtaza64 #22 anchor)
+==================
+
+def (a, b) = [1, 2]
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator name: (identifier))
+    (variable_declarator name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (number_literal))))
+
+==================
+Multi-assignment three variables
+==================
+
+def (a, b, c) = source
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator name: (identifier))
+    (variable_declarator name: (identifier))
+    (variable_declarator name: (identifier))
+    value: (identifier)))
+
+==================
+Typed local variable declaration
+==================
+
+String name = 'Groovy'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+Typed local variable with integer
+==================
+
+int count = 42
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Typed local variable with expression init
+==================
+
+long total = a + b
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Typed multi-declarator
+==================
+
+int x = 1, y = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)
+    name: (identifier)
+    value: (number_literal)))

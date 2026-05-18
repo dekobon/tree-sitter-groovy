@@ -1,0 +1,107 @@
+==================
+Unary minus on identifier
+==================
+
+-x
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
+Unary plus on number
+==================
+
++42
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (number_literal))))
+
+==================
+Logical not on boolean
+==================
+
+!true
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (boolean_literal))))
+
+==================
+Bitwise complement
+==================
+
+~0xFF
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (number_literal))))
+
+==================
+Stacked unary operators
+==================
+
+!~x
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (unary_expression
+        operand: (identifier)))))
+
+==================
+Parenthesised identifier
+==================
+
+(x)
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
+
+==================
+Parenthesised unary
+==================
+
+(-x)
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (unary_expression
+        operand: (identifier)))))
+
+==================
+Nested parens
+==================
+
+(((x)))
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (parenthesized_expression
+        (parenthesized_expression
+          (identifier))))))

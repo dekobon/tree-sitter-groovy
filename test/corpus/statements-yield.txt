@@ -1,0 +1,65 @@
+==================
+Yield in switch arrow case
+==================
+
+switch (x) {
+    case 1 -> yield 'one'
+    default -> yield 'other'
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (yield_statement (string_literal)))
+        (switch_default
+          body: (yield_statement (string_literal)))))))
+
+==================
+Yield in classic case
+==================
+
+switch (x) {
+    case 1: yield 1
+    default: yield 0
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (yield_statement (number_literal)))
+        (switch_default
+          (yield_statement (number_literal)))))))
+
+==================
+Yield with expression
+==================
+
+switch (x) {
+    case 1 -> yield a + b
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (yield_statement
+            (binary_expression
+              left: (identifier)
+              right: (identifier))))))))

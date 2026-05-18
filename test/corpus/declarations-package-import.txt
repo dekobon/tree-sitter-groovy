@@ -1,0 +1,135 @@
+==================
+Package declaration
+==================
+
+package com.example
+
+---
+
+(source_file
+  (package_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier))))
+
+==================
+Single import
+==================
+
+import java.util.List
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Wildcard import
+==================
+
+import java.util.*
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier))))
+
+==================
+Static import
+==================
+
+import static java.util.Arrays.asList
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Static wildcard import
+==================
+
+import static java.lang.Math.*
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Aliased import
+==================
+
+import com.foo.Bar as Baz
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier))
+    alias: (identifier)))
+
+==================
+Multiple imports
+==================
+
+import java.util.List
+import java.util.Map
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier)))
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier))))
+
+==================
+Package and import
+==================
+
+package com.example
+import java.util.List
+
+class Foo { }
+
+---
+
+(source_file
+  (package_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)))
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier)))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))

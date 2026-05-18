@@ -1,0 +1,73 @@
+==================
+Quoted identifier after dot
+==================
+
+map."key with spaces"
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (quoted_identifier))))
+
+==================
+Quoted identifier after safe nav
+==================
+
+map?."hello world"
+
+---
+
+(source_file
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (quoted_identifier))))
+
+==================
+Quoted method name in declaration
+==================
+
+def "test name"() { true }
+
+---
+
+(source_file
+  (method_declaration
+    name: (quoted_identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement (boolean_literal)))))
+
+==================
+Quoted method named like a keyword (Spock-style)
+==================
+
+def "abstract"() { 1 }
+
+---
+
+(source_file
+  (method_declaration
+    name: (quoted_identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement (number_literal)))))
+
+==================
+Quoted method call via field access
+==================
+
+obj."some method"()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (quoted_identifier))
+      arguments: (argument_list))))

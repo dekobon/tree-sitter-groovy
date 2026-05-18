@@ -1,0 +1,242 @@
+==================
+Plain assignment
+==================
+
+a = b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Add-assign
+==================
+
+a += 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Subtract-assign
+==================
+
+a -= 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Multiply-assign
+==================
+
+a *= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Divide-assign
+==================
+
+a /= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Modulo-assign
+==================
+
+a %= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Power-assign
+==================
+
+a **= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Shift-left assign
+==================
+
+a <<= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Shift-right assign
+==================
+
+a >>= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Shift-right unsigned assign
+==================
+
+a >>>= 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Bitwise AND assign
+==================
+
+a &= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bitwise XOR assign
+==================
+
+a ^= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bitwise OR assign
+==================
+
+a |= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Elvis assign
+==================
+
+a ?= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Assignment is right-associative
+==================
+
+a = b = c
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (assignment_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Assignment is looser than ternary
+==================
+
+a = b ? c : d
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (identifier)
+        consequence: (identifier)
+        alternative: (identifier)))))
+
+==================
+Plus-assign disambiguates from plus
+==================
+
+a + b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))

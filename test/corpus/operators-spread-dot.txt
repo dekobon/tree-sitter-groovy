@@ -1,0 +1,45 @@
+==================
+Spread dot single
+==================
+
+items*.size
+
+---
+
+(source_file
+  (expression_statement
+    (spread_dot_expression
+      object: (identifier)
+      property: (identifier))))
+
+==================
+Spread dot method call
+==================
+
+items*.size()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (spread_dot_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list))))
+
+==================
+Spread dot chained with regular dot
+==================
+
+list*.foo.bar
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (spread_dot_expression
+        object: (identifier)
+        property: (identifier))
+      field: (identifier))))

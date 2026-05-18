@@ -1,0 +1,182 @@
+==================
+Empty list
+==================
+
+[]
+
+---
+
+(source_file
+  (expression_statement (list_literal)))
+
+==================
+Single-element list
+==================
+
+[1]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal (number_literal))))
+
+==================
+Multi-element list
+==================
+
+[1, 2, 3]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (number_literal)
+      (number_literal)
+      (number_literal))))
+
+==================
+List with trailing comma
+==================
+
+[1, 2,]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (number_literal)
+      (number_literal))))
+
+==================
+List of mixed expressions
+==================
+
+[1, 'two', null, true]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (number_literal)
+      (string_literal)
+      (null_literal)
+      (boolean_literal))))
+
+==================
+Nested list
+==================
+
+[[1, 2], [3, 4]]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (list_literal (number_literal) (number_literal))
+      (list_literal (number_literal) (number_literal)))))
+
+==================
+Empty map
+==================
+
+[:]
+
+---
+
+(source_file
+  (expression_statement (map_literal)))
+
+==================
+Single-entry map
+==================
+
+[a: 1]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (map_entry
+        key: (identifier)
+        value: (number_literal)))))
+
+==================
+Multi-entry map
+==================
+
+[a: 1, b: 2, c: 3]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (map_entry key: (identifier) value: (number_literal))
+      (map_entry key: (identifier) value: (number_literal))
+      (map_entry key: (identifier) value: (number_literal)))))
+
+==================
+Map with trailing comma
+==================
+
+[a: 1, b: 2,]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (map_entry key: (identifier) value: (number_literal))
+      (map_entry key: (identifier) value: (number_literal)))))
+
+==================
+Map with string keys
+==================
+
+['a': 1, 'b': 2]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (map_entry key: (string_literal) value: (number_literal))
+      (map_entry key: (string_literal) value: (number_literal)))))
+
+==================
+Nested map
+==================
+
+[outer: [inner: 1]]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (map_entry
+        key: (identifier)
+        value: (map_literal
+          (map_entry
+            key: (identifier)
+            value: (number_literal)))))))
+
+==================
+List containing map
+==================
+
+[[a: 1], [b: 2]]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (map_literal (map_entry key: (identifier) value: (number_literal)))
+      (map_literal (map_entry key: (identifier) value: (number_literal))))))

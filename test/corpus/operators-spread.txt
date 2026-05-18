@@ -1,0 +1,92 @@
+==================
+Spread arguments single
+==================
+
+f(*args)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (spread_arguments value: (identifier))))))
+
+==================
+Spread arguments mixed with positional
+==================
+
+f(a, *rest)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (spread_arguments value: (identifier))))))
+
+==================
+Spread arguments with list literal value
+==================
+
+f(*[1, 2, 3])
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (spread_arguments
+          value: (list_literal
+            (number_literal)
+            (number_literal)
+            (number_literal)))))))
+
+==================
+Spread map entry single
+==================
+
+[*: other]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (spread_map_entry value: (identifier)))))
+
+==================
+Spread map entry mixed with regular entries
+==================
+
+[*: defaults, key: value]
+
+---
+
+(source_file
+  (expression_statement
+    (map_literal
+      (spread_map_entry value: (identifier))
+      (map_entry key: (identifier) value: (identifier)))))
+
+==================
+Spread dot is still distinct
+==================
+
+items*.size()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (spread_dot_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list))))

@@ -1,0 +1,141 @@
+==================
+Empty class
+==================
+
+class Foo { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Class with one method
+==================
+
+class Foo {
+    def greet() { 'hello' }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (string_literal)))))))
+
+==================
+Class with method taking parameters
+==================
+
+class Calc {
+    def add(a, b) { a }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter name: (identifier))
+          (formal_parameter name: (identifier)))
+        body: (block
+          (expression_statement (identifier)))))))
+
+==================
+Class with typed parameters
+==================
+
+class Greeter {
+    def hi(String name) { name }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement (identifier)))))))
+
+==================
+Empty interface
+==================
+
+interface I { }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Trait with method (dekobon #247 anchor)
+==================
+
+trait Greeter {
+    def greet() {
+        "hello"
+    }
+}
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement (string_literal)))))))
+
+==================
+Class with multiple methods
+==================
+
+class Foo {
+    def a() { 1 }
+    def b() { 2 }
+    def c() { 3 }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal)))))))

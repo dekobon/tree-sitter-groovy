@@ -1,0 +1,78 @@
+==================
+Member of collection
+==================
+
+x in xs
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier))))
+
+==================
+Not in collection
+==================
+
+x !in xs
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier))))
+
+==================
+In with list literal
+==================
+
+x in [1, 2, 3]
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (list_literal
+        (number_literal)
+        (number_literal)
+        (number_literal)))))
+
+==================
+Not-in with list literal
+==================
+
+x !in [1, 2, 3]
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (list_literal
+        (number_literal)
+        (number_literal)
+        (number_literal)))))
+
+==================
+Membership in conditional
+==================
+
+x in xs ? a : b
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (membership_expression
+        element: (identifier)
+        collection: (identifier))
+      consequence: (identifier)
+      alternative: (identifier))))

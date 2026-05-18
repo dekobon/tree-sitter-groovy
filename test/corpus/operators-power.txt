@@ -1,0 +1,118 @@
+==================
+Power on identifiers
+==================
+
+a ** b
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Power on number literals
+==================
+
+2 ** 8
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (number_literal)
+      right: (number_literal))))
+
+==================
+Power right-associative chain
+==================
+
+1 ** 2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (number_literal)
+      right: (power_expression
+        left: (number_literal)
+        right: (number_literal)))))
+
+==================
+Unary minus is looser than power
+==================
+
+-2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (unary_expression
+      operand: (power_expression
+        left: (number_literal)
+        right: (number_literal)))))
+
+==================
+Bitwise complement is tighter than power
+==================
+
+~2 ** 3
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (unary_expression
+        operand: (number_literal))
+      right: (number_literal))))
+
+==================
+Logical not is tighter than power
+==================
+
+!a ** b
+
+---
+
+(source_file
+  (expression_statement
+    (power_expression
+      left: (unary_expression
+        operand: (identifier))
+      right: (identifier))))
+
+==================
+Power is tighter than multiplicative
+==================
+
+a * b ** c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (power_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Power-assign is one token, not power then assign
+==================
+
+a **= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))

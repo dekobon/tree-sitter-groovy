@@ -1,0 +1,92 @@
+==================
+Command chain with string argument
+==================
+
+println 'hello'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)))
+
+==================
+Command chain with number
+==================
+
+retry 3
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
+
+==================
+Command chain with boolean
+==================
+
+enabled true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (boolean_literal)))
+
+==================
+Command chain with null
+==================
+
+reset null
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (null_literal)))
+
+==================
+Command chain with closure argument
+==================
+
+times { x }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (expression_statement (identifier)))))
+
+==================
+Subscript still parses as subscript
+==================
+
+arr[0]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal))))
+
+==================
+Two identifiers still parse as two statements
+==================
+
+foo
+bar
+
+---
+
+(source_file
+  (expression_statement (identifier))
+  (expression_statement (identifier)))

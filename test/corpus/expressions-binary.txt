@@ -1,0 +1,343 @@
+==================
+Shift left
+==================
+
+a << b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Shift right arithmetic
+==================
+
+a >> b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Shift right unsigned
+==================
+
+a >>> b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Less-than
+==================
+
+a < b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Less-or-equal
+==================
+
+a <= b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Greater-than
+==================
+
+a > b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Greater-or-equal
+==================
+
+a >= b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Equality
+==================
+
+a == b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Inequality
+==================
+
+a != b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bitwise AND
+==================
+
+a & b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bitwise XOR
+==================
+
+a ^ b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Bitwise OR
+==================
+
+a | b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Logical AND
+==================
+
+a && b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Logical OR
+==================
+
+a || b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Precedence: && binds tighter than ||
+==================
+
+a || b && c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Precedence: == binds tighter than &&
+==================
+
+a == b && c == d
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Precedence: shift binds looser than additive
+==================
+
+a + b << c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Precedence: < binds looser than shift
+==================
+
+a << b < c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Precedence: == binds looser than <
+==================
+
+a < b == c < d
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Precedence: & looser than ==
+==================
+
+a == b & c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Precedence: ^ looser than &
+==================
+
+a & b ^ c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Precedence: | looser than ^
+==================
+
+a ^ b | c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Precedence: && looser than |
+==================
+
+a | b && c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))

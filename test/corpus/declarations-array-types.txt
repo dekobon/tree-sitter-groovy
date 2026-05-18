@@ -1,0 +1,81 @@
+==================
+Array-typed local variable
+==================
+
+int[] xs = empty
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier)
+    value: (identifier)))
+
+==================
+Two-dimensional array type
+==================
+
+String[][] grid = none
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (array_type
+      (array_type
+        (type_identifier)))
+    name: (identifier)
+    value: (identifier)))
+
+==================
+Array type in method parameter
+==================
+
+def first(int[] xs) { xs }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (array_type
+          (type_identifier))
+        name: (identifier)))
+    body: (block
+      (expression_statement (identifier)))))
+
+==================
+Array type in cast
+==================
+
+(int[]) x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (array_type
+        (type_identifier))
+      value: (identifier))))
+
+==================
+Array typed return method
+==================
+
+String[] names() { x }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (array_type
+      (type_identifier))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement (identifier)))))

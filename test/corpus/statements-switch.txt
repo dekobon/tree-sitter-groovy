@@ -1,0 +1,160 @@
+==================
+Classic switch with one case
+==================
+
+switch (x) { case 1: foo }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement (identifier)))))))
+
+==================
+Classic switch with default
+==================
+
+switch (x) { case 1: foo default: bar }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement (identifier)))
+        (switch_default
+          (expression_statement (identifier)))))))
+
+==================
+Arrow switch single case
+==================
+
+switch (x) { case 1 -> foo }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (expression_statement (identifier)))))))
+
+==================
+Arrow switch multiple cases
+==================
+
+switch (c) {
+    case 'a' -> 1
+    case 'b' -> 2
+    case 'c' -> 3
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (string_literal)
+          body: (expression_statement (number_literal)))
+        (switch_arrow_case
+          value: (string_literal)
+          body: (expression_statement (number_literal)))
+        (switch_arrow_case
+          value: (string_literal)
+          body: (expression_statement (number_literal)))))))
+
+==================
+Arrow switch with block body
+==================
+
+switch (x) { case 1 -> { a() } }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (block
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list)))))))))
+
+==================
+Arrow switch with default
+==================
+
+switch (x) { case 1 -> a default -> b }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (expression_statement (identifier)))
+        (switch_default
+          body: (expression_statement (identifier)))))))
+
+==================
+Empty switch body
+==================
+
+switch (x) { }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block))))
+
+==================
+Switch with field-access case value (murtaza64 #36 anchor shape)
+==================
+
+switch (c) {
+    case Color.R -> 'r'
+    case Color.G -> 'g'
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (field_access
+            object: (identifier)
+            field: (identifier))
+          body: (expression_statement (string_literal)))
+        (switch_arrow_case
+          value: (field_access
+            object: (identifier)
+            field: (identifier))
+          body: (expression_statement (string_literal)))))))

@@ -1,0 +1,82 @@
+==================
+Empty enum
+==================
+
+enum E { }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body)))
+
+==================
+Enum with constants
+==================
+
+enum Color { R, G, B }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier)))))
+
+==================
+Enum with trailing comma
+==================
+
+enum Color { R, G, B, }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier)))))
+
+==================
+Enum constants with constructor args
+==================
+
+enum Code { RED(0xff0000), GREEN(0x00ff00) }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (number_literal))))))
+
+==================
+Enum with methods after semicolon
+==================
+
+enum E { A, B; def f() { 1 } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal)))))))

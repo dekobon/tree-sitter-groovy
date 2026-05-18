@@ -1,0 +1,152 @@
+==================
+Basic subscript
+==================
+
+arr[0]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal))))
+
+==================
+Subscript with identifier index
+==================
+
+m[key]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (identifier))))
+
+==================
+Subscript with string index
+==================
+
+m['key']
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (string_literal))))
+
+==================
+Chained subscript
+==================
+
+m[i][j]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      index: (identifier))))
+
+==================
+Subscript with expression index
+==================
+
+a[i + 1]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (binary_expression
+        left: (identifier)
+        right: (number_literal)))))
+
+==================
+Safe subscript on identifier
+==================
+
+arr?[0]
+
+---
+
+(source_file
+  (expression_statement
+    (safe_subscript_expression
+      object: (identifier)
+      index: (number_literal))))
+
+==================
+Chained safe subscript
+==================
+
+m?[i]?[j]
+
+---
+
+(source_file
+  (expression_statement
+    (safe_subscript_expression
+      object: (safe_subscript_expression
+        object: (identifier)
+        index: (identifier))
+      index: (identifier))))
+
+==================
+Mixed safe and regular subscript
+==================
+
+m[i]?[j]
+
+---
+
+(source_file
+  (expression_statement
+    (safe_subscript_expression
+      object: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      index: (identifier))))
+
+==================
+Ternary with list does not collide with safe subscript
+==================
+
+a ? [1, 2] : null
+
+---
+
+(source_file
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (list_literal
+        (number_literal)
+        (number_literal))
+      alternative: (null_literal))))
+
+==================
+Subscript binds tighter than additive
+==================
+
+a[i] + 1
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      right: (number_literal))))

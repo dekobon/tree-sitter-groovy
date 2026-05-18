@@ -1,0 +1,150 @@
+==================
+For-in with identifier collection
+==================
+
+for (x in xs) doIt()
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+For-in with list literal
+==================
+
+for (i in [1, 2, 3]) print(i)
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (list_literal
+      (number_literal)
+      (number_literal)
+      (number_literal))
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier))))))
+
+==================
+For-in with range
+==================
+
+for (i in 0..<n) f(i)
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (range_expression
+      start: (number_literal)
+      end: (identifier))
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier))))))
+
+==================
+For-in with block body
+==================
+
+for (item in items) { process(item) }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list (identifier)))))))
+
+==================
+C-style for with all parts
+==================
+
+for (i = 0; i < n; i++) f(i)
+
+---
+
+(source_file
+  (for_statement
+    init: (assignment_expression
+      left: (identifier)
+      right: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier))))))
+
+==================
+Infinite for loop
+==================
+
+for (;;) body()
+
+---
+
+(source_file
+  (for_statement
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+For loop with only condition
+==================
+
+for (; i < 10;) ++i
+
+---
+
+(source_file
+  (for_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    body: (expression_statement
+      (unary_update_expression
+        operand: (identifier)))))
+
+==================
+Nested for-in
+==================
+
+for (i in xs) for (j in ys) f(i, j)
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (for_in_statement
+      variable: (identifier)
+      value: (identifier)
+      body: (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))))))

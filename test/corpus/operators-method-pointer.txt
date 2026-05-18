@@ -1,0 +1,46 @@
+==================
+Method pointer single
+==================
+
+obj.&method
+
+---
+
+(source_file
+  (expression_statement
+    (method_pointer_expression
+      object: (identifier)
+      method: (identifier))))
+
+==================
+Method pointer chained
+==================
+
+a.&b
+
+---
+
+(source_file
+  (expression_statement
+    (method_pointer_expression
+      object: (identifier)
+      method: (identifier))))
+
+==================
+Method pointer passed as argument
+==================
+
+list.collect(obj.&method)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (method_pointer_expression
+          object: (identifier)
+          method: (identifier))))))

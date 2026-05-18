@@ -1,0 +1,199 @@
+==================
+Addition
+==================
+
+a + b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Subtraction
+==================
+
+a - b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Multiplication
+==================
+
+a * b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Division
+==================
+
+a / b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Modulo
+==================
+
+a % b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Left-assoc addition
+==================
+
+a + b + c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Left-assoc subtraction
+==================
+
+a - b - c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Mul binds tighter than add (precedence)
+==================
+
+a + b * c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Mul binds tighter than add — other side
+==================
+
+a * b + c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Mixed multiplicative left-assoc
+==================
+
+a * b / c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Parens override precedence
+==================
+
+(a + b) * c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (parenthesized_expression
+        (binary_expression
+          left: (identifier)
+          right: (identifier)))
+      right: (identifier))))
+
+==================
+Unary binds tighter than binary
+==================
+
+-a + b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (unary_expression
+        operand: (identifier))
+      right: (identifier))))
+
+==================
+Arithmetic on number literals
+==================
+
+1 + 2 * 3 - 4
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (number_literal)
+        right: (binary_expression
+          left: (number_literal)
+          right: (number_literal)))
+      right: (number_literal))))
