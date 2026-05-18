@@ -15,6 +15,9 @@ for every file.
 | `control_flow.groovy` | if/else, while, for-in, switch (classic + arrow), try-catch-finally with multi-catch |
 | `imports_and_package.groovy` | package, plain / static / wildcard / aliased imports |
 | `operators_grab_bag.groovy` | dot-family access, regex match / find, spaceship, identity, Elvis, ternary, range |
+| `generics.groovy` | `generic_type`, `type_arguments`, class / interface / trait `type_parameters`, method `method_type_parameters`, wildcards (`?`, `? extends`, `? super`), nested and qualified generic bases |
+| `jenkins_pipeline.groovy` | realistic Jenkinsfile shape — nested `pipeline { stages { stage(...) { steps { ... } } } }` closures, GString interpolation, named-argument command chains |
+| `gradle_buildscript.groovy` | Gradle DSL — `plugins { id '...' }`, `dependencies { implementation '...' }`, `tasks.named('test') { ... }`, configuration closures |
 
 Adding new stress files is encouraged — keep them syntactically
 valid Groovy that exercises constructs from `SPECIFICATION.md` §3

@@ -1,0 +1,352 @@
+==================
+Simple generic type in variable declaration
+==================
+
+List<String> items = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Generic type with multiple arguments
+==================
+
+Map<String, Integer> counts = [:]
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (type_identifier)))
+    name: (identifier)
+    value: (map_literal)))
+
+==================
+Nested generic type
+==================
+
+Map<String, List<Integer>> m = [:]
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))))
+    name: (identifier)
+    value: (map_literal)))
+
+==================
+Wildcard type argument
+==================
+
+List<?> any = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (wildcard)))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Bounded wildcard with extends
+==================
+
+List<? extends Number> nums = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (wildcard
+          (type_identifier))))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Bounded wildcard with super
+==================
+
+List<? super Integer> sup = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (wildcard
+          (type_identifier))))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Generic type with qualified base
+==================
+
+java.util.List<String> qual = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Generic type in parenthesized cast
+==================
+
+def x = (List<String>) obj
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        value: (identifier)))))
+
+==================
+Generic type in method return type
+==================
+
+List<String> greet() { return [] }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (list_literal)))))
+
+==================
+Generic type in formal parameter
+==================
+
+def f(List<String> items) { items }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Generic type as object creation type
+==================
+
+def x = new ArrayList<String>()
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        arguments: (argument_list)))))
+
+==================
+Class with single type parameter
+==================
+
+class Box<T> {}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    body: (class_body)))
+
+==================
+Class with bounded type parameter
+==================
+
+class Sorter<T extends Comparable<T>> {}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))))
+    body: (class_body)))
+
+==================
+Class with multiple type parameters
+==================
+
+class Pair<K, V> {}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier))
+      (type_parameter
+        name: (type_identifier)))
+    body: (class_body)))
+
+==================
+Interface with type parameter
+==================
+
+interface Holder<T> {}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    body: (class_body)))
+
+==================
+Trait with type parameter
+==================
+
+trait Boxable<T> {}
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    body: (class_body)))
+
+==================
+Method-level generic type parameter
+==================
+
+class Util {
+    static <T> T identity(T x) { x }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier)))))))
+
+==================
+Method-level multi-bound type parameter
+==================
+
+class Util {
+    static <T extends Number & Comparable> T pick(T a) { a }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)
+            (type_identifier)
+            (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier)))))))

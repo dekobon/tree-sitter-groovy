@@ -58,3 +58,52 @@ obj.field instanceof Number
         object: (identifier)
         field: (identifier))
       type: (type_identifier))))
+
+==================
+instanceof with qualified type
+==================
+
+x instanceof java.lang.Number
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+not-instanceof with qualified type
+==================
+
+x !instanceof java.util.Collection
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+not-instanceof requires trailing whitespace (no mis-tokenisation)
+==================
+
+x
+!instanceofX
+
+---
+
+(source_file
+  (expression_statement (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))

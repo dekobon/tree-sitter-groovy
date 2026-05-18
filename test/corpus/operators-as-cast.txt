@@ -72,3 +72,40 @@ C-style cast and as-cast both yield type_identifier
     (parenthesized_type_cast
       type: (type_identifier)
       value: (identifier))))
+
+==================
+as cast to qualified type
+==================
+
+x as java.util.Map
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+as cast to deeply qualified type
+==================
+
+x as a.b.c.d.E
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+

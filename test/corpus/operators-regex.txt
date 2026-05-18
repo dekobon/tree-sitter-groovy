@@ -68,3 +68,99 @@ a == ~b
       left: (identifier)
       right: (unary_expression
         operand: (identifier)))))
+
+==================
+Slashy regex after assignment operator
+==================
+
+def x = /pattern/
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)))))
+
+==================
+Slashy regex inside list literal
+==================
+
+def xs = [/foo/, /bar/]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (string_literal
+          (string_fragment))
+        (string_literal
+          (string_fragment))))))
+
+==================
+Slashy after return keyword
+==================
+
+def f() { return /home/ }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (string_literal
+          (string_fragment))))))
+
+==================
+Slash with surrounding spaces parses as division (not slashy)
+==================
+
+a / b
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Repeated division in expression
+==================
+
+def y = a / b / c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier)))))
+
+==================
+Augmented division-assign still works
+==================
+
+a /= b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))

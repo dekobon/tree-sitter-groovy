@@ -27,7 +27,7 @@ class Foo { }
   (class_declaration
     (annotation
       name: (qualified_name (identifier))
-      arguments: (argument_list (string_literal)))
+      arguments: (argument_list (string_literal (string_fragment))))
     name: (identifier)
     body: (class_body)))
 
@@ -47,7 +47,7 @@ class Bar { }
       arguments: (argument_list
         (assignment_expression
           left: (identifier)
-          right: (string_literal))))
+          right: (string_literal (string_fragment)))))
     name: (identifier)
     body: (class_body)))
 

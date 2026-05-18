@@ -2,8 +2,7 @@
 //
 // Handles §6.2 slashy-string-start and §6.6 line/block/groovydoc
 // comments. Both start with `/`; combining the dispatch keeps the
-// in-grammar lexer from partially consuming the leading `/`. See
-// `docs/divergences-from-spec.md` for §6 tokens not yet wired.
+// in-grammar lexer from partially consuming the leading `/`.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -20,6 +19,10 @@ enum TokenType {
 
 static inline void advance(TSLexer *lexer) {
     lexer->advance(lexer, false);
+}
+
+static inline bool is_whitespace(int32_t c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
 void *tree_sitter_groovy_external_scanner_create(void) {
@@ -73,10 +76,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         return false;
     }
 
-    while (lexer->lookahead == ' '
-           || lexer->lookahead == '\t'
-           || lexer->lookahead == '\n'
-           || lexer->lookahead == '\r') {
+    while (is_whitespace(lexer->lookahead)) {
         lexer->advance(lexer, true);
     }
     if (lexer->lookahead != '/') {
@@ -155,13 +155,39 @@ bool tree_sitter_groovy_external_scanner_scan(
         // in-grammar lexer can match `/=` cleanly.
         return false;
     }
-    // Slashy string body — we've consumed the opening `/`,
-    // continue from the body.
+    // Slashy string opening `/` — we've consumed it; the body and
+    // closing `/` are matched by the grammar's `slashy_string` rule
+    // via regex tokens, so `$identifier` and `${expr}` segments can
+    // be exposed as structured children. SPECIFICATION.md §5.4 /
+    // §6.2 require a context-sensitive emit. Three pragmatic guards
+    // keep `a / b` and similar division contexts from being
+    // mis-tokenised as the opening of a slashy:
+    //
+    //   (1) Reject an empty body (the next char after the opening
+    //       `/` is a closing `/`) — `//` is already a line comment
+    //       and `/=` is already trapped above, so an empty slashy
+    //       is excluded.
+    //   (2) Reject a body that starts with whitespace — `a / b`
+    //       has a space immediately after the operator `/`, but
+    //       every legal slashy regex starts with a non-whitespace
+    //       char.
+    //   (3) Look ahead through the body to confirm there is a
+    //       closing `/` on the same line. Without this, `a / b\nc`
+    //       at end of file would emit a slashy opener and leave
+    //       the body unterminated.
     if (!wants_slashy) {
         return false;
     }
-    // EOF-bounded loop: unterminated `/…` terminates here via
-    // lexer->eof().
+    if (lexer->lookahead == '/' || is_whitespace(lexer->lookahead)) {
+        return false;
+    }
+    // Look ahead (without consuming) to confirm a closing `/` exists
+    // before a newline or EOF. `lexer->mark_end` records the position
+    // where the slashy opener token ends; advancing past it during
+    // look-ahead does not extend the token range as long as we do
+    // not call `mark_end` again.
+    lexer->mark_end(lexer);
+    bool found_close = false;
     while (!lexer->eof(lexer)) {
         if (lexer->lookahead == '\\') {
             advance(lexer);
@@ -171,11 +197,17 @@ bool tree_sitter_groovy_external_scanner_scan(
             continue;
         }
         if (lexer->lookahead == '/') {
-            advance(lexer);
-            lexer->result_symbol = SLASHY_STRING_START;
-            return true;
+            found_close = true;
+            break;
+        }
+        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+            break;
         }
         advance(lexer);
     }
-    return false;
+    if (!found_close) {
+        return false;
+    }
+    lexer->result_symbol = SLASHY_STRING_START;
+    return true;
 }

@@ -54,6 +54,24 @@ const PREC = {
 };
 /* eslint-enable no-multi-spaces */
 
+/**
+ * GString body segment choice shared between `"..."` and `"""..."""`.
+ * The text rule differs (single-quoted bans newlines, triple-quoted
+ * allows them) but every other alternative is identical.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} textRule The flavour-specific literal-text rule.
+ * @returns {ChoiceRule} The shared body-segment choice.
+ */
+function gstringPart($, textRule) {
+  return choice(
+    alias(textRule, $.string_fragment),
+    $.gstring_dollar_interpolation,
+    $.gstring_brace_interpolation,
+    alias($._gstring_literal_dollar, $.string_fragment),
+  );
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -70,11 +88,13 @@ module.exports = grammar({
 
   // Externals listed here must have a matching branch in
   // `src/scanner.c` AND be referenced by at least one rule below.
-  // Tokens that the spec §6 reserves for the scanner but that no rule
-  // consumes yet (automatic-semicolon, gstring-body/interpolation,
-  // slashy-body/end, label-colon) are intentionally NOT listed —
-  // listing them would mark them valid in tree-sitter's error-recovery
-  // state and let dormant scanner branches mis-fire on unrelated input.
+  // Tokens the spec §6 proposes as external scanner branches but
+  // that this grammar implements in-grammar (GString interpolation
+  // via regex tokens, slashy body via in-grammar `_slashy_text`,
+  // statement boundaries via `repeat($._statement)`, label colon
+  // via grammar precedence) are intentionally NOT listed — listing
+  // an unwired external token would let dormant scanner branches
+  // mis-fire in error-recovery states.
   externals: $ => [
     $._slashy_string_start,
     $.line_comment,
@@ -100,7 +120,14 @@ module.exports = grammar({
     // qualified_type_repeat1 aux symbol forces a separate
     // declaration.
     [$._expression, $.qualified_type],
-    [$._type, $.qualified_type],
+
+    // §3.2.2 — `_cast_type` overlaps `_type` on identifier / array /
+    // generic alternatives; only the dotted path diverges. The
+    // companion three-way conflict pulls in `_dotted_type` so the
+    // dotted shape can win the trailing `.identifier` from the
+    // surrounding `field_access` reduction.
+    [$._cast_type, $._type],
+    [$._cast_type, $._dotted_type, $.qualified_type],
 
     // §4 — `for ( identifier …` could continue as a for_statement
     // (identifier is part of the init expression) or as a
@@ -167,29 +194,36 @@ module.exports = grammar({
     ),
 
     // §5.5 — command_chain is the parenthesis-free method-call
-    // form (`println 'hello'`). v1 is intentionally conservative:
-    // receiver is a bare identifier and there is exactly one
-    // argument, which must be a non-identifier literal-shaped
-    // expression (no risk of mis-parsing `foo bar` as a command
-    // call on a bare identifier). Multi-argument, chained
-    // (`foo bar baz`), and named-argument command chains land
-    // later. Closes a subset of murtaza64 #5.
+    // form (`println 'hello'`, `events 'a', 'b', 'c'`). v1 is
+    // intentionally conservative: receiver is a bare identifier
+    // and arguments are restricted to literal-shaped expressions
+    // and closures (no risk of mis-parsing `foo bar` as a command
+    // call on a bare identifier). Multi-argument lists are supported
+    // (comma-separated literal arguments per Gradle / Jenkins DSL
+    // idioms). Chained `foo bar baz` and complex argument shapes
+    // land later. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', choice(
-        $.string_literal,
-        $.number_literal,
-        $.boolean_literal,
-        $.null_literal,
-        $.closure,
-      )),
+      field('argument', $._command_argument),
+      repeat(seq(',', field('argument', $._command_argument))),
     )),
+
+    _command_argument: $ => choice(
+      $.string_literal,
+      $.number_literal,
+      $.boolean_literal,
+      $.null_literal,
+      $.closure,
+    ),
 
     // §5.3 — `label: stmt`. Required only at statement-start
     // position; map_entries (which share `:`) are inside `[…]`
-    // and don't collide here. Conflict declaration keeps both
+    // and don't collide here. `prec(1, ...)` keeps both
     // labeled_statement and expression_statement alive after
-    // `identifier`; the `:` decides.
+    // `identifier`; the `:` decides. A scanner-token form
+    // (`_label_colon`) was attempted but interacted with
+    // not-yet-implemented named-argument command chains
+    // (`archiveArtifacts artifacts: 'x'`); see divergence #5.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',
@@ -369,6 +403,7 @@ module.exports = grammar({
       optional(choice('sealed', token('non-sealed'))),
       'class',
       field('name', $.identifier),
+      optional(field('type_parameters', $.type_parameters)),
       optional($.superclass),
       optional($.super_interfaces),
       optional($.permits_clause),
@@ -381,6 +416,7 @@ module.exports = grammar({
       optional(choice('sealed', token('non-sealed'))),
       'trait',
       field('name', $.identifier),
+      optional(field('type_parameters', $.type_parameters)),
       optional($.extends_interfaces),
       optional($.permits_clause),
       field('body', $.class_body),
@@ -392,9 +428,31 @@ module.exports = grammar({
       optional(choice('sealed', token('non-sealed'))),
       'interface',
       field('name', $.identifier),
+      optional(field('type_parameters', $.type_parameters)),
       optional($.extends_interfaces),
       optional($.permits_clause),
       field('body', $.class_body),
+    ),
+
+    // §4 / §5.14 — generic type parameter list on a class /
+    // interface / trait / method declaration. The `<` is
+    // `token.immediate` so the parser only treats it as a type
+    // parameter opener when it follows the declaration name with
+    // no intervening whitespace.
+    type_parameters: $ => seq(
+      token.immediate('<'),
+      $.type_parameter,
+      repeat(seq(',', $.type_parameter)),
+      '>',
+    ),
+
+    type_parameter: $ => seq(
+      field('name', alias($.identifier, $.type_identifier)),
+      optional(seq(
+        'extends',
+        $._type,
+        repeat(seq('&', $._type)),
+      )),
     ),
 
     // §4 — class has a single super and zero-or-more interfaces.
@@ -460,6 +518,46 @@ module.exports = grammar({
 
     _class_member: $ => choice(
       $.method_declaration,
+      $.field_declaration,
+      $.constructor_declaration,
+      $.static_initializer,
+    ),
+
+    // §4 — constructors share the method_declaration shape but have
+    // no return type and the name matches the enclosing class. We
+    // don't enforce the name match (downstream tooling can), but we
+    // emit a distinct node kind so IDE features (rename, jump) can
+    // tell constructors apart from methods. `prec(3, …)` wins over
+    // both field and method when the identifier is followed by `(`
+    // and no return type precedes it.
+    constructor_declaration: $ => prec.right(3, seq(
+      repeat($.annotation),
+      repeat($._modifier),
+      field('name', $.identifier),
+      field('parameters', $.formal_parameters),
+      optional($.throws_clause),
+      field('body', $.block),
+    )),
+
+    // §4 — `static { … }` class-body initializer block. Runs once
+    // when the class is loaded. Distinct node kind so downstream
+    // tools can index it.
+    static_initializer: $ => seq(
+      'static',
+      field('body', $.block),
+    ),
+
+    // §4 — class / interface / trait field. Java-style shape: optional
+    // annotations, optional modifiers, `def` or a `_type`, then one or
+    // more declarators (each with optional initializer). Method
+    // declarations share the same prefix; `prec(2, …)` on
+    // `method_declaration` and the trailing `(` discriminate.
+    field_declaration: $ => seq(
+      repeat($.annotation),
+      repeat($._modifier),
+      choice('def', field('type', $._type)),
+      $.variable_declarator,
+      repeat(seq(',', $.variable_declarator)),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()
@@ -468,15 +566,28 @@ module.exports = grammar({
     // prec(1) wins over local_variable_declaration when `(` follows
     // the name, so `def f() { … }` at script-top-level parses as a
     // method rather than a `def f` variable followed by `(…) { … }`.
-    method_declaration: $ => prec.right(1, seq(
+    method_declaration: $ => prec.right(2, seq(
       repeat($.annotation),
       repeat($._modifier),
+      optional(field('type_parameters', $.method_type_parameters)),
       choice('def', field('return_type', $._type)),
       field('name', $._property_name),
       field('parameters', $.formal_parameters),
       optional($.throws_clause),
       optional(field('body', $.block)),
     )),
+
+    // §4 / §5.14 — method-level generic type parameters
+    // (`<T> T identity(T x) { x }`). Distinct from `type_parameters`
+    // (used on class/trait/interface) because here the `<` cannot be
+    // `token.immediate` — it appears at the start of the declaration
+    // with optional whitespace from preceding modifiers / annotations.
+    method_type_parameters: $ => seq(
+      '<',
+      $.type_parameter,
+      repeat(seq(',', $.type_parameter)),
+      '>',
+    ),
 
     // §4 — `throws E1, E2, …` after a method signature.
     throws_clause: $ => prec.left(seq(
@@ -755,19 +866,55 @@ module.exports = grammar({
     ),
 
     // §3.2 — `x as Type`. RELATIONAL level (10), left-associative.
-    // RHS is a _type, NOT an _expression — that is the distinction
-    // from `x === foo` and other binary ops at the same level.
+    // RHS is `_cast_type`, a `_type`-shaped sibling that swaps in
+    // `_dotted_type` for `qualified_type` so the trailing
+    // `.identifier` of `x as java.util.Map` extends the type
+    // through every dot segment (instead of being claimed by
+    // `field_access` at higher precedence than `cast_expression`).
     cast_expression: $ => prec.left(PREC.RELATIONAL, seq(
       field('value', $._expression),
       'as',
-      field('type', $._type),
+      field('type', $._cast_type),
+    )),
+
+    // §3.2.2 — RHS type of `as`, `instanceof`, and `!instanceof`.
+    // Same alternatives as `_type` except `qualified_type` is
+    // replaced by `_dotted_type`, whose tail shifts each dot at a
+    // precedence tighter than `field_access`.
+    _cast_type: $ => choice(
+      alias($.identifier, $.type_identifier),
+      $.array_type,
+      alias($._dotted_type, $.qualified_type),
+      $.generic_type,
+    ),
+
+    _dotted_type: $ => seq(
+      alias($.identifier, $.type_identifier),
+      $._dotted_type_tail,
+    ),
+
+    _dotted_type_tail: $ => prec.right(PREC.ACCESS + 1, seq(
+      '.',
+      alias($.identifier, $.type_identifier),
+      optional($._dotted_type_tail),
     )),
 
     // §3.2 — `x in xs` and `x !in xs`. RELATIONAL level. Both
     // operators share one node kind; the `operator` field
-    // distinguishes them.
+    // distinguishes them. `!in` is wrapped in `token(prec(1, …))`
+    // so it lexes as a single token despite the embedded space
+    // requirement implied by §3.2.2's trailing-context rule —
+    // Apache's `NOT_IN` predicate is approximated by requiring at
+    // least one trailing whitespace, `[`, `(`, or `{` after `!in`.
+    // §3.2 / §3.2.2 — `x in xs` and `x !in xs`. `!in` is a single
+    // token whose match requires a trailing whitespace / bracket
+    // character (Apache `NOT_IN` predicate) so `a !inXs` does not
+    // mis-tokenise as `!in` followed by `Xs`.
     membership_expression: $ => {
-      const ops = ['in', '!in'];
+      const ops = [
+        'in',
+        token(prec(1, seq('!in', /[ \t\r\n\[({]/))),
+      ];
       return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(
         field('element', $._expression),
         field('operator', op),
@@ -775,18 +922,20 @@ module.exports = grammar({
       ))));
     },
 
-    // §3.2 / §3.2.2 — `x instanceof T` and `x !instanceof T`. RHS
-    // is `_type`, NOT `_expression`. The Apache trailing-context
-    // rule for `!instanceof` / `!in` (must be followed by
-    // whitespace or open-bracket) is enforced in v1 only by the
-    // word boundary on the surrounding tokens; a proper scanner
-    // branch lands later if tests show a mis-tokenisation.
+    // §3.2 / §3.2.2 — `x instanceof T` and `x !instanceof T`.
+    // `!instanceof` is a single token whose match requires a
+    // trailing whitespace (Apache `NOT_INSTANCEOF` predicate) so
+    // `a !instanceofX` does not mis-tokenise as `!instanceof`
+    // followed by identifier `X`.
     instanceof_expression: $ => {
-      const ops = ['instanceof', '!instanceof'];
+      const ops = [
+        'instanceof',
+        token(prec(1, seq('!instanceof', /[ \t\r\n]/))),
+      ];
       return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(
         field('value', $._expression),
         field('operator', op),
-        field('type', $._type),
+        field('type', $._cast_type),
       ))));
     },
 
@@ -814,21 +963,65 @@ module.exports = grammar({
     )),
 
     // §4 — `_type`. Supports unqualified type identifiers,
-    // qualified types (`java.util.List`), and array types
-    // (`int[]`, `String[][]`). Generics (`List<String>`) are
-    // tracked in `docs/divergences-from-spec.md` §5.
+    // qualified types (`java.util.List`), array types
+    // (`int[]`, `String[][]`), and generic types (`List<String>`,
+    // `Map<String, Integer>`). `generic_type` always carries explicit
+    // angle brackets, so it never competes with comparison operators
+    // in expression context (which only reach `_type` through a
+    // separate parse stack).
     _type: $ => choice(
       alias($.identifier, $.type_identifier),
       $.array_type,
       $.qualified_type,
+      $.generic_type,
     ),
 
+    // Near-twin of `_dotted_type` below; the two cannot be merged
+    // without breaking either field-access (which needs
+    // `qualified_type` to NOT outrank `field_access`) or
+    // cast / instanceof RHS (which needs `_dotted_type` to outrank
+    // `field_access`). Edits here should be mirrored in
+    // `_dotted_type` / `_dotted_type_tail`.
     qualified_type: $ => prec.left(seq(
       alias($.identifier, $.type_identifier),
       repeat1(seq('.', alias($.identifier, $.type_identifier))),
     )),
 
     array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, '[', ']')),
+
+    // §4 / §5.14 — Java-style generic type arguments. Allows nested
+    // generics (`Map<String, List<Integer>>`) and bounded wildcards
+    // (`? extends Foo`, `? super Bar`). The `<` is `token.immediate`
+    // so it only matches when the angle bracket directly follows the
+    // base name with no intervening whitespace — `a < b` still parses
+    // as a binary expression because of the space before `<`.
+    generic_type: $ => prec.right(PREC.ARRAY_TYPE, seq(
+      field('base', choice(
+        alias($.identifier, $.type_identifier),
+        $.qualified_type,
+      )),
+      field('arguments', $.type_arguments),
+    )),
+
+    type_arguments: $ => seq(
+      token.immediate('<'),
+      $._type_argument,
+      repeat(seq(',', $._type_argument)),
+      '>',
+    ),
+
+    _type_argument: $ => choice(
+      $._type,
+      $.wildcard,
+    ),
+
+    wildcard: $ => seq(
+      '?',
+      optional(seq(
+        choice('extends', 'super'),
+        $._type,
+      )),
+    ),
 
     // §3.1 ACCESS tier / §3.2 — seven distinct node kinds for the
     // dot family. All at PREC.ACCESS left-associative so chains like
@@ -1151,13 +1344,10 @@ module.exports = grammar({
     },
 
     // §5.8 — closure expression. `{ -> }` is the explicit no-parameter
-    // form; `{ a, b -> body }` has typed-less identifier parameters;
-    // `{ body }` has no `->` and an implicit `it` parameter (we do
-    // NOT emit a synthetic `it` per §5.8). Closure parameter types,
-    // defaults, and varargs land later — for v1 of this rule we
-    // accept untyped identifier parameters only, which is what the
-    // overwhelming majority of Groovy / Jenkins / Spock closures
-    // use in practice.
+    // form; `{ a, b -> body }` has identifier parameters;
+    // `{ String a, int b -> body }` has typed parameters; `{ body }`
+    // has no `->` and an implicit `it` parameter (we do NOT emit a
+    // synthetic `it` per §5.8). Default values and varargs land later.
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
@@ -1173,7 +1363,10 @@ module.exports = grammar({
       '->',
     ),
 
-    closure_parameter: $ => field('name', $.identifier),
+    closure_parameter: $ => seq(
+      optional(field('type', $._type)),
+      field('name', $.identifier),
+    ),
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.
     // Empty list is `[]`; the empty map literal is the distinct `[:]`
@@ -1262,19 +1455,39 @@ module.exports = grammar({
     null_literal: _ => 'null',
 
     // §5.7 — string flavours. Single and triple-single never
-    // interpolate. Double-quoted and triple-double *do* interpolate
-    // GString segments in Groovy proper, but for v1 we tokenise
-    // them as flat strings; the interpolation scanner branch
-    // (§6.3) lands as a follow-up. Slashy and dollar-slashy land
-    // alongside that scanner work.
+    // interpolate. Double-quoted and triple-double interpolate
+    // `$identifier(.identifier)*` and `${expression}` as structured
+    // children, so consumers can walk into the GString's expression
+    // segments. Slashy bodies and dollar-slashy bodies remain flat
+    // tokens (their internal `$` is rare in practice and the
+    // scanner cannot interrupt a slashy mid-body without per-flavor
+    // state).
     string_literal: $ => choice(
       $._single_quoted_string,
       $._triple_single_quoted_string,
       $._double_quoted_string,
       $._triple_double_quoted_string,
       $._dollar_slashy_string,
-      $._slashy_string_start,
+      $._slashy_string,
     ),
+
+    // §5.7 — slashy regex `/.../`. The opening `/` is emitted by
+    // the external scanner (after the context guard from §5.4 / §6.2
+    // and a lookahead that confirms a closing `/` exists on the same
+    // line). The body is parsed as `gstringPart` so `$identifier` and
+    // `${expr}` segments expose the same structured children as
+    // double-quoted GStrings. The closing `/` is `token.immediate`
+    // so it cannot skip whitespace between the body and the closer.
+    _slashy_string: $ => seq(
+      $._slashy_string_start,
+      repeat(gstringPart($, $._slashy_text)),
+      token.immediate('/'),
+    ),
+
+    _slashy_text: _ => token.immediate(repeat1(choice(
+      /[^\/\\$\n\r]/,
+      /\\[\s\S]/,
+    ))),
 
     _single_quoted_string: _ => token(seq(
       '\'',
@@ -1296,48 +1509,85 @@ module.exports = grammar({
       '\'\'\'',
     )),
 
-    _double_quoted_string: _ => token(seq(
+    // §5.7 / §6.3 — double-quoted GString. The opening `"` is
+    // tokenised separately from the body so that `$identifier` and
+    // `${expr}` segments parse as proper child nodes. The text
+    // fragment stops before any `$`, so `$identifier` and `${expr}`
+    // get a chance to match; literal `$` (followed by `"` or a
+    // digit etc.) is recovered as `$` plus the fallback shape.
+    _double_quoted_string: $ => seq(
       '"',
-      repeat(choice(
-        /[^"\\\n\r]/,
-        /\\[\s\S]/,
-      )),
-      '"',
-    )),
+      repeat(gstringPart($, $._gstring_text)),
+      token.immediate('"'),
+    ),
 
-    _triple_double_quoted_string: _ => token(seq(
-      '"""',
-      repeat(choice(
-        /[^"\\]/,
-        /\\[\s\S]/,
-        /"[^"]/,
-        /""[^"]/,
-      )),
-      '"""',
-    )),
+    _gstring_text: _ => token.immediate(repeat1(choice(
+      /[^"\\$\n\r]/,
+      /\\[\s\S]/,
+    ))),
 
-    // §5.7 — `$/...$/` dollar-slashy strings. Spec calls this a
-    // simple grammar rule (no scanner needed) because `$` is not a
-    // binary operator, so there is no division-vs-slashy
-    // disambiguation issue. Treated as a flat token in v1;
-    // interpolation structure lands with the GString scanner.
-    // Body escape rules:
-    //   $$  → literal $
-    //   $/  → literal /
-    //   $X  → bare X (interpolation in real Groovy; flat here)
-    //   /X  with X != $ → literal /
-    // The closing `/$` is matched by longest-match.
-    _dollar_slashy_string: _ => token(seq(
+    // Bare `$` inside a GString body that does not start a valid
+    // interpolation (`$"`, `$5`, `$$`, `$ `) is matched as a one-
+    // char literal fragment. This rule must have lower precedence
+    // than `_gstring_dollar_path` so `$name` still wins.
+    _gstring_literal_dollar: _ => token.immediate(prec(-1, /\$/)),
+
+    // §5.7 — triple-double GString. Like `_double_quoted_string`
+    // but newlines and embedded `"` / `""` are part of the body.
+    _triple_double_quoted_string: $ => seq(
+      '"""',
+      repeat(gstringPart($, $._triple_gstring_text)),
+      token.immediate('"""'),
+    ),
+
+    _triple_gstring_text: _ => token.immediate(repeat1(choice(
+      /[^"\\$]/,
+      /\\[\s\S]/,
+      /"[^"]/,
+      /""[^"]/,
+    ))),
+
+    // §5.7 — `$identifier(.identifier)*` interpolation. The whole
+    // `$identifier...` shape is matched as a single immediate token
+    // so the `$` only consumes when followed by an identifier start;
+    // `_gstring_literal_dollar` handles the lone-`$` fallback above.
+    gstring_dollar_interpolation: $ => seq(
+      field('value', alias(
+        $._gstring_dollar_path,
+        $.identifier,
+      )),
+    ),
+
+    _gstring_dollar_path: _ => token.immediate(
+      /\$[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*/,
+    ),
+
+    // §5.7 / §6.3 — `${expression}` interpolation.
+    gstring_brace_interpolation: $ => seq(
+      token.immediate('${'),
+      field('value', $._expression),
+      '}',
+    ),
+
+    // §5.7 — `$/...$/` dollar-slashy strings. The body is parsed
+    // through `gstringPart` so `$identifier` and `${expr}` segments
+    // expose structured children. `_dollar_slashy_text` consumes
+    // every literal-text alternative: `/X` where X is not `$`,
+    // `$$` (literal `$`), `$/` (literal `/`), and any other
+    // non-`/` non-`$` char. The closer `/$` is `token.immediate`
+    // so it always wins over text when `/` is followed by `$`.
+    _dollar_slashy_string: $ => seq(
       '$/',
-      repeat(choice(
-        /[^/$]/,
-        /\/[^$]/,
-        /\$\$/,
-        /\$\//,
-        /\$[^/$]/,
-      )),
-      '/$',
-    )),
+      repeat(gstringPart($, $._dollar_slashy_text)),
+      token.immediate('/$'),
+    ),
+
+    _dollar_slashy_text: _ => token.immediate(repeat1(choice(
+      /[^/$]/,
+      /\/[^$]/,
+      /\$\$/,
+      /\$\//,
+    ))),
 
     // §5.1 — hex (0x…), binary (0b…), decimal int / float / scientific,
     // each with optional type suffix from { G g L l I i D d F f }.

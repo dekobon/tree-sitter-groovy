@@ -11,6 +11,8 @@
   (block)
   (closure)
   (method_declaration)
+  (constructor_declaration)
+  (static_initializer)
   (for_statement)
   (for_in_statement)
   (catch_clause)
@@ -20,6 +22,8 @@
 (formal_parameter name: (identifier) @local.definition.parameter)
 (closure_parameter name: (identifier) @local.definition.parameter)
 (variable_declarator name: (identifier) @local.definition.var)
+(field_declaration
+  (variable_declarator name: (identifier) @local.definition.field))
 (for_in_statement variable: (identifier) @local.definition.var)
 (catch_formal_parameter name: (identifier) @local.definition.var)
 (record_component name: (identifier) @local.definition.parameter)

@@ -90,3 +90,47 @@ bar
 (source_file
   (expression_statement (identifier))
   (expression_statement (identifier)))
+
+==================
+Command chain with multiple string arguments
+==================
+
+events 'passed', 'failed', 'skipped'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (string_literal)
+    argument: (string_literal)))
+
+==================
+Command chain with mixed argument types
+==================
+
+log 'starting', 42, true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (number_literal)
+    argument: (boolean_literal)))
+
+==================
+Named-argument command chain (v1 fallback shape)
+==================
+
+archiveArtifacts artifacts: 'build/**/*'
+
+---
+
+(source_file
+  (expression_statement (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement (string_literal))))

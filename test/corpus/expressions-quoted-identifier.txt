@@ -10,7 +10,7 @@ map."key with spaces"
   (expression_statement
     (field_access
       object: (identifier)
-      field: (quoted_identifier))))
+      field: (quoted_identifier (string_fragment)))))
 
 ==================
 Quoted identifier after safe nav
@@ -24,7 +24,7 @@ map?."hello world"
   (expression_statement
     (safe_navigation_expression
       object: (identifier)
-      property: (quoted_identifier))))
+      property: (quoted_identifier (string_fragment)))))
 
 ==================
 Quoted method name in declaration
@@ -36,7 +36,7 @@ def "test name"() { true }
 
 (source_file
   (method_declaration
-    name: (quoted_identifier)
+    name: (quoted_identifier (string_fragment))
     parameters: (formal_parameters)
     body: (block
       (expression_statement (boolean_literal)))))
@@ -51,7 +51,7 @@ def "abstract"() { 1 }
 
 (source_file
   (method_declaration
-    name: (quoted_identifier)
+    name: (quoted_identifier (string_fragment))
     parameters: (formal_parameters)
     body: (block
       (expression_statement (number_literal)))))
@@ -69,5 +69,5 @@ obj."some method"()
     (method_invocation
       function: (field_access
         object: (identifier)
-        field: (quoted_identifier))
+        field: (quoted_identifier (string_fragment)))
       arguments: (argument_list))))

@@ -1,0 +1,180 @@
+==================
+Untyped def field with initializer
+==================
+
+class C {
+    def name = "hi"
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal (string_fragment)))))))
+
+==================
+Typed field with no initializer
+==================
+
+class C {
+    String name
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Typed field with initializer
+==================
+
+class C {
+    int age = 10
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Generic typed field
+==================
+
+class C {
+    List<String> items = []
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (list_literal))))))
+
+==================
+Multiple field declarators on one line
+==================
+
+class C {
+    int a = 1, b = 2
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Field with modifier
+==================
+
+class C {
+    private final String name = "x"
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal (string_fragment)))))))
+
+==================
+Field with annotation
+==================
+
+class C {
+    @Deprecated
+    String old = "x"
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal (string_fragment)))))))
+
+==================
+Mix of fields and methods in class body
+==================
+
+class Person {
+    String name
+    int age = 0
+
+    def greet() { "hi" }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal (string_fragment))))))))

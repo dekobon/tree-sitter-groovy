@@ -188,7 +188,7 @@ trait Greeter {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block
-          (expression_statement (string_literal)))))))
+          (expression_statement (string_literal (string_fragment))))))))
 
 ==================
 dekobon 247 exclusive range

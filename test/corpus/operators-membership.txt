@@ -76,3 +76,18 @@ x in xs ? a : b
         collection: (identifier))
       consequence: (identifier)
       alternative: (identifier))))
+
+==================
+not-in requires trailing whitespace or bracket (no mis-tokenisation)
+==================
+
+a
+!inXs
+
+---
+
+(source_file
+  (expression_statement (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))

@@ -1,0 +1,148 @@
+==================
+No-arg constructor
+==================
+
+class Foo {
+    Foo() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Constructor with parameter
+==================
+
+class Foo {
+    Foo(String name) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Constructor with modifiers and annotation
+==================
+
+class Foo {
+    @Inject
+    private Foo() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Constructor with throws clause
+==================
+
+class Foo {
+    Foo() throws IOException { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        (throws_clause
+          (type_identifier))
+        body: (block)))))
+
+==================
+Static initializer block
+==================
+
+class Foo {
+    static {
+        println "init"
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (static_initializer
+        body: (block
+          (command_chain
+            receiver: (identifier)
+            argument: (string_literal (string_fragment))))))))
+
+==================
+Class with field, static init, and constructor
+==================
+
+class App {
+    String name = ""
+
+    static {
+        configure()
+    }
+
+    App() {
+        name = "x"
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (string_literal (string_fragment)))))))))

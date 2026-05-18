@@ -24,9 +24,113 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Quoted-name property/method highlights — `obj."some prop"` and
   `def "foo bar"() { … }` now receive `@property` / `@function`
   highlights.
+- `x as java.util.Map` and `x instanceof java.lang.Number` now
+  extend the qualified type through every `.identifier` segment
+  instead of splitting as `(field_access (cast x as java.util)
+  Map)`. The dedicated `_cast_type` / `_dotted_type` rule shifts
+  each dot continuation at a precedence (`PREC.ACCESS + 1`)
+  tighter than `field_access`. Closes the qualified-type half of
+  divergence doc §5. (SPECIFICATION.md §3.2.2)
+- `!instanceof` and `!in` now require the trailing-context
+  predicate from SPECIFICATION.md §3.2.2 (Apache `NOT_INSTANCEOF`
+  / `NOT_IN` lexer rules). Each is matched as a single token
+  whose pattern includes a trailing whitespace (or `[ ( {` for
+  `!in`), so `x !instanceofX` no longer mis-tokenises as
+  `!instanceof` + identifier `X`. Regression tests pinned in
+  `test/corpus/operators-instanceof.txt` and
+  `test/corpus/operators-membership.txt`.
 
 ### Added
 
+- `generic_type` covering `List<String>`, nested
+  (`Map<String, List<Integer>>`), qualified bases
+  (`java.util.List<String>`), and bounded wildcards
+  (`? extends T`, `? super T`, bare `?`) in every position that
+  accepts a `_type` (variable declaration, formal parameter,
+  closure parameter, return type, `new`, parenthesized cast,
+  `as` cast). Class / interface / trait declarations and method
+  declarations also accept `type_parameters` /
+  `method_type_parameters` (`class Box<T extends Comparable>`,
+  `<T> T identity(T x)`, multi-bound
+  `<T extends Number & Comparable>`).
+  `test/corpus/declarations-generics.txt` pins the AST shape and
+  `test/stress/generics.groovy` provides a zero-ERROR stress sample.
+  Closes the generics gap in `docs/divergences-from-spec.md` §5.
+  (SPECIFICATION.md §4 / §5.14)
+- `closure_parameter` now accepts an optional `type` field, so
+  `{ String s -> s }` and `{ List<String> xs -> xs }` parse with
+  full type structure instead of as identifier-only parameters.
+  Corpus tests added in `test/corpus/expressions-closure.txt`.
+  (SPECIFICATION.md §5.8)
+- `field_declaration` inside class / interface / trait bodies.
+  Supports `def x = …`, `Type x`, `Type x = …`,
+  `Type x = …, y = …`, generic-typed fields, and annotations /
+  modifiers prefixes. Methods continue to win via higher
+  precedence when `(` follows the name. Corpus tests in
+  `test/corpus/declarations-fields.txt`; tags / highlights /
+  locals queries updated to mark field-position declarators as
+  `@property`, `@definition.field`, and `@local.definition.field`
+  respectively. (SPECIFICATION.md §4)
+- `constructor_declaration` as a distinct node kind for
+  class-body constructors (`Foo()`, `Foo(String name)`,
+  `private Foo() throws IOException { … }`). Tagged as
+  `@definition.constructor`, highlighted as `@constructor`, and
+  scoped as `@local.scope`. Corpus tests in
+  `test/corpus/declarations-constructors.txt`.
+  (SPECIFICATION.md §4)
+- `static_initializer` for `static { … }` class-body blocks.
+  Recognised as `@local.scope` and emitted with a `body` field
+  pointing at the contained block. Corpus coverage in
+  `test/corpus/declarations-constructors.txt`.
+  (SPECIFICATION.md §4)
+- `command_chain` now accepts multiple comma-separated arguments
+  (`events 'passed', 'failed', 'skipped'`) — the dominant Gradle /
+  Jenkins DSL invocation shape. (SPECIFICATION.md §5.5)
+- Stress samples `jenkins_pipeline.groovy` and
+  `gradle_buildscript.groovy` covering realistic DSL shapes
+  (nested `pipeline { stages { stage { steps { ... } } } }`,
+  `dependencies { implementation '...' }`,
+  `tasks.named('test') { ... }`).
+- Slashy regex `/.../` and dollar-slashy `$/.../$` now expose
+  GString interpolation as parse-tree children:
+  `gstring_dollar_interpolation` and `gstring_brace_interpolation`
+  appear alongside `string_fragment` text segments. The external
+  scanner's slashy emission now yields the opening `/` only (with
+  a same-line lookahead confirming a closing `/` exists); the
+  grammar-level `_slashy_string` and `_dollar_slashy_string` rules
+  compose the body via the shared `gstringPart` helper. Closes
+  the slashy half of §5.7 and divergence doc #7. Corpus tests in
+  `test/corpus/expressions-strings.txt`. (SPECIFICATION.md §5.7)
+- `injections.scm` now routes triple-double-quoted strings passed
+  to a `sql.execute """..."""` (or `Sql.execute`) call as
+  `@injection.language sql`, demonstrating the named-call DSL
+  pattern documented in SPECIFICATION.md §9.2. Highlight
+  assertions in `test/highlight/strings.groovy` pin GString
+  interpolation `${...}` / `}` to `@punctuation.special` and the
+  contained identifier reference to `@variable`.
+- `gstring_dollar_interpolation` and `gstring_brace_interpolation`
+  for double-quoted (`"..."`) and triple-double-quoted
+  (`"""..."""`) strings. Each interpolation segment is exposed as
+  a parse-tree child with a `value` field, and literal-text
+  segments parse as `string_fragment`. The bare `$` fallback
+  (e.g. the trailing `$` in `"^a.c$"`) is preserved as a single-
+  char `string_fragment`. Highlight queries route `${` / `}` to
+  `@punctuation.special` and the contained identifier / expression
+  to `@variable` / inherited captures. Closes divergence doc §2.
+  (SPECIFICATION.md §5.7, §6.3)
+- Tighter slashy-string scanner: SLASHY_STRING_START rejects an
+  immediate `/`, whitespace, or newline after the opening `/`,
+  and rejects bodies that span a newline before any non-whitespace
+  content. `a / b` and `a /= b` keep parsing as binary / augmented
+  division; `def x = /pat/`, `[1, /pat/, 2]`, and `return /home/`
+  keep parsing as slashy regex. Corpus tests pinned in
+  `test/corpus/operators-regex.txt`. Closes divergence doc §7.
+  (SPECIFICATION.md §5.4, §6.2)
+- `queries/groovy/tags.scm` — `ctags`-style definition / reference
+  query covering class / interface / trait / annotation-type / enum
+  / record / method declarations, enum constants, method-invocation
+  references, `new` expressions, and inheritance clauses.
+  (SPECIFICATION.md §2.1)
 - Highlight assertions for `non-sealed`, `permits`, and `yield`.
 
 - External-scanner support for `line_comment`, `block_comment`, and

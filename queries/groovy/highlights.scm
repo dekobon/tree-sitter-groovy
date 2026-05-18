@@ -25,8 +25,16 @@
 
 (number_literal) @number
 (string_literal) @string
+(string_fragment) @string
 (boolean_literal) @boolean
 (null_literal) @constant.builtin
+
+; GString interpolation — `${expr}` and `$identifier` (per §5.7).
+(gstring_brace_interpolation
+  "${" @punctuation.special
+  "}" @punctuation.special)
+(gstring_dollar_interpolation
+  value: (identifier) @variable)
 
 ; -- Layer 2: operators (anonymous tokens) -------------------------
 
@@ -101,10 +109,15 @@
   "new"
   "as"
   "in"
-  "!in"
   "instanceof"
-  "!instanceof"
 ] @keyword.operator
+
+; `!in` and `!instanceof` are composite tokens (literal + trailing
+; whitespace) per SPECIFICATION.md §3.2.2 lexer rule, so they
+; cannot be referenced as direct anonymous tokens in a `[ … ]`
+; group. Capture them through the operator field instead.
+(membership_expression operator: _ @keyword.operator)
+(instanceof_expression operator: _ @keyword.operator)
 
 [
   "if"
@@ -183,9 +196,12 @@
 (annotation_type_declaration name: (identifier) @type.definition)
 (enum_constant name: (identifier) @constant)
 (method_declaration name: [(identifier) (quoted_identifier)] @function)
+(constructor_declaration name: (identifier) @constructor)
 (formal_parameter name: (identifier) @variable.parameter)
+(closure_parameter name: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)
 (variable_declarator name: (identifier) @variable)
+(field_declaration (variable_declarator name: (identifier) @property))
 
 ; Labels (declaration + use sites)
 (labeled_statement label: (identifier) @label)
