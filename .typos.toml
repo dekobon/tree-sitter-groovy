@@ -1,0 +1,16 @@
+# See https://github.com/crate-ci/typos/blob/master/docs/reference.md to configure typos
+
+[default.extend-identifiers]
+
+[default.extend-words]
+
+[files]
+extend-exclude = [
+  "src/parser.c",
+  "src/grammar.json",
+  "src/node-types.json",
+  "src/tree_sitter/**",
+  "test/corpus/**",
+  "test/highlight/**",
+  "test/stress/**",
+]

@@ -22,6 +22,11 @@ on:
       - setup.py
       - Package.swift
       - tree-sitter.json
+      - .taplo.toml
+      - .typos.toml
+      - deny.toml
+      - .markdownlint-cli2.jsonc
+      - "**/*.md"
   pull_request:
     paths: *paths
 
@@ -74,6 +79,45 @@ jobs:
           test-rust: true
           rust-version: "1.85"
           # test-node: true
+
+  rust-lint:
+    name: Rust lint (clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85"
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets -- -D warnings
+
+  cargo-deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  tooling:
+    name: Repo tooling checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: typos
+        uses: crate-ci/typos@master
+      - name: taplo (TOML format check)
+        uses: uncenter/setup-taplo@v1
+        with:
+          version: latest
+      - run: taplo format --check
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: "**/*.md"
 
   fuzz:
     name: Fuzz parser

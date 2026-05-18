@@ -31,3 +31,4 @@ Thumbs.db
 # Claude Code worktrees and local settings
 .claude/worktrees/
 .claude/settings.local.json
+.claude/ralph-loop.local.md

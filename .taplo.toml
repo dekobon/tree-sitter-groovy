@@ -1,0 +1,20 @@
+# taplo configuration.
+#
+# Scope taplo to first-party TOML files only. Build outputs and vendored
+# tree-sitter runtime sources under src/tree_sitter/ follow upstream
+# formatting and must not be reformatted by this project's tooling.
+
+include = [
+  "Cargo.toml",
+  "pyproject.toml",
+  ".taplo.toml",
+  ".typos.toml",
+  "deny.toml",
+]
+exclude = [
+  "target/**",
+  "node_modules/**",
+  "src/tree_sitter/**",
+  ".claude/**",
+  ".git/**",
+]
