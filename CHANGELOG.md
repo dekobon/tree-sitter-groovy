@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- **Editor integration.** `ftdetect/groovy.lua` ships with the grammar
+  so Neovim auto-detects filetype `groovy` for the extensions
+  declared in `tree-sitter.json` that Neovim's built-in detection
+  misses (`*.gvy`, `*.gy`, `*.jenkinsfile`) plus the `Jenkinsfile.*`
+  filename pattern (`Jenkinsfile.ci`, `Jenkinsfile.release`, etc.)
+  common in repos with multiple pipelines. The existing
+  `ftplugin/groovy.lua` then calls `vim.treesitter.start()`. README
+  gains a "Filetype detection" section covering what is auto-detected
+  plus modeline and per-project autocmd opt-in recipes for files that
+  don't match any pattern.
+
 ## [0.1.0] - 2026-05-18
 
 Initial release. Purpose-built Groovy 2.x--4.x parser with complete
