@@ -1,5 +1,11 @@
 name: CI
 
+# Third-party actions (anything outside `actions/*` and `github/*`)
+# are pinned to a commit SHA with a trailing `# vN` comment.
+# Floating tags or branches would let an upstream owner change
+# behavior silently. Dependabot still bumps these because the
+# version comment is in the format it recognizes.
+
 on:
   push:
     branches: [main]
@@ -69,10 +75,10 @@ jobs:
             exit 1
           fi
           printf 'ref=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-      - uses: tree-sitter/setup-action/cli@v2
+      - uses: tree-sitter/setup-action/cli@eeb902ac2f1be576edc296309872cf476a209b7f # v2
         with:
           tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
-      - uses: tree-sitter/parser-test-action@v2
+      - uses: tree-sitter/parser-test-action@aba4a3de737f86f8ce83be38166a1ab521d4c960 # v2
         with:
           generate: true
           test-parser: true
@@ -97,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: EmbarkStudios/cargo-deny-action@6c8f9facfa5047ec02d8485b6bf52b587b7777d1 # v2
         with:
           command: check
           arguments: --all-features
@@ -108,10 +114,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: typos
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@7b516f27c45bff0d4c617a0fb60c2bcb19e58b21 # v1.46.2
       - name: taplo (TOML format check)
-        # SHA-pinned third-party action: the floating `@v1` branch
-        # would let an upstream owner change behavior silently.
         uses: uncenter/setup-taplo@09968a8ae38d66ddd3d23802c44bf6122d7aa991 # v1
         with:
           # Pinned: the action downloads taplo-full-* assets which
@@ -121,7 +125,7 @@ jobs:
           version: "0.9.3"
       - run: taplo format --check
       - name: markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v23
+        uses: DavidAnson/markdownlint-cli2-action@ded1f9488f68a970bc66ea5619e13e9b52e601cd # v23
         with:
           globs: "**/*.md"
 
@@ -142,5 +146,5 @@ jobs:
           else
             printf 'changed=true\n' >> "$GITHUB_OUTPUT"
           fi
-      - uses: tree-sitter/fuzz-action@v4
+      - uses: tree-sitter/fuzz-action@6a1dcff00aefd038ba418bd63732a9add4901266 # v4
         if: steps.scanner-changes.outputs.changed == 'true'
