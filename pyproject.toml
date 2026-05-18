@@ -29,7 +29,7 @@ readme = "README.md"
 Homepage = "https://github.com/dekobon/tree-sitter-groovy"
 
 [project.optional-dependencies]
-core = ["tree-sitter~=0.25"]
+core = ["tree-sitter~=0.23"]
 
 [tool.cibuildwheel]
 build = "cp38-*"
