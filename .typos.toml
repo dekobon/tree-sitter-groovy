@@ -3,6 +3,10 @@
 [default.extend-identifiers]
 
 [default.extend-words]
+# "mis-" prefix: valid English hyphenation (mis-shapes, mis-lex, etc.)
+mis = "mis"
+# "juxt" = juxtaposition; used as a grammar term (juxt_function_call)
+juxt = "juxt"
 
 [files]
 extend-exclude = [

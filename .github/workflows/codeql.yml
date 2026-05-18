@@ -1,0 +1,78 @@
+name: CodeQL
+
+# Intentionally has no `paths:` filter (unlike ci.yml): CodeQL needs to
+# run on every push/PR to keep the default-branch SARIF history
+# continuous, even for doc-only changes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly run so the database stays fresh even on quiet weeks.
+    - cron: "23 4 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # This workflow has `security-events: write`, so any third-party
+  # action it runs executes with elevated privilege. SHA-pin every
+  # third-party action added here (first-party `actions/*` and
+  # `github/*` are exempt).
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: c-cpp
+            os: ubuntu-latest
+            build-mode: manual
+          - language: javascript-typescript
+            os: ubuntu-latest
+            build-mode: none
+          - language: python
+            os: ubuntu-latest
+            build-mode: none
+          - language: go
+            os: ubuntu-latest
+            build-mode: autobuild
+          - language: rust
+            os: ubuntu-latest
+            # Rust extractor only supports build-mode: none (it walks
+            # the source tree directly; no cargo invocation needed).
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: security-and-quality
+
+      - name: Build C scanner
+        if: matrix.language == 'c-cpp'
+        run: |-
+          # Only the hand-written scanner is in scope (parser.c is
+          # ignored via the CodeQL config). Compile it standalone so
+          # CodeQL has a trace to extract.
+          cc -c -fPIC -Isrc src/scanner.c -o /tmp/scanner.o
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -1,0 +1,12 @@
+name: CodeQL config
+
+# Generated tree-sitter outputs dominate the C source tree and would
+# drown real findings in noise. Keep the hand-written scanner in scope
+# and exclude the generated parser / JSON descriptors plus the vendored
+# runtime headers.
+paths-ignore:
+  - src/parser.c
+  - src/grammar.json
+  - src/node-types.json
+  - src/tree_sitter/**
+  - test/**

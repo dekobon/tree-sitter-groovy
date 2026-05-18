@@ -85,11 +85,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
           toolchain: "1.85"
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
       - run: cargo clippy --all-targets -- -D warnings
 
   cargo-deny:
@@ -110,9 +110,15 @@ jobs:
       - name: typos
         uses: crate-ci/typos@master
       - name: taplo (TOML format check)
-        uses: uncenter/setup-taplo@v1
+        # SHA-pinned third-party action: the floating `@v1` branch
+        # would let an upstream owner change behavior silently.
+        uses: uncenter/setup-taplo@09968a8ae38d66ddd3d23802c44bf6122d7aa991 # v1
         with:
-          version: latest
+          # Pinned: the action downloads taplo-full-* assets which
+          # only exist up through 0.9.3. `latest` (and 0.10.0) ship
+          # only taplo-* assets and the action fails with
+          # "gzip: stdin: not in gzip format".
+          version: "0.9.3"
       - run: taplo format --check
       - name: markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v18
