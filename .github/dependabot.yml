@@ -44,6 +44,14 @@ updates:
       # and break CI. Bump this dependency manually via `make version`
       # or `npx tree-sitter generate` after editing package.json.
       - dependency-name: tree-sitter-cli
+      # eslint-config-treesitter pins eslint-plugin-jsdoc@^50.x, which
+      # only supports eslint 7-9, and imports `globals` without
+      # declaring it as a dep (relying on eslint 9's transitives).
+      # eslint 10 breaks both. Hold at major 9 until the config is
+      # updated upstream.
+      - dependency-name: eslint
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: cargo
     directory: /
