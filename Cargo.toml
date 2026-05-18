@@ -34,7 +34,7 @@ tree-sitter-language = "0.1.7"
 cc = "1.2"
 
 [dev-dependencies]
-tree-sitter = "0.25"
+tree-sitter = "0.26"
 
 # Lint posture. No crate-wide allows — additional allows go at file or
 # function level so the carve-out stays visible at the affected site

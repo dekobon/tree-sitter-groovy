@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Security
+
+- **CI.** `.github/workflows/ci.yml` declares a top-level
+  `permissions: contents: read` block so every job runs with a
+  read-only `GITHUB_TOKEN`, closing the six
+  `actions/missing-workflow-permissions` CodeQL alerts. No job in this
+  workflow needs write scopes.
+
+### Added
+
+- **Node binding.** `bindings/node/index.js` now exposes
+  `HIGHLIGHTS_QUERY` as a lazy property that reads
+  `queries/groovy/highlights.scm` on first access (cached thereafter
+  by replacing the getter with the string value, matching the upstream
+  `tree-sitter` CLI template). Brings the Node binding to parity with
+  the Rust binding, which already re-exports the same query as
+  `tree_sitter_groovy::HIGHLIGHTS_QUERY`.
+- **Editor integration.** `ftdetect/groovy.lua` ships with the grammar
+  so Neovim auto-detects filetype `groovy` for the extensions
+  declared in `tree-sitter.json` that Neovim's built-in detection
+  misses (`*.gvy`, `*.gy`, `*.jenkinsfile`) plus the `Jenkinsfile.*`
+  filename pattern (`Jenkinsfile.ci`, `Jenkinsfile.release`, etc.)
+  common in repos with multiple pipelines. The existing
+  `ftplugin/groovy.lua` then calls `vim.treesitter.start()`. README
+  gains a "Filetype detection" section covering what is auto-detected
+  plus modeline and per-project autocmd opt-in recipes for files that
+  don't match any pattern.
+
+### Changed
+
+- **BREAKING.** Node binding `bindings/node/binding.cc` no longer
+  exports the `name` field (`require('tree-sitter-groovy').name`
+  returns `undefined`). The matching `name: string` declaration is
+  removed from `bindings/node/index.d.ts`. Upstream
+  `Parser.Language.name` has been deprecated since the NAPI migration
+  and no other binding in this repo (Rust, Python, Go, Swift) exposes
+  it; consumers needing the package identifier should read it from
+  `package.json`. The rest of the TypeScript declarations are
+  refreshed to match the current upstream `tree-sitter` CLI template:
+  `language` is documented `@private` and typed `unknown` (fixing a
+  pre-existing self-referential `language: Language` declaration), and
+  the optional `HIGHLIGHTS_QUERY?: string` field is declared.
+
 ## [0.1.0] - 2026-05-18
 
 Initial release. Purpose-built Groovy 2.x--4.x parser with complete
