@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **Node binding.** `bindings/node/index.js` now exposes
+  `HIGHLIGHTS_QUERY` as a lazy property that reads
+  `queries/groovy/highlights.scm` on first access (cached thereafter
+  by replacing the getter with the string value, matching the upstream
+  `tree-sitter` CLI template). Brings the Node binding to parity with
+  the Rust binding, which already re-exports the same query as
+  `tree_sitter_groovy::HIGHLIGHTS_QUERY`.
 - **Editor integration.** `ftdetect/groovy.lua` ships with the grammar
   so Neovim auto-detects filetype `groovy` for the extensions
   declared in `tree-sitter.json` that Neovim's built-in detection
@@ -19,6 +26,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   gains a "Filetype detection" section covering what is auto-detected
   plus modeline and per-project autocmd opt-in recipes for files that
   don't match any pattern.
+
+### Changed
+
+- **BREAKING.** Node binding `bindings/node/binding.cc` no longer
+  exports the `name` field (`require('tree-sitter-groovy').name`
+  returns `undefined`). The matching `name: string` declaration is
+  removed from `bindings/node/index.d.ts`. Upstream
+  `Parser.Language.name` has been deprecated since the NAPI migration
+  and no other binding in this repo (Rust, Python, Go, Swift) exposes
+  it; consumers needing the package identifier should read it from
+  `package.json`. The rest of the TypeScript declarations are
+  refreshed to match the current upstream `tree-sitter` CLI template:
+  `language` is documented `@private` and typed `unknown` (fixing a
+  pre-existing self-referential `language: Language` declaration), and
+  the optional `HIGHLIGHTS_QUERY?: string` field is declared.
 
 ## [0.1.0] - 2026-05-18
 
