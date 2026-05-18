@@ -52,7 +52,7 @@ fn find_first_problem(node: Node<'_>) -> Option<Node<'_>> {
 fn parses_stress_corpus_with_no_errors() {
     let mut parser = Parser::new();
     parser
-        .set_language(&tree_sitter_groovy::LANGUAGE.into())
+        .set_language(&dekobon_tree_sitter_groovy::LANGUAGE.into())
         .expect("load Groovy grammar");
 
     let files = collect_groovy_files(&stress_dir());

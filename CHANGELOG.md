@@ -83,9 +83,9 @@ operator coverage, six language bindings, and full editor query support.
   `tree_sitter_groovy()`.
 - Node binding exposes `HIGHLIGHTS_QUERY` as a lazy property that
   reads `queries/groovy/highlights.scm` on first access, matching the
-  Rust binding's `tree_sitter_groovy::HIGHLIGHTS_QUERY`.
+  Rust binding's `dekobon_tree_sitter_groovy::HIGHLIGHTS_QUERY`.
 - Node binding no longer exports the deprecated `name` field
-  (`require('tree-sitter-groovy').name` returns `undefined`).
+  (`require('@dekobon/tree-sitter-groovy').name` returns `undefined`).
   TypeScript declarations refreshed to match the current upstream
   `tree-sitter` CLI template.
 

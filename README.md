@@ -2,13 +2,20 @@
 
 [![CI](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml/badge.svg)](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/codeql.yml/badge.svg)](https://github.com/dekobon/tree-sitter-groovy/actions/workflows/codeql.yml)
-[![npm](https://img.shields.io/npm/v/tree-sitter-groovy)](https://www.npmjs.com/package/tree-sitter-groovy)
-[![crates.io](https://img.shields.io/crates/v/tree-sitter-groovy)](https://crates.io/crates/tree-sitter-groovy)
-[![PyPI](https://img.shields.io/pypi/v/tree-sitter-groovy)](https://pypi.org/project/tree-sitter-groovy/)
+[![npm](https://img.shields.io/npm/v/@dekobon/tree-sitter-groovy)](https://www.npmjs.com/package/@dekobon/tree-sitter-groovy)
+[![crates.io](https://img.shields.io/crates/v/dekobon-tree-sitter-groovy)](https://crates.io/crates/dekobon-tree-sitter-groovy)
+[![PyPI](https://img.shields.io/pypi/v/dekobon-tree-sitter-groovy)](https://pypi.org/project/dekobon-tree-sitter-groovy/)
 
 Tree-sitter grammar for [Apache Groovy](https://groovy-lang.org/) —
 the JVM scripting language used in Jenkins pipelines, Gradle build
 files, and Spock test specifications.
+
+**Published as**: `@dekobon/tree-sitter-groovy` on npm,
+`dekobon-tree-sitter-groovy` on crates.io and PyPI,
+`github.com/dekobon/tree-sitter-groovy` as a Go module / Swift package.
+The unscoped name belongs to the upstream comparison grammar linked
+below; the C library (no naming conflict) still ships as
+`libtree-sitter-groovy`.
 
 This grammar is **purpose-built** for Groovy (it does not extend the
 `tree-sitter-java` grammar). It synthesises the best ideas from the
@@ -133,13 +140,13 @@ For Rust consumers:
 
 ```toml
 [dependencies]
-tree-sitter-groovy = "0.1"
+dekobon-tree-sitter-groovy = "0.1"
 tree-sitter = "0.25"
 ```
 
 ```rust
 let mut parser = tree_sitter::Parser::new();
-let language = tree_sitter_groovy::LANGUAGE;
+let language = dekobon_tree_sitter_groovy::LANGUAGE;
 parser.set_language(&language.into()).expect("Error loading Groovy parser");
 let tree = parser.parse(source, None).unwrap();
 ```

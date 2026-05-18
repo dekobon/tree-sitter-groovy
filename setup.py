@@ -10,10 +10,10 @@ class Build(build):
     # Queries live at the repo root (`queries/groovy/*.scm`), outside
     # the Python package source tree, so `package_data` cannot reach
     # them. Copy them into `build_lib` here; the wheel-builder then
-    # includes them under `tree_sitter_groovy/queries/groovy/`.
+    # includes them under `dekobon_tree_sitter_groovy/queries/groovy/`.
     def run(self):
         if isdir("queries"):
-            dest = join(self.build_lib, "tree_sitter_groovy", "queries")
+            dest = join(self.build_lib, "dekobon_tree_sitter_groovy", "queries")
             self.copy_tree("queries", dest)
         super().run()
 
@@ -30,14 +30,14 @@ setup(
     packages=find_packages("bindings/python"),
     package_dir={"": "bindings/python"},
     package_data={
-        "tree_sitter_groovy": ["*.pyi", "py.typed"],
+        "dekobon_tree_sitter_groovy": ["*.pyi", "py.typed"],
     },
-    ext_package="tree_sitter_groovy",
+    ext_package="dekobon_tree_sitter_groovy",
     ext_modules=[
         Extension(
             name="_binding",
             sources=[
-                "bindings/python/tree_sitter_groovy/binding.c",
+                "bindings/python/dekobon_tree_sitter_groovy/binding.c",
                 "src/parser.c",
                 "src/scanner.c",
             ],

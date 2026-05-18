@@ -3,8 +3,8 @@ requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tree-sitter-groovy"
-description = "Apache Groovy grammar for the tree-sitter parsing library"
+name = "dekobon-tree-sitter-groovy"
+description = "Apache Groovy grammar for tree-sitter (dekobon fork)"
 version = "0.1.0"
 keywords = [
   "incremental",

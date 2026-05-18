@@ -25,7 +25,7 @@ type NodeInfo =
  *
  * @example
  * const Parser = require("tree-sitter");
- * const Groovy = require("tree-sitter-groovy");
+ * const Groovy = require("@dekobon/tree-sitter-groovy");
  *
  * const parser = new Parser();
  * parser.setLanguage(Groovy);

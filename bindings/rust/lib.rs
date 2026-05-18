@@ -12,7 +12,7 @@
 //! greet 'Groovy'
 //! "#;
 //! let mut parser = tree_sitter::Parser::new();
-//! let language = tree_sitter_groovy::LANGUAGE;
+//! let language = dekobon_tree_sitter_groovy::LANGUAGE;
 //! parser
 //!     .set_language(&language.into())
 //!     .expect("Error loading Groovy parser");

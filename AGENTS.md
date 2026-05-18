@@ -194,8 +194,17 @@ chore: regenerate parser after grammar.js edit
 
 ### Semantic Versioning
 
-The published artifacts (`tree-sitter-groovy` on crates.io, npm, PyPI;
-Go module; Swift package) follow [SemVer 2.0.0](https://semver.org/).
+The published artifacts follow [SemVer 2.0.0](https://semver.org/).
+Distribution names differ because the unscoped `tree-sitter-groovy`
+name is held by `amaanq/tree-sitter-groovy` on every flat registry:
+
+- **npm**: `@dekobon/tree-sitter-groovy` (scoped)
+- **crates.io**: `dekobon-tree-sitter-groovy` (owner-prefixed)
+- **PyPI**: `dekobon-tree-sitter-groovy` (owner-prefixed)
+- **Go module**: `github.com/dekobon/tree-sitter-groovy` (URL-namespaced)
+- **Swift package**: identified by Git URL
+- **C library**: `libtree-sitter-groovy` (no naming conflict; unchanged)
+
 The single source of truth for the version is `tree-sitter.json` →
 `metadata.version`; `package.json`, `Cargo.toml`, and `pyproject.toml`
 must be kept in sync. `npx tree-sitter version <X.Y.Z>` (wrapped by
