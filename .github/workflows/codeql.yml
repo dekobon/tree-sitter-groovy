@@ -17,6 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This workflow has `security-events: write`, so any third-party
+  # action it runs executes with elevated privilege. SHA-pin every
+  # third-party action added here (first-party `actions/*` and
+  # `github/*` are exempt).
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
@@ -45,7 +49,9 @@ jobs:
             build-mode: autobuild
           - language: rust
             os: ubuntu-latest
-            build-mode: manual
+            # Rust extractor only supports build-mode: none (it walks
+            # the source tree directly; no cargo invocation needed).
+            build-mode: none
 
     steps:
       - uses: actions/checkout@v4
@@ -57,22 +63,6 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
           config-file: ./.github/codeql/codeql-config.yml
           queries: security-and-quality
-
-      - name: Set up Rust toolchain
-        if: matrix.language == 'rust'
-        # Pinned to SHA: this workflow has `security-events: write`, so
-        # any third-party action runs with elevated privilege.
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
-        with:
-          toolchain: "1.85"
-
-      - name: Cache Rust dependencies
-        if: matrix.language == 'rust'
-        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
-
-      - name: Build Rust binding
-        if: matrix.language == 'rust'
-        run: cargo build --all-targets --locked
 
       - name: Build C scanner
         if: matrix.language == 'c-cpp'

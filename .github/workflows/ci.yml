@@ -110,9 +110,15 @@ jobs:
       - name: typos
         uses: crate-ci/typos@master
       - name: taplo (TOML format check)
-        uses: uncenter/setup-taplo@v1
+        # SHA-pinned third-party action: the floating `@v1` branch
+        # would let an upstream owner change behavior silently.
+        uses: uncenter/setup-taplo@09968a8ae38d66ddd3d23802c44bf6122d7aa991 # v1
         with:
-          version: latest
+          # Pinned: the action downloads taplo-full-* assets which
+          # only exist up through 0.9.3. `latest` (and 0.10.0) ship
+          # only taplo-* assets and the action fails with
+          # "gzip: stdin: not in gzip format".
+          version: "0.9.3"
       - run: taplo format --check
       - name: markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v18
