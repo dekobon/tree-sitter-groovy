@@ -11,10 +11,10 @@ license = "Apache-2.0 OR MIT"
 
 build = "bindings/rust/build.rs"
 include = [
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
+  "/LICENSE-APACHE",
+  "/LICENSE-MIT",
   "bindings/rust/**",
-  "grammar.js",
+  "/grammar.js",
   "queries/*",
   "src/*",
   "test/stress/**",
