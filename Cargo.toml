@@ -1,7 +1,7 @@
 [package]
 name = "dekobon-tree-sitter-groovy"
 description = "Apache Groovy grammar for tree-sitter (dekobon fork)"
-version = "0.1.0"
+version = "0.2.0"
 keywords = ["incremental", "parsing", "groovy", "jenkins", "gradle"]
 categories = ["parsing", "text-editors"]
 repository = "https://github.com/dekobon/tree-sitter-groovy"

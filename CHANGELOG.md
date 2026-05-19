@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-19
+
+First version published through the automated release pipeline to
+all three registries (`@dekobon/tree-sitter-groovy` on npm,
+`dekobon-tree-sitter-groovy` on crates.io and PyPI). No
+functional changes from `0.1.0`; grammar, scanner, queries, and
+bindings are identical.
+
+`0.1.0` was a manual bootstrap upload to crates.io, required
+because crates.io does not yet support pending Trusted
+Publishers — the crate had to exist before the publisher entry
+could be registered. It has been yanked. npm and PyPI never saw
+`0.1.0`.
+
+### Changed
+
+- **Release pipeline now uses Trusted Publishing on all three
+  registries.** crates.io, npm, and PyPI all authenticate via
+  short-lived OIDC tokens minted by GitHub Actions; no long-lived
+  `NPM_TOKEN` or `CARGO_REGISTRY_TOKEN` secret on the repo.
+- **`bindings/rust` packaging hardened**: the `[package].include`
+  patterns in `Cargo.toml` are now anchored to the package root,
+  so bare basenames like `LICENSE-MIT` no longer match
+  same-named files under `node_modules/`. Published tarball
+  contents are unchanged (34 files, 5.7 MiB).
+
 ## [0.1.0] - 2026-05-18
 
 Initial release. Purpose-built Groovy 2.x--4.x parser with complete
