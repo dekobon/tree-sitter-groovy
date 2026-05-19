@@ -150,7 +150,10 @@ together when bumping `tree-sitter-cli`.
 ## Versioning, commits, and changelog
 
 This project uses Conventional Commits, Semantic Versioning, and a
-Keep-a-Changelog-formatted `CHANGELOG.md` at the repo root.
+Keep-a-Changelog-formatted `CHANGELOG.md` at the repo root. The
+step-by-step release walkthrough — version bump, changelog move,
+tag-and-push, monitoring, and recovery — lives in
+[`docs/cutting-a-release.md`](docs/cutting-a-release.md).
 
 ### Conventional Commits
 
