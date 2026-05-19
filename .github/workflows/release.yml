@@ -168,7 +168,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
       - run: npm ci
       - run: npm run prebuildify
       - uses: actions/upload-artifact@v4
@@ -183,12 +183,9 @@ jobs:
   # publishes with provenance — no NPM_TOKEN required. A missing or
   # misconfigured trusted publisher on npmjs.com (wrong owner / repo
   # / workflow / environment claims) fails `npm publish` with an
-  # explicit OIDC error. The GitHub-hosted Node 22 runner image
-  # currently ships with npm 10.x, so we upgrade to a pinned npm 11
-  # before publishing. The `^11.5.1` range stays inside the major
-  # version known to support Trusted Publishing while letting
-  # patch / minor security fixes through. Bump the pin
-  # deliberately when npm 12 lands.
+  # explicit OIDC error. Node 24 ships with npm 11.x natively, so
+  # no self-upgrade dance is needed; the `npm verify` step asserts
+  # the CLI floor in case a future runner image regresses.
   npm-publish:
     name: Publish to npm
     needs: [validate, npm-prebuilds]
@@ -201,12 +198,11 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
-      - name: Install npm with Trusted Publishing support
+          node-version: "24"
+      - name: Verify npm supports Trusted Publishing
         shell: bash
         run: |-
           set -eu
-          npm install -g 'npm@^11.5.1'
           ver=$(npm --version)
           echo "npm version: $ver"
           major=${ver%%.*}

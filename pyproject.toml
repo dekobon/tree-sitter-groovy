@@ -20,7 +20,7 @@ classifiers = [
   "Topic :: Text Processing :: Linguistic",
   "Typing :: Typed",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "Apache-2.0 OR MIT"
 license-files = ["LICENSE-APACHE", "LICENSE-MIT"]
 readme = "README.md"
@@ -32,5 +32,5 @@ Homepage = "https://github.com/dekobon/tree-sitter-groovy"
 core = ["tree-sitter~=0.25"]
 
 [tool.cibuildwheel]
-build = "cp38-*"
+build = "cp39-*"
 build-frontend = "build"
