@@ -168,7 +168,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: "22"
       - run: npm ci
       - run: npm run prebuildify
       - uses: actions/upload-artifact@v4
@@ -177,6 +177,18 @@ jobs:
           path: prebuilds/
           if-no-files-found: error
 
+  # Authentication is via npm Trusted Publishing (OIDC). npm CLI
+  # >= 11.5.1 auto-detects the GitHub OIDC environment, exchanges
+  # the runner's ID token for a short-lived registry token, and
+  # publishes with provenance — no NPM_TOKEN required. A missing or
+  # misconfigured trusted publisher on npmjs.com (wrong owner / repo
+  # / workflow / environment claims) fails `npm publish` with an
+  # explicit OIDC error. The GitHub-hosted Node 22 runner image
+  # currently ships with npm 10.x, so we upgrade to a pinned npm 11
+  # before publishing. The `^11.5.1` range stays inside the major
+  # version known to support Trusted Publishing while letting
+  # patch / minor security fixes through. Bump the pin
+  # deliberately when npm 12 lands.
   npm-publish:
     name: Publish to npm
     needs: [validate, npm-prebuilds]
@@ -189,8 +201,19 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
-          registry-url: "https://registry.npmjs.org"
+          node-version: "22"
+      - name: Install npm with Trusted Publishing support
+        shell: bash
+        run: |-
+          set -eu
+          npm install -g 'npm@^11.5.1'
+          ver=$(npm --version)
+          echo "npm version: $ver"
+          major=${ver%%.*}
+          if [ "$major" -lt 11 ]; then
+            echo "npm $ver is below the 11.5.1 minimum required for Trusted Publishing" >&2
+            exit 1
+          fi
       - uses: actions/download-artifact@v4
         with:
           path: prebuilds/
@@ -198,8 +221,6 @@ jobs:
           merge-multiple: true
       - run: ls -R prebuilds/
       - name: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
 
   pypi-wheels:
