@@ -14,6 +14,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Manual re-trigger for the same tag — needed when a publish job
+  # fails partway and one of the registries already accepted the
+  # upload. Run with: `gh workflow run release.yml --ref vX.Y.Z`.
+  # The `validate` job derives the version from `GITHUB_REF`, which
+  # is the tag ref under both triggers.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -273,6 +279,14 @@ jobs:
           path: dist/
       - run: ls -R dist/
       - uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
+        # `skip-existing: true` makes the upload idempotent — a
+        # re-run after a partial publish no-ops on the files PyPI
+        # already has, matching the `crates-publish` job's
+        # sparse-index check. Without this, every retry that gets
+        # past `validate` would fail PyPI with "File already exists"
+        # and cascade to skipping `github-release`.
+        with:
+          skip-existing: true
 
   github-release:
     name: Create GitHub release

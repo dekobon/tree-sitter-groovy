@@ -48,6 +48,9 @@
     "name": "Elijah Zupancic"
   },
   "license": "Apache-2.0 OR MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },

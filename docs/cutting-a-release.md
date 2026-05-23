@@ -135,29 +135,66 @@ exists on PyPI.
 
 ### npm Trusted Publisher setup
 
-On `npmjs.com`, open the package settings for
-`@dekobon/tree-sitter-groovy` (or the **pending publisher** page on
-the `@dekobon` org if the package doesn't exist yet) and add a
-GitHub Actions trusted publisher with:
+Unlike PyPI, **npm does not support pending trusted publishers** —
+the package must exist on the registry before a TP entry can be
+registered against it. The very first publish therefore needs the
+same kind of manual bootstrap that crates.io does. After that
+single upload, all subsequent releases go through the automated
+TP pipeline.
 
-- Organization or user: `dekobon`
-- Repository: `tree-sitter-groovy`
-- Workflow filename: `release.yml`
-- Environment: `release`
+1. **Bootstrap the package on npm** (only required before the
+   very first release; skip if `@dekobon/tree-sitter-groovy`
+   already exists on npm). From a clean checkout at the
+   release-prep commit, on a machine where `npm whoami` resolves
+   to an account with the **Owner** role on the `@dekobon` org:
 
-All fields are case-sensitive and must match the OIDC claims
-exactly. A pending publisher is the right choice for the very
-first npm upload — it lets the OIDC exchange succeed before the
-package exists on npm, so unlike crates.io there is no manual
-bootstrap step.
+   ```bash
+   # Build prebuilds. If you have access to the prior failed CI
+   # run, prefer downloading its `prebuilds-*` artifacts so the
+   # bootstrap ships the full linux-x64 / darwin-arm64 / win32-x64
+   # set rather than just your local platform:
+   gh run download <run-id> --dir /tmp/prebuilds --pattern 'prebuilds-*'
+   mkdir -p prebuilds
+   cp -r /tmp/prebuilds/prebuilds-*/* prebuilds/
 
-The `npm-publish` job installs `npm@^11.5.1` before publishing —
-the GitHub-hosted Node 22 runner image currently ships with npm
-10.x, but Trusted Publishing requires npm >= 11.5.1. The caret
-range pins to the major version known to support Trusted
-Publishing while letting patch / minor security fixes through;
-bump it deliberately when npm 12 lands. No `NPM_TOKEN` secret is
-needed — the OIDC exchange is automatic.
+   # Confirm the package set:
+   npm pack --dry-run
+
+   # Publish. `--otp` is required if the @dekobon org enforces
+   # "Require 2FA for write actions"; supply a fresh code from your
+   # authenticator app. Skip `--provenance` — provenance requires
+   # CI OIDC and isn't available from a local terminal. The first
+   # automated release post-bootstrap will carry provenance.
+   npm publish --access public --otp=<6-digit-code>
+
+   # Clean up:
+   rm -rf prebuilds/ /tmp/prebuilds
+   ```
+
+2. **Register the Trusted Publisher on the now-existing package.**
+   On `npmjs.com`, navigate to
+   **https://www.npmjs.com/package/@dekobon/tree-sitter-groovy/access**
+   → **Trusted Publisher** section → **GitHub Actions** → fill in:
+
+   - Organization or user: `dekobon`
+   - Repository: `tree-sitter-groovy`
+   - Workflow filename: `release.yml`
+   - Environment: `release`
+
+   All fields are case-sensitive and must match the OIDC claims
+   exactly.
+
+3. After this, the automated `npm-publish` job authenticates via
+   OIDC for every subsequent release — no token, no OTP, no human
+   in the loop. The manual bootstrap is never needed again unless
+   the package is unpublished and re-created.
+
+The `npm-publish` job uses Node 24, which ships with npm 11.x
+natively — Trusted Publishing requires npm >= 11.5.1, and Node 22
+runners only ship npm 10.x, so Node 24 avoids a brittle self-upgrade
+step. Bump the `node-version` floor deliberately when npm 12 lands.
+No `NPM_TOKEN` secret is needed once the bootstrap is done — the
+OIDC exchange is automatic.
 
 ### Distribution names
 
@@ -422,14 +459,16 @@ The three publish jobs (`crates-publish`, `npm-publish`,
 the others. Diagnosing a partial success therefore means looking
 at each job independently.
 
-Re-running is also constrained: `release.yml` only triggers on
-`push: tags: ["v*"]`, so the **Actions → Run workflow** button is
-not available. Until a `workflow_dispatch:` trigger is added to
-`on:` in `release.yml`, the only way to re-trigger is to delete
-and re-push the tag (`gh release delete vX.Y.Z --cleanup-tag --yes`
-then re-tag). Add `workflow_dispatch:` if you expect any of these
-recovery paths to come up — it's a one-line change and eliminates
-the tag-delete dance.
+Re-running the workflow on the same tag is supported via the
+`workflow_dispatch:` trigger:
+
+```bash
+gh workflow run release.yml --ref vX.Y.Z
+```
+
+The `validate` job derives the version from `GITHUB_REF` under both
+the push and dispatch triggers, so a re-run from a tag ref is
+indistinguishable from a tag push for everything downstream.
 
 The fix then depends on which job failed:
 
@@ -437,21 +476,20 @@ The fix then depends on which job failed:
   queries the sparse index and skips when the version is already
   present, so once the underlying issue is fixed, re-running the
   workflow uploads if needed and no-ops if not.
-- **PyPI upload failed**: `pypi-publish` is **not** idempotent.
-  `pypa/gh-action-pypi-publish` is invoked without
-  `skip-existing: true` (see `release.yml`), so a re-run after a
-  partial upload errors on the duplicate filename. The cleanest
-  options are: (a) add `with: { skip-existing: true }` to that
-  step before re-running, or (b) bump to the next patch version
-  and re-tag.
+- **PyPI upload failed**: `pypi-publish` runs
+  `pypa/gh-action-pypi-publish` with `skip-existing: true`, so the
+  step no-ops on any file PyPI already has. A re-run after a
+  partial upload completes the missing files without erroring on
+  the duplicates.
 - **npm upload failed**: `npm publish` rejects duplicate versions
   outright. Within 24 hours of upload, `npm unpublish
   @dekobon/tree-sitter-groovy@X.Y.Z` is allowed and lets you
   re-publish the same version. After 24 hours, the version is
   immutable — bump to the next patch and re-tag.
-- **`github-release` failed**: re-run after adding
-  `workflow_dispatch:`, or create the release by hand with `gh
-  release create vX.Y.Z --notes-file <(awk ...CHANGELOG.md)`.
+- **`github-release` failed**: re-run via
+  `gh workflow run release.yml --ref vX.Y.Z`, or create the release
+  by hand with `gh release create vX.Y.Z --notes-file
+  <(awk ...CHANGELOG.md)`.
 
 If you need to pull a release entirely:
 
@@ -473,18 +511,17 @@ artefacts even if you unpublished within the window.
   publishes to crates.io / npm / PyPI just like a stable tag.
   If you need rehearsal without external uploads, use a fork or
   add a `prerelease`-aware `if:` to the publish jobs.
-- **No `workflow_dispatch` trigger.** Re-running the workflow on
-  the same tag from the Actions UI requires adding
-  `workflow_dispatch:` to `on:` in `release.yml`. Without it,
-  re-runs are tag-delete-and-re-push only.
 - **No WASM artefact on the Release.** `tree-sitter build --wasm`
   runs on `npm start` but is not built or uploaded by `release.yml`.
   Editor integrations that pull the WASM blob fetch it from the
   npm tarball instead.
-- **No signature on the GitHub Release assets.** The npm publish
-  carries SLSA provenance via `--provenance`; crates.io and PyPI
-  carry their own provenance via Trusted Publishing. The
-  `github-release` job itself does not produce a `SHA256SUMS` or
-  a minisign signature. Consumers should pull from the named
-  registries, not the GitHub release tarball, when integrity
-  matters.
+- **No signature on the GitHub Release assets — intentionally.**
+  The npm publish carries SLSA provenance via `--provenance`;
+  crates.io and PyPI carry their own provenance via Trusted
+  Publishing. Adding a minisign signature on the `github-release`
+  job's tarball would require a long-lived signing key as a repo
+  secret, weakening the otherwise-zero-secret posture without
+  adding meaningful integrity guarantees beyond what the three
+  registry attestations already provide. Consumers should pull
+  from the named registries, not the GitHub release tarball, when
+  integrity matters.
