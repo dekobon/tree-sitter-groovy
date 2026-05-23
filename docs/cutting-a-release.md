@@ -146,7 +146,15 @@ TP pipeline.
    very first release; skip if `@dekobon/tree-sitter-groovy`
    already exists on npm). From a clean checkout at the
    release-prep commit, on a machine where `npm whoami` resolves
-   to an account with the **Owner** role on the `@dekobon` org:
+   to an account with the **Owner** role on the `@dekobon` org.
+
+   **Gotcha**: npm tokens cache role claims at mint time. If you
+   were granted Owner shortly before the bootstrap, run a fresh
+   `npm login` first — tokens minted earlier still assert the
+   prior role and will 404 with "you do not have permission",
+   even though the npm website shows you as Owner. The
+   `npm org ls dekobon` command should print `ez24 - owner` for
+   the role to be in effect for publishing.
 
    ```bash
    # Build prebuilds. If you have access to the prior failed CI
@@ -160,11 +168,13 @@ TP pipeline.
    # Confirm the package set:
    npm pack --dry-run
 
-   # Publish. `--otp` is required if the @dekobon org enforces
-   # "Require 2FA for write actions"; supply a fresh code from your
-   # authenticator app. Skip `--provenance` — provenance requires
-   # CI OIDC and isn't available from a local terminal. The first
-   # automated release post-bootstrap will carry provenance.
+   # Publish. `--otp=<6-digit-code>` is required only if the org
+   # enforces "Require 2FA for write actions" (the `@dekobon`
+   # org's current policy); omit the flag otherwise. Supply a fresh
+   # code from your authenticator app. Skip `--provenance` —
+   # provenance requires CI OIDC and isn't available from a local
+   # terminal. The first automated release post-bootstrap will
+   # carry provenance.
    npm publish --access public --otp=<6-digit-code>
 
    # Clean up:
@@ -468,7 +478,17 @@ gh workflow run release.yml --ref vX.Y.Z
 
 The `validate` job derives the version from `GITHUB_REF` under both
 the push and dispatch triggers, so a re-run from a tag ref is
-indistinguishable from a tag push for everything downstream.
+indistinguishable from a tag push for everything downstream. Only
+dispatch from a *tag* ref — branch refs fail `validate` with a
+"does not look like vX.Y.Z" error.
+
+**Caveat**: GitHub Actions resolves the workflow file from the ref
+being dispatched, not from `main`. `workflow_dispatch:` therefore
+only works on tags whose ref commit includes the trigger — i.e.,
+tags created *after* the commit that added `workflow_dispatch:` to
+`release.yml`. For older tags lacking the trigger, the only
+recourse is the tag-delete-and-re-push dance, or creating the
+GitHub Release by hand.
 
 The fix then depends on which job failed:
 

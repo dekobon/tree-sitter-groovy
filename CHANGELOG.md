@@ -11,9 +11,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 First version published through the automated release pipeline to
 all three registries (`@dekobon/tree-sitter-groovy` on npm,
-`dekobon-tree-sitter-groovy` on crates.io and PyPI). No
-functional changes from `0.1.0`; grammar, scanner, queries, and
-bindings are identical.
+`dekobon-tree-sitter-groovy` on crates.io and PyPI). Grammar,
+scanner, queries, and bindings are unchanged from `0.1.0`.
 
 `0.1.0` was a manual bootstrap upload to crates.io, required
 because crates.io does not yet support pending Trusted
@@ -23,6 +22,14 @@ could be registered. It has been yanked. npm and PyPI never saw
 
 ### Changed
 
+- **BREAKING: Python binding minimum is now 3.9** (previously 3.8).
+  setuptools >= 82.0.1 — required by the build — dropped Python
+  3.8 support, so the cibuildwheel matrix and `requires-python`
+  both move to 3.9. abi3 wheels at the 3.9 floor still cover 3.9
+  through 3.13+. No Python 3.8 user could have consumed this
+  package via PyPI (the registry never had `0.1.0`), but Python
+  3.8 users building from sdist need to either pin to a pre-`0.2.0`
+  source release or upgrade their Python.
 - **Release pipeline now uses Trusted Publishing on all three
   registries.** crates.io, npm, and PyPI all authenticate via
   short-lived OIDC tokens minted by GitHub Actions; no long-lived

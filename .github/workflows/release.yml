@@ -17,8 +17,11 @@ on:
   # Manual re-trigger for the same tag — needed when a publish job
   # fails partway and one of the registries already accepted the
   # upload. Run with: `gh workflow run release.yml --ref vX.Y.Z`.
-  # The `validate` job derives the version from `GITHUB_REF`, which
-  # is the tag ref under both triggers.
+  # The `validate` job derives the version from `GITHUB_REF` via
+  # `tag="${GITHUB_REF#refs/tags/}"`; under push this is always a
+  # tag, under dispatch it's whatever `--ref` was passed. Only
+  # dispatch from a tag ref — `validate` rejects branch refs with
+  # a "does not look like vX.Y.Z" error.
   workflow_dispatch:
 
 permissions:
@@ -211,8 +214,15 @@ jobs:
           set -eu
           ver=$(npm --version)
           echo "npm version: $ver"
-          major=${ver%%.*}
-          if [ "$major" -lt 11 ]; then
+          # Floor: 11.5.1, the first npm release with Trusted
+          # Publishing support. Encode the version as
+          # major*1_000_000 + minor*1_000 + patch (no leading zeros,
+          # so bash's `[ -lt ]` doesn't reinterpret octal). Strips
+          # any pre-release suffix first since the runner image
+          # ships stable releases.
+          IFS=. read -r maj min pat <<<"${ver%%-*}"
+          encoded=$(( maj * 1000000 + min * 1000 + pat ))
+          if [ "$encoded" -lt 11005001 ]; then
             echo "npm $ver is below the 11.5.1 minimum required for Trusted Publishing" >&2
             exit 1
           fi
