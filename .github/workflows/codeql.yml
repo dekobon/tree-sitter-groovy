@@ -35,6 +35,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - language: actions
+            os: ubuntu-latest
+            # CodeQL's GitHub Actions analyzer scans workflow YAML
+            # for misconfigurations (missing permissions, untrusted
+            # script injection, unpinned third-party actions, etc.).
+            # Always `build-mode: none` — there's nothing to build.
+            build-mode: none
           - language: c-cpp
             os: ubuntu-latest
             build-mode: manual
