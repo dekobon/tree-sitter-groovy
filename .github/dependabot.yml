@@ -37,13 +37,6 @@ updates:
           - minor
           - patch
     ignore:
-      # Any tree-sitter-cli bump (major, minor, or patch) requires
-      # regenerating src/parser.c with the new CLI and committing the
-      # result alongside the lockfile change. Dependabot only touches
-      # package-lock.json, so its PRs would land with a stale parser.c
-      # and break CI. Bump this dependency manually via `make version`
-      # or `npx tree-sitter generate` after editing package.json.
-      - dependency-name: tree-sitter-cli
       # eslint-config-treesitter pins eslint-plugin-jsdoc@^50.x, which
       # only supports eslint 7-9, and imports `globals` without
       # declaring it as a dep (relying on eslint 9's transitives).
