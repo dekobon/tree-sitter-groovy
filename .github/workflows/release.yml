@@ -245,7 +245,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-14]
     steps:
       - uses: actions/checkout@v6
-      - uses: pypa/cibuildwheel@faf86a6ed7efa889faf6996aa23820831055001a # v3.0.0
+      - uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.0.0
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
