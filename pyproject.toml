@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dekobon-tree-sitter-groovy"
 description = "Apache Groovy grammar for tree-sitter (dekobon fork)"
-version = "0.2.0"
+version = "0.2.1"
 keywords = [
   "incremental",
   "parsing",

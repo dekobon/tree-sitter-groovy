@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-24
+
+Maintenance release. No grammar, scanner, or query changes; this
+ships the regenerated parser source from a newer `tree-sitter-cli`
+plus dependency bumps. AST shape, query captures, and binding
+public surface are all identical to `0.2.0`.
+
+### Changed
+
+- Bumped `tree-sitter-cli` from 0.25.10 to 0.26.9 (dev dependency).
+  `src/parser.c` and `src/tree_sitter/array.h` have been regenerated
+  with the new CLI; the committed parser source matches what CI
+  expects.
+- Bumped the Rust `tree-sitter` runtime from 0.26.8 to 0.26.9
+  (patch).
+- Bumped `node-addon-api` from 8.7.0 to 8.8.0 (minor).
+- Pinned several GitHub Actions to current major versions
+  (`actions/upload-artifact` v7, `actions/download-artifact` v8,
+  `pypa/cibuildwheel` 3.4.1, and the actions-minor-and-patch
+  group).
+- CI: aligned the regenerate workflow with the upstream
+  `tree-sitter-grammars/template`, added GitHub Actions to the
+  CodeQL language matrix, and closed the release-pipeline known
+  gaps surfaced after `v0.2.0`. Dependabot is now allowed to bump
+  `tree-sitter-cli`.
+
 ## [0.2.0] - 2026-05-19
 
 First version published through the automated release pipeline to

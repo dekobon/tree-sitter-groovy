@@ -1,6 +1,6 @@
 {
   "name": "@dekobon/tree-sitter-groovy",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Apache Groovy grammar for tree-sitter (dekobon fork)",
   "main": "bindings/node",
   "types": "bindings/node",
