@@ -180,7 +180,7 @@ jobs:
           node-version: "24"
       - run: npm ci
       - run: npm run prebuildify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: prebuilds-${{ matrix.os }}
           path: prebuilds/
@@ -246,7 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084 # v3.0.0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -263,7 +263,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade build
       - run: python -m build --sdist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
