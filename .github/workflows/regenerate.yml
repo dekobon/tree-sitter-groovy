@@ -1,0 +1,43 @@
+name: Regenerate parser
+
+# Runs on Dependabot PRs that bump `tree-sitter-cli` (or other npm
+# deps that change generated parser output) and commits the
+# regenerated `src/parser.c` back onto the PR branch. Matches the
+# tree-sitter-grammars/template workflow of the same name.
+#
+# `tree-sitter/workflows` has no tagged release containing
+# `regenerate.yml` yet, so the SHA below points at main. Bump it
+# manually when a tagged release becomes available.
+#
+# CI RE-TRIGGER CAVEAT. The reusable workflow pushes the regenerate
+# commit using the default GITHUB_TOKEN. GitHub deliberately does
+# NOT fire downstream `pull_request` events for GITHUB_TOKEN pushes,
+# so `ci.yml` will not auto-run on the regenerated HEAD. Practical
+# impact is limited because `ci.yml` runs `tree-sitter/parser-test-
+# action` with `generate: true`, so the pre-regenerate CI run
+# already tests against a freshly-regenerated parser. But if your
+# branch protection requires status checks on the current HEAD SHA,
+# the dependabot PR may need a manual nudge before it can merge:
+#
+#   - comment `@dependabot rebase` (dependabot will force-push,
+#     which DOES trigger CI; the regenerate workflow then re-runs
+#     and re-commits the parser), or
+#   - push an empty commit to the PR branch yourself, or
+#   - install a GitHub App and swap the reusable workflow's push
+#     credential for the app token (out of scope for this repo).
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    uses: tree-sitter/workflows/.github/workflows/regenerate.yml@216133f5cb4469b112c5e83415869e58b25c353a # main
+    if: "!github.event.repository.is_template && github.actor == 'dependabot[bot]'"
