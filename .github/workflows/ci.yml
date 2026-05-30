@@ -86,8 +86,23 @@ jobs:
           generate: true
           test-parser: true
           test-rust: true
-          rust-version: "1.85"
+          rust-version: "1.94"
           # test-node: true
+      # Catch a committed parser.c / grammar.json / node-types.json
+      # that drifted from grammar.js. The parser-test-action above
+      # regenerates these in-place but never compares them against the
+      # checkout, so a stale committed copy can pass tests while
+      # shipping out-of-date C to downstream consumers. Linux only —
+      # line-ending normalization on Windows produces spurious diffs.
+      - name: Verify generated parser artifacts are up to date
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |-
+          set -eu
+          if ! git diff --exit-code src/parser.c src/grammar.json src/node-types.json; then
+            echo "Committed parser artifacts are stale. Run 'npx tree-sitter generate' and commit the result." >&2
+            exit 1
+          fi
 
   rust-lint:
     name: Rust lint (clippy)
@@ -96,7 +111,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
-          toolchain: "1.85"
+          toolchain: "1.94"
           components: clippy
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - run: cargo clippy --all-targets -- -D warnings
