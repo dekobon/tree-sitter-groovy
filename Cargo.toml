@@ -6,7 +6,7 @@ keywords = ["incremental", "parsing", "groovy", "jenkins", "gradle"]
 categories = ["parsing", "text-editors"]
 repository = "https://github.com/dekobon/tree-sitter-groovy"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.94"
 license = "Apache-2.0 OR MIT"
 
 build = "bindings/rust/build.rs"
