@@ -343,10 +343,10 @@ than a tight window.
 ## Cutting a pre-release
 
 The `validate` regex
-(`^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$`) accepts SemVer
-pre-release suffixes — e.g. `v0.2.0-rc1`, `v0.2.0-beta.2`,
-`v0.2.0-alpha3`. The version in every metadata file must include
-the suffix exactly.
+(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
+accepts SemVer 2 pre-release suffixes — e.g. `v0.2.0-rc1`,
+`v0.2.0-beta.2`, `v0.2.0-alpha3`. The version in every metadata
+file must include the suffix exactly.
 
 There is **no automatic skip** of registry uploads for pre-release
 tags in this pipeline — unlike the `host-identity` workflow,
@@ -393,7 +393,7 @@ Common failure signatures and what they mean:
 
 | Failure | Cause |
 |---------|-------|
-| `Tag 'vX' does not look like vX.Y.Z` | The tag isn't SemVer; re-tag. |
+| `Tag 'vX' is not a valid SemVer 2 version` | The tag isn't SemVer 2; re-tag. |
 | `Version mismatch: tag=… tree-sitter.json=…` | One of the four metadata files drifted. Re-run `make version` and commit. |
 | `package-lock.json name is …, expected …` | Run `npm install --package-lock-only` and commit. |
 | `CHANGELOG.md is missing a section for X.Y.Z` | Add a `## [X.Y.Z]` heading on the tagged commit. Editing `main` after tagging does not help — re-tag. |
@@ -480,7 +480,7 @@ The `validate` job derives the version from `GITHUB_REF` under both
 the push and dispatch triggers, so a re-run from a tag ref is
 indistinguishable from a tag push for everything downstream. Only
 dispatch from a *tag* ref — branch refs fail `validate` with a
-"does not look like vX.Y.Z" error.
+"not a valid SemVer 2 version" error.
 
 **Caveat**: GitHub Actions resolves the workflow file from the ref
 being dispatched, not from `main`. `workflow_dispatch:` therefore
