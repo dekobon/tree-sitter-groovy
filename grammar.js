@@ -91,10 +91,12 @@ module.exports = grammar({
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
-  // statement boundaries via `repeat($._statement)`, label colon
-  // via grammar precedence) are intentionally NOT listed — listing
-  // an unwired external token would let dormant scanner branches
-  // mis-fire in error-recovery states.
+  // label colon via grammar precedence, and statement boundaries
+  // via `repeat(choice($._statement, ';'))` — newline is `extras`
+  // whitespace and `;` is an anonymous list element, see §5.10)
+  // are intentionally NOT listed: listing an unwired external token
+  // would let dormant scanner branches mis-fire in error-recovery
+  // states.
   externals: $ => [
     $._slashy_string_start,
     $.line_comment,
@@ -150,7 +152,7 @@ module.exports = grammar({
     // SPECIFICATION.md §4 (statement and declaration coverage).
     source_file: $ => seq(
       optional($.shebang),
-      repeat($._statement),
+      repeat(choice($._statement, ';')),
     ),
 
     // §4 — `#!/usr/bin/env groovy` line at file start. Single
@@ -237,7 +239,7 @@ module.exports = grammar({
     // are valid alternatives (e.g. the body slot of `if` / `while`).
     block: $ => prec(1, seq(
       '{',
-      repeat($._statement),
+      repeat(choice($._statement, ';')),
       '}',
     )),
 
@@ -266,13 +268,17 @@ module.exports = grammar({
     ),
 
     // §4 — C-style for. init / condition / update slots all
-    // optional; bare `for (;;)` is the infinite-loop idiom.
-    // Typed variable declarations in init (`int i = 0`) land with
-    // local_variable_declaration in a later iteration.
+    // optional; bare `for (;;)` is the infinite-loop idiom. The init
+    // slot accepts a single expression (`i = 0`) or a variable
+    // declaration (`int i = 0`, `def i = 0`, incl. multiple
+    // declarators). Apache `GroovyParser.g4` `forInit:
+    // localVariableDeclaration | expressionList` also allows a
+    // comma-separated expression list (`i = 0, j = 1`); that form is
+    // not yet supported.
     for_statement: $ => seq(
       'for',
       '(',
-      optional(field('init', $._expression)),
+      optional(field('init', choice($._expression, $.local_variable_declaration))),
       ';',
       optional(field('condition', $._expression)),
       ';',
@@ -847,7 +853,7 @@ module.exports = grammar({
       'case',
       field('value', $._expression),
       ':',
-      repeat($._statement),
+      repeat(choice($._statement, ';')),
     ),
 
     switch_arrow_case: $ => seq(
@@ -860,7 +866,7 @@ module.exports = grammar({
     switch_default: $ => seq(
       'default',
       choice(
-        seq(':', repeat($._statement)),
+        seq(':', repeat(choice($._statement, ';'))),
         seq('->', field('body', choice($.block, $._statement))),
       ),
     ),
@@ -1351,7 +1357,7 @@ module.exports = grammar({
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
-      repeat($._statement),
+      repeat(choice($._statement, ';')),
       '}',
     ),
 

@@ -209,3 +209,122 @@ for (i in 0..<n) { f(i) }
         (method_invocation
           function: (identifier)
           arguments: (argument_list (identifier)))))))
+
+==================
+dekobon 20 top-level typed method with semicolon body
+==================
+
+void f() { x(); }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+dekobon 20 typed method with multiple semicolon statements
+==================
+
+void f() { x(); y() }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+dekobon 20 typed method with C-style for loop
+==================
+
+void f() { for (int i = 0; i < 3; i++) { a(); } }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (for_statement
+        init: (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (number_literal))
+        condition: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        update: (update_expression
+          operand: (identifier))
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+dekobon 20 semicolon terminates top-level statements
+==================
+
+def x = 1; def y = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+dekobon 20 semicolon in switch case body
+==================
+
+switch (x) {
+  case 1: y(); break
+  default: z()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))
+          (break_statement))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))

@@ -4122,6 +4122,10 @@
             "named": true
           },
           {
+            "type": "local_variable_declaration",
+            "named": true
+          },
+          {
             "type": "logical_implication_expression",
             "named": true
           },

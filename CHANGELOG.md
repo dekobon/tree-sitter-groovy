@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept `;` as a statement terminator, separator, and empty statement
+  in every statement-list context (`source_file`, `block`, `closure`,
+  and `switch` `case`/`default` bodies). Previously any `;` produced an
+  `ERROR` node, which at script top level also cascaded into a misparse
+  of a typed method (`void f() { x(); }` was read as a bare identifier
+  plus a call plus a closure instead of a `method_declaration`). (#20)
+- Accept a typed or `def`/`var` variable declaration in the C-style
+  `for` init clause (`for (int i = 0; …)`, `for (def i = 0; …)`), which
+  previously errored. (#20)
+
 ## [0.2.1] - 2026-05-24
 
 Maintenance release. No grammar, scanner, or query changes; this
