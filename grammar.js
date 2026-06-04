@@ -245,13 +245,20 @@ module.exports = grammar({
 
     // §4 — if / else. `prec.right` resolves the dangling-else
     // ambiguity in favour of the closest `if`. Body accepts either
-    // an explicit block (preferred) or a single statement.
+    // an explicit block (preferred) or a single statement. The
+    // `optional(';')` after the consequence keeps the else attached
+    // when a braceless consequence is terminated by a semicolon
+    // (`if (x) a(); else b()`); without it the `;` is claimed by the
+    // enclosing statement list (§5.10) and the `else` is severed. It
+    // sits outside the else clause so the no-else form (`if (x) a();
+    // b()`) does not require an `else` after eating the `;`.
     if_statement: $ => prec.right(seq(
       'if',
       '(',
       field('condition', $._expression),
       ')',
       field('consequence', choice($.block, $._statement)),
+      optional(';'),
       optional(seq(
         'else',
         field('alternative', choice($.block, $._statement)),
@@ -288,9 +295,13 @@ module.exports = grammar({
     ),
 
     // §4 — do-while. Body is required; condition follows the body.
+    // `optional(';')` lets a braceless body be terminated before
+    // `while` (`do a(); while (c)`, the Java/Groovy `do S while (e);`
+    // form); without it the `;` errors since `while` is required next.
     do_while_statement: $ => seq(
       'do',
       field('body', choice($.block, $._statement)),
+      optional(';'),
       'while',
       '(',
       field('condition', $._expression),
@@ -516,9 +527,13 @@ module.exports = grammar({
 
     // §4 — `{ method* }` for v1. Field declarations, static
     // initialisers, and inner classes land later.
+    // The body accepts `;` as an empty member / terminator the same
+    // way statement lists do (§5.10): a field or abstract method is
+    // commonly written `int x = 1;` / `void f();`, and a stray `;` is
+    // a no-op member. `;` is anonymous, so it never appears in the AST.
     class_body: $ => seq(
       '{',
-      repeat($._class_member),
+      repeat(choice($._class_member, ';')),
       '}',
     ),
 
@@ -641,7 +656,7 @@ module.exports = grammar({
         repeat(seq(',', $.enum_constant)),
         optional(','),
       )),
-      optional(seq(';', repeat($._class_member))),
+      optional(seq(';', repeat(choice($._class_member, ';')))),
       '}',
     ),
 
@@ -856,18 +871,23 @@ module.exports = grammar({
       repeat(choice($._statement, ';')),
     ),
 
+    // The arrow body may be terminated by `;` (`case 1 -> foo();`),
+    // matching the Java/Groovy `case L -> expr;` arrow form. The `;`
+    // is anonymous and absorbed here rather than by the switch block,
+    // which has no statement-list of its own.
     switch_arrow_case: $ => seq(
       'case',
       field('value', $._expression),
       '->',
       field('body', choice($.block, $._statement)),
+      optional(';'),
     ),
 
     switch_default: $ => seq(
       'default',
       choice(
         seq(':', repeat(choice($._statement, ';'))),
-        seq('->', field('body', choice($.block, $._statement))),
+        seq('->', field('body', choice($.block, $._statement)), optional(';')),
       ),
     ),
 

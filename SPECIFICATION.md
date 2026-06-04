@@ -708,14 +708,26 @@ scanner branches are avoided):
   separator. Inside `(`/`[`/`{` a newline is likewise just whitespace,
   matching Groovy's rule.
 - **Semicolon** `;` is an optional, anonymous element of every
-  statement list: `repeat(choice($._statement, ';'))`. Because no
-  statement rule itself contains `;`, the only production that can
-  consume one is this list alternative — so there is exactly one place
-  a `;` can attach (no nested-terminator ambiguity), and it never
-  appears as a named node in the AST. This covers terminators
-  (`x();`), separators (`x(); y()`), and empty statements (`;`, `;;`).
-  The statement-list contexts are `source_file`, `block`, `closure`,
-  and the classic `switch` `case`/`default` bodies.
+  statement list (`repeat(choice($._statement, ';'))`) and member list
+  (`repeat(choice($._class_member, ';'))`). It never appears as a named
+  node in the AST, so wherever it attaches the named-node tree is
+  identical. This covers terminators (`x();`), separators (`x(); y()`),
+  empty statements (`;`, `;;`), and empty / terminated members
+  (`class C { ; }`, `void f();`, `int x = 1;`). The list contexts are
+  `source_file`, `block`, `closure`, the classic `switch`
+  `case`/`default` bodies, and the class / interface / trait / enum
+  member bodies.
+- Three single-statement (non-list) bodies take an explicit
+  `optional(';')` so their terminator is not claimed by the *enclosing*
+  list or rejected before a required follow-on token: the braceless
+  `if` consequence (without it the `;` in `if (x) a(); else b()` would
+  be eaten by the outer list and the `else` severed into a stray
+  declaration), the braceless `do`-`while` body (`do a(); while (c)`,
+  where `while` must follow), and the `switch` arrow-case body
+  (`case 1 -> foo();`, matching the Java/Groovy `case L -> expr;`
+  form). For `if`, the `;` sits *after* the consequence and *before*
+  the optional `else`, so the no-`else` form (`if (x) a(); b()`) does
+  not error.
 
 An earlier draft proposed a `_terminator` external scanner token
 matching `;`-or-meaningful-newline; it was never wired, because the

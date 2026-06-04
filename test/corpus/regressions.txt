@@ -328,3 +328,114 @@ switch (x) {
             (method_invocation
               function: (identifier)
               arguments: (argument_list))))))))
+
+==================
+dekobon 20 else attaches after semicolon-terminated consequence
+==================
+
+if (x) a(); else b()
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))
+    alternative: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+dekobon 20 semicolon after braceless if without else
+==================
+
+if (x) a(); b()
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+dekobon 20 interface abstract method with semicolon
+==================
+
+interface Foo { void bar(); }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+dekobon 20 class field with semicolon
+==================
+
+class Foo { int x = 1; }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+dekobon 20 switch arrow case with semicolon
+==================
+
+switch (x) { case 1 -> foo(); }
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+dekobon 20 do-while with semicolon-terminated body
+==================
+
+do a(); while (c)
+
+---
+
+(source_file
+  (do_while_statement
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))
+    condition: (identifier)))

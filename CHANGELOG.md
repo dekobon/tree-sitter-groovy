@@ -9,12 +9,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
-- Accept `;` as a statement terminator, separator, and empty statement
-  in every statement-list context (`source_file`, `block`, `closure`,
-  and `switch` `case`/`default` bodies). Previously any `;` produced an
-  `ERROR` node, which at script top level also cascaded into a misparse
-  of a typed method (`void f() { x(); }` was read as a bare identifier
-  plus a call plus a closure instead of a `method_declaration`). (#20)
+- Accept `;` as a terminator, separator, and empty statement / member
+  in statement-list contexts (`source_file`, `block`, `closure`,
+  `switch` `case`/`default` bodies) and member-list contexts (class /
+  interface / trait / enum bodies). This covers the common
+  abstract-method (`interface Foo { void bar(); }`), field
+  (`int x = 1;`), and semicolon-terminated statement
+  (`void f() { x(); }`) forms that previously produced `ERROR` nodes;
+  at script top level the last also cascaded into a misparse of the
+  whole method. (#20)
+- Accept a `;` terminating a braceless single-statement body: keep the
+  `else` attached after an `if` consequence ends in `;`
+  (`if (x) a(); else b()`), allow a `do`-`while` body to end in `;`
+  (`do a(); while (c)`), and accept a trailing `;` on a `switch`
+  arrow-case body (`case 1 -> foo();`). (#20)
 - Accept a typed or `def`/`var` variable declaration in the C-style
   `for` init clause (`for (int i = 0; …)`, `for (def i = 0; …)`), which
   previously errored. (#20)
