@@ -396,7 +396,7 @@ fix relative to *both* parent grammars.
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`. |
 | `if` / `else` | port | |
 | `while` / `do-while` | port | |
-| `for(;;)` | port | including multi-assignment in initializer per Groovy semantics doc |
+| `for(;;)` | port | `init` accepts a single expression (`i = 0`) or a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | |
 | `switch` with `case … :` | port | |
 | `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). |
@@ -697,20 +697,33 @@ syntax) is a separate class-declaration form (§4).
 
 ### 5.10 Statement terminators
 
-Groovy treats newline as a statement terminator *most of the time*.
-The grammar approach:
+Groovy treats both newline and `;` as statement terminators *most of
+the time*. The grammar handles the two cases differently, both
+in-grammar (no external `_terminator` token — see §6 on why dormant
+scanner branches are avoided):
 
-- `_terminator`: external scanner token that matches `;` or a newline
-  that ends a statement (i.e., a newline that is not preceded by an
-  operator that requires a right-hand operand and not inside a
-  bracket pair).
-- Inside `(`/`[`/`{`, newlines are whitespace (matches Groovy's
-  rule).
+- **Newline** is whitespace (`/\s/` is in `extras`), so statements are
+  delimited purely structurally: a statement list is `repeat(...)` and
+  two adjacent complete statements (`x()` then `y()`) need no explicit
+  separator. Inside `(`/`[`/`{` a newline is likewise just whitespace,
+  matching Groovy's rule.
+- **Semicolon** `;` is an optional, anonymous element of every
+  statement list: `repeat(choice($._statement, ';'))`. Because no
+  statement rule itself contains `;`, the only production that can
+  consume one is this list alternative — so there is exactly one place
+  a `;` can attach (no nested-terminator ambiguity), and it never
+  appears as a named node in the AST. This covers terminators
+  (`x();`), separators (`x(); y()`), and empty statements (`;`, `;;`).
+  The statement-list contexts are `source_file`, `block`, `closure`,
+  and the classic `switch` `case`/`default` bodies.
 
-amaanq's grammar uses `DELIMITER = choice(';', /\n/, '\0')` literally
-in every statement rule — this works for tree-sitter but produces
-ambiguity at line continuations (`a +\n b` would split into two
-statements). Our external scanner is smarter about this.
+An earlier draft proposed a `_terminator` external scanner token
+matching `;`-or-meaningful-newline; it was never wired, because the
+in-grammar split above is simpler and avoids a dormant scanner branch
+(§6). amaanq's grammar uses `DELIMITER = choice(';', /\n/, '\0')`
+literally in every statement rule — this works for tree-sitter but
+produces ambiguity at line continuations (`a +\n b` would split into
+two statements), which the structural-newline approach sidesteps.
 
 ### 5.11 Spread in three positions
 

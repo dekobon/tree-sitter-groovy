@@ -148,3 +148,53 @@ for (i in xs) for (j in ys) f(i, j)
           arguments: (argument_list
             (identifier)
             (identifier)))))))
+
+==================
+C-style for with typed init
+==================
+
+for (int i = 0; i < 3; i++) { a() }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    update: (update_expression
+      operand: (identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+C-style for with def init
+==================
+
+for (def i = 0; i < 3; i++) { a() }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      (variable_declarator
+        name: (identifier)
+        value: (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    update: (update_expression
+      operand: (identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))

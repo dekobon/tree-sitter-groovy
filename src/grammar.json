@@ -21,8 +21,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "_statement"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_statement"
+              },
+              {
+                "type": "STRING",
+                "value": ";"
+              }
+            ]
           }
         }
       ]
@@ -268,8 +277,17 @@
           {
             "type": "REPEAT",
             "content": {
-              "type": "SYMBOL",
-              "name": "_statement"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_statement"
+                },
+                {
+                  "type": "STRING",
+                  "value": ";"
+                }
+              ]
             }
           },
           {
@@ -419,8 +437,17 @@
               "type": "FIELD",
               "name": "init",
               "content": {
-                "type": "SYMBOL",
-                "name": "_expression"
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "_expression"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "local_variable_declaration"
+                  }
+                ]
               }
             },
             {
@@ -2915,8 +2942,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "_statement"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_statement"
+              },
+              {
+                "type": "STRING",
+                "value": ";"
+              }
+            ]
           }
         }
       ]
@@ -2979,8 +3015,17 @@
                 {
                   "type": "REPEAT",
                   "content": {
-                    "type": "SYMBOL",
-                    "name": "_statement"
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "_statement"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": ";"
+                      }
+                    ]
                   }
                 }
               ]
@@ -5606,8 +5651,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "_statement"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_statement"
+              },
+              {
+                "type": "STRING",
+                "value": ";"
+              }
+            ]
           }
         },
         {
