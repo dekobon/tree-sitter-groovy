@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-04
+
 ### Fixed
 
 - Accept `;` as a terminator, separator, and empty statement / member
@@ -212,5 +214,8 @@ for full details.
 - `a\n+ b` joins as one expression rather than splitting into two
   statements.
 
-[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dekobon/tree-sitter-groovy/releases/tag/v0.1.0
