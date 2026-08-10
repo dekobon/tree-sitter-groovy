@@ -80,3 +80,43 @@ enum E { A, B; def f() { 1 } }
         name: (identifier)
         parameters: (formal_parameters)
         body: (block (expression_statement (number_literal)))))))
+
+==================
+Enum with visibility modifier
+==================
+
+public enum Status { OK, NG }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier)))))
+
+==================
+Nested enum inside a class
+==================
+
+class Holder {
+    private enum Kind { A, B }
+    def use() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant name: (identifier))
+          (enum_constant name: (identifier))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

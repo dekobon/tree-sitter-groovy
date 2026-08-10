@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `trait` / `record` / `@interface` may now be declared inside another
   type's body, recursing to arbitrary depth. Previously an inner type
   produced `ERROR` nodes and truncated the enclosing type.
+- Visibility / other modifiers on an `enum` declaration
+  (`public enum E { … }`), matching the modifier support already present
+  on `class` / `interface` / `trait`.
 
 ## [0.2.2] - 2026-06-04
 

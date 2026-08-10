@@ -654,8 +654,12 @@ module.exports = grammar({
     // further class members. Constants may carry constructor
     // arguments (`RED(0xff0000)`); v1 supports that via the
     // optional argument_list.
+    // §4 — like class / interface / trait, an enum may carry visibility /
+    // other modifiers (`public enum E { … }`), so `_modifier` is accepted
+    // before the `enum` keyword.
     enum_declaration: $ => seq(
       repeat($.annotation),
+      repeat($._modifier),
       'enum',
       field('name', $.identifier),
       field('body', $.enum_body),
