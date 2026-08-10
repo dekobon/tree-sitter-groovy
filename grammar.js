@@ -186,6 +186,7 @@ module.exports = grammar({
       $.do_while_statement,
       $.for_statement,
       $.for_in_statement,
+      $.enhanced_for_statement,
       $.return_statement,
       $.break_statement,
       $.continue_statement,
@@ -817,6 +818,22 @@ module.exports = grammar({
       '@',
       field('name', $.qualified_name),
       optional(field('arguments', $.argument_list)),
+    ),
+
+    // §4 — Java-style enhanced for: `for (Type var : iterable)` /
+    // `for (def var : iterable)` / `for (var : iterable)`. The `:`
+    // separates the loop variable from the iterable and distinguishes
+    // this from the Groovy `for (var in iterable)` form and the C-style
+    // `for (init; cond; update)` form.
+    enhanced_for_statement: $ => seq(
+      'for',
+      '(',
+      optional(choice('def', field('type', $._type))),
+      field('variable', $.identifier),
+      ':',
+      field('value', $._expression),
+      ')',
+      field('body', choice($.block, $._statement)),
     ),
 
     // §4 — `for (x in xs)`. Untyped variable for v1. Typed

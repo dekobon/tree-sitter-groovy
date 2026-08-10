@@ -15,6 +15,7 @@
   (static_initializer)
   (for_statement)
   (for_in_statement)
+  (enhanced_for_statement)
   (catch_clause)
 ] @local.scope
 
@@ -25,6 +26,7 @@
 (field_declaration
   (variable_declarator name: (identifier) @local.definition.field))
 (for_in_statement variable: (identifier) @local.definition.var)
+(enhanced_for_statement variable: (identifier) @local.definition.var)
 (catch_formal_parameter name: (identifier) @local.definition.var)
 (record_component name: (identifier) @local.definition.parameter)
 

@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Visibility / other modifiers on an `enum` declaration
   (`public enum E { … }`), matching the modifier support already present
   on `class` / `interface` / `trait`.
+- Java-style enhanced `for` loop `for (Type x : xs)` as a distinct
+  `enhanced_for_statement` node kind (optional variable type: a type,
+  `def`, or none).
 
 ### Fixed
 

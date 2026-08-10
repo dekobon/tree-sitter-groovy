@@ -198,3 +198,45 @@ for (def i = 0; i < 3; i++) { a() }
         (method_invocation
           function: (identifier)
           arguments: (argument_list))))))
+
+==================
+Enhanced for with typed variable
+==================
+
+for (String s : items) f(s)
+
+---
+
+(source_file
+  (enhanced_for_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier))))))
+
+==================
+Enhanced for with generic qualified type
+==================
+
+for (Map.Entry<String, String> e : m) g(e)
+
+---
+
+(source_file
+  (enhanced_for_statement
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)
+        (type_identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list (identifier))))))
