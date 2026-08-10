@@ -139,3 +139,37 @@ class Foo {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block (expression_statement (number_literal)))))))
+
+==================
+Nested class with members before and after
+==================
+
+class Outer {
+    def outerMethod() { }
+    class Inner {
+        def innerMethod() { }
+    }
+    def after() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (class_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

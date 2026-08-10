@@ -537,11 +537,23 @@ module.exports = grammar({
       '}',
     ),
 
+    // §4 — a class / trait / interface / enum body member. Besides the
+    // callable and field members, a member may itself be a nested (inner)
+    // type declaration — Groovy allows a class/interface/enum/trait/record
+    // or an `@interface` to be declared inside another type's body. These
+    // are the same rules used at the top level (§4); listing them here lets
+    // the body recurse to arbitrary nesting depth.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
+      $.class_declaration,
+      $.interface_declaration,
+      $.enum_declaration,
+      $.trait_declaration,
+      $.annotation_type_declaration,
+      $.record_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have

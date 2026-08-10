@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- Nested (inner) type declarations: a `class` / `interface` / `enum` /
+  `trait` / `record` / `@interface` may now be declared inside another
+  type's body, recursing to arbitrary depth. Previously an inner type
+  produced `ERROR` nodes and truncated the enclosing type.
+
 ## [0.2.2] - 2026-06-04
 
 ### Fixed

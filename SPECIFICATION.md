@@ -384,7 +384,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | a body member may itself be a nested (inner) type declaration (`class` / `interface` / `enum` / `trait` / `record` / `@interface`), recursing to arbitrary depth. |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | constants list followed by optional `;` then class body; arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |

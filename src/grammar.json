@@ -1630,6 +1630,30 @@
         {
           "type": "SYMBOL",
           "name": "static_initializer"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "class_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interface_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "enum_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "trait_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "annotation_type_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "record_declaration"
         }
       ]
     },
