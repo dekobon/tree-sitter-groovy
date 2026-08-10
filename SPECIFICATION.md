@@ -386,7 +386,7 @@ fix relative to *both* parent grammars.
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | a body member may itself be a nested (inner) type declaration (`class` / `interface` / `enum` / `trait` / `record` / `@interface`), recursing to arbitrary depth. |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | optional visibility / other modifiers (`public enum E`); constants list followed by optional `;` then class body; arrow switch is the typical use site (#36). |
+| `enum` declaration | **new** | optional visibility / other modifiers (`public enum E`); constants list followed by class members. Java requires a `;` between the constants and the members, but Groovy accepts a newline separator, so the `;` is optional. Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |

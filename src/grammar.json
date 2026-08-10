@@ -2175,8 +2175,20 @@
               "type": "SEQ",
               "members": [
                 {
-                  "type": "STRING",
-                  "value": ";"
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": ";"
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_class_member"
                 },
                 {
                   "type": "REPEAT",
@@ -6646,6 +6658,14 @@
     ],
     [
       "for_in_statement",
+      "_expression"
+    ],
+    [
+      "enum_constant",
+      "_type"
+    ],
+    [
+      "formal_parameter",
       "_expression"
     ],
     [

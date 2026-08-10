@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`public enum E { … }`), matching the modifier support already present
   on `class` / `interface` / `trait`.
 
+### Fixed
+
+- Accept ordinary members (fields, constructors, methods, nested types)
+  after an `enum`'s constants list without requiring a `;` separator:
+  Groovy treats a newline as a statement separator, so
+  `enum E { A, B\n String x }` no longer errors.
+
 ## [0.2.2] - 2026-06-04
 
 ### Fixed

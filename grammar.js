@@ -138,6 +138,20 @@ module.exports = grammar({
     // disambiguates.
     [$.for_in_statement, $._expression],
 
+    // §4 — inside an enum body, after the constants list a bare
+    // `Identifier` could start another `enum_constant` or be the `_type`
+    // that opens a following member declaration (`Entry\n private final
+    // String x`). The token after it (`(` / `,` vs a declarator name)
+    // decides; the conflict keeps both alternatives alive until then.
+    [$.enum_constant, $._type],
+
+    // §4 — an enum constant with arguments (`NAME(x)`) overlaps a
+    // constructor member (`NAME(params)`) that a Groovy enum body may
+    // also declare: the argument `x` parses as either an `_expression`
+    // (constant argument) or a `formal_parameter` (constructor param)
+    // until the closing `)` and what follows disambiguate.
+    [$.formal_parameter, $._expression],
+
     // §5.2 — `def identifier` could either be a
     // local_variable_declaration (variable_declarator with no
     // initializer) or the start of a method_declaration
@@ -665,6 +679,12 @@ module.exports = grammar({
       field('body', $.enum_body),
     ),
 
+    // §4 — enum body: the constants list, optionally followed by ordinary
+    // class members (fields, constructors, methods, nested types). Java
+    // requires a `;` between the constants and the members, but Groovy
+    // treats a newline as a statement separator, so the `;` is optional
+    // here. A member section requires at least one real `_class_member` so
+    // the empty / `;`-only body stays unambiguous.
     enum_body: $ => seq(
       '{',
       optional(seq(
@@ -672,7 +692,11 @@ module.exports = grammar({
         repeat(seq(',', $.enum_constant)),
         optional(','),
       )),
-      optional(seq(';', repeat(choice($._class_member, ';')))),
+      optional(seq(
+        optional(';'),
+        $._class_member,
+        repeat(choice($._class_member, ';')),
+      )),
       '}',
     ),
 
