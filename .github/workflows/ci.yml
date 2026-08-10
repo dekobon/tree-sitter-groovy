@@ -78,7 +78,7 @@ jobs:
             exit 1
           fi
           printf 'ref=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-      - uses: tree-sitter/setup-action/cli@eeb902ac2f1be576edc296309872cf476a209b7f # v2
+      - uses: tree-sitter/setup-action/cli@49f8c1f20b60102eae8c033bb7c7f6cd056f6086 # v2
         with:
           tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
       - uses: tree-sitter/parser-test-action@aba4a3de737f86f8ce83be38166a1ab521d4c960 # v2
