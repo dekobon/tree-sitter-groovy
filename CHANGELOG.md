@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `tree-sitter-cli` from 0.26.12 to 0.26.13 and the
+  `tree-sitter` crate from 0.26.11 to 0.26.13. Both are dev
+  dependencies pinned only in the lockfiles, so the runtime version
+  resolved by downstream consumers is unaffected. The generated
+  sources (`src/parser.c`, `src/tree_sitter/array.h`) regenerate
+  byte-identically under the new CLI. (#41)
+
 ## [0.2.2] - 2026-06-04
 
 ### Fixed
