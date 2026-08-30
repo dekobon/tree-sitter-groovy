@@ -237,6 +237,15 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |-
           set -eu
+          # Refuse an empty version rather than trusting validate to
+          # have supplied one. `npm view pkg@` (empty range) resolves
+          # to *latest* and exits 0, so an empty VERSION would take the
+          # skip branch below and complete the release having published
+          # nothing. validate cannot emit an empty version, but the
+          # check should not silently depend on a distant invariant to
+          # avoid its one unsafe outcome.
+          : "${VERSION:?validate did not provide a version}"
+
           # npm rejects republishing an existing version (E403), which
           # stranded the workflow_dispatch re-run this file documents:
           # once npm had accepted a version, re-running the release to
@@ -245,13 +254,19 @@ jobs:
           # crates-publish's index check and pypi-publish's
           # skip-existing.
           #
-          # Skips only on positive confirmation. `npm view` exits 0
-          # solely when it resolves the version, so a network or
-          # registry error falls through to publish and fails loudly
-          # rather than silently shipping no package.
-          if npm view "@dekobon/tree-sitter-groovy@${VERSION}" version >/dev/null 2>&1; then
-            echo "@dekobon/tree-sitter-groovy ${VERSION} already on npm - skipping"
+          # Skip only on positive confirmation: `npm view` exits 0 only
+          # when it resolves the version, so a registry error publishes
+          # and fails loudly rather than silently shipping no package.
+          # Its output is captured so that reason reaches the log --
+          # suppressing it entirely makes an unexpected publish on a
+          # re-run impossible to explain.
+          PKG=$(jq -r '.name' package.json)
+          if view_out=$(npm view "${PKG}@${VERSION}" version 2>&1); then
+            echo "${PKG} ${VERSION} already on npm (${view_out}) - skipping"
           else
+            echo "${PKG} ${VERSION} did not resolve on npm - publishing."
+            echo "npm view reported:"
+            echo "${view_out}"
             npm publish --provenance --access public
           fi
 
