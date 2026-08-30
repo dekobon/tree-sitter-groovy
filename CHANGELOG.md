@@ -10,20 +10,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 ### Changed
 
 - Bumped `tree-sitter-cli` from 0.26.12 to 0.26.13 and the
-  `tree-sitter` crate from 0.26.11 to 0.26.13. Both are dev
-  dependencies pinned only in the lockfiles, so the runtime version
-  resolved by downstream consumers is unaffected. The generated
-  sources (`src/parser.c`, `src/tree_sitter/array.h`) regenerate
-  byte-identically under the new CLI. (#41)
+  `tree-sitter` crate from 0.26.11 to 0.26.13, and raised the declared
+  `tree-sitter-cli` range in `package.json` from `^0.26.9` to
+  `^0.26.13` so it matches the CLI the committed parser source is
+  generated with. Both are dev dependencies, so neither is installed
+  for downstream consumers and no runtime version changes. The
+  generated sources (`src/parser.c`, `src/tree_sitter/array.h`) are
+  unchanged from the 0.26.12 output already committed. (#41)
 
 ### Fixed
 
 - The vendored `src/tree_sitter/array.h` now compiles inside a C++
   translation unit. Its array macros cast their result through
-  `decltype`, where previously the bare `void *` returned by the
-  reallocation helpers failed to convert to the array's element
-  pointer type. C builds are unaffected — under C the cast expands to
-  a no-op. This arrived as regenerated parser source in the
+  `decltype`, where previously the bare `void *` produced by its
+  allocation helpers and swap temporary failed to convert to the
+  array's element pointer type. C builds are unaffected — under C the
+  cast expands to a no-op. This arrived as regenerated source in the
   `tree-sitter-cli` 0.26.12 bump. (#40)
 
 ## [0.2.2] - 2026-06-04
