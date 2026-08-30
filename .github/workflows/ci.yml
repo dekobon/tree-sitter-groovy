@@ -132,6 +132,45 @@ jobs:
         with:
           globs: "**/*.md"
 
+  wheels:
+    name: Build wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      # cibuildwheel otherwise runs only in the tag-triggered release
+      # workflow, so a packaging break surfaces while a release is
+      # already publishing -- and by then crates.io has committed
+      # irreversibly. It also went unexercised across the v3 -> v4
+      # bump, which added an abi3audit step and made delvewheel the
+      # default Windows repair command. Gate on packaging paths the
+      # way `fuzz` gates on scanner changes: src/** is deliberately
+      # excluded, since it changes on every regeneration and the
+      # `test` job already compiles it everywhere.
+      - name: Check for packaging changes
+        id: packaging-changes
+        shell: bash
+        run: |-
+          if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            printf 'changed=false\n' >> "$GITHUB_OUTPUT"
+          elif git diff --quiet HEAD^ -- setup.py pyproject.toml \
+              bindings/python .github/workflows/ci.yml \
+              .github/workflows/release.yml; then
+            printf 'changed=false\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'changed=true\n' >> "$GITHUB_OUTPUT"
+          fi
+      # Same SHA release.yml pins. The job is only evidence about the
+      # release if it builds with what the release builds with, so
+      # Dependabot must move both together.
+      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+        if: steps.packaging-changes.outputs.changed == 'true'
+
   fuzz:
     name: Fuzz parser
     runs-on: ubuntu-latest

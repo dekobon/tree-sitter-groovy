@@ -34,3 +34,8 @@ core = ["tree-sitter~=0.26"]
 [tool.cibuildwheel]
 build = "cp311-*"
 build-frontend = "build"
+# Run the binding tests against the freshly built wheel on every
+# platform, so a wheel that imports but cannot parse -- the shape a
+# missing src/scanner.c takes -- fails the build instead of shipping.
+test-requires = ["tree-sitter~=0.26"]
+test-command = "python -m unittest discover -s {project}/bindings/python/tests"
