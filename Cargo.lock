@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "dekobon-tree-sitter-groovy"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "cc",
  "tree-sitter",
