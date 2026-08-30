@@ -9,12 +9,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
-- Python wheels are now tagged `cp39-abi3` instead of `cp38-abi3`,
-  and the extension is compiled against the 3.9 limited API
-  (`Py_LIMITED_API` 0x03090000) rather than 3.8. The project already
-  declared `requires-python = ">=3.9"`, so pip never offered these
-  wheels to 3.8 regardless; the old tag understated the real floor.
-  No API or ABI change for supported interpreters. (#42)
+- **BREAKING:** the minimum supported Python is now 3.11. Wheels are
+  tagged `cp311-abi3` (was `cp38-abi3`), the extension is compiled
+  against the 3.11 limited API (`Py_LIMITED_API` 0x030B0000), and the
+  `core` extra requires `tree-sitter~=0.26`.
+
+  The previously declared 3.9 floor never worked. The committed parser
+  is ABI 15, which needs the `tree-sitter` runtime at 0.25 or later,
+  and every such release requires Python 3.10+. The newest runtime
+  installable on 3.9 is 0.23.2, which rejects ABI 15 outright --
+  `ValueError: Incompatible Language version 15. Must be between 13
+  and 14` -- so `Parser` could never be constructed there, and
+  `pip install dekobon-tree-sitter-groovy[core]` did not even resolve.
+
+  Python 3.10 is a genuine removal rather than a correction: it works
+  today with `tree-sitter` 0.26. It is dropped because it reaches end
+  of life on 2026-10-31, which would make it a floor with two months
+  of runway. (#42, #44)
 - The Python build no longer requires the `wheel` package. `setup.py`
   takes `bdist_wheel` from `setuptools.command.bdist_wheel`, which
   setuptools has owned since 70.1; the `wheel` copy emitted a
