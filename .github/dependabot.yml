@@ -37,11 +37,22 @@ updates:
           - minor
           - patch
     ignore:
-      # eslint-config-treesitter pins eslint-plugin-jsdoc@^50.x, which
-      # only supports eslint 7-9, and imports `globals` without
-      # declaring it as a dep (relying on eslint 9's transitives).
-      # eslint 10 breaks both. Hold at major 9 until the config is
-      # updated upstream.
+      # Hold at major 9 until eslint-config-treesitter supports 10.
+      # Verified against eslint 10.9.1 / eslint-config-treesitter 1.0.2:
+      #   - Hard failure: the config imports `globals` without
+      #     declaring it, relying on it being an eslint 9 transitive.
+      #     eslint 10 no longer supplies it, so config loading dies
+      #     with ERR_MODULE_NOT_FOUND before linting a single file.
+      #   - Metadata failure: eslint-plugin-jsdoc@^50.x declares
+      #     eslint 7-9, so eslint 10 leaves an invalid peer in the
+      #     tree. `npm ci` still installs (npm nests and warns) but
+      #     `npm ls` exits non-zero on ELSPROBLEMS.
+      # Rule behavior itself is NOT a blocker — with `globals` present
+      # eslint 10 reports byte-identical results to 9.39.5 on this
+      # config, deprecated stylistic rules included. So the upgrade
+      # buys no lint coverage; it only trades a supported peer graph
+      # for an unsupported one. Lift this once the upstream config
+      # declares `globals` and moves off eslint-plugin-jsdoc 50.
       - dependency-name: eslint
         update-types:
           - version-update:semver-major
