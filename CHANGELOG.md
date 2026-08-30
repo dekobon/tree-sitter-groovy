@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- Python wheels are now tagged `cp39-abi3` instead of `cp38-abi3`,
+  and the extension is compiled against the 3.9 limited API
+  (`Py_LIMITED_API` 0x03090000) rather than 3.8. The project already
+  declared `requires-python = ">=3.9"`, so pip never offered these
+  wheels to 3.8 regardless; the old tag understated the real floor.
+  No API or ABI change for supported interpreters. (#42)
 - Bumped `tree-sitter-cli` from 0.26.12 to 0.26.13 and the
   `tree-sitter` crate from 0.26.11 to 0.26.13, and raised the declared
   `tree-sitter-cli` range in `package.json` from `^0.26.9` to
