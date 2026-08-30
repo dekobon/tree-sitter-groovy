@@ -233,7 +233,27 @@ jobs:
           merge-multiple: true
       - run: ls -R prebuilds/
       - name: npm publish
-        run: npm publish --provenance --access public
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |-
+          set -eu
+          # npm rejects republishing an existing version (E403), which
+          # stranded the workflow_dispatch re-run this file documents:
+          # once npm had accepted a version, re-running the release to
+          # retry a different registry died here, and github-release
+          # (which needs this job) never fired. Skip instead, matching
+          # crates-publish's index check and pypi-publish's
+          # skip-existing.
+          #
+          # Skips only on positive confirmation. `npm view` exits 0
+          # solely when it resolves the version, so a network or
+          # registry error falls through to publish and fails loudly
+          # rather than silently shipping no package.
+          if npm view "@dekobon/tree-sitter-groovy@${VERSION}" version >/dev/null 2>&1; then
+            echo "@dekobon/tree-sitter-groovy ${VERSION} already on npm - skipping"
+          else
+            npm publish --provenance --access public
+          fi
 
   pypi-wheels:
     name: Build wheels (${{ matrix.os }})
