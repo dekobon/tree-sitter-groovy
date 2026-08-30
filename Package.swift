@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "TreeSitterGroovy", targets: ["TreeSitterGroovy"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ChimeHQ/SwiftTreeSitter", from: "0.8.0"),
+        .package(url: "https://github.com/ChimeHQ/SwiftTreeSitter", from: "0.25.0"),
     ],
     targets: [
         .target(name: "TreeSitterGroovy",
