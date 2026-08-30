@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   sources (`src/parser.c`, `src/tree_sitter/array.h`) regenerate
   byte-identically under the new CLI. (#41)
 
+### Fixed
+
+- The vendored `src/tree_sitter/array.h` now compiles inside a C++
+  translation unit. Its array macros cast their result through
+  `decltype`, where previously the bare `void *` returned by the
+  reallocation helpers failed to convert to the array's element
+  pointer type. C builds are unaffected — under C the cast expands to
+  a no-op. This arrived as regenerated parser source in the
+  `tree-sitter-cli` 0.26.12 bump. (#40)
+
 ## [0.2.2] - 2026-06-04
 
 ### Fixed
