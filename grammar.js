@@ -110,6 +110,23 @@ module.exports = grammar({
     //  an explicit conflict because `:` after the first element
     //  always disambiguates within one token of lookahead.)
     //
+    // §4 — inside enum_body, right after `{`, a bare identifier could
+    // still be starting an enum_constant (`RED`) or could be a
+    // field_declaration's type (`String dataType`) now that the
+    // member section no longer requires a leading `;` to separate it
+    // from the constant list. The next identifier vs `,`/`(`/`}`
+    // disambiguates.
+    [$.enum_constant, $._type],
+
+    // §4 — `enum Type { NAME(x, ...` — inside the parens, a bare
+    // identifier could still be an enum_constant's constructor
+    // argument (`_expression`) or the start of the *next* member's
+    // constructor/method formal_parameter, once the member section
+    // can directly follow the constant list. Resolved by what comes
+    // after: `,`/`)` (argument) vs a second identifier (typed
+    // parameter) vs nothing (untyped parameter name).
+    [$.formal_parameter, $._expression],
+
     // §5.15 — inside `( … )` an identifier could be either an
     // _expression (parenthesized_expression) or a _type
     // (parenthesized_type_cast). Tree-sitter explores both via
@@ -638,10 +655,13 @@ module.exports = grammar({
     varargs_type: $ => seq($._type, '...'),
 
     // §4 — enum. Closes murtaza64 #36 first half. Constants list
-    // (optionally trailing-comma) optionally followed by `;` and
-    // further class members. Constants may carry constructor
-    // arguments (`RED(0xff0000)`); v1 supports that via the
-    // optional argument_list.
+    // (optionally trailing-comma) optionally followed by further
+    // class members. Unlike Java, the `;` separating the constant
+    // list from the member section is optional in Groovy — mirrors
+    // class_body's `repeat(choice($._class_member, ';'))` rather than
+    // gating the whole member section behind a required leading `;`.
+    // Constants may carry constructor arguments (`RED(0xff0000)`);
+    // v1 supports that via the optional argument_list.
     enum_declaration: $ => seq(
       repeat($.annotation),
       'enum',
@@ -656,7 +676,7 @@ module.exports = grammar({
         repeat(seq(',', $.enum_constant)),
         optional(','),
       )),
-      optional(seq(';', repeat(choice($._class_member, ';')))),
+      repeat(choice($._class_member, ';')),
       '}',
     ),
 

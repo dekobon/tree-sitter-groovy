@@ -80,3 +80,47 @@ enum E { A, B; def f() { 1 } }
         name: (identifier)
         parameters: (formal_parameters)
         body: (block (expression_statement (number_literal)))))))
+
+==================
+Enum with fields and constructor after constants, no semicolon
+==================
+
+enum Type {
+    ADDRESS('STRING'),
+    EMAIL('STRING')
+
+    String dataType
+
+    Type(String dataType) {
+        this.dataType = dataType
+    }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (string_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (string_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier))))))))

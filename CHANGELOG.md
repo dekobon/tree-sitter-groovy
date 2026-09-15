@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- `enum_body` no longer requires a `;` before the member section. Groovy,
+  unlike Java, allows fields and methods to follow the constant list
+  directly (`enum Type { A, B\n\nString label }`); the grammar now mirrors
+  `class_body`'s `repeat(choice($._class_member, ';'))` instead of gating
+  the whole member section behind a required leading `;`.
+
 ## [0.3.0] - 2026-08-30
 
 ### Changed
