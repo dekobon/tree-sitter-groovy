@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `type_arguments` now accepts an empty argument list — the diamond
+  operator (`new ArrayList<>()`, `new HashMap<>()`), inherited from
+  Java 7 and used constantly. Previously `<>` required at least one
+  type argument, so any diamond-operator call failed to parse.
 - `field_declaration` now accepts a modifier-only field with no `def`
   and no type (`static MEDIUM_TTL = 900`), inferring the field's type as
   Object — a common static-constant idiom. Previously a field required

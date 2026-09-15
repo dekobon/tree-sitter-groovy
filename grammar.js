@@ -1078,10 +1078,16 @@ module.exports = grammar({
       field('arguments', $.type_arguments),
     )),
 
+    // Empty type-argument list is the diamond operator (`new
+    // ArrayList<>()`) — ubiquitous since Java 7 / Groovy's matching
+    // support, so `<>` has to parse as zero type arguments rather
+    // than requiring at least one.
     type_arguments: $ => seq(
       token.immediate('<'),
-      $._type_argument,
-      repeat(seq(',', $._type_argument)),
+      optional(seq(
+        $._type_argument,
+        repeat(seq(',', $._type_argument)),
+      )),
       '>',
     ),
 
