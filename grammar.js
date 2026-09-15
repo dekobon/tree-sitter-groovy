@@ -162,6 +162,15 @@ module.exports = grammar({
     // decides; the conflict keeps both alternatives alive until
     // then.
     [$.variable_declarator, $._property_name],
+
+    // §4 — `static NAME` inside a class body: after one or more
+    // modifiers and one identifier, that identifier could be the
+    // modifier-only field_declaration's variable_declarator name
+    // (`static MEDIUM_TTL = 900`) or the start of a typed
+    // field_declaration/method_declaration's `_type` (`static Foo
+    // bar`). The next token (`=`/`,`/`;` vs a second identifier)
+    // disambiguates.
+    [$.variable_declarator, $._type],
   ],
 
   rules: {
@@ -590,12 +599,26 @@ module.exports = grammar({
     // more declarators (each with optional initializer). Method
     // declarations share the same prefix; `prec(2, …)` on
     // `method_declaration` and the trailing `(` discriminate.
-    field_declaration: $ => seq(
-      repeat($.annotation),
-      repeat($._modifier),
-      choice('def', field('type', $._type)),
-      $.variable_declarator,
-      repeat(seq(',', $.variable_declarator)),
+    //
+    // A modifier alone (no `def`, no type) also introduces a field —
+    // `static MEDIUM_TTL = 900` infers Object, a common constant-field
+    // idiom. Gated behind `repeat1($._modifier)` (not `repeat`) so this
+    // alternative can't match a bare, modifier-less identifier, which
+    // would collide with a plain expression_statement.
+    field_declaration: $ => choice(
+      seq(
+        repeat($.annotation),
+        repeat($._modifier),
+        choice('def', field('type', $._type)),
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
+      ),
+      seq(
+        repeat($.annotation),
+        repeat1($._modifier),
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
+      ),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()

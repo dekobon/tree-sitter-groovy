@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `field_declaration` now accepts a modifier-only field with no `def`
+  and no type (`static MEDIUM_TTL = 900`), inferring the field's type as
+  Object — a common static-constant idiom. Previously a field required
+  `def` or an explicit type even when a modifier alone already
+  distinguishes it from a bare expression statement.
 - `enum_declaration` now accepts modifiers (`public enum`, `static enum` —
   the latter for enums nested inside a class). Previously any modifier
   before `enum` was rejected.
