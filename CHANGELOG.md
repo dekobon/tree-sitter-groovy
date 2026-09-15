@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `method_invocation` now accepts a trailing closure as the call's last
+  argument, with or without a parenthesised argument list —
+  `list.find { it > 5 }` and `list.inject(0) { acc, x -> acc + x }` both
+  reduce to a single `method_invocation` node (`closure` field alongside
+  the optional `arguments` field). Previously any call written this way
+  outside of a bare statement-level command chain (`§5.5`) required
+  parentheses around the closure or failed to parse.
+
+### Fixed
+
+- A nested `enum` inside a class body (`static enum EventType { ... }`,
+  a common Groovy domain-model idiom for entity fields backed by a
+  fixed set of values) now parses as a class member. Previously
+  `_class_member` had no enum_declaration alternative at all, so `enum`
+  silently misparsed as a field_declaration's type name and everything
+  after it in the class body fell apart.
+- `catch_formal_parameter`'s type is now optional — Groovy allows a
+  bare `catch (e) { … }`, implicitly typed as Exception. Previously a
+  type was mandatory.
+- `type_arguments` now accepts an empty argument list — the diamond
+  operator (`new ArrayList<>()`, `new HashMap<>()`), inherited from
+  Java 7 and used constantly. Previously `<>` required at least one
+  type argument, so any diamond-operator call failed to parse.
+- `field_declaration` now accepts a modifier-only field with no `def`
+  and no type (`static MEDIUM_TTL = 900`), inferring the field's type as
+  Object — a common static-constant idiom. Previously a field required
+  `def` or an explicit type even when a modifier alone already
+  distinguishes it from a bare expression statement.
+- `enum_declaration` now accepts modifiers (`public enum`, `static enum` —
+  the latter for enums nested inside a class). Previously any modifier
+  before `enum` was rejected.
+- `for_in_statement` now also accepts the Java-compatible enhanced-for
+  form Groovy allows side by side with its own `for (x in xs)`: `for
+  (Type x : xs)` and `for (def x : xs)`. Only the `in` keyword form
+  parsed before.
+- `formal_parameter` now accepts annotations (`@PathVariable("id") Long
+  id`, `@RequestBody Map body`). Spring/JPA-style annotated parameters
+  are ubiquitous on framework-facing methods and previously misparsed
+  the whole parameter list.
+- `enum_body` no longer requires a `;` before the member section. Groovy,
+  unlike Java, allows fields and methods to follow the constant list
+  directly (`enum Type { A, B\n\nString label }`); the grammar now mirrors
+  `class_body`'s `repeat(choice($._class_member, ';'))` instead of gating
+  the whole member section behind a required leading `;`.
+
 ## [0.3.0] - 2026-08-30
 
 ### Changed

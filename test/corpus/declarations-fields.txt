@@ -123,6 +123,25 @@ class C {
           value: (string_literal (string_fragment)))))))
 
 ==================
+Modifier-only field, no type or def (static constant idiom)
+==================
+
+class C {
+    static MEDIUM_TTL = 900
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
 Field with annotation
 ==================
 
