@@ -667,6 +667,7 @@ module.exports = grammar({
     // v1 supports that via the optional argument_list.
     enum_declaration: $ => seq(
       repeat($.annotation),
+      repeat($._modifier),
       'enum',
       field('name', $.identifier),
       field('body', $.enum_body),

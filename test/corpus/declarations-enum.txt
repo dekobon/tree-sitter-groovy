@@ -12,6 +12,22 @@ enum E { }
     body: (enum_body)))
 
 ==================
+Enum with a modifier
+==================
+
+public enum Color { R, G, B }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier)))))
+
+==================
 Enum with constants
 ==================
 

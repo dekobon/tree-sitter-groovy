@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `enum_declaration` now accepts modifiers (`public enum`, `static enum` —
+  the latter for enums nested inside a class). Previously any modifier
+  before `enum` was rejected.
 - `for_in_statement` now also accepts the Java-compatible enhanced-for
   form Groovy allows side by side with its own `for (x in xs)`: `for
   (Type x : xs)` and `for (def x : xs)`. Only the `in` keyword form
