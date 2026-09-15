@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `for_in_statement` now also accepts the Java-compatible enhanced-for
+  form Groovy allows side by side with its own `for (x in xs)`: `for
+  (Type x : xs)` and `for (def x : xs)`. Only the `in` keyword form
+  parsed before.
 - `formal_parameter` now accepts annotations (`@PathVariable("id") Long
   id`, `@RequestBody Map body`). Spring/JPA-style annotated parameters
   are ubiquitous on framework-facing methods and previously misparsed

@@ -802,16 +802,18 @@ module.exports = grammar({
       optional(field('arguments', $.argument_list)),
     ),
 
-    // §4 — `for (x in xs)`. Untyped variable for v1. Typed
-    // (`for (Type x in xs)`) lands later. The `in` keyword here
-    // is a structural delimiter, not the membership_expression
-    // operator — context disambiguates because the for-header is
-    // not an expression position.
+    // §4 — `for (x in xs)`, plus the Java-compatible enhanced-for
+    // form Groovy accepts side by side: `for (Type x : xs)` / `for
+    // (def x : xs)`. The `in` / `:` keyword here is a structural
+    // delimiter, not the membership_expression operator or a
+    // labelled_statement colon — context disambiguates because the
+    // for-header is not an expression position.
     for_in_statement: $ => seq(
       'for',
       '(',
+      optional(choice('def', field('type', $._type))),
       field('variable', $.identifier),
-      'in',
+      choice('in', ':'),
       field('value', $._expression),
       ')',
       field('body', choice($.block, $._statement)),
