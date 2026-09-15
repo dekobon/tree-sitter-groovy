@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `method_invocation` now accepts a trailing closure as the call's last
+  argument, with or without a parenthesised argument list —
+  `list.find { it > 5 }` and `list.inject(0) { acc, x -> acc + x }` both
+  reduce to a single `method_invocation` node (`closure` field alongside
+  the optional `arguments` field). Previously any call written this way
+  outside of a bare statement-level command chain (`§5.5`) required
+  parentheses around the closure or failed to parse.
+
 ### Fixed
 
 - `enum_body` no longer requires a `;` before the member section. Groovy,

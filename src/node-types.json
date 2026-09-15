@@ -7478,10 +7478,20 @@
     "fields": {
       "arguments": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "argument_list",
+            "named": true
+          }
+        ]
+      },
+      "closure": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "closure",
             "named": true
           }
         ]

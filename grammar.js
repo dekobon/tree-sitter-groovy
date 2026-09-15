@@ -1155,10 +1155,35 @@ module.exports = grammar({
     // expression so subscript / future field_access / future
     // safe_navigation chains compose naturally. PREC.POSTFIX
     // matches subscript so chains like `obj[i](x)[j]` work.
-    method_invocation: $ => prec.left(PREC.POSTFIX, seq(
-      field('function', $._expression),
-      field('arguments', $.argument_list),
-    )),
+    //
+    // Trailing closure (§5.5's command_chain covers the bare-
+    // identifier statement form; this covers the general expression
+    // form used constantly on property-access chains: `list.find {
+    // it > 5 }`, `list.inject(0) { acc, x -> acc + x }`). Groovy
+    // treats a closure literal as the call's last argument whether
+    // or not parens are present, so `argument_list` becomes optional
+    // once a trailing closure is there to anchor the call.
+    //
+    // The args-and-closure alternative sits one precedence level
+    // above plain POSTFIX so `f(x) { … }` reduces to a single
+    // method_invocation node (arguments AND closure fields on the
+    // same node) instead of GLR instead reaching the same span by
+    // nesting a closure-only method_invocation around a plain call.
+    method_invocation: $ => choice(
+      prec.left(PREC.POSTFIX + 1, seq(
+        field('function', $._expression),
+        field('arguments', $.argument_list),
+        field('closure', $.closure),
+      )),
+      prec.left(PREC.POSTFIX, seq(
+        field('function', $._expression),
+        field('arguments', $.argument_list),
+      )),
+      prec.left(PREC.POSTFIX, seq(
+        field('function', $._expression),
+        field('closure', $.closure),
+      )),
+    ),
 
     // §3.2 / §5.11 — argument list. Positional args are `_expression`;
     // named args (Groovy's `k: v` in call position) are `map_entry`
