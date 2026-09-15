@@ -222,3 +222,29 @@ void doIt() throws Exception { foo() }
         (method_invocation
           function: (identifier)
           arguments: (argument_list))))))
+
+==================
+Method with annotated parameters (Spring / JPA style)
+==================
+
+ResponseEntity get(@PathVariable("id") Long id, @RequestBody Map body) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name (identifier))
+          arguments: (argument_list (string_literal (string_fragment))))
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        (annotation
+          name: (qualified_name (identifier)))
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))

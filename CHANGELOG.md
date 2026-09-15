@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `formal_parameter` now accepts annotations (`@PathVariable("id") Long
+  id`, `@RequestBody Map body`). Spring/JPA-style annotated parameters
+  are ubiquitous on framework-facing methods and previously misparsed
+  the whole parameter list.
 - `enum_body` no longer requires a `;` before the member section. Groovy,
   unlike Java, allows fields and methods to follow the constant list
   directly (`enum Type { A, B\n\nString label }`); the grammar now mirrors
