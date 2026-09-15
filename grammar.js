@@ -564,11 +564,17 @@ module.exports = grammar({
       '}',
     ),
 
+    // A nested enum (`static enum EventType { … }` inside a domain
+    // class) is common enough in real Groovy that leaving it out
+    // silently misparses `enum` as a field_declaration's type name.
+    // Nested class/interface/trait land separately (bigger surface,
+    // own conflict set) — out of scope here.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
+      $.enum_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have

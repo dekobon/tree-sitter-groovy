@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A nested `enum` inside a class body (`static enum EventType { ... }`,
+  a common Groovy domain-model idiom for entity fields backed by a
+  fixed set of values) now parses as a class member. Previously
+  `_class_member` had no enum_declaration alternative at all, so `enum`
+  silently misparsed as a field_declaration's type name and everything
+  after it in the class body fell apart.
 - `catch_formal_parameter`'s type is now optional — Groovy allows a
   bare `catch (e) { … }`, implicitly typed as Exception. Previously a
   type was mandatory.

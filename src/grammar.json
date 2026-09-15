@@ -1638,6 +1638,10 @@
         {
           "type": "SYMBOL",
           "name": "static_initializer"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "enum_declaration"
         }
       ]
     },

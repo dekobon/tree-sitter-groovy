@@ -1808,6 +1808,10 @@
           "named": true
         },
         {
+          "type": "enum_declaration",
+          "named": true
+        },
+        {
           "type": "field_declaration",
           "named": true
         },
@@ -2976,6 +2980,10 @@
         },
         {
           "type": "enum_constant",
+          "named": true
+        },
+        {
+          "type": "enum_declaration",
           "named": true
         },
         {
