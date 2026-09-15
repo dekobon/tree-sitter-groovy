@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `catch_formal_parameter`'s type is now optional — Groovy allows a
+  bare `catch (e) { … }`, implicitly typed as Exception. Previously a
+  type was mandatory.
 - `type_arguments` now accepts an empty argument list — the diamond
   operator (`new ArrayList<>()`, `new HashMap<>()`), inherited from
   Java 7 and used constantly. Previously `<>` required at least one

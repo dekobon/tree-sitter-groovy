@@ -416,9 +416,10 @@ module.exports = grammar({
 
     // §4 — `catch_formal_parameter` accepts either a single _type
     // or a multi_type for Java 7+ / Groovy multi-catch. Closes
-    // murtaza64 #39.
+    // murtaza64 #39. The type itself is optional — Groovy allows a
+    // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
-      field('type', choice($._type, $.multi_type)),
+      optional(field('type', choice($._type, $.multi_type))),
       field('name', $.identifier),
     ),
 
