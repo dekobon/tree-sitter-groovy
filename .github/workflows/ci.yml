@@ -117,7 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: typos
-        uses: crate-ci/typos@d43b6c087ac471e2ea7b8af622ff15f05c0c365b # v1.50.1
+        uses: crate-ci/typos@512fc24f32f44ab01972217aaaf3dc86ec234d53 # v1.50.2
       - name: taplo (TOML format check)
         uses: uncenter/setup-taplo@b18c8c8302695fe63d6853bc004006215ac52b91 # v2
         with:
@@ -168,7 +168,7 @@ jobs:
       # Same SHA release.yml pins. The job is only evidence about the
       # release if it builds with what the release builds with, so
       # Dependabot must move both together.
-      - uses: pypa/cibuildwheel@1828c10ab37f080699c7b81cea34097c684a7074 # v4.2.0
+      - uses: pypa/cibuildwheel@e090b81e30c4d855ea63bf4b6e59204c09a101ae # v4.2.1
         if: steps.packaging-changes.outputs.changed == 'true'
 
   fuzz:
