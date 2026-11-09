@@ -181,3 +181,73 @@ int x = 1, y = 2
     value: (number_literal)
     name: (identifier)
     value: (number_literal)))
+
+==================
+Final local with type
+==================
+
+def m() {
+  final String name = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        value: (string_literal)))))
+
+==================
+Final local with def
+==================
+
+def m() {
+  final def n = 1
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Modifier-only final local
+==================
+
+def m() {
+  final source = '''
+x
+'''
+  final a = 1, b = 2
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))

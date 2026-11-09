@@ -105,6 +105,12 @@ module.exports = grammar({
   ],
 
   conflicts: $ => [
+    // `final def x` / `final x = 1` in a block vs. a modified member at top level.
+    [$._modifier, $.local_variable_declaration],
+    // `final name` in a block: the identifier is the modifier-only local's
+    // name (`final x = 1`) or the start of a type (`final Foo x`); the next
+    // token decides. (Same pair PR #49 adds for modifier-only fields.)
+    [$.variable_declarator, $._type],
     // See SPECIFICATION.md §7. Populated as rules accumulate.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
@@ -721,16 +727,26 @@ module.exports = grammar({
     // would conflict with method_invocation `Type(x)` and is
     // disallowed in v1. Multiple declarators per statement
     // (`def a = 1, b = 2`) are supported in all three forms.
+    // `final` is the one modifier Groovy (like Java) allows on a local.
+    // `final x = 1` with no type or `def` is the modifier-only form;
+    // the variable is dynamically typed, as with `def`.
     local_variable_declaration: $ => prec.right(choice(
       seq(
+        optional('final'),
         choice('def', 'var'),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       seq(
+        optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
+      ),
+      seq(
+        'final',
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
       ),
     )),
 
