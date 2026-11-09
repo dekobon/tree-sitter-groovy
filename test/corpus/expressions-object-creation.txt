@@ -13,6 +13,22 @@ new Foo()
       arguments: (argument_list))))
 
 ==================
+New with diamond operator (empty type-argument list)
+==================
+
+new ArrayList<>()
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments))
+      arguments: (argument_list))))
+
+==================
 New with single arg
 ==================
 

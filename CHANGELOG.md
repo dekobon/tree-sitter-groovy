@@ -7,8 +7,50 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `method_invocation` now accepts a trailing closure as the call's last
+  argument, with or without a parenthesised argument list —
+  `list.find { it > 5 }` and `list.inject(0) { acc, x -> acc + x }` both
+  reduce to a single `method_invocation` node (`closure` field alongside
+  the optional `arguments` field). Previously any call written this way
+  outside of a bare statement-level command chain (`§5.5`) required
+  parentheses around the closure or failed to parse. (#49)
+
 ### Fixed
 
+- A nested `enum` inside a class body (`static enum EventType { ... }`,
+  a common Groovy domain-model idiom for entity fields backed by a
+  fixed set of values) now parses as a class member. Previously
+  `_class_member` had no enum_declaration alternative at all, so `enum`
+  silently misparsed as a field_declaration's type name and everything
+  after it in the class body fell apart. (#49)
+- `catch_formal_parameter`'s type is now optional — Groovy allows a
+  bare `catch (e) { … }`, implicitly typed as Exception. Previously a
+  type was mandatory. (#49)
+- Constructor calls now accept the diamond operator (`new ArrayList<>()`,
+  `new HashMap<>()`). Ordinary types and nested type arguments still
+  require non-empty argument lists, so `List<> xs` and
+  `new HashMap<String, List<>>()` remain errors. (#49)
+- `field_declaration` now accepts a modifier-only field with no `def`
+  and no type (`static MEDIUM_TTL = 900`), inferring the field's type as
+  Object — a common static-constant idiom. Previously a field required
+  `def` or an explicit type even when a modifier alone already
+  distinguishes it from a bare expression statement. (#49)
+- Typed fields retain their type when followed by a constructor rather
+  than being split into a modifier-only field and a method declaration
+  (`private final int value` followed by `C() {}`). (#49)
+- `enum_declaration` now accepts modifiers (`public enum`, `static enum` —
+  the latter for enums nested inside a class). Previously any modifier
+  before `enum` was rejected. (#49)
+- `for_in_statement` now also accepts the Java-compatible enhanced-for
+  form Groovy allows side by side with its own `for (x in xs)`: `for
+  (Type x : xs)` and `for (def x : xs)`. Only the `in` keyword form
+  parsed before. (#49)
+- `formal_parameter` now accepts annotations (`@PathVariable("id") Long
+  id`, `@RequestBody Map body`). Spring/JPA-style annotated parameters
+  are ubiquitous on framework-facing methods and previously misparsed
+  the whole parameter list. (#49)
 - Accept enum class members directly after the constants with no `;`
   between, as Groovy's own parser does (`classBody` in
   `GroovyParser.g4`, GROOVY-7773 / GROOVY-9306). Previously an enum
