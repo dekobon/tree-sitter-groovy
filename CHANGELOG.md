@@ -24,13 +24,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   0.27 and `tree-sitter-language` 0.1.8+ declare. Consumers on 1.85–1.89
   must stay on an earlier release of this crate. The `tree-sitter`
   dev dependency moves from 0.26 to 0.27; the `tree-sitter-language`
-  requirement is unchanged at `0.1.7`.
+  requirement is unchanged at `0.1.7`. (#66)
 - Bumped `tree-sitter-cli` from 0.26.13 to 0.27.2 and raised the
   declared range in `package.json` to `^0.27.2` so it matches the CLI
   the committed parser source is generated with. It is a dev
   dependency, so nothing changes for downstream consumers; regenerating
   under 0.27.2 leaves `src/parser.c` and `src/tree_sitter/*.h`
-  byte-identical to the committed sources (still ABI 15).
+  byte-identical to the committed sources (still ABI 15). (#66)
 
 ### Fixed
 
