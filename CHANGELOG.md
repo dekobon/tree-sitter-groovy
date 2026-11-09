@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- Raised the Rust crate's minimum supported Rust version
+  (`rust-version`) from 1.85 to 1.90, the floor that `tree-sitter`
+  0.27 and `tree-sitter-language` 0.1.8+ declare. Consumers on 1.85–1.89
+  must stay on an earlier release of this crate. The `tree-sitter`
+  dev dependency moves from 0.26 to 0.27; the `tree-sitter-language`
+  requirement is unchanged at `0.1.7`.
 - Bumped `tree-sitter-cli` from 0.26.13 to 0.27.2 and raised the
   declared range in `package.json` to `^0.27.2` so it matches the CLI
   the committed parser source is generated with. It is a dev
