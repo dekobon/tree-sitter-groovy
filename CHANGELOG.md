@@ -25,16 +25,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line, so `int x { … }` and a record's compact constructor
   (`public Name { … }`, unsupported) parse as a field plus a block
   with no `ERROR`, where v0.4.0 reported one. (#68)
-- Nested `class`, `interface`, `trait`, and `@interface`
-  declarations are members of class, interface, trait, record,
+- Nested type declarations are now class members: `static class
+  Config { … }`, a member `interface`, `trait`, `record` or
+  `@interface`, at any depth, in class, interface, trait, record,
   `@interface`, enum, and anonymous class bodies, joining the nested
-  enum. They use the top-level node kinds (`class_declaration` and
-  so on) as children of `class_body` / `enum_body`. A nested
-  `record` is still not recognised and reads as a method. This
-  reserves `sealed` and `trait` at member start; see Changed below.
+  enum. Previously `_class_member` had no type-declaration
+  alternatives, so a nested type was an `ERROR` node and broke the
+  rest of the class body. They use the top-level node kinds
+  (`class_declaration` and so on) as children of `class_body` /
+  `enum_body`. This reserves `sealed` and `trait` at member start;
+  see Changed below. `record` is not reserved: its keyword comes
+  from the scanner only before a record header (see Fixed below).
 
-  No node kind is added by either entry, and the symbol and field
-  ids of the generated parser are identical to v0.4.0. (#68)
+  No node kind is added by either entry. (#60, #68)
 
 ### Changed
 

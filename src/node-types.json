@@ -1836,6 +1836,10 @@
           "named": true
         },
         {
+          "type": "record_declaration",
+          "named": true
+        },
+        {
           "type": "static_initializer",
           "named": true
         },
@@ -3028,6 +3032,10 @@
         },
         {
           "type": "method_declaration",
+          "named": true
+        },
+        {
+          "type": "record_declaration",
           "named": true
         },
         {

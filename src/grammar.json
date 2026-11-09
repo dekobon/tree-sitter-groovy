@@ -1661,6 +1661,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "record_declaration"
+        },
+        {
+          "type": "SYMBOL",
           "name": "annotation_type_declaration"
         }
       ]

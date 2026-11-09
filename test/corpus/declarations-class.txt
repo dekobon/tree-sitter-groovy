@@ -367,3 +367,96 @@ class C {
         (variable_declarator
           name: (identifier)))
       (ERROR))))
+
+==================
+Nested static class
+==================
+
+class Outer {
+  static class Config {
+    String name
+    def go() { }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (method_declaration
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Nested interface, trait, record and annotation type
+==================
+
+class Outer {
+  interface Service { }
+  trait Greeter { }
+  record Point(int x, int y) { }
+  @interface Marker { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Doubly nested class with superclass and interfaces
+==================
+
+class A {
+  private static class B extends Base implements Runnable {
+    class C { }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body
+          (class_declaration
+            name: (identifier)
+            body: (class_body)))))))

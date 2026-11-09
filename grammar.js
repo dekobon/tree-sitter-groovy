@@ -584,9 +584,10 @@ module.exports = grammar({
     // `memberDeclaration`. Each kind must be listed: a declaration
     // keyword with no action at member start lexes as an identifier,
     // so `class Inner { … }` would silently parse as a field `Inner`
-    // of type `class` followed by an instance initializer block.
-    // `record_declaration` is left out because `record` is a common
-    // member name; a nested record still reads as a method.
+    // of type `class` followed by an instance initializer block, and
+    // a nested `record R(int x) { }` as a method `R` returning
+    // `record`. The record keyword comes from the scanner (§6.7), so
+    // listing it here does not reserve `record` as a member name.
     //
     // The price: `trait` and `sealed` are keywords wherever a member
     // can start, as they already are where a statement can. A member
@@ -605,6 +606,7 @@ module.exports = grammar({
       $.class_declaration,
       $.interface_declaration,
       $.trait_declaration,
+      $.record_declaration,
       $.annotation_type_declaration,
     ),
 
