@@ -286,6 +286,10 @@
         {
           "type": "SYMBOL",
           "name": "method_invocation"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "subscript_expression"
         }
       ]
     },

@@ -254,3 +254,19 @@ String name = 'a'
     type: (type_identifier)
     name: (identifier)
     value: (string_literal)))
+
+==================
+Command chain with a subscript after the first argument
+==================
+
+assertEquals 'v', params['k']
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (subscript_expression
+      object: (identifier)
+      index: (string_literal))))

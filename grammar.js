@@ -240,13 +240,15 @@ module.exports = grammar({
 
     // §5.5 item 3 — after the first argument has made the statement a
     // command chain, later positional arguments may also be identifiers,
-    // dotted paths and method calls: `systemProperty 'k', System.getProperty('k')`.
+    // dotted paths, method calls and subscripts:
+    // `systemProperty 'k', System.getProperty('k')`, `assertEquals 'v', params['k']`.
     // The first argument stays restricted, since `foo bar` with no comma
     // is a typed declaration.
     _command_trailing_argument: $ => choice(
       $.identifier,
       $.field_access,
       $.method_invocation,
+      $.subscript_expression,
     ),
 
     _command_argument: $ => choice(
