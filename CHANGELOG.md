@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept enum class members directly after the constants with no `;`
+  between, as Groovy's own parser does (`classBody` in
+  `GroovyParser.g4`, GROOVY-7773 / GROOVY-9306). Previously an enum
+  such as
+
+  ```groovy
+  enum E {
+      A(1), B, C(2)
+      E(int v) { }
+  }
+  ```
+
+  closed on a zero-width `MISSING "}"` after the last constant and the
+  constructor was re-parsed as a top-level method invocation followed
+  by a closure. The `;` and `,;` spellings keep parsing as before, a
+  trailing `,` directly before a member stays an error as in Groovy,
+  and an enum whose members carry a modifier or `def` no longer needs
+  a leading `;` when it has no constants.
+
+  Newlines are whitespace to this grammar, so where Groovy reads the
+  line break the parser has to choose. After a bare first constant,
+  `enum E { A\n E() { } }` is a constant followed by a constructor,
+  not a method `E` returning type `A`. The same preference applies
+  when there are no constants at all: `enum E { int f() { } }` reads
+  as a constant `int` and a constructor `f`. Spell the member with a
+  modifier (`private E() { }`), a `def`, or a leading `;` to make it a
+  member — all three were already required at v0.3.0, which could not
+  parse the member either way. Constants missing their comma
+  (`enum E { A\n B }`) stay an `ERROR`, as in Groovy; at v0.3.0 they
+  silently parsed as a field `A B`. Enum constants with an anonymous
+  class body (`A { … }`) stay unsupported.
+
+  Node kinds, symbol ids, and field ids are unchanged. (#55)
+
 ## [0.3.0] - 2026-08-30
 
 ### Changed

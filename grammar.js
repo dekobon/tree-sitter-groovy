@@ -145,6 +145,16 @@ module.exports = grammar({
     // decides; the conflict keeps both alternatives alive until
     // then.
     [$.variable_declarator, $._property_name],
+
+    // §4 — `enum E { E(v, w) { } }`: after `E(` an identifier could be
+    // a constant's argument (`_expression`) or a constructor's untyped
+    // parameter (`formal_parameter`); the `{` after `)` decides. The
+    // conflict is global by necessity — it is between the two
+    // reductions, not their containers — and was checked inert
+    // outside an enum body: declaring it on the v0.3.0 grammar makes
+    // tree-sitter report it unnecessary. Regenerate without it to
+    // confirm that still holds.
+    [$.formal_parameter, $._expression],
   ],
 
   rules: {
@@ -637,11 +647,21 @@ module.exports = grammar({
 
     varargs_type: $ => seq($._type, '...'),
 
-    // §4 — enum. Closes murtaza64 #36 first half. Constants list
-    // (optionally trailing-comma) optionally followed by `;` and
-    // further class members. Constants may carry constructor
-    // arguments (`RED(0xff0000)`); v1 supports that via the
-    // optional argument_list.
+    // §4 — enum. Closes murtaza64 #36 first half. Constants may
+    // carry constructor arguments (`RED(0xff0000)`) via the optional
+    // argument_list.
+    //
+    // The body follows GroovyParser.g4 `classBody` for `t == 2`:
+    // after the constants either a trailing `,` closes the list, or
+    // members follow after `;`, `,;`, or nothing at all — Groovy's
+    // own parser treats the newline as the separator (GROOVY-7773,
+    // GROOVY-9306), and newlines are extras here, so the member
+    // simply follows the last constant. `A,` directly before a
+    // member is rejected, as in Groovy. With no constants the body
+    // is an ordinary member list. The member list is spelled three
+    // times rather than shared with `class_body` through a hidden
+    // rule: a new rule renumbers the aux symbols and ~100 symbol ids,
+    // which a patch release must not do.
     enum_declaration: $ => seq(
       repeat($.annotation),
       'enum',
@@ -651,19 +671,37 @@ module.exports = grammar({
 
     enum_body: $ => seq(
       '{',
-      optional(seq(
-        $.enum_constant,
-        repeat(seq(',', $.enum_constant)),
-        optional(','),
-      )),
-      optional(seq(';', repeat(choice($._class_member, ';')))),
+      choice(
+        seq(
+          $.enum_constant,
+          repeat(seq(',', $.enum_constant)),
+          optional(choice(
+            ',',
+            seq(optional(','), ';', repeat(choice($._class_member, ';'))),
+            seq($._class_member, repeat(choice($._class_member, ';'))),
+          )),
+        ),
+        repeat(choice($._class_member, ';')),
+      ),
       '}',
     ),
 
-    enum_constant: $ => seq(
+    // §4 — `prec(1)` makes a bare identifier at the start of the body
+    // a constant rather than the type of the first member: `A\n E() { }`
+    // is a constant followed by a constructor, not a method `E`
+    // returning `A`. The mirror case with no constants, `int f() { }`
+    // as the first thing in the body, therefore reads as constant `int`
+    // plus constructor `f` — a newline is whitespace here and nothing
+    // else tells the two apart; a modifier, `def`, or a leading `;`
+    // makes it a member. Static precedence rather than `prec.dynamic`
+    // with an `[enum_constant, _type]` conflict: both yield the same
+    // tree on every valid shape, but the GLR form silently accepts
+    // `A\n B` (constants missing their comma, which Groovy rejects) as
+    // a field `A B`, where this form reports the ERROR.
+    enum_constant: $ => prec(1, seq(
       field('name', $.identifier),
       optional(field('arguments', $.argument_list)),
-    ),
+    )),
 
     // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
     // `record` is a contextual keyword — tree-sitter's word: directive
