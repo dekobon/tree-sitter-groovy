@@ -525,8 +525,8 @@ module.exports = grammar({
       field('body', $.class_body),
     ),
 
-    // §4 — `{ method* }` for v1. Field declarations, static
-    // initialisers, and inner classes land later.
+    // §4 — class members: methods, fields, constructors, static
+    // initialisers, and nested type declarations.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
@@ -537,11 +537,20 @@ module.exports = grammar({
       '}',
     ),
 
+    // Nested types (`static class Config { … }`, a member `interface`,
+    // `trait`, `record` or `@interface`) are members too; each starts
+    // with its own keyword after the shared annotations and modifiers,
+    // so the keyword decides.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
+      $.class_declaration,
+      $.interface_declaration,
+      $.trait_declaration,
+      $.record_declaration,
+      $.annotation_type_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have
