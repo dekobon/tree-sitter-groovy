@@ -102,9 +102,21 @@ module.exports = grammar({
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
+    // §5.5 — `name:` key of a named argument in a parenthesis-free call.
+    // Scanner-side so the newline before a Spock label (`result` then
+    // `where:`) is not swallowed, and so `Type name =` stays a declaration.
+    $._command_named_key,
+    // Never referenced by a rule: valid only during error recovery, when
+    // the scanner must not emit context-sensitive tokens.
+    $._error_sentinel,
   ],
 
   conflicts: $ => [
+    // §5.5 — a literal after a command chain's comma is a positional
+    // argument, or the start of a trailing method_invocation's function
+    // expression; only `(` would make it the latter.
+    [$._command_argument, $._expression],
+    [$._command_trailing_argument, $._expression],
     // See SPECIFICATION.md §7. Populated as rules accumulate.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
@@ -206,9 +218,36 @@ module.exports = grammar({
     // land later. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', $._command_argument),
-      repeat(seq(',', field('argument', $._command_argument))),
+      field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
+      repeat(seq(',', field('argument', choice(
+        $._command_argument,
+        alias($._command_named_argument, $.named_argument),
+        $._command_trailing_argument,
+      )))),
     )),
+
+    // §5.5 item 3 — named arguments in a parenthesis-free call:
+    // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+    // GORM's `name blank: false, size: 1..100`. The key is an identifier
+    // lexed by the external scanner only when `:` follows on the same
+    // line, so `Type name = …` and a bare statement followed by a Spock
+    // label on the next line are unaffected.
+    _command_named_argument: $ => seq(
+      field('key', alias($._command_named_key, $.identifier)),
+      ':',
+      field('value', $._expression),
+    ),
+
+    // §5.5 item 3 — after the first argument has made the statement a
+    // command chain, later positional arguments may also be identifiers,
+    // dotted paths and method calls: `systemProperty 'k', System.getProperty('k')`.
+    // The first argument stays restricted, since `foo bar` with no comma
+    // is a typed declaration.
+    _command_trailing_argument: $ => choice(
+      $.identifier,
+      $.field_access,
+      $.method_invocation,
+    ),
 
     _command_argument: $ => choice(
       $.string_literal,
@@ -224,8 +263,9 @@ module.exports = grammar({
     // labeled_statement and expression_statement alive after
     // `identifier`; the `:` decides. A scanner-token form
     // (`_label_colon`) was attempted but interacted with
-    // not-yet-implemented named-argument command chains
-    // (`archiveArtifacts artifacts: 'x'`); see divergence #5.
+    // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
+    // which now lex their key through `_command_named_key` instead;
+    // see divergence #5.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',

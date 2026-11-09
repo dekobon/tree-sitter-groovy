@@ -35,7 +35,7 @@ reasoning here.
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below). |
-| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted in this session but coupled to a not-yet-implemented named-argument command-chain (`archiveArtifacts artifacts: 'x'`), which the workaround grammar path quietly absorbed. Reverted to grammar precedence; v2 work is named-args + scanner token together. |
+| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
 | §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |

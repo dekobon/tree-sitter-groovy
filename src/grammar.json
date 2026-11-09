@@ -183,8 +183,22 @@
             "type": "FIELD",
             "name": "argument",
             "content": {
-              "type": "SYMBOL",
-              "name": "_command_argument"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_command_argument"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_command_named_argument"
+                  },
+                  "named": true,
+                  "value": "named_argument"
+                }
+              ]
             }
           },
           {
@@ -200,8 +214,26 @@
                   "type": "FIELD",
                   "name": "argument",
                   "content": {
-                    "type": "SYMBOL",
-                    "name": "_command_argument"
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "_command_argument"
+                      },
+                      {
+                        "type": "ALIAS",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "_command_named_argument"
+                        },
+                        "named": true,
+                        "value": "named_argument"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_command_trailing_argument"
+                      }
+                    ]
                   }
                 }
               ]
@@ -209,6 +241,53 @@
           }
         ]
       }
+    },
+    "_command_named_argument": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "key",
+          "content": {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_command_named_key"
+            },
+            "named": true,
+            "value": "identifier"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        }
+      ]
+    },
+    "_command_trailing_argument": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "field_access"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "method_invocation"
+        }
+      ]
     },
     "_command_argument": {
       "type": "CHOICE",
@@ -6597,6 +6676,14 @@
   ],
   "conflicts": [
     [
+      "_command_argument",
+      "_expression"
+    ],
+    [
+      "_command_trailing_argument",
+      "_expression"
+    ],
+    [
       "_expression",
       "_type"
     ],
@@ -6639,6 +6726,14 @@
     {
       "type": "SYMBOL",
       "name": "groovydoc_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_command_named_key"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_error_sentinel"
     }
   ],
   "inline": [],

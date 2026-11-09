@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- Parenthesis-free calls now accept named arguments, as §5.5 specifies:
+  `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+  GORM's `name blank: false, size: 1..100`. After the first argument,
+  positional arguments may also be identifiers, dotted paths and method
+  calls (`systemProperty 'k', System.getProperty('k')`). The key is lexed
+  by a new external scanner token, `_command_named_key`, which only
+  matches when `:` follows on the same line, so `Type name = …`
+  declarations and a bare statement followed by a Spock label on the next
+  line parse as before. `archiveArtifacts artifacts: 'x'` previously
+  parsed as an expression statement followed by a labeled statement.
+
 ## [0.3.0] - 2026-08-30
 
 ### Changed

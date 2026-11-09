@@ -10,12 +10,67 @@
 
 #include "tree_sitter/parser.h"
 
+#include <string.h>
+
 enum TokenType {
     SLASHY_STRING_START,
     LINE_COMMENT,
     BLOCK_COMMENT,
     GROOVYDOC_COMMENT,
+    COMMAND_NAMED_KEY,
+    ERROR_SENTINEL,
 };
+
+static inline bool is_ident_start(int32_t c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+        || c == '$' || c > 127;
+}
+
+static inline bool is_ident_part(int32_t c) {
+    return is_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+// SPECIFICATION.md §5.5 — the key of a named argument in a
+// parenthesis-free call (`exclude group: 'a'`). Matches an identifier
+// on the current line that is followed by `:` (not `::`), consuming
+// only the identifier. A newline before the key means a new statement
+// (a Spock `where:` label, say), so no match.
+static bool scan_command_named_key(TSLexer *lexer) {
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, true);
+    }
+    if (!is_ident_start(lexer->lookahead)) {
+        return false;
+    }
+    // Keep the first few chars to reject `case:` / `default:`, which
+    // are switch labels, not keys.
+    char word[8];
+    unsigned len = 0;
+    while (is_ident_part(lexer->lookahead)) {
+        if (len < sizeof(word)) {
+            word[len] = (char)lexer->lookahead;
+        }
+        len++;
+        lexer->advance(lexer, false);
+    }
+    if ((len == 4 && memcmp(word, "case", 4) == 0)
+        || (len == 7 && memcmp(word, "default", 7) == 0)) {
+        return false;
+    }
+    lexer->mark_end(lexer);
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead != ':') {
+        return false;
+    }
+    lexer->advance(lexer, false);
+    if (lexer->lookahead == ':') {
+        return false;
+    }
+    lexer->result_symbol = COMMAND_NAMED_KEY;
+    return true;
+}
 
 static inline void advance(TSLexer *lexer) {
     lexer->advance(lexer, false);
@@ -58,6 +113,21 @@ bool tree_sitter_groovy_external_scanner_scan(
     const bool *valid_symbols
 ) {
     (void)payload;
+
+    if (valid_symbols[COMMAND_NAMED_KEY] && !valid_symbols[ERROR_SENTINEL]) {
+        if (lexer->lookahead == ' ' || lexer->lookahead == '\t'
+            || is_ident_start(lexer->lookahead)) {
+            // Either the key matches, or the lookahead is an identifier
+            // (never a comment / slashy start), so nothing below applies.
+            int32_t first = lexer->lookahead;
+            if (scan_command_named_key(lexer)) {
+                return true;
+            }
+            if (is_ident_start(first) || is_ident_start(lexer->lookahead)) {
+                return false;
+            }
+        }
+    }
 
     // SPECIFICATION.md §6.6 — line / block / groovydoc comments
     // and §6.2 slashy strings. Both start with `/`; combining their
