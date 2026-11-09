@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   outside of a bare statement-level command chain (`§5.5`) required
   parentheses around the closure or failed to parse. (#49)
 
+### Changed
+
+- Bumped `tree-sitter-cli` from 0.26.13 to 0.27.2 and raised the
+  declared range in `package.json` to `^0.27.2` so it matches the CLI
+  the committed parser source is generated with. It is a dev
+  dependency, so nothing changes for downstream consumers; regenerating
+  under 0.27.2 leaves `src/parser.c` and `src/tree_sitter/*.h`
+  byte-identical to the committed sources (still ABI 15).
+
 ### Fixed
 
 - A nested `enum` inside a class body (`static enum EventType { ... }`,
