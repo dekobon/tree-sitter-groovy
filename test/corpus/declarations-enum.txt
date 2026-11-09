@@ -80,3 +80,402 @@ enum E { A, B; def f() { 1 } }
         name: (identifier)
         parameters: (formal_parameters)
         body: (block (expression_statement (number_literal)))))))
+
+==================
+Enum constructors after constants with no semicolon
+==================
+
+enum E {
+    A(1), B, C(2)
+    E(int v) { }
+    E() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (number_literal)))
+      (enum_constant name: (identifier))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (number_literal)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter type: (type_identifier) name: (identifier)))
+        body: (block))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum with a single bare constant then a constructor
+==================
+
+enum E {
+    A
+    E() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum constant then typed method and typed field
+==================
+
+enum E {
+    A
+    int f() { 1 }
+    int x
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier))))))
+
+==================
+Enum constant then a method sharing the enum's name
+==================
+
+enum E {
+    A
+    String E() { 'x' }
+    E() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (string_literal))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum with a constructor and no constants
+==================
+
+enum E { private E() { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum constructor with untyped parameters and no constants
+==================
+
+enum E { private E(v, w) { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter name: (identifier))
+          (formal_parameter name: (identifier)))
+        body: (block)))))
+
+==================
+Enum constants, comma and semicolon, then members
+==================
+
+enum E { A, B,; E() { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum constants then stray semicolons and members
+==================
+
+enum E {
+    A
+    ;; E() { } ;
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum comments between the last constant and the first member
+==================
+
+enum E {
+    A // c
+    /* d */ E() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (line_comment)
+      (block_comment)
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum with every member kind after a bare constant
+==================
+
+enum E {
+    A
+    int x = 1
+    String name
+    def f() { 1 }
+    static { }
+    @Override String toString() { 'x' }
+    private E(int v) { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier) value: (number_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal))))
+      (static_initializer body: (block))
+      (method_declaration
+        (annotation name: (qualified_name (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (string_literal))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter type: (type_identifier) name: (identifier)))
+        body: (block)))))
+
+==================
+Enum constant and constructor on one line
+==================
+
+enum E { A E() { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Enum constants with empty and identifier arguments
+==================
+
+enum E { A(), B(x), C }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list (identifier)))
+      (enum_constant name: (identifier)))))
+
+==================
+Enum field and constructor after a blank line
+==================
+
+enum E {
+    A, B
+
+    private final int v
+    E(int v) { this.v = v }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter type: (type_identifier) name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access object: (identifier) field: (identifier))
+              right: (identifier))))))))
+
+==================
+Enum typed method with no constants after a leading semicolon
+==================
+
+enum E { ; int f() { 1 } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal)))))))
+
+==================
+Enum constant with an anonymous class body is unsupported
+:error
+==================
+
+enum E {
+    A, B,
+    E() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list))
+      (ERROR)))
+  (ERROR))
+
+==================
+Enum constants missing their comma are an error
+:error
+==================
+
+enum E {
+    A
+    B
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (ERROR (identifier)))))
+
+==================
+Enum typed method with no constants and no semicolon reads as constant and constructor
+==================
+
+enum E { int f() { 1 } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block (expression_statement (number_literal)))))))
