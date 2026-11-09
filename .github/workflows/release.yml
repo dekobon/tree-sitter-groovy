@@ -108,7 +108,7 @@ jobs:
         run: |-
           version=$(jq -r '.packages["node_modules/tree-sitter-cli"].version' package-lock.json)
           printf 'ref=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-      - uses: tree-sitter/setup-action/cli@49f8c1f20b60102eae8c033bb7c7f6cd056f6086 # v2
+      - uses: tree-sitter/setup-action/cli@faab9a23fa6195da0f1cf868219cc1e89f238d3d # v2
         with:
           tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
       - uses: tree-sitter/parser-test-action@aba4a3de737f86f8ce83be38166a1ab521d4c960 # v2
@@ -143,7 +143,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "1.85"
       - name: Authenticate to crates.io via Trusted Publishing
@@ -280,7 +280,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
+      - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e # v4.3.5
       - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}

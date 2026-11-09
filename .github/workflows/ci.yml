@@ -78,7 +78,7 @@ jobs:
             exit 1
           fi
           printf 'ref=v%s\n' "$version" >> "$GITHUB_OUTPUT"
-      - uses: tree-sitter/setup-action/cli@49f8c1f20b60102eae8c033bb7c7f6cd056f6086 # v2
+      - uses: tree-sitter/setup-action/cli@faab9a23fa6195da0f1cf868219cc1e89f238d3d # v2
         with:
           tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
       - uses: tree-sitter/parser-test-action@aba4a3de737f86f8ce83be38166a1ab521d4c960 # v2
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "1.85"
           components: clippy
@@ -117,7 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: typos
-        uses: crate-ci/typos@7f9d0819ca1c008ade73f4b41fa9d258d48f605b # v1.51.1
+        uses: crate-ci/typos@4c8b7f51ca60df14e3c5ca82770dfbbe6c3dae85 # v1.52.0
       - name: taplo (TOML format check)
         uses: uncenter/setup-taplo@b18c8c8302695fe63d6853bc004006215ac52b91 # v2
         with:
@@ -128,7 +128,7 @@ jobs:
           version: "0.10.0"
       - run: taplo format --check
       - name: markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25
         with:
           globs: "**/*.md"
 
@@ -168,7 +168,7 @@ jobs:
       # Same SHA release.yml pins. The job is only evidence about the
       # release if it builds with what the release builds with, so
       # Dependabot must move both together.
-      - uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
+      - uses: pypa/cibuildwheel@f9b966cfadf4109556cadc5bb39ddb72d0ce664e # v4.3.5
         if: steps.packaging-changes.outputs.changed == 'true'
 
   fuzz:
