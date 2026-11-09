@@ -102,6 +102,13 @@ module.exports = grammar({
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
+    // §5.10 — `[` on the same line as the expression before it (spaces and
+    // tabs allowed). A `[` after a newline isn't one, so it starts a list or
+    // map literal: a statement, not a subscript of the line above.
+    $._subscript_open,
+    // Never referenced by a rule: valid only during error recovery, when
+    // the scanner must not emit context-sensitive tokens.
+    $._error_sentinel,
   ],
 
   conflicts: $ => [
@@ -1013,7 +1020,7 @@ module.exports = grammar({
       repeat1(seq('.', alias($.identifier, $.type_identifier))),
     )),
 
-    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, '[', ']')),
+    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, alias($._subscript_open, '['), ']')),
 
     // §4 / §5.14 — Java-style generic type arguments. Allows nested
     // generics (`Map<String, List<Integer>>`) and bounded wildcards
@@ -1172,9 +1179,12 @@ module.exports = grammar({
     // explicit ask of dekobon #247 for the `?[]` row. Both at
     // PREC.POSTFIX, left-associative — `a[b][c]` parses as
     // `(a[b])[c]`.
+    // `[` must be on the object's line (see `_subscript_open`): a Grails
+    // controller action that ends in `[model: value]` on its own line returns
+    // a map; it isn't a subscript of the statement before it.
     subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
-      '[',
+      alias($._subscript_open, '['),
       field('index', $._expression),
       ']',
     )),

@@ -3550,7 +3550,12 @@
             "name": "_type"
           },
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_subscript_open"
+            },
+            "named": false,
             "value": "["
           },
           {
@@ -4122,7 +4127,12 @@
             }
           },
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_subscript_open"
+            },
+            "named": false,
             "value": "["
           },
           {
@@ -6639,6 +6649,14 @@
     {
       "type": "SYMBOL",
       "name": "groovydoc_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_subscript_open"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_error_sentinel"
     }
   ],
   "inline": [],

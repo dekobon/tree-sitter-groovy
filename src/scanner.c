@@ -15,6 +15,8 @@ enum TokenType {
     LINE_COMMENT,
     BLOCK_COMMENT,
     GROOVYDOC_COMMENT,
+    SUBSCRIPT_OPEN,
+    ERROR_SENTINEL,
 };
 
 static inline void advance(TSLexer *lexer) {
@@ -58,6 +60,21 @@ bool tree_sitter_groovy_external_scanner_scan(
     const bool *valid_symbols
 ) {
     (void)payload;
+
+    // SPECIFICATION.md §5.10 — a `[` on the current line continues the
+    // expression (subscript or array type). Only spaces and tabs are
+    // skipped; at a newline we fall through, and the in-grammar `[` starts
+    // a list or map literal instead.
+    if (valid_symbols[SUBSCRIPT_OPEN] && !valid_symbols[ERROR_SENTINEL]) {
+        while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+            lexer->advance(lexer, true);
+        }
+        if (lexer->lookahead == '[') {
+            lexer->advance(lexer, false);
+            lexer->result_symbol = SUBSCRIPT_OPEN;
+            return true;
+        }
+    }
 
     // SPECIFICATION.md §6.6 — line / block / groovydoc comments
     // and §6.2 slashy strings. Both start with `/`; combining their

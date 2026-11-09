@@ -79,3 +79,20 @@ String[] names() { x }
     parameters: (formal_parameters)
     body: (block
       (expression_statement (identifier)))))
+
+==================
+Array type with a space before the brackets
+==================
+
+def a = xs as Object []
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (cast_expression
+        value: (identifier)
+        type: (array_type
+          (type_identifier))))))
