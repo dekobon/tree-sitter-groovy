@@ -128,3 +128,19 @@ public abstract class A extends B implements I { }
     (super_interfaces
       (type_identifier))
     body: (class_body)))
+
+==================
+Trait implementing interfaces
+==================
+
+trait T implements A, B { }
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    (super_interfaces
+      (type_identifier)
+      (type_identifier))
+    body: (class_body)))

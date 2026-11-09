@@ -435,6 +435,8 @@ module.exports = grammar({
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
       optional($.extends_interfaces),
+      // a trait may implement interfaces, like a class
+      optional($.super_interfaces),
       optional($.permits_clause),
       field('body', $.class_body),
     ),

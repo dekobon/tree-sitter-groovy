@@ -14726,6 +14726,10 @@
         {
           "type": "permits_clause",
           "named": true
+        },
+        {
+          "type": "super_interfaces",
+          "named": true
         }
       ]
     }
