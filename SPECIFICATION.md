@@ -826,6 +826,8 @@ enum TokenType {
   LABEL_COLON,            // §5.3 — colon that closes a statement label
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
+  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the expression before it
+  ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
 
@@ -932,6 +934,10 @@ in murtaza64's grammar requires at least one whitespace character
 after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
 both fail. A scanner-driven token simply consumes from the opener to
 the matching `*/` regardless of intermediate content.
+
+### 6.7 SUBSCRIPT_OPEN — implementation contract
+
+Emitted only where a subscript or array-type `[` may follow, and never during error recovery (`ERROR_SENTINEL` valid). Skips spaces and tabs but not newlines; if the next character is `[`, consumes it. At a newline it emits nothing, so the in-grammar `[` lexes instead and starts a list or map literal: Groovy ends a statement at a newline, which is what lets a Grails controller action return `[model: value]` on its own line.
 
 ---
 
