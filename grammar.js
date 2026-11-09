@@ -803,6 +803,7 @@ module.exports = grammar({
     for_in_statement: $ => seq(
       'for',
       '(',
+      optional('final'),
       field('variable', $.identifier),
       'in',
       field('value', $._expression),

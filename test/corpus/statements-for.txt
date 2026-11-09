@@ -198,3 +198,17 @@ for (def i = 0; i < 3; i++) { a() }
         (method_invocation
           function: (identifier)
           arguments: (argument_list))))))
+
+==================
+For-in with a final loop variable
+==================
+
+for (final line in lines) { }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))

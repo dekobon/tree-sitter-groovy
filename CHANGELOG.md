@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 - `final` is now accepted on local variable declarations: `final String
   name = 'a'`, `final def n = 1`, and the modifier-only form `final x = 1`
-  (dynamically typed, as with `def`). Previously any local starting with
-  `final` inside a method body was an `ERROR` node.
+  (dynamically typed, as with `def`), plus a `final` loop variable in
+  `for (final x in xs)`. Previously any local starting with `final` inside
+  a method body was an `ERROR` node.
 
 ## [0.3.0] - 2026-08-30
 
