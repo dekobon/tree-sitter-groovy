@@ -826,6 +826,8 @@ enum TokenType {
   LABEL_COLON,            // §5.3 — colon that closes a statement label
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
+  COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
+  ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
 
@@ -932,6 +934,20 @@ in murtaza64's grammar requires at least one whitespace character
 after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
 both fail. A scanner-driven token simply consumes from the opener to
 the matching `*/` regardless of intermediate content.
+
+### 6.7 COMMAND_NAMED_KEY — implementation contract
+
+Emitted only where a command chain argument may start, and never during
+error recovery (`ERROR_SENTINEL` valid). Skips spaces and tabs but not
+newlines, consumes an identifier, marks the token end, then looks ahead
+past spaces and tabs for a single `:` (a following second `:` means a
+method reference, so no emit). `case` and `default` are rejected so a
+switch label after a statement on the same line stays a label.
+
+Keeping the key scanner-side gives the parser a distinct lookahead token,
+so `Type name = …` stays a declaration without a precedence change, and a
+bare statement followed by a label on the next line (Spock's `where:`)
+stays two statements.
 
 ---
 
