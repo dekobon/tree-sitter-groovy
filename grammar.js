@@ -629,7 +629,9 @@ module.exports = grammar({
     // §5.13 — formal parameter with optional type, optional
     // varargs marker (`Type... name`), and optional default value
     // (`name = expr`).
+    // `final` is the one modifier a parameter takes, as in Java.
     formal_parameter: $ => seq(
+      optional('final'),
       optional(field('type', choice($._type, $.varargs_type))),
       field('name', $.identifier),
       optional(seq('=', field('default', $._expression))),

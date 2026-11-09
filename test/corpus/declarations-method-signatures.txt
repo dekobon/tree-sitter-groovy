@@ -222,3 +222,22 @@ void doIt() throws Exception { foo() }
         (method_invocation
           function: (identifier)
           arguments: (argument_list))))))
+
+==================
+Final parameters
+==================
+
+def f(final String a, final b) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))

@@ -1984,6 +1984,18 @@
           "type": "CHOICE",
           "members": [
             {
+              "type": "STRING",
+              "value": "final"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
               "type": "FIELD",
               "name": "type",
               "content": {
