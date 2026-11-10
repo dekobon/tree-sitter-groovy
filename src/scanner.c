@@ -2,7 +2,10 @@
 //
 // Handles §6.2 slashy-string-start and §6.6 line/block/groovydoc
 // comments. Both start with `/`; combining the dispatch keeps the
-// in-grammar lexer from partially consuming the leading `/`.
+// in-grammar lexer from partially consuming the leading `/`. Also
+// handles §6.7 COMMAND_NAMED_KEY, the key of a named argument in a
+// parenthesis-free call. ERROR_SENTINEL is never emitted; the parser
+// marks it valid only during error recovery.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -23,7 +26,7 @@ enum TokenType {
 
 static inline bool is_ident_start(int32_t c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
-        || c == '$' || c > 127;
+        || c == '$';
 }
 
 static inline bool is_ident_part(int32_t c) {
@@ -43,7 +46,10 @@ static bool scan_command_named_key(TSLexer *lexer) {
         return false;
     }
     // Keep the first few chars to reject `case:` / `default:`, which
-    // are switch labels, not keys.
+    // are switch labels, not keys. Apache's `namedArgLabel` accepts both
+    // keywords, so `foo default: 1` diverges on purpose: the one-liner
+    // `switch (x) { case 1: foo default: bar }` in statements-switch.txt
+    // depends on the rejection.
     char word[8];
     unsigned len = 0;
     while (is_ident_part(lexer->lookahead)) {

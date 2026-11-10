@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments` | |
+| `new` | `object_creation_expression` | `type`, `arguments` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -386,7 +386,7 @@ fix relative to *both* parent grammars.
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | constants list followed by optional `;` then class body; arrow switch is the typical use site (#36). |
+| `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
@@ -559,11 +559,17 @@ The resolution we adopt:
 2. **First token is an identifier or property-access chain**, not
    any expression — so `(x + y) z` is a syntax error, not a juxt-call
    on a parenthesised expression.
-3. **Argument forms allowed**: positional args (literals, identifiers,
-   dotted paths, closures), named args (`k: v` where `k` is an
-   identifier or string), and trailing closure. Disallowed: nested
-   command chains, ternaries with unparenthesised conditions inside
-   the argument list (forces `f (a ? b : c)`).
+3. **Argument forms allowed**: the first argument is a literal, a
+   closure, or a named arg (`k: v`). After a comma an argument is a
+   named arg or any expression (`assertEquals 'v', a + b`,
+   `foo 'a', x ? 1 : 2`). That is Apache's `argumentListElement`
+   without spread arguments: `foo 'a', *args` and `foo a: 1, *:m`
+   are an `ERROR`.
+   A named-arg key is an identifier; Apache also accepts string keys
+   (`foo 'a': 1`), which are not implemented yet (§6.7). Disallowed:
+   nested command chains, and an identifier or other non-literal
+   expression as the first positional argument, since `foo bar` with
+   no comma is a typed declaration.
 4. **Chain continuation**: after the first call, subsequent `name`
    tokens become property/method dispatches. The Apache grammar uses
    `commandArgument: pathElement+ argumentList?` for the chain
@@ -948,6 +954,48 @@ Keeping the key scanner-side gives the parser a distinct lookahead token,
 so `Type name = …` stays a declaration without a precedence change, and a
 bare statement followed by a label on the next line (Spock's `where:`)
 stays two statements.
+
+After a comma the statement cannot end, so a key on a continuation line
+(`sh script: 'make',` then `returnStdout: true`) is matched in the grammar
+as a plain identifier followed by `:` and needs no scanner token.
+
+Known limitations:
+
+- String keys (`foo 'a': 1`, `foo "$k": 1`) are an `ERROR`. Apache's
+  `namedArgPrimary` accepts them.
+- `case` and `default` cannot be keys as the first argument. Apache's
+  `namedArgLabel` accepts every keyword, so `foo default: 1` is a
+  named-argument call there and an expression statement plus a label here.
+  The divergence is deliberate: the one-line
+  `switch (x) { case 1: foo default: bar }` depends on it. After a comma
+  both are accepted as keys (`foo 'a', default: 1`, `foo a: 1, case: 2`),
+  on the same line or the next: the scanner still rejects them, and the
+  grammar's continuation rule takes the keyword as a plain identifier.
+- The keys `new`, `true`, `false`, `null` and `switch` are accepted on the
+  same line as the preceding argument (`foo a: 1, new: 2`) but are an
+  `ERROR` on a continuation line (`foo a: 1,` then `new: 2`). The keys
+  `this`, `super`, `if`, `def`, `in` and `as` are accepted in both
+  positions.
+- A block or groovydoc comment before a label defeats the newline guard.
+  The comment branch consumes the newline when it emits the comment, so
+  `result` followed by a line reading `/* note */ where:` or
+  `/** note */ where:` parses as a command chain with key `where`.
+- A trailing argument continues onto the next line. After a comma an
+  argument is a full expression, and expressions do not stop at a newline,
+  so a next line that starts with something that can continue an expression
+  joins the last argument, even a literal one. `foo 1, 2` followed by a
+  line reading `[a].each { }` parses as `2[a].each { }`, and `foo 'a', 'b'`
+  followed by `[x, y].each { }` is an `ERROR`. The same happens when the
+  next line starts with `(` (a call on the argument), `{` (a trailing
+  closure), `-` or `+` (a binary operator), `in`, `as` or `instanceof`.
+  A chain with one argument (`foo 'a'` then `[x, y].each { }`) is not
+  affected. Expressions outside command chains already behave this way:
+  `def x = 'b'` followed by `[a].each { }` is a subscript on `'b'`. The
+  same-line subscript rule proposed in #63 would remove the `[` case only.
+- A dangling comma takes the first token of the next statement. `foo a: 1,`
+  followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
+  chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The
+  dangling comma was an `ERROR` before.
 
 ---
 

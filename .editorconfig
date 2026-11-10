@@ -37,3 +37,6 @@ indent_size = 8
 [Makefile]
 indent_style = tab
 indent_size = 8
+
+[test/corpus/expressions-command-chain-crlf.txt]
+end_of_line = crlf

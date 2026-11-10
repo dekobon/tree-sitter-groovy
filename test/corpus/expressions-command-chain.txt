@@ -289,3 +289,132 @@ assert y
   (line_comment)
   (assert_statement
     (identifier)))
+
+==================
+Named arguments continued on the next line
+==================
+
+sh script: 'make',
+   returnStdout: true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (boolean_literal))))
+
+==================
+Named arguments continued over three lines
+==================
+
+foo a: 1,
+    b: 2,
+    c: 3
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Label on the line after a command chain stays a label
+==================
+
+foo 'a', b
+c: d
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (identifier))))
+
+==================
+Command chain with a binary expression after the first argument
+==================
+
+assertEquals 'v', a + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Command chain with a subscript operand after the first argument
+==================
+
+foo 'a', b[0] + 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (binary_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (number_literal))
+      right: (number_literal))))
+
+==================
+Command chain with a constructor call after the first argument
+==================
+
+foo 'a', new Bar(1)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (number_literal)))))
+
+==================
+Command chain with a ternary after the first argument
+==================
+
+foo 'a', x ? 1 : 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal))))
