@@ -349,6 +349,50 @@ class Flags {
         body: (class_body)))))
 
 ==================
+Fields and methods named record after a modifier and a type
+==================
+
+class Flags {
+    private Record record
+    private final Record record = null
+    public void record() { }
+    private Record record() { null }
+    int following
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (null_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (null_literal))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
 Field named sealed after a modifier and a type is unsupported
 :error
 ==================

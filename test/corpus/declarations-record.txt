@@ -207,3 +207,175 @@ class Holder {
             type: (type_identifier)
             name: (identifier)))
         body: (class_body)))))
+
+==================
+Nested records with and without a body followed by a field
+==================
+
+class Shapes {
+    record Point(int x, int y) { }
+    record Pair(Object left, Object right)
+    int after = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Nested record with its body on the next line
+==================
+
+class C {
+    record Point(int x)
+    {
+        int manhattan() { x }
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Record inside an anonymous class body
+==================
+
+def task = new Runnable() {
+    record Step(int n) { }
+    void run() { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (record_declaration
+            name: (identifier)
+            components: (record_components
+              (record_component
+                type: (type_identifier)
+                name: (identifier)))
+            body: (class_body))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Records inside enum bodies after the constants
+==================
+
+enum Planet {
+    MERCURY, VENUS
+    record Orbit(int days) { }
+}
+
+enum Moon {
+    LUNA;
+    record Phase(int day) { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Nested record with a modifier still reads as a method
+==================
+
+class C {
+    static record P(int x) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block)))))

@@ -69,3 +69,10 @@ record.key()
 
 record(1)
 // <- function.call
+
+class Holder {
+    private Record record
+    //             ^ property
+    record Inner(int x) { }
+    // <- keyword
+}
