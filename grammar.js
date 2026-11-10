@@ -791,11 +791,14 @@ module.exports = grammar({
       optional(field('arguments', $.argument_list)),
     )),
 
-    // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
+    // §4 — record (Groovy 4+), after Apache's `classDeclaration`:
+    // `[modifiers] record Name[<T>](Type a, Type b) [implements I] [{ body }]`.
+    // Records cannot `extends`, and the body is optional here where
+    // Groovy requires it.
     // §5.2 / §6.7 — `record` is a contextual keyword. The keyword
     // comes from the external scanner, which emits it only when a
-    // name follows on the same line and `(` after that; in every
-    // other position the word lexes as `identifier`. A grammar literal
+    // name follows on the same line and `(` or `<` after that; in
+    // every other position the word lexes as `identifier`. A grammar literal
     // cannot do this: keyword extraction yields the keyword wherever
     // it has an action, which made `record.key()` at statement start,
     // and `private Record record` once record_declaration became a
@@ -815,9 +818,12 @@ module.exports = grammar({
     // right whenever both parse.
     record_declaration: $ => prec.dynamic(1, prec.right(seq(
       repeat($.annotation),
+      repeat($._modifier),
       alias($._record_keyword, 'record'),
       field('name', $.identifier),
+      optional(field('type_parameters', $.type_parameters)),
       field('components', $.record_components),
+      optional($.super_interfaces),
       optional(field('body', $.class_body)),
     ))),
 

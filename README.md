@@ -186,8 +186,7 @@ These are documented in detail in
   `boolean sealed` and `String trait`, with no modifier, parse.
   `record` is not affected: it is a keyword only directly before a
   record header (`record Name(`), so `private Record record` and
-  `record.key()` parse. A nested record with a modifier
-  (`static record P(int x) { }`) still reads as a method.
+  `record.key()` parse.
 
 ## Contributing
 

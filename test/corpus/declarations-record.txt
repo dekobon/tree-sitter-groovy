@@ -358,11 +358,116 @@ enum Moon {
         body: (class_body)))))
 
 ==================
-Nested record with a modifier still reads as a method
+Nested records with modifiers beside fields named record after a modifier
 ==================
 
 class C {
     static record P(int x) { }
+    @Foo private static record Q(int y)
+    static record = 5
+    private record
+}
+public record Top(int x) { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (record_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Generic records and records implementing interfaces
+==================
+
+record Pair<A, B>(A left, B right) { }
+record Point(int x) implements Serializable, Comparable<Point> { }
+record Both<T>(T value) implements Supplier<T> { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier))
+      (type_parameter
+        name: (type_identifier)))
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier))
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    (super_interfaces
+      (type_identifier)
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    (super_interfaces
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (class_body)))
+
+==================
+Method with a modifier and return type spelled record reads as a record
+:error
+==================
+
+class C {
+    private record bar() { 1 }
 }
 
 ---
@@ -371,14 +476,12 @@ class C {
   (class_declaration
     name: (identifier)
     body: (class_body
-      (method_declaration
-        return_type: (type_identifier)
+      (record_declaration
         name: (identifier)
-        parameters: (formal_parameters
-          (formal_parameter
-            type: (type_identifier)
-            name: (identifier)))
-        body: (block)))))
+        components: (record_components)
+        body: (class_body
+          (ERROR
+            (number_literal)))))))
 
 ==================
 Record headers with comments and a line break before the components

@@ -87,8 +87,10 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
 }
 
 // SPECIFICATION.md §6.7 — `record` is a keyword only at the start of
-// a record header: `record`, a name on the same line, then `(`, with
-// Groovy's lexer trivia allowed in between. Everywhere else the word
+// a record header: `record`, a name on the same line, then `(` with
+// Groovy's lexer trivia allowed in between, or `<` straight after the
+// name (type parameters; the grammar's `type_parameters` opener is
+// `token.immediate` too). Everywhere else the word
 // is an identifier (`record.key()`, `private Record record`,
 // `public void record()`), as Apache's `identifier` rule allows. The
 // grammar cannot make that choice: with `word: $.identifier` the
@@ -123,6 +125,9 @@ static bool scan_record_header(TSLexer *lexer) {
     // predicate.
     while (is_identifier_char(lexer->lookahead)) {
         advance(lexer);
+    }
+    if (lexer->lookahead == '<') {
+        return true;
     }
     if (!skip_header_trivia(lexer, true)) {
         return false;

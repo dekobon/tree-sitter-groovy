@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   from the scanner only before a record header (see Fixed below).
 
   No node kind is added by either entry. (#60, #68)
+- `record_declaration` takes the rest of Apache's `classDeclaration`
+  shape: modifiers before `record` (`public record P(int x) { }`,
+  `static record Q(int y) { }` as a member), type parameters
+  (`record Pair<A, B>(A left, B right)`, in the `type_parameters`
+  field), and an `implements` clause (a `super_interfaces` child, as
+  on classes). Each was an `ERROR` or a silent `method_declaration`
+  before. `node-types.json` adds `type_parameters` to the fields and
+  `super_interfaces` to the children of `record_declaration`.
+  (#60, #68)
 
 ### Changed
 
@@ -72,8 +81,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `record Point(int x) { }` as a member parsed at v0.4.0, with no
   `ERROR`, as a `method_declaration` named `Point` with return type
   `record`; so did a method whose return type is spelled `record`
-  with no modifier (`record foo() { }`), which takes the same tree
-  now. `record_declaration` joins the child lists of `class_body`
+  (`record foo() { }`, `private record bar() { }`), which takes the
+  same tree now. `record_declaration` joins the child lists of `class_body`
   and `enum_body` in `node-types.json`. In the other direction,
   `record` with a line break or a line comment before the name, then
   `Point(int x) { }` on the next line, was a `record_declaration` at
@@ -107,9 +116,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `(` (`SPECIFICATION.md` §6.7); everywhere else the word is an
   identifier. One residual, an `ERROR` at v0.4.0 too: a command-style
   call whose argument is a call (`record Point(1, 2)`) reads as a
-  record header. A nested record with a modifier
-  (`static record P(int x) { }`) still reads as a method, since
-  `record_declaration` takes no modifiers. (#60, #68)
+  record header. (#60, #68)
 
 - Anonymous inner classes now parse. `new Runnable() { … }` had no
   production. At v0.3.0 the body was cut loose from the creation: in

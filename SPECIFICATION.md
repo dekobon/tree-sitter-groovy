@@ -387,7 +387,7 @@ fix relative to *both* parent grammars.
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
-| `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
+| `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
@@ -966,10 +966,11 @@ Emit RECORD_KEYWORD when, from the current position:
     break and no line comment, because `classDeclaration` in
     GroovyParser.g4 has no `nls` between RECORD and the name; then
   - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
-    class); then
+    class); then either
+  - `<` immediately (type parameters; the grammar's `type_parameters`
+    opener is `token.immediate` as well), or
   - any mix of spaces, tabs, line breaks, block and line comments
-    (the rule has `nls` before `formalParameters`); then
-  - `(`.
+    (the rule has `nls` before `formalParameters`) and then `(`.
 The token is `record` alone: `mark_end` is called after it and the
 look-ahead is not kept. On any other input return false; the
 in-grammar lexer then reads the word as `identifier`.
@@ -995,9 +996,10 @@ Known residuals:
   reads as a method declaration with return type `record`. Groovy
   rejects that input; v0.4.0 read it as a record because comments
   and newlines are `extras` around a literal keyword.
-- Record type parameters (`record Pair<A, B>(…)`) and modifiers
-  before `record` (`static record P(int x) { }`, a method today) have
-  no production.
+- With modifiers accepted before `record`, a method whose modifiers
+  are followed by a return type spelled `record`
+  (`private record bar() { … }`) reads as a record declaration too;
+  it was a method at v0.4.0.
 
 ---
 
