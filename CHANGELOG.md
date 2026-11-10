@@ -84,11 +84,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   that already parsed without an error; see Changed above.
 
   Still unsupported, as before: enum constants with an anonymous
-  class body (`A { … }`), qualified creation
-  (`outer.new Inner(...)`), and a cast written directly in front of
-  `new T()` in a field initialiser that follows another member
-  (`def f = (Foo) new T() { … }`). Symbol and field ids are unchanged
-  by this fix. (#68)
+  class body (`A { … }`) and qualified creation
+  (`outer.new Inner(...)`). Symbol and field ids are unchanged by
+  this fix. (#68)
+
+- A cast in front of `new` in a field initialiser that follows
+  another member now parses as a cast. `def f = (Foo) new T()` after
+  an earlier field or method was split, with no `ERROR`, into a field
+  `f = (Foo)` and a method `T()` with return type `new`, whenever the
+  arguments could pass for parameters (none, or bare names). `new` is
+  now a reserved word: it is the keyword everywhere except where a
+  property or method name can stand (`foo.new`, `def new() { }`, and
+  with them `def new = 1`). Input that used it as any other
+  identifier (`def f(new) { }`, `import a.new.B`, `x as new`) is now
+  an `ERROR`; none of that is valid Groovy. A statement that opens
+  with `outer.new Inner()` now reads as a property access and a call,
+  as it already did after `=`, instead of a method declaration.
+  Symbol and field ids are unchanged. (#68)
 
 ## [0.4.0] - 2026-11-09
 

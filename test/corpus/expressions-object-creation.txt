@@ -530,3 +530,123 @@ def list = new ArrayList()
               (type_identifier)
               (type_identifier))
             (number_literal)))))))
+
+==================
+Cast of an object creation in a field initialiser after another member
+==================
+
+class C {
+    int a
+    def f = (Foo) new T()
+    def g = (Foo) new T(a, b)
+    private final Handler h = (Handler) new DefaultHandler() { void m() { } }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list
+                (identifier)
+                (identifier))))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)
+              body: (class_body
+                (method_declaration
+                  return_type: (type_identifier)
+                  name: (identifier)
+                  parameters: (formal_parameters)
+                  body: (block))))))))))
+
+==================
+Cast of an object creation in an anonymous inner class body
+==================
+
+def o = new O() {
+    def a = 1
+    def f = (Foo) new T()
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (field_declaration
+            (variable_declarator
+              name: (identifier)
+              value: (number_literal)))
+          (field_declaration
+            (variable_declarator
+              name: (identifier)
+              value: (parenthesized_type_cast
+                type: (type_identifier)
+                value: (object_creation_expression
+                  type: (type_identifier)
+                  arguments: (argument_list))))))))))
+
+==================
+Property, safe-navigation and method-pointer names spelled new
+==================
+
+foo.new
+foo?.new
+foo.&new
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (identifier)))
+  (expression_statement
+    (method_pointer_expression
+      object: (identifier)
+      method: (identifier))))
+
+==================
+The keyword new is not a parameter name
+:error
+==================
+
+def f(new) { }
+
+---

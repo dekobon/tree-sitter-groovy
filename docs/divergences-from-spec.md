@@ -509,21 +509,13 @@ a line break; it has to track the enclosing bracket, because
 Apache's lexer hides the break inside `(` and `[`, and it does
 nothing for the same-line form.
 
-Two `new` forms never reach `object_creation_expression`, so a `{`
-after them is not a class body either. Both predate #68, and in the
-positions shown neither reports an `ERROR`, with or without a body:
-
-- Qualified creation, `def i = outer.new Inner(...) { … }` (Apache
-  `pathElement`: `DOT nls NEW creator[1]`), has no production.
-  `.new` reads as a property access and `Inner(...) { … }` as a
-  separate call with a trailing closure. As a call argument the
-  form is an `ERROR`.
-- In a member list, after another member, a cast written directly
-  in front of `new` loses to a reading in which `new` is an
-  identifier, provided the arguments can pass for parameters (none,
-  or bare names): `def f = (Foo) new T() { … }` becomes a field
-  `f = (Foo)` followed by a method `T()` with return type `new`.
-  `new T() as Foo` and `(Foo) (new T())` parse as intended.
+One `new` form never reaches `object_creation_expression`, so a `{`
+after it is not a class body either. Qualified creation,
+`def i = outer.new Inner(...) { … }` (Apache `pathElement`:
+`DOT nls NEW creator[1]`), has no production. `.new` reads as a
+property access and `Inner(...) { … }` as a separate call with a
+trailing closure, with no `ERROR`, with or without a body. As a call
+argument the form is an `ERROR`. This predates #68.
 
 ---
 

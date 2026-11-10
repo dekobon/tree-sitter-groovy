@@ -79,6 +79,18 @@ module.exports = grammar({
   // is the contract this rule set will fulfil.
   word: $ => $.identifier,
 
+  // §5.2 — `new` is a hard keyword. Keyword extraction alone still
+  // lexes it as `identifier` wherever the keyword has no action,
+  // which let `def f = (Foo) new T()` after another member split
+  // into a field `= (Foo)` and a method `T()` returning `new`. The
+  // empty `property` set keeps `foo.new` (Apache `namePart`) valid;
+  // `_property_name` also names methods, so `new` is not reserved
+  // where a method name may follow (`def new`, `int new`).
+  reserved: {
+    global: _ => ['new'],
+    property: _ => [],
+  },
+
   extras: $ => [
     /\s/,
     $.line_comment,
@@ -1246,7 +1258,7 @@ module.exports = grammar({
     // keywords, or special chars. `map."key with spaces"` and
     // `def "abstract"() { … }` both rely on this.
     _property_name: $ => choice(
-      $.identifier,
+      reserved('property', $.identifier),
       alias($.string_literal, $.quoted_identifier),
     ),
 
