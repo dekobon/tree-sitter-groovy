@@ -251,3 +251,76 @@ x
         (variable_declarator
           name: (identifier)
           value: (number_literal))))))
+
+==================
+Blank final local with type
+==================
+
+def m() {
+  final String name
+  name = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (string_literal))))))
+
+==================
+Blank final local with generic type
+==================
+
+def m() {
+  final List<String> xs
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))))
+
+==================
+Final locals inside a closure body
+==================
+
+xs.each {
+  final y = it
+  final String s = y
+}
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)
+            value: (identifier)))
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (identifier))))))

@@ -24,6 +24,30 @@ try { risky() } catch (Exception e) { handle(e) }
             arguments: (argument_list (identifier))))))))
 
 ==================
+Try catch with untyped parameter (implicit Exception)
+==================
+
+try { risky() } catch (e) { handle(e) }
+
+---
+
+(source_file
+  (try_statement
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    (catch_clause
+      parameter: (catch_formal_parameter
+        name: (identifier))
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list (identifier))))))))
+
+==================
 Try finally
 ==================
 

@@ -123,6 +123,25 @@ class C {
           value: (string_literal (string_fragment)))))))
 
 ==================
+Modifier-only field, no type or def (static constant idiom)
+==================
+
+class C {
+    static MEDIUM_TTL = 900
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
 Field with annotation
 ==================
 
@@ -145,6 +164,37 @@ class C {
         (variable_declarator
           name: (identifier)
           value: (string_literal (string_fragment)))))))
+
+==================
+Typed field before a constructor retains its type
+==================
+
+class C {
+    private final int value
+    C(int value) { this.value = value }
+    static DEFAULT = 0
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter type: (type_identifier) name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access object: (identifier) field: (identifier))
+              right: (identifier)))))
+      (field_declaration
+        (variable_declarator name: (identifier) value: (number_literal))))))
 
 ==================
 Mix of fields and methods in class body
