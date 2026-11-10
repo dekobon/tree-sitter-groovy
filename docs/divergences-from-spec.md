@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `record`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -435,12 +435,12 @@ parses without an `ERROR` as a field whose value is the call
 The instance initializer (a bare `block` in `class_body`) is
 recognised where nothing before it can take the `{`: at the start
 of the body, after a member that ends in `}` (a method or
-constructor with a body, another initializer, a nested enum), after
+constructor with a body, another initializer, a nested type), after
 a field with no initialiser (`int x`), and after a `;`. A block
 after a bodiless method (`abstract void f()`) becomes that method's
 body, which Apache's `(nls methodBody)?` allows as well.
 
-Three places in a member list do differ from Apache:
+Two places in a member list do differ from Apache:
 
 - **A field with no initialiser.** A `{ … }` on the *same* line is
   an instance initializer here too, so `int x { … }` and
@@ -449,17 +449,13 @@ Three places in a member list do differ from Apache:
   body this hides an unsupported construct: the compact canonical
   constructor `public Name { … }` parses as a modifier-only field
   `Name` followed by an initializer block.
-- **A nested `class`, `interface` or `trait`.** These have no
-  production in a member list yet, so the keyword lexes as an
-  identifier there and `class Inner { … }` takes the same reading: a
-  field `Inner` of type `class` followed by an initializer block
-  that holds the members, often with no `ERROR` at all (an
-  `extends Base` clause reads as one more field). v0.4.0, which had
-  no initializer block, reported an `ERROR` at the `{`. Nested enums
-  have a production and are not affected.
-- **An enum body.** `enum_body` takes no instance initializer at
-  all: `enum E { A, B; { init() } }` is an error, where Apache's
-  `classBody` accepts the block.
+- **An enum constant.** `enum_body` takes the initializer wherever
+  its member list repeats — after `;`, after a first member, or
+  with no constants — but not directly after a constant. With the
+  line break invisible, `A` followed by `{ … }` on the next line
+  (in Apache a constant, then an initializer) cannot be told from
+  `A { … }` (a constant with an anonymous class body, which has no
+  production), and both stay errors. Write `A;` first.
 
 The larger divergence is after `new T(...)`: every `{` that follows
 the arguments is the anonymous class body. Apache instead has a
@@ -513,11 +509,6 @@ a line break; it has to track the enclosing bracket, because
 Apache's lexer hides the break inside `(` and `[`, and it does
 nothing for the same-line form.
 
-Nested `class` / `interface` / `trait` declarations need their own
-productions in `_class_member`. Once the keyword is valid at member
-start it no longer lexes as an identifier, and the field-plus-block
-reading goes away.
-
 Two `new` forms never reach `object_creation_expression`, so a `{`
 after them is not a class body either. Both predate #68, and in the
 positions shown neither reports an `ERROR`, with or without a body:
@@ -533,3 +524,59 @@ positions shown neither reports an `ERROR`, with or without a body:
   or bare names): `def f = (Foo) new T() { … }` becomes a field
   `f = (Foo)` followed by a method `T()` with return type `new`.
   `new T() as Foo` and `(Foo) (new T())` parse as intended.
+
+---
+
+## 12. `sealed` and `trait` are keywords where a member can start
+
+**Apache `GroovyParser.g4`** lets both words name things: its
+`identifier` rule lists `SEALED` and `TRAIT` next to `Identifier`,
+so `private boolean sealed` and `String trait` are ordinary fields.
+**Spec §5.2** asks for the same through an
+`identifier_or_contextual` fallback.
+
+**Current implementation**: the declaration rules spell the words
+as literals, and with `word: $.identifier` the lexer hands back the
+keyword wherever the parser could accept it, with no fallback to
+`identifier`. That was already so where a statement can start:
+`boolean sealed = true` in a method body, and a statement that
+opens with a variable named `trait`, are errors at v0.4.0 too
+(`def sealed = 1` is not).
+
+Nested type declarations (#68) extend it to member lists. A nested
+`class`, `interface`, `trait` or `@interface` has to be a member,
+because otherwise its keyword lexes as an identifier and
+`class Inner { … }` parses, with no `ERROR`, as a field `Inner` of
+type `class` followed by an instance initializer block. With the
+productions in place `sealed` and `trait` are keywords wherever a
+member can start:
+
+| Input in a class body | Result |
+|---|---|
+| `boolean sealed`, `String trait`, `def sealed = 1` | field, as before |
+| `int x, trait`, `List<String> sealed`, `@Lazy List sealed` | field, as before |
+| `void sealed() { }`, parameters and property accesses named `sealed` / `trait` | as before |
+| `private boolean sealed`, `private String trait = "x"` | `ERROR` (a field at v0.4.0) |
+| `public static final int sealed = 1` | `ERROR` (a field at v0.4.0) |
+| `static trait = 1`, `private trait`, `sealed() { }` | `ERROR` (parsed at v0.4.0) |
+| `enum E { trait, B }`, `enum E { sealed }` | `ERROR` (constants at v0.4.0) |
+
+The rows that fail share one shape. A field needs no type after a
+modifier, so `private boolean` is already a complete field named
+`boolean`, a new member may start right after it, and the lexer
+prefers the keyword. Without a modifier the type cannot stand
+alone, the next word can only be the name, and it stays an
+identifier. The first constant of an enum sits where a member could
+start too; a later one (`enum E { A, sealed }`) does not.
+
+`record` is left out for that reason: it is a far more common
+member name, so a nested `record R(int x) { }` still parses,
+without an `ERROR`, as a method `R` with return type `record`.
+
+**Action**: accept the two words as names through an aliased
+keyword (`alias('sealed', $.identifier)`) in the declarator and
+enum-constant positions. After `private boolean` that is a genuine
+LR(1) conflict — field name, or start of the next member — so it
+needs a declared conflict and a check that the GLR fork does not
+reach unrelated member lists. A nested `record` needs the same
+treatment.

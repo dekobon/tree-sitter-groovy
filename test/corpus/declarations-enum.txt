@@ -616,3 +616,74 @@ class C {
             name: (identifier)
             parameters: (formal_parameters)
             body: (block (expression_statement (string_literal)))))))))
+
+==================
+Enum instance initializer after the constants
+==================
+
+enum E {
+    A, B;
+    { init() }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Enum instance initializers after a member and with no constants
+==================
+
+enum E {
+    A, B
+    void f() { }
+    { init() }
+    static { load() }
+}
+
+enum F {
+    { init() }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))

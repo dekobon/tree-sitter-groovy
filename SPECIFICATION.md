@@ -384,7 +384,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested enums, and instance initializers — a bare `block` child of `class_body` (#68). |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
@@ -709,9 +709,9 @@ scanner branches are avoided):
   matching Groovy's rule.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
-  (`repeat(choice($._class_member, $.block, ';'))` in `class_body`,
-  where the `block` is an instance initializer; the same without
-  `$.block` in `enum_body`). It never appears as a named
+  (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
+  and `enum_body`, where the `block` is an instance initializer). It
+  never appears as a named
   node in the AST, so wherever it attaches the named-node tree is
   identical. This covers terminators (`x();`), separators (`x(); y()`),
   empty statements (`;`, `;;`), and empty / terminated members

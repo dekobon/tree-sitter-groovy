@@ -9,30 +9,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
-- Class, interface, trait, record, and `@interface` bodies now accept
-  instance initializer blocks — `class C { { init() } }`. The block is
-  a bare `block` child of `class_body`, next to the existing
-  `static_initializer`; previously it closed the class early on a
-  `MISSING "}"`. Enum bodies are unchanged. A block on the line after
-  a field *with* an initialiser (`int x = 5\n{ … }`) is not an
-  initializer but that expression's trailing closure, the reading
-  Apache's grammar gives it too — end the field with `;` to get the
-  initializer; see `docs/divergences-from-spec.md` §11.
+- Class, interface, trait, record, `@interface`, and enum bodies now
+  accept instance initializer blocks — `class C { { init() } }`. The
+  block is a bare `block` child of `class_body` or `enum_body`, next
+  to the existing `static_initializer`; previously it closed the
+  class early on a `MISSING "}"`. In an enum the block may follow
+  `;`, another member, or an empty constant list, but not a constant
+  directly (`A\n{ … }` stays an error; write `A;`). A block on the
+  line after a field *with* an initialiser (`int x = 5\n{ … }`) is
+  not an initializer but that expression's trailing closure, the
+  reading Apache's grammar gives it too — end the field with `;` to
+  get the initializer; see `docs/divergences-from-spec.md` §11.
 
   The block also follows a field with no initialiser on the same
-  line, which costs an error report: a nested `class`, `interface` or
-  `trait` declaration, unsupported before and after, used to get an
-  `ERROR` at its `{`. `class Inner { … }` inside a class body now
-  parses as a field `Inner` of type `class` followed by an
-  initializer block, often with no `ERROR` at all.
+  line, so `int x { … }` and a record's compact constructor
+  (`public Name { … }`, unsupported) parse as a field plus a block
+  with no `ERROR`, where v0.4.0 reported one. (#68)
+- Nested `class`, `interface`, `trait`, and `@interface`
+  declarations are members of class, interface, trait, record,
+  `@interface`, enum, and anonymous class bodies, joining the nested
+  enum. They use the top-level node kinds (`class_declaration` and
+  so on) as children of `class_body` / `enum_body`. A nested
+  `record` is still not recognised and reads as a method.
 
-  No node kind is added, but the generated parser gains one auxiliary
-  symbol, so the numeric ids of the three alias kinds
-  (`named_argument`, `quoted_identifier`, `type_identifier`) each move
-  up by one (308–310, now 309–311). So do the fourteen hidden
-  auxiliary symbols numbered after the new one (294–307, now
-  295–308), which never appear in a tree. Symbol ids below 294 and
-  all field ids are unchanged. (#68)
+  This makes `sealed` and `trait` keywords wherever a member can
+  start, as they already were at statement start. Input that parsed
+  at v0.4.0 and is now an `ERROR`: a field named `sealed` or `trait`
+  after a modifier (`private boolean sealed`,
+  `static final String trait = "x"`), a member that opens with one
+  of the words (`static trait = 1`, `sealed() { }`), and a first
+  enum constant so named (`enum E { trait, B }`). `boolean sealed`
+  and `String trait`, with no modifier, still parse; see
+  `docs/divergences-from-spec.md` §12.
+
+  No node kind is added by either entry, and the symbol and field
+  ids of the generated parser are identical to v0.4.0. (#68)
 
 ### Fixed
 

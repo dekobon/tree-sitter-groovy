@@ -1646,6 +1646,22 @@
         {
           "type": "SYMBOL",
           "name": "enum_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "class_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "interface_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "trait_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "annotation_type_declaration"
         }
       ]
     },
@@ -2235,6 +2251,10 @@
                                     "name": "_class_member"
                                   },
                                   {
+                                    "type": "SYMBOL",
+                                    "name": "block"
+                                  },
+                                  {
                                     "type": "STRING",
                                     "value": ";"
                                   }
@@ -2258,6 +2278,10 @@
                                   {
                                     "type": "SYMBOL",
                                     "name": "_class_member"
+                                  },
+                                  {
+                                    "type": "SYMBOL",
+                                    "name": "block"
                                   },
                                   {
                                     "type": "STRING",
@@ -2285,6 +2309,10 @@
                   {
                     "type": "SYMBOL",
                     "name": "_class_member"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "block"
                   },
                   {
                     "type": "STRING",

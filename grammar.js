@@ -553,28 +553,46 @@ module.exports = grammar({
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
     // a no-op member. `;` is anonymous, so it never appears in the AST.
     //
-    // A bare `block` is an instance initializer. It is listed here
-    // rather than in `_class_member` because `enum_body` places
-    // `_class_member` directly after its constants: a block there
-    // would silently accept `A { }` (a constant with an anonymous
-    // class body, unsupported) as constant-plus-initializer.
+    // A bare `block` is an instance initializer. It sits in the member
+    // repeat — here and in the three identical repeats of `enum_body` —
+    // rather than in `_class_member`, because `enum_body` also places
+    // a lone `_class_member` directly after its constants. A block in
+    // that slot is an LR conflict on `A() {` (constructor, or constant
+    // plus initializer) and, once that is resolved, silently accepts
+    // `A { }` (a constant with an anonymous class body, unsupported)
+    // as constant-plus-initializer.
     class_body: $ => seq(
       '{',
       repeat(choice($._class_member, $.block, ';')),
       '}',
     ),
 
-    // A nested enum (`static enum EventType { … }` inside a domain
-    // class) is common enough in real Groovy that leaving it out
-    // silently misparses `enum` as a field_declaration's type name.
-    // Nested class/interface/trait land separately (bigger surface,
-    // own conflict set) — out of scope here.
+    // Nested type declarations are members, as in Apache's
+    // `memberDeclaration`. Each kind must be listed: a declaration
+    // keyword with no action at member start lexes as an identifier,
+    // so `class Inner { … }` would silently parse as a field `Inner`
+    // of type `class` followed by an instance initializer block.
+    // `record_declaration` is left out because `record` is a common
+    // member name; a nested record still reads as a method.
+    //
+    // The price: `trait` and `sealed` are keywords wherever a member
+    // can start, as they already are where a statement can. A member
+    // cannot open with one of them as a plain identifier, with or
+    // without modifiers (`static trait = 1`, `sealed() { }`), nor use
+    // one as the name after `modifier(s) Type`, because `private Foo`
+    // is already a complete field (`private boolean sealed` is an
+    // ERROR; `boolean sealed` is not). See divergence 12. No
+    // `conflicts` entry is needed.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
       $.enum_declaration,
+      $.class_declaration,
+      $.interface_declaration,
+      $.trait_declaration,
+      $.annotation_type_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have
@@ -700,10 +718,22 @@ module.exports = grammar({
     // GROOVY-9306), and newlines are extras here, so the member
     // simply follows the last constant. `A,` directly before a
     // member is rejected, as in Groovy. With no constants the body
-    // is an ordinary member list. The member list is spelled three
-    // times rather than shared with `class_body` through a hidden
-    // rule: a new rule renumbers the aux symbols and ~100 symbol ids,
-    // which a patch release must not do.
+    // is an ordinary member list.
+    //
+    // An instance initializer (`block`) is accepted wherever the
+    // member list repeats — after `;`, after a first member, or with
+    // no constants — but not directly after a constant. Newlines are
+    // extras, so `A\n{ … }` (in the .g4 a constant, then an
+    // initializer) cannot be told from `A { … }` (a constant with an
+    // anonymous class body, unsupported); both stay errors.
+    //
+    // The three member repeats are spelled out, and must stay
+    // identical to the one in `class_body`, so that the generator
+    // folds all four into one aux symbol (`aux_sym_class_body_repeat1`).
+    // A differing copy, or a hidden rule that is not inlined, adds a
+    // symbol and renumbers every id after it — the alias kinds
+    // `named_argument`, `quoted_identifier` and `type_identifier`
+    // included — which a patch release must not do.
     enum_declaration: $ => seq(
       repeat($.annotation),
       repeat($._modifier),
@@ -720,11 +750,11 @@ module.exports = grammar({
           repeat(seq(',', $.enum_constant)),
           optional(choice(
             ',',
-            seq(optional(','), ';', repeat(choice($._class_member, ';'))),
-            seq($._class_member, repeat(choice($._class_member, ';'))),
+            seq(optional(','), ';', repeat(choice($._class_member, $.block, ';'))),
+            seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
           )),
         ),
-        repeat(choice($._class_member, ';')),
+        repeat(choice($._class_member, $.block, ';')),
       ),
       '}',
     ),
