@@ -96,3 +96,13 @@ def a = xs as Object []
         value: (identifier)
         type: (array_type
           (type_identifier))))))
+
+==================
+Array type continued on a new line inside parentheses is unsupported
+:error
+==================
+
+(String
+  []) x
+
+---

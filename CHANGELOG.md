@@ -9,7 +9,112 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
-- A `[` that starts a new line now begins a list or map literal instead of subscripting the previous statement, so a Grails controller action ending in `[model: value]` parses. Subscripts and array types on the same line, with or without a space before the `[`, are unchanged. Implemented as an external scanner token, `_subscript_open`.
+- A `[` that starts a new line now begins a list or map literal instead
+  of subscripting the previous statement, so a Grails controller action
+  ending in `[model: value]` parses. A `[` on the same line as the token
+  before it, with or without spaces or tabs between them, parses as
+  before. The rule also holds inside `(…)` and `[…]`, where Groovy ignores
+  newlines, so a subscript or array type continued on a new line there
+  (`foo(a` then `[0])`) is now an `ERROR`; see `SPECIFICATION.md` §6.7.
+  Implemented as an external scanner token, `_subscript_open`. (#63)
+
+## [0.4.0] - 2026-11-09
+
+### Added
+
+- `method_invocation` now accepts a trailing closure as the call's last
+  argument, with or without a parenthesised argument list —
+  `list.find { it > 5 }` and `list.inject(0) { acc, x -> acc + x }` both
+  reduce to a single `method_invocation` node (`closure` field alongside
+  the optional `arguments` field). Previously any call written this way
+  outside of a bare statement-level command chain (`§5.5`) required
+  parentheses around the closure or failed to parse. `arguments` is
+  no longer a required field in `node-types.json`, so code that
+  assumes every `method_invocation` has one must handle its absence.
+  (#49)
+
+### Changed
+
+- **BREAKING:** raised the Rust crate's minimum supported Rust version
+  (`rust-version`) from 1.85 to 1.90, the floor that `tree-sitter`
+  0.27 and `tree-sitter-language` 0.1.8+ declare. Consumers on 1.85–1.89
+  must stay on an earlier release of this crate. The `tree-sitter`
+  dev dependency moves from 0.26 to 0.27; the `tree-sitter-language`
+  requirement is unchanged at `0.1.7`. (#66)
+- Bumped `tree-sitter-cli` from 0.26.13 to 0.27.2 and raised the
+  declared range in `package.json` to `^0.27.2` so it matches the CLI
+  the committed parser source is generated with. It is a dev
+  dependency, so nothing changes for downstream consumers; regenerating
+  under 0.27.2 leaves `src/parser.c` and `src/tree_sitter/*.h`
+  byte-identical to the committed sources (still ABI 15). (#66)
+
+### Fixed
+
+- A nested `enum` inside a class body (`static enum EventType { ... }`,
+  a common Groovy domain-model idiom for entity fields backed by a
+  fixed set of values) now parses as a class member. Previously
+  `_class_member` had no enum_declaration alternative at all, so `enum`
+  silently misparsed as a field_declaration's type name and everything
+  after it in the class body fell apart. (#49)
+- `catch_formal_parameter`'s type is now optional — Groovy allows a
+  bare `catch (e) { … }`, implicitly typed as Exception. Previously a
+  type was mandatory. (#49)
+- Constructor calls now accept the diamond operator (`new ArrayList<>()`,
+  `new HashMap<>()`). Ordinary types and nested type arguments still
+  require non-empty argument lists, so `List<> xs` and
+  `new HashMap<String, List<>>()` remain errors. (#49)
+- `field_declaration` now accepts a modifier-only field with no `def`
+  and no type (`static MEDIUM_TTL = 900`), inferring the field's type as
+  Object — a common static-constant idiom. Previously a field required
+  `def` or an explicit type even when a modifier alone already
+  distinguishes it from a bare expression statement. (#49)
+- Typed fields retain their type when followed by a constructor rather
+  than being split into a modifier-only field and a method declaration
+  (`private final int value` followed by `C() {}`). (#49)
+- `enum_declaration` now accepts modifiers (`public enum`, `static enum` —
+  the latter for enums nested inside a class). Previously any modifier
+  before `enum` was rejected. (#49)
+- `for_in_statement` now also accepts the Java-compatible enhanced-for
+  form Groovy allows side by side with its own `for (x in xs)`: `for
+  (Type x : xs)` and `for (def x : xs)`. Only the `in` keyword form
+  parsed before. (#49)
+- `formal_parameter` now accepts annotations (`@PathVariable("id") Long
+  id`, `@RequestBody Map body`). Spring/JPA-style annotated parameters
+  are ubiquitous on framework-facing methods and previously misparsed
+  the whole parameter list. (#49)
+- Accept enum class members directly after the constants with no `;`
+  between, as Groovy's own parser does (`classBody` in
+  `GroovyParser.g4`, GROOVY-7773 / GROOVY-9306). Previously an enum
+  such as
+
+  ```groovy
+  enum E {
+      A(1), B, C(2)
+      E(int v) { }
+  }
+  ```
+
+  closed on a zero-width `MISSING "}"` after the last constant and the
+  constructor was re-parsed as a top-level method invocation followed
+  by a closure. The `;` and `,;` spellings keep parsing as before, a
+  trailing `,` directly before a member stays an error as in Groovy,
+  and an enum whose members carry a modifier or `def` no longer needs
+  a leading `;` when it has no constants.
+
+  Newlines are whitespace to this grammar, so where Groovy reads the
+  line break the parser has to choose. After a bare first constant,
+  `enum E { A\n E() { } }` is a constant followed by a constructor,
+  not a method `E` returning type `A`. The same preference applies
+  when there are no constants at all: `enum E { int f() { } }` reads
+  as a constant `int` and a constructor `f`. Spell the member with a
+  modifier (`private E() { }`), a `def`, or a leading `;` to make it a
+  member — all three were already required at v0.3.0, which could not
+  parse the member either way. Constants missing their comma
+  (`enum E { A\n B }`) stay an `ERROR`, as in Groovy; at v0.3.0 they
+  silently parsed as a field `A B`. Enum constants with an anonymous
+  class body (`A { … }`) stay unsupported.
+
+  Node kinds, symbol ids, and field ids are unchanged. (#55)
 
 ## [0.3.0] - 2026-08-30
 
@@ -263,7 +368,8 @@ for full details.
 - `a\n+ b` joins as one expression rather than splitting into two
   statements.
 
-[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.0...v0.2.1

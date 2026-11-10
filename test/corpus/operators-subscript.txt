@@ -208,3 +208,43 @@ if (math [op]) { a[0][1] }
             object: (identifier)
             index: (number_literal))
           index: (number_literal))))))
+
+==================
+Subscript continued on a new line inside parentheses is unsupported
+:error
+==================
+
+foo(a
+  [0])
+
+---
+
+==================
+Subscript continued on a new line inside brackets is unsupported
+:error
+==================
+
+[a
+  [0]]
+
+---
+
+==================
+List literal on the same line after a block is not a subscript
+==================
+
+if (a) { } [1].each { }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (number_literal))
+        field: (identifier))
+      closure: (closure))))

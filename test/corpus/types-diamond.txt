@@ -1,0 +1,96 @@
+==================
+Qualified diamond constructor chained with a method call
+==================
+
+new java.util.ArrayList<>().size()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (object_creation_expression
+          type: (generic_type
+            base: (qualified_type
+              (type_identifier)
+              (type_identifier)
+              (type_identifier))
+            arguments: (type_arguments))
+          arguments: (argument_list))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+Explicit nested constructor type arguments remain supported
+==================
+
+new HashMap<String, List<Integer>>()
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (generic_type
+            base: (type_identifier)
+            arguments: (type_arguments (type_identifier)))))
+      arguments: (argument_list))))
+
+==================
+Diamond is not a local variable type
+:error
+==================
+
+List<> xs = []
+
+---
+
+==================
+Diamond is not a field type
+:error
+==================
+
+class C { List<> xs }
+
+---
+
+==================
+Diamond is not a parameter type
+:error
+==================
+
+def f(List<> xs) {}
+
+---
+
+==================
+Diamond is not a cast type
+:error
+==================
+
+def y = xs as List<>
+
+---
+
+==================
+Diamond is not a superclass type
+:error
+==================
+
+class C extends ArrayList<> {}
+
+---
+
+==================
+Diamond cannot occur inside explicit constructor type arguments
+:error
+==================
+
+new HashMap<String, List<>>()
+
+---

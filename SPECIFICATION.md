@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments` | |
+| `new` | `object_creation_expression` | `type`, `arguments` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -386,7 +386,7 @@ fix relative to *both* parent grammars.
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | constants list followed by optional `;` then class body; arrow switch is the typical use site (#36). |
+| `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
@@ -826,7 +826,7 @@ enum TokenType {
   LABEL_COLON,            // §5.3 — colon that closes a statement label
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
-  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the expression before it
+  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -937,7 +937,30 @@ the matching `*/` regardless of intermediate content.
 
 ### 6.7 SUBSCRIPT_OPEN — implementation contract
 
-Emitted only where a subscript or array-type `[` may follow, and never during error recovery (`ERROR_SENTINEL` valid). Skips spaces and tabs but not newlines; if the next character is `[`, consumes it. At a newline it emits nothing, so the in-grammar `[` lexes instead and starts a list or map literal: Groovy ends a statement at a newline, which is what lets a Grails controller action return `[model: value]` on its own line.
+Emitted wherever a `[` may follow, and never during error recovery
+(`ERROR_SENTINEL` valid). Skips spaces and tabs but not newlines; if
+the next character is `[`, consumes it. Subscripts and array types
+accept only this token. List and map literals accept it and the
+in-grammar `[`, so a `[` on the same line resolves as it did with a
+single token. At a newline it emits nothing, so the in-grammar `[`
+lexes instead and starts a list or map literal: Groovy ends a statement
+at a newline, which is what lets a Grails controller action return
+`[model: value]` on its own line.
+
+Two known differences from Groovy are accepted. The scanner is
+stateless, so a newline before `[` ends the expression everywhere,
+including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a`
+followed by `[0])` on the next line. Groovy's lexer ignores newlines
+inside `(…)`, `[…]` and `?[…]`, so `foo(a` followed by `[0])` on the
+next line, `[a` followed by `[0]]`, and the array-type forms `(String`
+followed by `[]) x` and `def m(String` followed by `[] a) { }` are
+valid Groovy and an `ERROR` here (pinned in
+`test/corpus/operators-subscript.txt` and
+`test/corpus/declarations-array-types.txt`). Matching Groovy needs a
+stack of open parentheses, brackets and braces in the scanner. A block
+comment at the start of the `[` line also hides the newline before it:
+`a` followed by `/* c */ [0]` on the next line parses as a subscript,
+where Groovy ends the statement at the newline.
 
 ---
 

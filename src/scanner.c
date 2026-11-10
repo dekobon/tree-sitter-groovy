@@ -3,6 +3,10 @@
 // Handles §6.2 slashy-string-start and §6.6 line/block/groovydoc
 // comments. Both start with `/`; combining the dispatch keeps the
 // in-grammar lexer from partially consuming the leading `/`.
+// Also handles §6.7 SUBSCRIPT_OPEN, a `[` on the same line as the
+// token before it. ERROR_SENTINEL is never emitted; it is
+// valid only during error recovery, where SUBSCRIPT_OPEN is
+// suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -61,10 +65,11 @@ bool tree_sitter_groovy_external_scanner_scan(
 ) {
     (void)payload;
 
-    // SPECIFICATION.md §5.10 — a `[` on the current line continues the
+    // SPECIFICATION.md §5.10 — a `[` on the current line can continue the
     // expression (subscript or array type). Only spaces and tabs are
-    // skipped; at a newline we fall through, and the in-grammar `[` starts
-    // a list or map literal instead.
+    // skipped, the same-line whitespace of Groovy's lexer; at a newline we
+    // fall through, and the in-grammar `[` starts a list or map literal
+    // instead.
     if (valid_symbols[SUBSCRIPT_OPEN] && !valid_symbols[ERROR_SENTINEL]) {
         while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
             lexer->advance(lexer, true);
