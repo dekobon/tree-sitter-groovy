@@ -662,7 +662,6 @@ trait T {
 
 ==================
 Nested record recovers after a rejected field named sealed
-:error
 ==================
 
 class C {

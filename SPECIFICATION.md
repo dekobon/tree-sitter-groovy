@@ -989,12 +989,12 @@ Known residuals:
 - A method with no modifier whose return type is spelled `record`
   (`record foo() { … }`) reads as a record declaration, as it did at
   v0.4.0 at statement start; in a class body it was a method there.
-- `record` directly followed by a line break or a line comment, then
-  a name and `(` on the next line, is not a header: the word is an
-  identifier and the rest reads as a method declaration with return
-  type `record`. Groovy rejects that input; v0.4.0 read it as a
-  record because comments and newlines are `extras` around a
-  literal keyword.
+- A line break or a line comment anywhere between `record` and the
+  name (after a block comment too), with the name and `(` on the
+  next line, is not a header: the word is an identifier and the rest
+  reads as a method declaration with return type `record`. Groovy
+  rejects that input; v0.4.0 read it as a record because comments
+  and newlines are `extras` around a literal keyword.
 - Record type parameters (`record Pair<A, B>(…)`) and modifiers
   before `record` (`static record P(int x) { }`, a method today) have
   no production.

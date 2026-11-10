@@ -75,7 +75,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   with no modifier (`record foo() { }`), which takes the same tree
   now. `record_declaration` joins the child lists of `class_body`
   and `enum_body` in `node-types.json`. In the other direction,
-  `record` followed directly by a line break or a line comment, then
+  `record` with a line break or a line comment before the name, then
   `Point(int x) { }` on the next line, was a `record_declaration` at
   v0.4.0 and now reads as a method declaration with return type
   `record`; Groovy rejects that input (`SPECIFICATION.md` §6.7).
