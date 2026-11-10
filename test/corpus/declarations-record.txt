@@ -178,3 +178,32 @@ record Point(1, 2)
       (ERROR
         (number_literal)
         (number_literal)))))
+
+==================
+Field named record then a comment then a nested record
+==================
+
+class Holder {
+    private Record record
+    // the comment used to flip this tree
+    record Inner(int x) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (line_comment)
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))

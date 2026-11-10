@@ -801,13 +801,25 @@ module.exports = grammar({
     // and `private Record record` once record_declaration became a
     // class member, errors. The alias keeps the anonymous `record`
     // node that the queries capture.
-    record_declaration: $ => prec.right(seq(
+    //
+    // The dynamic precedence settles a GLR tie the scanner creates.
+    // After `private Record`, the `[variable_declarator, _type]`
+    // conflict forks on the next word: `record` is the field's name
+    // in one branch and a type in the other. When a record header
+    // follows on the next line, the first branch lexes its `record`
+    // as the keyword and the second as that field's name, and both
+    // survive (`private Record` / `record record` / constructor
+    // `Inner(int x) { }` is a valid member list). Without a weight,
+    // which tree wins depends on tree shape, and a comment between
+    // the two lines flipped it. Favouring the record declaration is
+    // right whenever both parse.
+    record_declaration: $ => prec.dynamic(1, prec.right(seq(
       repeat($.annotation),
       alias($._record_keyword, 'record'),
       field('name', $.identifier),
       field('components', $.record_components),
       optional(field('body', $.class_body)),
-    )),
+    ))),
 
     record_components: $ => seq(
       '(',
