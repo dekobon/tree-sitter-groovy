@@ -396,6 +396,7 @@ fix relative to *both* parent grammars.
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`. |
 | `if` / `else` | port | |
 | `while` / `do-while` | port | |
+| `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`) or a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | |
 | `switch` with `case … :` | port | |

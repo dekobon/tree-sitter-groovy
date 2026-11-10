@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `synchronized_statement` for Java's synchronized block,
+  `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`), with
+  `lock` and `body` fields. Previously the statement was an `ERROR`. (#76)
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

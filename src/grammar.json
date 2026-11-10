@@ -109,6 +109,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "synchronized_statement"
+        },
+        {
+          "type": "SYMBOL",
           "name": "class_declaration"
         },
         {
@@ -792,6 +796,39 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "synchronized_statement": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "synchronized"
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "FIELD",
+          "name": "lock",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_expression"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
         }
       ]
     },

@@ -1,0 +1,64 @@
+==================
+Synchronized statement
+==================
+
+synchronized (lock) {
+  pending.clear()
+}
+
+---
+
+(source_file
+  (synchronized_statement
+    lock: (identifier)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list))))))
+
+==================
+Synchronized statement inside a method body
+==================
+
+def reload() {
+  synchronized (this.lock) { count++ }
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (synchronized_statement
+        lock: (field_access
+          object: (identifier)
+          field: (identifier))
+        body: (block
+          (expression_statement
+            (update_expression
+              operand: (identifier))))))))
+
+==================
+Synchronized method modifier is not a statement
+==================
+
+class C { static synchronized int n() { 1 } }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (number_literal)))))))
