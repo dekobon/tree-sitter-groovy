@@ -523,3 +523,172 @@ Point(int x) { }
         type: (type_identifier)
         name: (identifier)))
     body: (block)))
+
+==================
+Modifier-only fields named record before a nested record
+==================
+
+class Ties {
+    static record
+    record P(int x) { }
+    private Record
+    record Inner(int x) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Annotated records at top level and as a member
+==================
+
+@Immutable record Top(int x) { }
+
+class C {
+    @Foo @Bar
+    record Nested(int y) { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Records inside interface, trait and annotation type bodies
+==================
+
+interface I {
+    record Pair(int a, int b) { }
+}
+trait T {
+    record Triple(int a, int b, int c) { }
+}
+@interface A {
+    record Meta(String name) { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Nested record recovers after a rejected field named sealed
+:error
+==================
+
+class C {
+    private boolean sealed
+    record After(int x) { }
+    int following
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (ERROR)
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
