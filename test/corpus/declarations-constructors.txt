@@ -146,3 +146,107 @@ class App {
             (assignment_expression
               left: (identifier)
               right: (string_literal (string_fragment)))))))))
+
+==================
+Instance initializer block
+==================
+
+class Foo {
+    {
+        configure()
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Instance initializer after a field, a method, and a static initializer
+==================
+
+class App {
+    int count
+    {
+        count = 1
+    }
+
+    void run() { }
+    {
+        run()
+    }
+
+    static { load() }
+    { ready() }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (number_literal))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Instance initializer after a semicolon-terminated field initialiser
+==================
+
+class Foo {
+    int x = 1;
+    { x = 2 }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (block
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (number_literal)))))))

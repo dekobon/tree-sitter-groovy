@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `record`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -362,3 +362,41 @@ the parser layer.
 Until then, code containing `val` / `async` / `await` / `defer`
 parses with these tokens as plain identifiers, which matches the
 behaviour of Groovy 2.x–4.x compilers.
+
+---
+
+## 11. A `{` on the next line continues the previous expression
+
+**Apache `GroovyParser.g4`** attaches a closure argument to a call
+only when the `{` follows on the same line: there is no `nls`
+between a path expression and its closure, so a newline ends the
+statement and a `{ … }` on the following line stands on its own.
+
+**Current implementation**: newlines are `extras` (§5.10), so the
+parser cannot see the line break. A `{` that opens the next line
+is taken as the trailing closure of the expression before it:
+
+```groovy
+class A {
+    int x = 5
+    {
+        x = 6
+    }
+}
+```
+
+parses without an `ERROR`, but as a field whose value is the call
+`5 { x = 6 }`, not as a field followed by an instance initializer.
+The instance initializer (a bare `block` in `class_body`) is
+recognised wherever nothing can absorb the `{`: at the start of the
+body, after a method, constructor or initializer, after a field
+with no initialiser (`int x`), and after a `;`.
+
+Workaround: terminate the field with `;` (`int x = 5;`), or place
+the initializer block before the fields or after a method.
+
+**Action**: needs a newline-aware external-scanner token for the
+`{` that opens a trailing closure (the same mechanism the
+unimplemented AUTOMATIC_SEMICOLON of §6.4 would have provided).
+Until then the statement-level form (`foo()` followed by a
+closure literal on its own line) has the same reading.

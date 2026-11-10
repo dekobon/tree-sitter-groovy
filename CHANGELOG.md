@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- Class, interface, trait, record, and `@interface` bodies now accept
+  instance initializer blocks — `class C { { init() } }`. The block is
+  a bare `block` child of `class_body`, next to the existing
+  `static_initializer`; previously it closed the class early on a
+  `MISSING "}"`. Enum bodies are unchanged. An initializer written on
+  the line after a field *with* an initialiser (`int x = 5\n{ … }`)
+  still reads as that expression's trailing closure — end the field
+  with `;`; see `docs/divergences-from-spec.md` §11.
+
+  No node kind is added, but the generated parser gains one auxiliary
+  symbol, so the numeric ids of the three alias kinds
+  (`named_argument`, `quoted_identifier`, `type_identifier`) each move
+  up by one. Every other symbol id and all field ids are unchanged.
+  (#68)
+
 ## [0.4.0] - 2026-11-09
 
 ### Added

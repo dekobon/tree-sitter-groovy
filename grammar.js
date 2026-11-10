@@ -545,15 +545,21 @@ module.exports = grammar({
       field('body', $.class_body),
     ),
 
-    // §4 — `{ method* }` for v1. Field declarations, static
-    // initialisers, and inner classes land later.
+    // §4 — member list shared by class / interface / trait / record /
+    // `@interface` bodies. Nested classes land later.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
     // a no-op member. `;` is anonymous, so it never appears in the AST.
+    //
+    // A bare `block` is an instance initializer. It is listed here
+    // rather than in `_class_member` because `enum_body` places
+    // `_class_member` directly after its constants: a block there
+    // would silently accept `A { }` (a constant with an anonymous
+    // class body, unsupported) as constant-plus-initializer.
     class_body: $ => seq(
       '{',
-      repeat(choice($._class_member, ';')),
+      repeat(choice($._class_member, $.block, ';')),
       '}',
     ),
 

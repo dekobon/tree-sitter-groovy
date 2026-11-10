@@ -1804,6 +1804,10 @@
       "required": false,
       "types": [
         {
+          "type": "block",
+          "named": true
+        },
+        {
           "type": "constructor_declaration",
           "named": true
         },

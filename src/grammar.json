@@ -1608,6 +1608,10 @@
                 "name": "_class_member"
               },
               {
+                "type": "SYMBOL",
+                "name": "block"
+              },
+              {
                 "type": "STRING",
                 "value": ";"
               }

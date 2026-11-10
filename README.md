@@ -166,6 +166,10 @@ These are documented in detail in
   as `a + b` rather than splitting into two statements. Idiomatic
   Groovy places continuation operators at the end of the previous
   line.
+- **A `{` on the next line continues the previous expression** --
+  `int x = 5\n{ ... }` reads as the call `5 { ... }` with a trailing
+  closure, not as a field followed by an instance initializer block.
+  Terminate the line with `;` to separate them.
 
 ## Contributing
 
