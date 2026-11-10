@@ -785,8 +785,12 @@ module.exports = grammar({
     // with an `[enum_constant, _type]` conflict: both yield the same
     // tree on every valid shape, but the GLR form silently accepts
     // `A\n B` (constants missing their comma, which Groovy rejects) as
-    // a field `A B`, where this form reports the ERROR.
+    // a field `A B`, where this form reports the ERROR. Annotations
+    // share the prefix with an annotated member; the same precedence
+    // decides after them, so `@Foo A\n int x` is a constant and a
+    // field.
     enum_constant: $ => prec(1, seq(
+      repeat($.annotation),
       field('name', $.identifier),
       optional(field('arguments', $.argument_list)),
     )),

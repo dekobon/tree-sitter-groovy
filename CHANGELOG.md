@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   before. `node-types.json` adds `type_parameters` to the fields and
   `super_interfaces` to the children of `record_declaration`.
   (#60, #68)
+- Enum constants accept annotations: `enum E { @Deprecated A, B }`
+  was an `ERROR` that took the rest of the body with it. The
+  annotations are `annotation` children of `enum_constant`, before
+  its `name`; `node-types.json` adds them to its children. (#60, #68)
 
 ### Changed
 

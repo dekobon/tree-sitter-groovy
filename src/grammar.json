@@ -2340,6 +2340,13 @@
         "type": "SEQ",
         "members": [
           {
+            "type": "REPEAT",
+            "content": {
+              "type": "SYMBOL",
+              "name": "annotation"
+            }
+          },
+          {
             "type": "FIELD",
             "name": "name",
             "content": {

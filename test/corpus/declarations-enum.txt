@@ -712,3 +712,97 @@ enum F { A, record }
         name: (identifier))
       (enum_constant
         name: (identifier)))))
+
+==================
+Annotated enum constants
+==================
+
+enum G { @Deprecated A, B }
+enum H { @Foo A(1), @Bar @Baz B }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))))
+
+==================
+Annotated enum constant followed by members
+==================
+
+enum I {
+    @Deprecated A,
+    B
+    int x
+    @Override String toString() { 'x' }
+}
+enum J {
+    @Deprecated A
+    int x
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
