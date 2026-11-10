@@ -115,17 +115,16 @@ bool tree_sitter_groovy_external_scanner_scan(
     (void)payload;
 
     if (valid_symbols[COMMAND_NAMED_KEY] && !valid_symbols[ERROR_SENTINEL]) {
-        if (lexer->lookahead == ' ' || lexer->lookahead == '\t'
-            || is_ident_start(lexer->lookahead)) {
-            // Either the key matches, or the lookahead is an identifier
-            // (never a comment / slashy start), so nothing below applies.
-            int32_t first = lexer->lookahead;
-            if (scan_command_named_key(lexer)) {
-                return true;
-            }
-            if (is_ident_start(first) || is_ident_start(lexer->lookahead)) {
-                return false;
-            }
+        while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+            lexer->advance(lexer, true);
+        }
+        // An identifier is either the key or, once consumed, not something
+        // the code below could start (a comment or slashy string), so stop
+        // here. Falling through after the scan advanced past `b` in
+        // `foo a, b` and a newline made the comment branch emit `b` as a
+        // line_comment, since mark_end had already been called.
+        if (is_ident_start(lexer->lookahead)) {
+            return scan_command_named_key(lexer);
         }
     }
 

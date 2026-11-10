@@ -270,3 +270,22 @@ assertEquals 'v', params['k']
     argument: (subscript_expression
       object: (identifier)
       index: (string_literal))))
+
+==================
+Comment after a command chain's last argument
+==================
+
+assertEquals 'v', x
+// note
+assert y
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (identifier))
+  (line_comment)
+  (assert_statement
+    (identifier)))
