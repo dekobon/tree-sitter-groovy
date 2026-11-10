@@ -67,8 +67,39 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   enum constant so named (`enum E { trait, B }`). `boolean sealed`
   and `String trait`, with no modifier, still parse; see
   `docs/divergences-from-spec.md` §12. (#68)
+- **BREAKING:** a record header inside a class, interface, trait,
+  enum or anonymous class body is now a `record_declaration`.
+  `record Point(int x) { }` as a member parsed at v0.4.0, with no
+  `ERROR`, as a `method_declaration` named `Point` with return type
+  `record`; so did a method whose return type is spelled `record`
+  with no modifier (`record foo() { }`), which takes the same tree
+  now. `record_declaration` joins the child lists of `class_body`
+  and `enum_body` in `node-types.json`. (#60, #68)
+- The `record` keyword is an external-scanner token
+  (`alias($._record_keyword, 'record')`) instead of a grammar
+  literal. The anonymous `record` node and the `"record" @keyword`
+  capture are unchanged, but the generated parser's terminal symbol
+  ids 55–150 shift down by one and `sym__record_keyword` is appended
+  at 150; non-terminal ids, `SYMBOL_COUNT`, and field ids are the
+  same as at v0.4.0. Other entries in this release that describe
+  ids as unchanged refer to their own change only. (#60, #68)
 
 ### Fixed
+
+- `record` is usable as a name. The word was a keyword wherever a
+  record declaration could start, so `record.key()` and `record = 5`
+  at statement start were `ERROR`s, and making records class members
+  would have done the same to `private Record record`,
+  `public void record() { }` and a first enum constant named `record`.
+  The keyword now comes from the external scanner, which emits it
+  only when `record`, one or more spaces, a name, and `(` follow on
+  one line (`SPECIFICATION.md` §6.7); everywhere else the word is an
+  identifier. Residuals, all `ERROR`s at v0.4.0 too: a command-style
+  call whose argument is a call (`record Point(1, 2)`) reads as a
+  record header, and a header split across lines (`record Point`,
+  then `(int x)` on the next line) does not. A nested record with a
+  modifier (`static record P(int x) { }`) still reads as a method,
+  since `record_declaration` takes no modifiers. (#60, #68)
 
 - Anonymous inner classes now parse. `new Runnable() { … }` had no
   production. At v0.3.0 the body was cut loose from the creation: in

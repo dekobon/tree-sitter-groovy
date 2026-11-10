@@ -384,7 +384,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12). |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |

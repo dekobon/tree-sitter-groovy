@@ -183,8 +183,11 @@ These are documented in detail in
   start** -- a field or enum constant named `sealed` or `trait` is an
   `ERROR` when it follows a modifier (`private boolean sealed`) or
   opens the member (`static trait = 1`, `enum E { trait }`).
-  `boolean sealed` and `String trait`, with no modifier, parse. A
-  nested `record` is not recognised and reads as a method.
+  `boolean sealed` and `String trait`, with no modifier, parse.
+  `record` is not affected: it is a keyword only directly before a
+  record header (`record Name(`), so `private Record record` and
+  `record.key()` parse. A nested record with a modifier
+  (`static record P(int x) { }`) still reads as a method.
 
 ## Contributing
 

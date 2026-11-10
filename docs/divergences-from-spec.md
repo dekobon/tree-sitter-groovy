@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -363,7 +363,12 @@ the parser layer.
    fails, or
 2. The grammar gains a feature flag that opts the file into
    Groovy-5 mode (e.g. via shebang or a leading directive), at
-   which point the keyword rules can be unconditionally active.
+   which point the keyword rules can be unconditionally active, or
+3. Each word gets the treatment `record` has (spec §6.7): an
+   external-scanner token emitted only when the construct's own
+   shape follows (`async {`, `await <expr>`, `defer {`), so the word
+   lexes as an identifier everywhere else. The scanner decides by
+   look-ahead, which is exactly the fallback the lexer layer lacks.
 
 Until then, code containing `val` / `async` / `await` / `defer`
 parses with these tokens as plain identifiers, which matches the
@@ -536,11 +541,11 @@ keyword wherever the parser could accept it, with no fallback to
 opens with a variable named `trait`, are errors at v0.4.0 too
 (`def sealed = 1` is not).
 
-Nested type declarations (#68) extend it to member lists. A nested
-`class`, `interface`, `trait` or `@interface` has to be a member,
-because otherwise its keyword lexes as an identifier and
-`class Inner { … }` parses, with no `ERROR`, as a field `Inner` of
-type `class` followed by an instance initializer block. With the
+Nested type declarations (#60, #68) extend it to member lists. A
+nested `class`, `interface`, `trait`, `record` or `@interface` has
+to be a member, because otherwise its keyword lexes as an identifier
+and `class Inner { … }` parses, with no `ERROR`, as a field `Inner`
+of type `class` followed by an instance initializer block. With the
 productions in place `sealed` and `trait` are keywords wherever a
 member can start:
 
@@ -562,14 +567,19 @@ alone, the next word can only be the name, and it stays an
 identifier. The first constant of an enum sits where a member could
 start too; a later one (`enum E { A, sealed }`) does not.
 
-`record` is left out for that reason: it is a far more common
-member name, so a nested `record R(int x) { }` still parses,
-without an `ERROR`, as a method `R` with return type `record`.
+`record` escapes the table because its keyword is not a grammar
+literal: the external scanner emits it only when `record`, a name
+and `(` follow on one line (spec §6.7), so `private Record record`,
+`public void record() { }` and `enum E { record, B }` all parse and
+a nested `record R(int x) { }` is a `record_declaration`.
 
-**Action**: accept the two words as names through an aliased
-keyword (`alias('sealed', $.identifier)`) in the declarator and
-enum-constant positions. After `private boolean` that is a genuine
-LR(1) conflict — field name, or start of the next member — so it
-needs a declared conflict and a check that the GLR fork does not
-reach unrelated member lists. A nested `record` needs the same
-treatment.
+**Action**: give `sealed` and `trait` the same treatment — a scanner
+token emitted only when the word opens a declaration (`sealed class`,
+`sealed interface`, `trait Name {`), so the literal disappears from
+the lexer and the word is an identifier elsewhere. The alternative,
+accepting the words as names through an aliased keyword
+(`alias('sealed', $.identifier)`) in the declarator and
+enum-constant positions, was tried for `record` and rejected: after
+`private boolean` it is a genuine LR(1) conflict that needs a
+declared conflict, and it still leaves `public void record() { }` an
+error because the method name position wants `_property_name`.
