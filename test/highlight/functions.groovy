@@ -18,3 +18,8 @@ String::length
 
 obj.&method
 //  ^ operator
+
+def r = new Runnable() {
+    void run() { }
+    //   ^ function
+}

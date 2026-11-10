@@ -1047,15 +1047,22 @@ module.exports = grammar({
       ))));
     },
 
-    // §3.2 / §5.15 — `new Foo(args)`. We only handle the plain
-    // constructor-call form here; array creation `new Foo[10]`,
-    // generic types, and array initialisers land later. PREC.PRIMARY
-    // so it composes with the access tier from the left
-    // (`new Foo().bar`).
+    // §3.2 / §5.15 — `new Foo(args)` and the anonymous inner class
+    // `new Foo(args) { members }`. Array creation `new Foo[10]` and
+    // array initialisers land later. PREC.PRIMARY so it composes with
+    // the access tier from the left (`new Foo().bar`).
+    //
+    // The optional body must win the `{` that follows the arguments:
+    // Apache's `creator` gives it the anonymous-class reading
+    // unconditionally, never the trailing-closure call of
+    // `method_invocation`. Right associativity does that statically —
+    // the shift into `class_body` beats reducing the bodiless form —
+    // so no conflict is declared and the closure reading never forks.
     object_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
       'new',
       field('type', choice($._type, alias($._diamond_type, $.generic_type))),
       field('arguments', $.argument_list),
+      optional(field('body', $.class_body)),
     )),
 
     // §3.2 — Apache's createdName permits diamond, but ordinary types

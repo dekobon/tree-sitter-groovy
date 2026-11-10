@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. |
+| `new` | `object_creation_expression` | `type`, `arguments`, `body` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. The optional `body` is the `class_body` of an anonymous inner class (`new Runnable() { … }`); a `{` after the arguments is always that body, never a trailing closure (#68). |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 

@@ -24,6 +24,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   up by one. Every other symbol id and all field ids are unchanged.
   (#68)
 
+### Fixed
+
+- Anonymous inner classes now parse. `new Runnable() { … }` had no
+  production: at v0.3.0 the body spilled into the enclosing class
+  behind an `ERROR`, and since v0.4.0 the trailing-closure call of #49
+  claimed it, yielding a `method_invocation` whose `closure` held the
+  class members — a tree that looked like a valid call and carried an
+  `ERROR` only when a member was not also a valid statement.
+  `object_creation_expression` gains an optional `body` field holding
+  a `class_body`, and a `{` directly after `new T(...)` is always that
+  body, as in Groovy. Together with the instance initializer above this
+  covers double-brace initialisation (`new HashMap() {{ put(1, 2) }}`).
+
+  Trees change for input that already parsed without an error:
+  `new Foo() { }`, and any body made only of members that are also
+  valid statements, move from `method_invocation` / `closure` to
+  `object_creation_expression` / `class_body`. Calls such as
+  `new Foo().bar { }` and `foo() { }` keep their trailing closure.
+  A `{` on the line *after* `new T(...)` is read as the body too; see
+  `docs/divergences-from-spec.md` §11. Enum constants with an anonymous
+  class body (`A { … }`) stay unsupported. Symbol and field ids are
+  unchanged by this fix. (#68)
+
 ## [0.4.0] - 2026-11-09
 
 ### Added

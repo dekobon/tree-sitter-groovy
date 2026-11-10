@@ -400,3 +400,18 @@ the initializer block before the fields or after a method.
 unimplemented AUTOMATIC_SEMICOLON of §6.4 would have provided).
 Until then the statement-level form (`foo()` followed by a
 closure literal on its own line) has the same reading.
+
+The anonymous inner class body is affected the same way. Apache's
+`creator` is `createdName nls arguments anonymousInnerClassDeclaration?`
+with no `nls` before the body, so only a `{` on the same line as
+`new T(...)` opens one. Here a `{` on the following line opens it
+too:
+
+```groovy
+def list = new ArrayList()
+{ list.add(1) }
+```
+
+reads `{ list.add(1) }` as the class body of an anonymous
+`ArrayList` subclass and reports an `ERROR` for the statement
+inside it. The same `;` workaround applies.
