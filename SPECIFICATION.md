@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments` | |
+| `new` | `object_creation_expression` | `type`, `arguments` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -386,7 +386,7 @@ fix relative to *both* parent grammars.
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | constants list followed by optional `;` then class body; arrow switch is the typical use site (#36). |
+| `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
