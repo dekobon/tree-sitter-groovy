@@ -452,3 +452,81 @@ new Foo().bar { }
           arguments: (argument_list))
         field: (identifier))
       closure: (closure))))
+
+==================
+Trailing closure after an anonymous inner class body
+==================
+
+def x = new Foo() { } { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body))
+        closure: (closure)))))
+
+==================
+Anonymous inner class body on the next line inside parentheses
+==================
+
+button.addActionListener(new ActionListener()
+{
+    void actionPerformed(ActionEvent e) { run() }
+})
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters
+                (formal_parameter
+                  type: (type_identifier)
+                  name: (identifier)))
+              body: (block
+                (expression_statement
+                  (method_invocation
+                    function: (identifier)
+                    arguments: (argument_list)))))))))))
+
+==================
+Trailing closure on the line after new is unsupported
+:error
+==================
+
+def list = new ArrayList()
+{ list.add(1) }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (ERROR
+            (qualified_type
+              (type_identifier)
+              (type_identifier))
+            (number_literal)))))))

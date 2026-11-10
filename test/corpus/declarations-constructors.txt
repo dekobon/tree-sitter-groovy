@@ -250,3 +250,63 @@ class Foo {
           (assignment_expression
             left: (identifier)
             right: (number_literal)))))))
+
+==================
+Block on the line after a field initialiser reads as its trailing closure
+==================
+
+class A {
+    int x = 5
+    {
+        x = 6
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (method_invocation
+            function: (number_literal)
+            closure: (closure
+              (expression_statement
+                (assignment_expression
+                  left: (identifier)
+                  right: (number_literal))))))))))
+
+==================
+Instance initializer after a constructor and after another instance initializer
+==================
+
+class Foo {
+    Foo() { }
+    { first() }
+    { second() }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
