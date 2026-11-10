@@ -34,7 +34,7 @@ reasoning here.
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
-| §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below). |
+| §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted in this session but coupled to a not-yet-implemented named-argument command-chain (`archiveArtifacts artifacts: 'x'`), which the workaround grammar path quietly absorbed. Reverted to grammar precedence; v2 work is named-args + scanner token together. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
 | §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
@@ -164,12 +164,17 @@ calls out:
 | `foo()\n.bar()` (leading-dot chain) | parses as one method invocation (line-continuation) |
 | `a\n+ b` (leading-operator) | currently parses as one binary expression — see edge case below |
 
-The one observable difference from the spec's scanner-token design
+One observable difference from the spec's scanner-token design
 is the leading-operator edge case: `a\n+ b` greedily joins as
 `a + b` rather than splitting. Idiomatic Groovy keeps continuation
 operators at the end of the previous line (`a +\n  b`), so the
 case rarely appears in real code; a stricter scanner-driven
 AUTOMATIC_SEMICOLON is a v2 improvement.
+
+The other is a `{` that opens the next line: it joins the previous
+expression where the §6.4 contract as written would end the
+statement. After a call that is Apache's reading too; after
+`new T(...)` it is not (see #11).
 
 ---
 
@@ -367,14 +372,54 @@ behaviour of Groovy 2.x–4.x compilers.
 
 ## 11. A `{` on the next line continues the previous expression
 
-**Apache `GroovyParser.g4`** attaches a closure argument to a call
-only when the `{` follows on the same line: there is no `nls`
-between a path expression and its closure, so a newline ends the
-statement and a `{ … }` on the following line stands on its own.
+**Apache `GroovyParser.g4`** allows a line break before a trailing
+closure but not before an anonymous class body (rules quoted from
+the 4.0.x branch; `master` spells `nls` as `NL*`):
+
+- `pathExpression` ends in `(pathElement)*`, and `pathElement` is
+  `nls ( … | closureOrLambdaExpression ) | arguments | …`, with the
+  comment "Can always append a block, as foo{bar}". The `nls` lets
+  the closure start on a later line.
+- `creator` is
+  `createdName ( nls arguments anonymousInnerClassDeclaration[0]? | … )`.
+  Nothing separates the arguments from the class body, so the body
+  cannot follow an `NL` token.
+- `GroovyLexer.g4` hides `NL` while the innermost open bracket is
+  `(`, `[` or `?[` ("Inside (...) and [...] but not {...}, ignore
+  newlines"; the resource list of `try (…)` is excepted), so there a
+  line break before either `{` does not count.
+
+The Groovy 3.0 release notes ("Nested code blocks") say the same of
+calls: a block after a method call is its closure argument "even
+after a new line", and the previous statement may need a terminating
+`;` when a separate block is meant. Parsed by Groovy 4.0.33,
+
+```groovy
+def list = new ArrayList()
+{ list.add(1) }
+```
+
+is one statement, `def list = new ArrayList().call({ ... })`, and no
+anonymous class is created; `new Foo() { }`, with the `{` on the
+same line, creates one. Those two results were observed. Everything
+else this section says about Groovy is read off `GroovyParser.g4`.
+
+**Spec §6.4** would end the statement instead: its
+AUTOMATIC_SEMICOLON contract emits the terminator at a line break
+outside `(` and `[` unless the next token is a binary operator, a
+dot, `?` or `:`, and `{` is not on that list. For a trailing closure
+it is the contract that departs from Apache, not the grammar.
 
 **Current implementation**: newlines are `extras` (§5.10), so the
-parser cannot see the line break. A `{` that opens the next line
-is taken as the trailing closure of the expression before it:
+parser cannot see the line break and a `{` binds the same way on
+either line.
+
+After a call, a name or a literal the `{` joins that expression,
+which is Apache's reading. `foo()` with `{ x }` on the next line is
+one call with a trailing closure, and so is an Allman-style
+Jenkinsfile or Gradle block (`node('linux')` with its `{ … }`
+opening the next line). In a class body the same holds after a field
+initialiser:
 
 ```groovy
 class A {
@@ -385,33 +430,106 @@ class A {
 }
 ```
 
-parses without an `ERROR`, but as a field whose value is the call
+parses without an `ERROR` as a field whose value is the call
 `5 { x = 6 }`, not as a field followed by an instance initializer.
 The instance initializer (a bare `block` in `class_body`) is
-recognised wherever nothing can absorb the `{`: at the start of the
-body, after a method, constructor or initializer, after a field
-with no initialiser (`int x`), and after a `;`.
+recognised where nothing before it can take the `{`: at the start
+of the body, after a member that ends in `}` (a method or
+constructor with a body, another initializer, a nested enum), after
+a field with no initialiser (`int x`), and after a `;`. A block
+after a bodiless method (`abstract void f()`) becomes that method's
+body, which Apache's `(nls methodBody)?` allows as well.
 
-Workaround: terminate the field with `;` (`int x = 5;`), or place
-the initializer block before the fields or after a method.
+Three places in a member list do differ from Apache:
 
-**Action**: needs a newline-aware external-scanner token for the
-`{` that opens a trailing closure (the same mechanism the
-unimplemented AUTOMATIC_SEMICOLON of §6.4 would have provided).
-Until then the statement-level form (`foo()` followed by a
-closure literal on its own line) has the same reading.
+- **A field with no initialiser.** A `{ … }` on the *same* line is
+  an instance initializer here too, so `int x { … }` and
+  `void run { … }` (parentheses forgotten) parse without an `ERROR`;
+  Apache's `classBody` wants a `sep` between members. In a record
+  body this hides an unsupported construct: the compact canonical
+  constructor `public Name { … }` parses as a modifier-only field
+  `Name` followed by an initializer block.
+- **A nested `class`, `interface` or `trait`.** These have no
+  production in a member list yet, so the keyword lexes as an
+  identifier there and `class Inner { … }` takes the same reading: a
+  field `Inner` of type `class` followed by an initializer block
+  that holds the members, often with no `ERROR` at all (an
+  `extends Base` clause reads as one more field). v0.4.0, which had
+  no initializer block, reported an `ERROR` at the `{`. Nested enums
+  have a production and are not affected.
+- **An enum body.** `enum_body` takes no instance initializer at
+  all: `enum E { A, B; { init() } }` is an error, where Apache's
+  `classBody` accepts the block.
 
-The anonymous inner class body is affected the same way. Apache's
-`creator` is `createdName nls arguments anonymousInnerClassDeclaration?`
-with no `nls` before the body, so only a `{` on the same line as
-`new T(...)` opens one. Here a `{` on the following line opens it
-too:
+The larger divergence is after `new T(...)`: every `{` that follows
+the arguments is the anonymous class body. Apache instead has a
+closure called on the new object when
+
+- the `{` starts a later line, outside parentheses and brackets.
+  Here the `ArrayList` input above gets `{ list.add(1) }` as the
+  class body of an anonymous `ArrayList` subclass, with an `ERROR`
+  for the statement inside it; or
+- the `{` is on the same line but its content cannot be a class
+  body, as in `new T() { x -> x }` (ANTLR skips the optional
+  `anonymousInnerClassDeclaration` when it cannot match). Here that
+  is a `class_body` with an `ERROR` in it.
+
+v0.4.0 parsed both as a call with a trailing closure. A next-line
+block made of members,
 
 ```groovy
-def list = new ArrayList()
-{ list.add(1) }
+def r = new Runnable()
+{
+    void run() { }
+}
 ```
 
-reads `{ list.add(1) }` as the class body of an anonymous
-`ArrayList` subclass and reports an `ERROR` for the statement
-inside it. The same `;` workaround applies.
+is accepted as an anonymous class without an error, although
+`creator` cannot produce one there. Directly inside parentheses or
+brackets (`foo(new T()` with the body opening the next line) the
+line break changes nothing in either parser.
+
+Workaround: where the closure reading after `new T(...)` is wanted,
+wrap the creation in parentheses (`(new ArrayList())`, then the
+`{`) or spell the call out (`new ArrayList().call { … }`). A `;`
+after `new T(...)` makes the block a separate statement, which is
+not Groovy's reading of the original. For an instance initializer
+after `int x = 5`, end the field with `;` or put the block where
+nothing before it can take the `{`, as in Groovy.
+
+**Action**: none for the trailing closure. A newline-aware token
+for that `{` would move the grammar away from Apache and break the
+Allman-style calls above, and so would an AUTOMATIC_SEMICOLON built
+to the §6.4 contract as written; the contract has to treat a `{` as
+continuing the expression first.
+
+For `new T(...)` two routes are open, neither taken yet. A declared
+conflict on `object_creation_expression` with `prec.dynamic` on the
+body restores both closure forms, but any body with an error in it
+(a member `class_body` cannot parse, or one still being typed) then
+falls back without an `ERROR` to the call-with-closure tree that #68
+reported. A newline-aware scanner token would refuse the body after
+a line break; it has to track the enclosing bracket, because
+Apache's lexer hides the break inside `(` and `[`, and it does
+nothing for the same-line form.
+
+Nested `class` / `interface` / `trait` declarations need their own
+productions in `_class_member`. Once the keyword is valid at member
+start it no longer lexes as an identifier, and the field-plus-block
+reading goes away.
+
+Two `new` forms never reach `object_creation_expression`, so a `{`
+after them is not a class body either. Both predate #68, and in the
+positions shown neither reports an `ERROR`, with or without a body:
+
+- Qualified creation, `def i = outer.new Inner(...) { … }` (Apache
+  `pathElement`: `DOT nls NEW creator[1]`), has no production.
+  `.new` reads as a property access and `Inner(...) { … }` as a
+  separate call with a trailing closure. As a call argument the
+  form is an `ERROR`.
+- In a member list, after another member, a cast written directly
+  in front of `new` loses to a reading in which `new` is an
+  identifier, provided the arguments can pass for parameters (none,
+  or bare names): `def f = (Foo) new T() { … }` becomes a field
+  `f = (Foo)` followed by a method `T()` with return type `new`.
+  `new T() as Foo` and `(Foo) (new T())` parse as intended.

@@ -251,9 +251,9 @@ module.exports = grammar({
       field('statement', $._statement),
     )),
 
-    // §4 — block of statements, used in control-flow bodies and
-    // (eventually) method bodies. Shares `{ ... }` syntax with
-    // closure (§5.8). A `prec(1, …)` keeps block preferred at use
+    // §4 — block of statements: control-flow, method and constructor
+    // bodies, static / instance initializers. Shares `{ ... }` syntax
+    // with closure (§5.8). A `prec(1, …)` keeps block preferred at use
     // sites where both `block` and a closure-bearing `_statement`
     // are valid alternatives (e.g. the body slot of `if` / `while`).
     block: $ => prec(1, seq(
@@ -546,7 +546,8 @@ module.exports = grammar({
     ),
 
     // §4 — member list shared by class / interface / trait / record /
-    // `@interface` bodies. Nested classes land later.
+    // `@interface` bodies and the anonymous inner class body of
+    // `object_creation_expression`.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
@@ -1047,17 +1048,29 @@ module.exports = grammar({
       ))));
     },
 
-    // §3.2 / §5.15 — `new Foo(args)` and the anonymous inner class
+    // §3.2 — `new Foo(args)` and the anonymous inner class
     // `new Foo(args) { members }`. Array creation `new Foo[10]` and
-    // array initialisers land later. PREC.PRIMARY so it composes with
-    // the access tier from the left (`new Foo().bar`).
+    // array initialisers land later. PREC.PRIMARY only labels the
+    // §3.1 tier. The number decides nothing: the rule's one conflict
+    // (below) is against itself, where it cancels out, and
+    // `new Foo().bar` composes without any precedence.
     //
-    // The optional body must win the `{` that follows the arguments:
-    // Apache's `creator` gives it the anonymous-class reading
-    // unconditionally, never the trailing-closure call of
-    // `method_invocation`. Right associativity does that statically —
-    // the shift into `class_body` beats reducing the bodiless form —
-    // so no conflict is declared and the closure reading never forks.
+    // The optional body takes every `{` that follows the arguments.
+    // Right associativity does that statically — the shift into
+    // `class_body` beats reducing the bodiless form — so no conflict
+    // is declared and the closure reading never forks.
+    //
+    // Apache is narrower. Its `creator` has no `nls` before the body,
+    // so `new T()\n{ … }` is a closure called on the new object
+    // (observed on Groovy 4.0.33). By the same grammar a same-line
+    // `{` whose content cannot be class members should be one too
+    // (`new T() { x -> x }`; not run through the compiler). Here both
+    // are read as a body, usually with an ERROR in it (divergence 11).
+    // Parsing them needs a declared conflict on this rule with
+    // `prec.dynamic` on the body, and that form was not taken: a body
+    // holding one member `class_body` cannot parse, or one still
+    // being typed, would then fall back silently to the closure tree
+    // that #68 reported.
     object_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
       'new',
       field('type', choice($._type, alias($._diamond_type, $.generic_type))),

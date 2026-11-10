@@ -13,38 +13,60 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   instance initializer blocks — `class C { { init() } }`. The block is
   a bare `block` child of `class_body`, next to the existing
   `static_initializer`; previously it closed the class early on a
-  `MISSING "}"`. Enum bodies are unchanged. An initializer written on
-  the line after a field *with* an initialiser (`int x = 5\n{ … }`)
-  still reads as that expression's trailing closure — end the field
-  with `;`; see `docs/divergences-from-spec.md` §11.
+  `MISSING "}"`. Enum bodies are unchanged. A block on the line after
+  a field *with* an initialiser (`int x = 5\n{ … }`) is not an
+  initializer but that expression's trailing closure, the reading
+  Apache's grammar gives it too — end the field with `;` to get the
+  initializer; see `docs/divergences-from-spec.md` §11.
+
+  The block also follows a field with no initialiser on the same
+  line, which costs an error report: a nested `class`, `interface` or
+  `trait` declaration, unsupported before and after, used to get an
+  `ERROR` at its `{`. `class Inner { … }` inside a class body now
+  parses as a field `Inner` of type `class` followed by an
+  initializer block, often with no `ERROR` at all.
 
   No node kind is added, but the generated parser gains one auxiliary
   symbol, so the numeric ids of the three alias kinds
   (`named_argument`, `quoted_identifier`, `type_identifier`) each move
-  up by one. Every other symbol id and all field ids are unchanged.
-  (#68)
+  up by one (308–310, now 309–311). So do the fourteen hidden
+  auxiliary symbols numbered after the new one (294–307, now
+  295–308), which never appear in a tree. Symbol ids below 294 and
+  all field ids are unchanged. (#68)
 
 ### Fixed
 
 - Anonymous inner classes now parse. `new Runnable() { … }` had no
-  production: at v0.3.0 the body spilled into the enclosing class
-  behind an `ERROR`, and since v0.4.0 the trailing-closure call of #49
-  claimed it, yielding a `method_invocation` whose `closure` held the
-  class members — a tree that looked like a valid call and carried an
-  `ERROR` only when a member was not also a valid statement.
+  production. At v0.3.0 the body was cut loose from the creation: in
+  the reported field initialiser it spilled into the enclosing class
+  behind an `ERROR`, in a script or method body it became a separate
+  closure statement with no `ERROR` at all. Since v0.4.0 the
+  trailing-closure call of #49 claimed it, yielding a
+  `method_invocation` whose `closure` held the class members — a tree
+  that looked like a valid call and carried an `ERROR` only when a
+  member was not also a valid statement.
   `object_creation_expression` gains an optional `body` field holding
-  a `class_body`, and a `{` directly after `new T(...)` is always that
-  body, as in Groovy. Together with the instance initializer above this
-  covers double-brace initialisation (`new HashMap() {{ put(1, 2) }}`).
+  a `class_body`, and every `{` that follows the arguments of
+  `new T(...)` is read as that body. Together with the instance
+  initializer above this covers double-brace initialisation
+  (`new HashMap() {{ put(1, 2) }}`).
 
   Trees change for input that already parsed without an error:
   `new Foo() { }`, and any body made only of members that are also
   valid statements, move from `method_invocation` / `closure` to
   `object_creation_expression` / `class_body`. Calls such as
   `new Foo().bar { }` and `foo() { }` keep their trailing closure.
-  A `{` on the line *after* `new T(...)` is read as the body too; see
-  `docs/divergences-from-spec.md` §11. Enum constants with an anonymous
-  class body (`A { … }`) stay unsupported. Symbol and field ids are
+  Groovy is narrower about the body than this grammar: it calls a
+  closure on the new object when the `{` starts a later line (outside
+  parentheses and brackets) or holds something that cannot be a class
+  body. `new ArrayList()\n{ list.add(1) }` and `new T() { x -> x }`
+  therefore move from a `method_invocation` with a `closure` to a
+  `class_body` with an `ERROR` in it; see
+  `docs/divergences-from-spec.md` §11. Still unsupported, as before:
+  enum constants with an anonymous class body (`A { … }`), qualified
+  creation (`outer.new Inner(...)`), and a cast written directly in
+  front of `new T()` in a field initialiser that follows another
+  member (`def f = (Foo) new T() { … }`). Symbol and field ids are
   unchanged by this fix. (#68)
 
 ## [0.4.0] - 2026-11-09

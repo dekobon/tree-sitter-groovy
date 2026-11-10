@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments`, `body` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. The optional `body` is the `class_body` of an anonymous inner class (`new Runnable() { … }`); a `{` after the arguments is always that body, never a trailing closure (#68). |
+| `new` | `object_creation_expression` | `type`, `arguments`, `body` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. The optional `body` is the `class_body` of an anonymous inner class (`new Runnable() { … }`); a `{` after the arguments is always that body, never a trailing closure (#68). That is wider than Groovy, which calls a closure on the new object when the `{` starts a later line or cannot be a class body (`docs/divergences-from-spec.md` §11). Qualified creation (`outer.new Inner(...)`) has no production. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -709,14 +709,16 @@ scanner branches are avoided):
   matching Groovy's rule.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
-  (`repeat(choice($._class_member, ';'))`). It never appears as a named
+  (`repeat(choice($._class_member, $.block, ';'))` in `class_body`,
+  where the `block` is an instance initializer; the same without
+  `$.block` in `enum_body`). It never appears as a named
   node in the AST, so wherever it attaches the named-node tree is
   identical. This covers terminators (`x();`), separators (`x(); y()`),
   empty statements (`;`, `;;`), and empty / terminated members
   (`class C { ; }`, `void f();`, `int x = 1;`). The list contexts are
   `source_file`, `block`, `closure`, the classic `switch`
-  `case`/`default` bodies, and the class / interface / trait / enum
-  member bodies.
+  `case`/`default` bodies, and the two member bodies, `class_body`
+  and `enum_body`.
 - Three single-statement (non-list) bodies take an explicit
   `optional(';')` so their terminator is not claimed by the *enclosing*
   list or rejected before a required follow-on token: the braceless

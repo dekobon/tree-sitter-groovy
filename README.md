@@ -166,11 +166,21 @@ These are documented in detail in
   as `a + b` rather than splitting into two statements. Idiomatic
   Groovy places continuation operators at the end of the previous
   line.
-- **A `{` on the next line continues the previous expression** --
-  `int x = 5\n{ ... }` reads as the call `5 { ... }` with a trailing
-  closure, not as a field followed by an instance initializer block.
-  After `new T(...)` the `{` opens an anonymous class body instead.
-  Terminate the line with `;` to separate them.
+- **A `{` after `new T(...)` is always an anonymous class body** --
+  Groovy instead calls a closure on the new object when the `{`
+  starts a later line (outside parentheses and brackets) or cannot be
+  a class body, so `new ArrayList()\n{ list.add(1) }` and
+  `new T() { x -> x }` get an `ERROR` inside a `class_body`. Write
+  `new ArrayList().call { ... }` to keep the call.
+- **A `{ ... }` straight after a field with no initializer is an
+  instance initializer block** -- `int x { ... }` parses with no
+  `ERROR`. Two unsupported constructs take the same reading, often
+  with no `ERROR` either: a record's compact constructor
+  (`public Name { ... }`) and a nested `class` / `interface` /
+  `trait` declaration (`class Inner { ... }` becomes a field `Inner`
+  of type `class` plus a block). After a field *with* an initializer
+  a next-line `{` is that expression's trailing closure, as in
+  Groovy: end the field with `;` to get an initializer block.
 
 ## Contributing
 
