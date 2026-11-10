@@ -37,7 +37,7 @@ reasoning here.
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted in this session but coupled to a not-yet-implemented named-argument command-chain (`archiveArtifacts artifacts: 'x'`), which the workaround grammar path quietly absorbed. Reverted to grammar precedence; v2 work is named-args + scanner token together. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
-| §6.7 RECORD_KEYWORD | **Done** | `record` emitted only before `Name (` on the same line; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
+| §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
 | §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -568,8 +568,8 @@ identifier. The first constant of an enum sits where a member could
 start too; a later one (`enum E { A, sealed }`) does not.
 
 `record` escapes the table because its keyword is not a grammar
-literal: the external scanner emits it only when `record`, a name
-and `(` follow on one line (spec §6.7), so `private Record record`,
+literal: the external scanner emits it only when a name follows on
+the same line and `(` after that (spec §6.7), so `private Record record`,
 `public void record() { }` and `enum E { record, B }` all parse and
 a nested `record R(int x) { }` is a `record_declaration`.
 

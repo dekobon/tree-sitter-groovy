@@ -74,7 +74,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `record`; so did a method whose return type is spelled `record`
   with no modifier (`record foo() { }`), which takes the same tree
   now. `record_declaration` joins the child lists of `class_body`
-  and `enum_body` in `node-types.json`. (#60, #68)
+  and `enum_body` in `node-types.json`. In the other direction,
+  `record` followed directly by a line break or a line comment, then
+  `Point(int x) { }` on the next line, was a `record_declaration` at
+  v0.4.0 and now reads as a method declaration with return type
+  `record`; Groovy rejects that input (`SPECIFICATION.md` §6.7).
+  (#60, #68)
+- **BREAKING:** `def f = (Foo) new T()` after another class member
+  is now a `parenthesized_type_cast` around the creation (see Fixed
+  below). At v0.4.0 that input parsed without an `ERROR` as a field
+  `f = (Foo)` followed by a method `T()`; the tree changes for input
+  that parsed. (#68)
 - The `record` keyword is an external-scanner token
   (`alias($._record_keyword, 'record')`) instead of a grammar
   literal. The anonymous `record` node and the `"record" @keyword`
@@ -126,7 +136,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   another member now parses as a cast. `def f = (Foo) new T()` after
   an earlier field or method was split, with no `ERROR`, into a field
   `f = (Foo)` and a method `T()` with return type `new`, whenever the
-  arguments could pass for parameters (none, or bare names). `new` is
+  arguments could pass for parameters (none, or bare names); the
+  tree change is listed under Changed above. `new` is
   now a reserved word: it is the keyword everywhere except where a
   property or method name can stand (`foo.new`, `def new() { }`, and
   with them `def new = 1`). Input that used it as any other
