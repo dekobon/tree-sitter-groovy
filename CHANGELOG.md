@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-09
+
 ### Added
 
 - `method_invocation` now accepts a trailing closure as the call's last
@@ -15,11 +17,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   reduce to a single `method_invocation` node (`closure` field alongside
   the optional `arguments` field). Previously any call written this way
   outside of a bare statement-level command chain (`§5.5`) required
-  parentheses around the closure or failed to parse. (#49)
+  parentheses around the closure or failed to parse. `arguments` is
+  no longer a required field in `node-types.json`, so code that
+  assumes every `method_invocation` has one must handle its absence.
+  (#49)
 
 ### Changed
 
-- Raised the Rust crate's minimum supported Rust version
+- **BREAKING:** raised the Rust crate's minimum supported Rust version
   (`rust-version`) from 1.85 to 1.90, the floor that `tree-sitter`
   0.27 and `tree-sitter-language` 0.1.8+ declare. Consumers on 1.85–1.89
   must stay on an earlier release of this crate. The `tree-sitter`
@@ -352,7 +357,8 @@ for full details.
 - `a\n+ b` joins as one expression rather than splitting into two
   statements.
 
-[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.0...v0.2.1
