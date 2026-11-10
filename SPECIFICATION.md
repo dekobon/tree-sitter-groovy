@@ -835,6 +835,7 @@ enum TokenType {
   GSTRING_BODY,           // §5.7 — literal fragment of a double-quoted string
   GSTRING_INTERPOLATION_START, // `${` or `$` followed by identifier
   LABEL_COLON,            // §5.3 — colon that closes a statement label
+  LINE_COMMENT,           // §6.6 — `//` to end of line, single token
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
@@ -961,11 +962,13 @@ those identifier uses begin. The scanner makes the choice instead.
 Emit RECORD_KEYWORD when, from the current position:
   - the next six characters are `record`, and the character after
     them is not an identifier character ([A-Za-z0-9_$]); then
-  - one or more spaces or tabs (no line break — `classDeclaration`
-    in GroovyParser.g4 has no `nls` between RECORD and the name);
+  - at least one of: spaces, tabs, block comments — but no line
+    break and no line comment, because `classDeclaration` in
+    GroovyParser.g4 has no `nls` between RECORD and the name; then
   - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
     class); then
-  - zero or more spaces or tabs; then
+  - any mix of spaces, tabs, line breaks, block and line comments
+    (the rule has `nls` before `formalParameters`); then
   - `(`.
 The token is `record` alone: `mark_end` is called after it and the
 look-ahead is not kept. On any other input return false; the
@@ -976,18 +979,25 @@ The grammar binds the token as `alias($._record_keyword, 'record')`,
 so the anonymous `record` node, `node-types.json`, and the query
 capture `"record" @keyword` are the same as with a literal.
 
-Known residuals, all already errors at v0.4.0 (where `record` was a
-keyword at every statement start regardless of what followed):
+Known residuals:
 
 - A command-style call whose argument is itself a call,
   `record Point(1, 2)`, matches the pattern and parses as a record
-  header with an `ERROR` in its components.
+  header with an `ERROR` in its components. It was an error at
+  v0.4.0 too, where `record` was a keyword at every statement start
+  regardless of what followed.
 - A method with no modifier whose return type is spelled `record`
-  (`record foo() { … }`) reads as a record declaration.
-- A header split across lines (`record Point` then `(int x)` on the
-  next line), which Apache permits through `nls`, and a comment
-  between the keyword and the name, both fall back to `identifier`.
-- Record type parameters (`record Pair<A, B>(…)`) have no production.
+  (`record foo() { … }`) reads as a record declaration, as it did at
+  v0.4.0 at statement start; in a class body it was a method there.
+- `record` directly followed by a line break or a line comment, then
+  a name and `(` on the next line, is not a header: the word is an
+  identifier and the rest reads as a method declaration with return
+  type `record`. Groovy rejects that input; v0.4.0 read it as a
+  record because comments and newlines are `extras` around a
+  literal keyword.
+- Record type parameters (`record Pair<A, B>(…)`) and modifiers
+  before `record` (`static record P(int x) { }`, a method today) have
+  no production.
 
 ---
 

@@ -793,8 +793,8 @@ module.exports = grammar({
 
     // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
     // §5.2 / §6.7 — `record` is a contextual keyword. The keyword
-    // comes from the external scanner, which emits it only when
-    // `record`, a space, a name and `(` follow on one line; in every
+    // comes from the external scanner, which emits it only when a
+    // name follows on the same line and `(` after that; in every
     // other position the word lexes as `identifier`. A grammar literal
     // cannot do this: keyword extraction yields the keyword wherever
     // it has an action, which made `record.key()` at statement start,

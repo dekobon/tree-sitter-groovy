@@ -92,14 +92,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   would have done the same to `private Record record`,
   `public void record() { }` and a first enum constant named `record`.
   The keyword now comes from the external scanner, which emits it
-  only when `record`, one or more spaces, a name, and `(` follow on
-  one line (`SPECIFICATION.md` §6.7); everywhere else the word is an
-  identifier. Residuals, all `ERROR`s at v0.4.0 too: a command-style
+  only when a name follows on the same line and `(` after that, with
+  comments allowed in between and a line break allowed before the
+  `(` (`SPECIFICATION.md` §6.7); everywhere else the word is an
+  identifier. One residual, an `ERROR` at v0.4.0 too: a command-style
   call whose argument is a call (`record Point(1, 2)`) reads as a
-  record header, and a header split across lines (`record Point`,
-  then `(int x)` on the next line) does not. A nested record with a
-  modifier (`static record P(int x) { }`) still reads as a method,
-  since `record_declaration` takes no modifiers. (#60, #68)
+  record header. A nested record with a modifier
+  (`static record P(int x) { }`) still reads as a method, since
+  `record_declaration` takes no modifiers. (#60, #68)
 
 - Anonymous inner classes now parse. `new Runnable() { … }` had no
   production. At v0.3.0 the body was cut loose from the creation: in

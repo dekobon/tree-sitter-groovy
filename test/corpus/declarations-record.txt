@@ -379,3 +379,147 @@ class C {
             type: (type_identifier)
             name: (identifier)))
         body: (block)))))
+
+==================
+Record headers with comments and a line break before the components
+==================
+
+record /* name */ Point(int x) { }
+record Pair /* components */ (int x) { }
+record Next
+(int x) { }
+record Line // trailing
+(int x) { }
+record /*
+ * multi-line
+ */ Doc(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    (block_comment)
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    (block_comment)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    (line_comment)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    (block_comment)
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Nested record header with comments in both gaps and the body on the next line
+==================
+
+class Holder {
+    record /* c */ Inner /* d */ (int x)
+    {
+        int y
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        (block_comment)
+        name: (identifier)
+        (block_comment)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier))))))))
+
+==================
+Record header separated by tabs
+==================
+
+record	Tab	(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+A line break directly after record is not a record header
+==================
+
+record
+Point(int x) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+A line comment directly after record is not a record header
+==================
+
+record // c
+Point(int x) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    (line_comment)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))

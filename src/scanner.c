@@ -43,10 +43,53 @@ static inline bool is_identifier_char(int32_t c) {
     return is_identifier_start(c) || (c >= '0' && c <= '9');
 }
 
+// Skips the trivia Groovy's lexer hides inside a record header:
+// spaces, tabs and block comments, plus line breaks and line comments
+// when `newlines` is set. Returns false on a `/` that opens neither
+// comment kind (a slashy string or division cannot be part of a
+// header) and on an unterminated block comment.
+static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
+    for (;;) {
+        while (is_inline_space(lexer->lookahead)
+            || (newlines
+                && (lexer->lookahead == '\n' || lexer->lookahead == '\r'))) {
+            advance(lexer);
+        }
+        if (lexer->lookahead != '/') {
+            return true;
+        }
+        advance(lexer);
+        if (lexer->lookahead == '*') {
+            advance(lexer);
+            // EOF-bounded: an unterminated comment ends the scan here.
+            for (;;) {
+                if (lexer->eof(lexer)) {
+                    return false;
+                }
+                if (lexer->lookahead == '*') {
+                    advance(lexer);
+                    if (lexer->lookahead == '/') {
+                        advance(lexer);
+                        break;
+                    }
+                } else {
+                    advance(lexer);
+                }
+            }
+        } else if (newlines && lexer->lookahead == '/') {
+            while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+                advance(lexer);
+            }
+        } else {
+            return false;
+        }
+    }
+}
+
 // SPECIFICATION.md §6.7 — `record` is a keyword only at the start of
-// a record header: `record`, one or more spaces or tabs, a name,
-// optional spaces or tabs, `(`, all on one line. Everywhere else the
-// word is an identifier (`record.key()`, `private Record record`,
+// a record header: `record`, a name on the same line, then `(`, with
+// Groovy's lexer trivia allowed in between. Everywhere else the word
+// is an identifier (`record.key()`, `private Record record`,
 // `public void record()`), as Apache's `identifier` rule allows. The
 // grammar cannot make that choice: with `word: $.identifier` the
 // keyword wins wherever it has an action, and once
@@ -54,35 +97,35 @@ static inline bool is_identifier_char(int32_t c) {
 //
 // The scanner has already consumed `record` when this is called.
 // `mark_end` fixes the token there; the look-ahead that follows is
-// read but not kept. No newline is allowed before the name
-// (`classDeclaration` in GroovyParser.g4 has no `nls` there), which
-// keeps `private Record record` followed by a constructor on the next
-// line a field and a constructor. None before `(` either: Apache
-// allows it, but `record item` on one line and `(1 + 2)` on the next
-// would otherwise read as a header. A command-style call
-// `record Point(1, 2)` matches the pattern and misfires; §6.7 lists
-// the residuals, all of them errors at v0.4.0 already.
+// read but not kept. Between `record` and the name only spaces, tabs
+// and block comments may appear: `classDeclaration` in
+// GroovyParser.g4 has no `nls` there, so `record` at the end of a line
+// is never a keyword, which keeps `private Record record` followed by
+// a constructor on the next line a field and a constructor. Before
+// `(` the rule has `nls`, so line breaks and line comments are
+// skipped there too. A command-style call `record Point(1, 2)`
+// matches the pattern and misfires; §6.7 lists the residuals.
 static bool scan_record_header(TSLexer *lexer) {
     if (is_identifier_char(lexer->lookahead)) {
         return false;
     }
     lexer->mark_end(lexer);
-    if (!is_inline_space(lexer->lookahead)) {
+    if (!is_inline_space(lexer->lookahead) && lexer->lookahead != '/') {
         return false;
     }
-    while (is_inline_space(lexer->lookahead)) {
-        advance(lexer);
+    if (!skip_header_trivia(lexer, false)) {
+        return false;
     }
     if (!is_identifier_start(lexer->lookahead)) {
         return false;
     }
-    // EOF-bounded: lookahead is 0 at end of input, which fails both
-    // predicates below.
+    // EOF-bounded: lookahead is 0 at end of input, which fails the
+    // predicate.
     while (is_identifier_char(lexer->lookahead)) {
         advance(lexer);
     }
-    while (is_inline_space(lexer->lookahead)) {
-        advance(lexer);
+    if (!skip_header_trivia(lexer, true)) {
+        return false;
     }
     return lexer->lookahead == '(';
 }
