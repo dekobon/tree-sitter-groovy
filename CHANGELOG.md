@@ -30,20 +30,40 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `@interface`, enum, and anonymous class bodies, joining the nested
   enum. They use the top-level node kinds (`class_declaration` and
   so on) as children of `class_body` / `enum_body`. A nested
-  `record` is still not recognised and reads as a method.
+  `record` is still not recognised and reads as a method. This
+  reserves `sealed` and `trait` at member start; see Changed below.
 
-  This makes `sealed` and `trait` keywords wherever a member can
-  start, as they already were at statement start. Input that parsed
+  No node kind is added by either entry, and the symbol and field
+  ids of the generated parser are identical to v0.4.0. (#68)
+
+### Changed
+
+- **BREAKING:** a `{` after the arguments of `new T(...)` is now
+  always an anonymous class body (see Fixed below), which changes
+  trees for input that parsed without an error at v0.4.0.
+  `new Foo() { }`, and any body made only of members that are also
+  valid statements, move from `method_invocation` / `closure` to
+  `object_creation_expression` / `class_body`. Calls such as
+  `new Foo().bar { }` and `foo() { }` keep their trailing closure.
+
+  Groovy is narrower about the body than this grammar: it calls a
+  closure on the new object when the `{` starts a later line (outside
+  parentheses and brackets) or holds something that cannot be a class
+  body. `new ArrayList()\n{ list.add(1) }` and `new T() { x -> x }`
+  therefore move from a `method_invocation` with a `closure` to a
+  `class_body` with an `ERROR` in it; write
+  `new ArrayList().call { … }` to keep the call. See
+  `docs/divergences-from-spec.md` §11. (#68)
+- **BREAKING:** `sealed` and `trait` are keywords wherever a class
+  member can start, as they already were at statement start; the
+  nested type declarations above need them there. Input that parsed
   at v0.4.0 and is now an `ERROR`: a field named `sealed` or `trait`
   after a modifier (`private boolean sealed`,
   `static final String trait = "x"`), a member that opens with one
   of the words (`static trait = 1`, `sealed() { }`), and a first
   enum constant so named (`enum E { trait, B }`). `boolean sealed`
   and `String trait`, with no modifier, still parse; see
-  `docs/divergences-from-spec.md` §12.
-
-  No node kind is added by either entry, and the symbol and field
-  ids of the generated parser are identical to v0.4.0. (#68)
+  `docs/divergences-from-spec.md` §12. (#68)
 
 ### Fixed
 
@@ -60,25 +80,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a `class_body`, and every `{` that follows the arguments of
   `new T(...)` is read as that body. Together with the instance
   initializer above this covers double-brace initialisation
-  (`new HashMap() {{ put(1, 2) }}`).
+  (`new HashMap() {{ put(1, 2) }}`). Trees change for some input
+  that already parsed without an error; see Changed above.
 
-  Trees change for input that already parsed without an error:
-  `new Foo() { }`, and any body made only of members that are also
-  valid statements, move from `method_invocation` / `closure` to
-  `object_creation_expression` / `class_body`. Calls such as
-  `new Foo().bar { }` and `foo() { }` keep their trailing closure.
-  Groovy is narrower about the body than this grammar: it calls a
-  closure on the new object when the `{` starts a later line (outside
-  parentheses and brackets) or holds something that cannot be a class
-  body. `new ArrayList()\n{ list.add(1) }` and `new T() { x -> x }`
-  therefore move from a `method_invocation` with a `closure` to a
-  `class_body` with an `ERROR` in it; see
-  `docs/divergences-from-spec.md` §11. Still unsupported, as before:
-  enum constants with an anonymous class body (`A { … }`), qualified
-  creation (`outer.new Inner(...)`), and a cast written directly in
-  front of `new T()` in a field initialiser that follows another
-  member (`def f = (Foo) new T() { … }`). Symbol and field ids are
-  unchanged by this fix. (#68)
+  Still unsupported, as before: enum constants with an anonymous
+  class body (`A { … }`), qualified creation
+  (`outer.new Inner(...)`), and a cast written directly in front of
+  `new T()` in a field initialiser that follows another member
+  (`def f = (Foo) new T() { … }`). Symbol and field ids are unchanged
+  by this fix. (#68)
 
 ## [0.4.0] - 2026-11-09
 
