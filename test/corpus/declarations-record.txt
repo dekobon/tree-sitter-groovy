@@ -72,3 +72,109 @@ record Point(int x, int y) {
         parameters: (formal_parameters)
         body: (block
           (expression_statement (identifier)))))))
+
+==================
+Record used as an identifier at statement start
+==================
+
+record.key()
+record = 5
+record(1)
+records = 1
+recordValue = 2
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Local variable named record beside a local record in a method body
+==================
+
+def f() {
+    def record = 1
+    record Local(int x) { }
+    record.hashCode()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list))))))
+
+==================
+Record header with a space before the components
+==================
+
+record Point (int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Command-style call named record with a call argument reads as a record header
+:error
+==================
+
+record Point(1, 2)
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (ERROR
+        (number_literal)
+        (number_literal)))))

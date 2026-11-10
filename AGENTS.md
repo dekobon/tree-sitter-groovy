@@ -36,11 +36,13 @@ The default branch is **`main`**.
   statement listed in `SPECIFICATION.md` §3 and §4.
 - `src/parser.c`, `src/grammar.json`, `src/node-types.json` — generated
   by `tree-sitter generate`. Treat as build outputs; do not hand-edit.
-- `src/scanner.c` — hand-written external scanner. Handles the four
-  context-sensitive lexing situations from `SPECIFICATION.md` §6:
-  slashy-vs-division, GString interpolation, automatic semicolons
-  (newline-as-terminator), labelled-statement colons, and the
-  block-comment / Groovydoc single-token emit. Symbols are
+- `src/scanner.c` — hand-written external scanner. Handles the
+  context-sensitive lexing situations from `SPECIFICATION.md` §6 that
+  the grammar cannot: slashy-vs-division, the line / block / Groovydoc
+  comment single-token emit, and the contextual `record` keyword,
+  which is emitted only before a record header (§6.7). GString
+  interpolation, automatic semicolons and label colons are handled
+  in-grammar (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does
   NOT rewrite `scanner.c`, so these symbols are stable across
   regenerations.

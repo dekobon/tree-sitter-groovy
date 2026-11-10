@@ -60,3 +60,12 @@ switch (x) { case 1 -> y }
 
 yield 42
 // <- keyword.control
+
+record Q(int x) { }
+// <- keyword
+
+record.key()
+// <- variable
+
+record(1)
+// <- function.call

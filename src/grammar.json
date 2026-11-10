@@ -2376,7 +2376,12 @@
             }
           },
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_record_keyword"
+            },
+            "named": false,
             "value": "record"
           },
           {
@@ -6995,6 +7000,10 @@
     {
       "type": "SYMBOL",
       "name": "groovydoc_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_record_keyword"
     }
   ],
   "inline": [],

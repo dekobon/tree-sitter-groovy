@@ -488,6 +488,12 @@ identifier_or_contextual: $ => choice($.identifier, 'var', 'record',
 otherwise hide a usable identifier behind a keyword (variable names,
 property accesses, named arguments).
 
+The implementation takes a different route for `record`: the keyword
+is an external-scanner token emitted only before a record header
+(§6.7), so the word lexes as a plain `identifier` in every other
+position and no fallback choice is needed. The same technique is
+available to the other contextual words.
+
 Quoted identifiers (`map."key with spaces"`, `def "test name"() { … }`)
 are supported by allowing a string-literal in identifier position
 inside method declarations and after `.`. Per the Groovy syntax
@@ -810,9 +816,12 @@ syntax error in expression position, by §5.5).
 ## 6. External scanner design
 
 The external scanner is the C file `src/scanner.c`. It exists to
-handle the four context-sensitive lexing situations that pure
-tree-sitter grammar rules cannot disambiguate. Each token below has a
-single emit/no-emit decision per call.
+handle the context-sensitive lexing situations that pure tree-sitter
+grammar rules cannot disambiguate. Each token below has a single
+emit/no-emit decision per call. The implementation exports the
+slashy opener, the three comment tokens, and the contextual `record`
+keyword (§6.7); the other tokens listed here are met in-grammar, see
+`docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
 
@@ -828,6 +837,7 @@ enum TokenType {
   LABEL_COLON,            // §5.3 — colon that closes a statement label
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
+  RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
 };
 ```
 
@@ -934,6 +944,50 @@ in murtaza64's grammar requires at least one whitespace character
 after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
 both fail. A scanner-driven token simply consumes from the opener to
 the matching `*/` regardless of intermediate content.
+
+### 6.7 RECORD_KEYWORD — implementation contract
+
+Apache's `identifier` rule lists `RECORD`, so `record` names fields,
+methods, variables and enum constants (`private Record record`,
+`record.key()`). With `word: $.identifier`, tree-sitter substitutes
+a keyword literal for the identifier wherever that keyword has an
+action in the current parse state, and it cannot fall back once the
+rule behind the keyword fails to match. Because `record_declaration`
+is a statement and a class member, a literal `'record'` would be the
+keyword at every statement and member start, which is exactly where
+those identifier uses begin. The scanner makes the choice instead.
+
+```text
+Emit RECORD_KEYWORD when, from the current position:
+  - the next six characters are `record`, and the character after
+    them is not an identifier character ([A-Za-z0-9_$]); then
+  - one or more spaces or tabs (no line break — `classDeclaration`
+    in GroovyParser.g4 has no `nls` between RECORD and the name);
+  - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
+    class); then
+  - zero or more spaces or tabs; then
+  - `(`.
+The token is `record` alone: `mark_end` is called after it and the
+look-ahead is not kept. On any other input return false; the
+in-grammar lexer then reads the word as `identifier`.
+```
+
+The grammar binds the token as `alias($._record_keyword, 'record')`,
+so the anonymous `record` node, `node-types.json`, and the query
+capture `"record" @keyword` are the same as with a literal.
+
+Known residuals, all already errors at v0.4.0 (where `record` was a
+keyword at every statement start regardless of what followed):
+
+- A command-style call whose argument is itself a call,
+  `record Point(1, 2)`, matches the pattern and parses as a record
+  header with an `ERROR` in its components.
+- A method with no modifier whose return type is spelled `record`
+  (`record foo() { … }`) reads as a record declaration.
+- A header split across lines (`record Point` then `(int x)` on the
+  next line), which Apache permits through `nls`, and a comment
+  between the keyword and the name, both fall back to `identifier`.
+- Record type parameters (`record Pair<A, B>(…)`) have no production.
 
 ---
 

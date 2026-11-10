@@ -7,12 +7,12 @@
  * SPECIFICATION.md at the repository root. Every rule below maps to
  * a section there. Read the spec before making non-trivial changes.
  *
- * The external scanner (src/scanner.c) handles four context-sensitive
+ * The external scanner (src/scanner.c) handles three context-sensitive
  * lexing situations that pure grammar rules cannot disambiguate:
  *   - Slashy-string-start vs. division
- *   - Automatic-semicolon (newline-as-terminator)
- *   - Labelled-statement colon
- *   - Block-comment / Groovydoc single-token emit
+ *   - Line / block / Groovydoc comment single-token emit
+ *   - The contextual `record` keyword, emitted only before a record
+ *     header so the word stays an identifier everywhere else
  * See SPECIFICATION.md §6.
  */
 
@@ -114,6 +114,7 @@ module.exports = grammar({
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
+    $._record_keyword,
   ],
 
   conflicts: $ => [
@@ -789,11 +790,18 @@ module.exports = grammar({
     )),
 
     // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
-    // `record` is a contextual keyword — tree-sitter's word: directive
-    // keeps `record` usable as a plain identifier elsewhere.
+    // §5.2 / §6.7 — `record` is a contextual keyword. The keyword
+    // comes from the external scanner, which emits it only when
+    // `record`, a space, a name and `(` follow on one line; in every
+    // other position the word lexes as `identifier`. A grammar literal
+    // cannot do this: keyword extraction yields the keyword wherever
+    // it has an action, which made `record.key()` at statement start,
+    // and `private Record record` once record_declaration became a
+    // class member, errors. The alias keeps the anonymous `record`
+    // node that the queries capture.
     record_declaration: $ => prec.right(seq(
       repeat($.annotation),
-      'record',
+      alias($._record_keyword, 'record'),
       field('name', $.identifier),
       field('components', $.record_components),
       optional(field('body', $.class_body)),
