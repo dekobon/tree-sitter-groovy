@@ -28,6 +28,9 @@ allow = [
   "CC0-1.0",
   "CDLA-Permissive-2.0",
 ]
+# The allow set is a policy, not a mirror of today's graph (which only
+# reaches Apache-2.0 and MIT), so unused entries are expected.
+unused-allowed-license = "allow"
 confidence-threshold = 0.93
 
 [bans]

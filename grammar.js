@@ -109,7 +109,7 @@ module.exports = grammar({
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
     //  always disambiguates within one token of lookahead.)
-    //
+
     // §5.15 — inside `( … )` an identifier could be either an
     // _expression (parenthesized_expression) or a _type
     // (parenthesized_type_cast). Tree-sitter explores both via
@@ -145,6 +145,25 @@ module.exports = grammar({
     // decides; the conflict keeps both alternatives alive until
     // then.
     [$.variable_declarator, $._property_name],
+
+    // §4 — `static NAME` inside a class body: after one or more
+    // modifiers and one identifier, that identifier could be the
+    // modifier-only field_declaration's variable_declarator name
+    // (`static MEDIUM_TTL = 900`) or the start of a typed
+    // field_declaration/method_declaration's `_type` (`static Foo
+    // bar`). The next token (`=`/`,`/`;` vs a second identifier)
+    // disambiguates.
+    [$.variable_declarator, $._type],
+
+    // §4 — `enum E { E(v, w) { } }`: after `E(` an identifier could be
+    // a constant's argument (`_expression`) or a constructor's untyped
+    // parameter (`formal_parameter`); the `{` after `)` decides. The
+    // conflict is global by necessity — it is between the two
+    // reductions, not their containers — and was checked inert
+    // outside an enum body: declaring it on the v0.3.0 grammar makes
+    // tree-sitter report it unnecessary. Regenerate without it to
+    // confirm that still holds.
+    [$.formal_parameter, $._expression],
   ],
 
   rules: {
@@ -390,9 +409,10 @@ module.exports = grammar({
 
     // §4 — `catch_formal_parameter` accepts either a single _type
     // or a multi_type for Java 7+ / Groovy multi-catch. Closes
-    // murtaza64 #39.
+    // murtaza64 #39. The type itself is optional — Groovy allows a
+    // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
-      field('type', choice($._type, $.multi_type)),
+      optional(field('type', choice($._type, $.multi_type))),
       field('name', $.identifier),
     ),
 
@@ -537,11 +557,17 @@ module.exports = grammar({
       '}',
     ),
 
+    // A nested enum (`static enum EventType { … }` inside a domain
+    // class) is common enough in real Groovy that leaving it out
+    // silently misparses `enum` as a field_declaration's type name.
+    // Nested class/interface/trait land separately (bigger surface,
+    // own conflict set) — out of scope here.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
+      $.enum_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have
@@ -573,12 +599,28 @@ module.exports = grammar({
     // more declarators (each with optional initializer). Method
     // declarations share the same prefix; `prec(2, …)` on
     // `method_declaration` and the trailing `(` discriminate.
-    field_declaration: $ => seq(
-      repeat($.annotation),
-      repeat($._modifier),
-      choice('def', field('type', $._type)),
-      $.variable_declarator,
-      repeat(seq(',', $.variable_declarator)),
+    //
+    // A modifier alone (no `def`, no type) also introduces a field —
+    // `static MEDIUM_TTL = 900` infers Object, a common constant-field
+    // idiom. Gated behind `repeat1($._modifier)` (not `repeat`) so this
+    // alternative can't match a bare, modifier-less identifier, which
+    // would collide with a plain expression_statement.
+    field_declaration: $ => choice(
+      // Prefer the typed field when both parses succeed, rather than
+      // splitting `private final int v\n C() {}` after `int`.
+      prec.dynamic(1, seq(
+        repeat($.annotation),
+        repeat($._modifier),
+        choice('def', field('type', $._type)),
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
+      )),
+      seq(
+        repeat($.annotation),
+        repeat1($._modifier),
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
+      ),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()
@@ -626,11 +668,14 @@ module.exports = grammar({
       ')',
     ),
 
-    // §5.13 — formal parameter with optional type, optional
-    // varargs marker (`Type... name`), and optional default value
+    // §5.13 — formal parameter with optional annotations (Spring's
+    // `@PathVariable`, `@RequestBody`, JPA's `@Param`, … — ubiquitous
+    // on framework-facing methods), optional type, optional varargs
+    // marker (`Type... name`), and optional default value
     // (`name = expr`).
-    // `final` is the one modifier a parameter takes, as in Java.
+    // `final` is the only modifier accepted here.
     formal_parameter: $ => seq(
+      repeat($.annotation),
       optional('final'),
       optional(field('type', choice($._type, $.varargs_type))),
       field('name', $.identifier),
@@ -639,13 +684,24 @@ module.exports = grammar({
 
     varargs_type: $ => seq($._type, '...'),
 
-    // §4 — enum. Closes murtaza64 #36 first half. Constants list
-    // (optionally trailing-comma) optionally followed by `;` and
-    // further class members. Constants may carry constructor
-    // arguments (`RED(0xff0000)`); v1 supports that via the
-    // optional argument_list.
+    // §4 — enum. Closes murtaza64 #36 first half. Constants may
+    // carry constructor arguments (`RED(0xff0000)`) via the optional
+    // argument_list.
+    //
+    // The body follows GroovyParser.g4 `classBody` for `t == 2`:
+    // after the constants either a trailing `,` closes the list, or
+    // members follow after `;`, `,;`, or nothing at all — Groovy's
+    // own parser treats the newline as the separator (GROOVY-7773,
+    // GROOVY-9306), and newlines are extras here, so the member
+    // simply follows the last constant. `A,` directly before a
+    // member is rejected, as in Groovy. With no constants the body
+    // is an ordinary member list. The member list is spelled three
+    // times rather than shared with `class_body` through a hidden
+    // rule: a new rule renumbers the aux symbols and ~100 symbol ids,
+    // which a patch release must not do.
     enum_declaration: $ => seq(
       repeat($.annotation),
+      repeat($._modifier),
       'enum',
       field('name', $.identifier),
       field('body', $.enum_body),
@@ -653,19 +709,37 @@ module.exports = grammar({
 
     enum_body: $ => seq(
       '{',
-      optional(seq(
-        $.enum_constant,
-        repeat(seq(',', $.enum_constant)),
-        optional(','),
-      )),
-      optional(seq(';', repeat(choice($._class_member, ';')))),
+      choice(
+        seq(
+          $.enum_constant,
+          repeat(seq(',', $.enum_constant)),
+          optional(choice(
+            ',',
+            seq(optional(','), ';', repeat(choice($._class_member, ';'))),
+            seq($._class_member, repeat(choice($._class_member, ';'))),
+          )),
+        ),
+        repeat(choice($._class_member, ';')),
+      ),
       '}',
     ),
 
-    enum_constant: $ => seq(
+    // §4 — `prec(1)` makes a bare identifier at the start of the body
+    // a constant rather than the type of the first member: `A\n E() { }`
+    // is a constant followed by a constructor, not a method `E`
+    // returning `A`. The mirror case with no constants, `int f() { }`
+    // as the first thing in the body, therefore reads as constant `int`
+    // plus constructor `f` — a newline is whitespace here and nothing
+    // else tells the two apart; a modifier, `def`, or a leading `;`
+    // makes it a member. Static precedence rather than `prec.dynamic`
+    // with an `[enum_constant, _type]` conflict: both yield the same
+    // tree on every valid shape, but the GLR form silently accepts
+    // `A\n B` (constants missing their comma, which Groovy rejects) as
+    // a field `A B`, where this form reports the ERROR.
+    enum_constant: $ => prec(1, seq(
       field('name', $.identifier),
       optional(field('arguments', $.argument_list)),
-    ),
+    )),
 
     // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
     // `record` is a contextual keyword — tree-sitter's word: directive
@@ -781,16 +855,18 @@ module.exports = grammar({
       optional(field('arguments', $.argument_list)),
     ),
 
-    // §4 — `for (x in xs)`. Untyped variable for v1. Typed
-    // (`for (Type x in xs)`) lands later. The `in` keyword here
-    // is a structural delimiter, not the membership_expression
-    // operator — context disambiguates because the for-header is
-    // not an expression position.
+    // §4 — `for (x in xs)`, plus the Java-compatible enhanced-for
+    // form Groovy accepts side by side: `for (Type x : xs)` / `for
+    // (def x : xs)`. The `in` / `:` keyword here is a structural
+    // delimiter, not the membership_expression operator or a
+    // labelled_statement colon — context disambiguates because the
+    // for-header is not an expression position.
     for_in_statement: $ => seq(
       'for',
       '(',
+      optional(choice('def', field('type', $._type))),
       field('variable', $.identifier),
-      'in',
+      choice('in', ':'),
       field('value', $._expression),
       ')',
       field('body', choice($.block, $._statement)),
@@ -974,9 +1050,21 @@ module.exports = grammar({
     // (`new Foo().bar`).
     object_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
       'new',
-      field('type', $._type),
+      field('type', choice($._type, alias($._diamond_type, $.generic_type))),
       field('arguments', $.argument_list),
     )),
+
+    // §3.2 — Apache's createdName permits diamond, but ordinary types
+    // (including nested type arguments) do not. Keep the public shape.
+    _diamond_type: $ => prec.right(PREC.ARRAY_TYPE, seq(
+      field('base', choice(
+        alias($.identifier, $.type_identifier),
+        $.qualified_type,
+      )),
+      field('arguments', alias($._diamond_type_arguments, $.type_arguments)),
+    )),
+
+    _diamond_type_arguments: _ => seq(token.immediate('<'), '>'),
 
     // §5.15 — C-style cast `(Foo) x`. Distinct from
     // `parenthesized_expression` followed by something (resolved
@@ -1137,10 +1225,35 @@ module.exports = grammar({
     // expression so subscript / future field_access / future
     // safe_navigation chains compose naturally. PREC.POSTFIX
     // matches subscript so chains like `obj[i](x)[j]` work.
-    method_invocation: $ => prec.left(PREC.POSTFIX, seq(
-      field('function', $._expression),
-      field('arguments', $.argument_list),
-    )),
+    //
+    // Trailing closure (§5.5's command_chain covers the bare-
+    // identifier statement form; this covers the general expression
+    // form used constantly on property-access chains: `list.find {
+    // it > 5 }`, `list.inject(0) { acc, x -> acc + x }`). Groovy
+    // treats a closure literal as the call's last argument whether
+    // or not parens are present, so `argument_list` becomes optional
+    // once a trailing closure is there to anchor the call.
+    //
+    // The args-and-closure alternative sits one precedence level
+    // above plain POSTFIX so `f(x) { … }` reduces to a single
+    // method_invocation node (arguments AND closure fields on the
+    // same node) instead of GLR instead reaching the same span by
+    // nesting a closure-only method_invocation around a plain call.
+    method_invocation: $ => choice(
+      prec.left(PREC.POSTFIX + 1, seq(
+        field('function', $._expression),
+        field('arguments', $.argument_list),
+        field('closure', $.closure),
+      )),
+      prec.left(PREC.POSTFIX, seq(
+        field('function', $._expression),
+        field('arguments', $.argument_list),
+      )),
+      prec.left(PREC.POSTFIX, seq(
+        field('function', $._expression),
+        field('closure', $.closure),
+      )),
+    ),
 
     // §3.2 / §5.11 — argument list. Positional args are `_expression`;
     // named args (Groovy's `k: v` in call position) are `map_entry`

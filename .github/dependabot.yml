@@ -36,26 +36,20 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      # Hold at major 9 until eslint-config-treesitter supports 10.
-      # Verified against eslint 10.9.1 / eslint-config-treesitter 1.0.2:
-      #   - Hard failure: the config imports `globals` without
-      #     declaring it, relying on it being an eslint 9 transitive.
-      #     eslint 10 no longer supplies it, so config loading dies
-      #     with ERR_MODULE_NOT_FOUND before linting a single file.
-      #   - Metadata failure: eslint-plugin-jsdoc@^50.x declares
-      #     eslint 7-9, so eslint 10 leaves an invalid peer in the
-      #     tree. `npm ci` still installs (npm nests and warns) but
-      #     `npm ls` exits non-zero on ELSPROBLEMS.
-      # Rule behavior itself is NOT a blocker — with `globals` present
-      # eslint 10 reports byte-identical results to 9.39.5 on this
-      # config, deprecated stylistic rules included. So the upgrade
-      # buys no lint coverage; it only trades a supported peer graph
-      # for an unsupported one. Lift this once the upstream config
-      # declares `globals` and moves off eslint-plugin-jsdoc 50.
-      - dependency-name: eslint
-        update-types:
-          - version-update:semver-major
+    # eslint 10 runs with two package.json workarounds for
+    # eslint-config-treesitter 1.0.2, which has had no release since
+    # 2024-09 (upstream master still has the first defect):
+    #   - `globals` is a direct devDependency. The config imports it
+    #     without declaring it; eslint 9 supplied it transitively,
+    #     eslint 10 does not, so config loading dies with
+    #     ERR_MODULE_NOT_FOUND.
+    #   - `overrides` moves the config's eslint-plugin-jsdoc from ^50
+    #     to ^62. 50.x does not accept eslint 10 as a peer, so `npm ls`
+    #     exits non-zero on ELSPROBLEMS. 62.x is the newest major that
+    #     still supports Node 20, which the CI lint job runs (#62);
+    #     63+ require Node 22. Update the override by hand.
+    # Drop both once eslint-config-treesitter publishes a release that
+    # declares `globals` and an eslint-10-compatible jsdoc plugin.
 
   - package-ecosystem: cargo
     directory: /
