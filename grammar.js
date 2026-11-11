@@ -99,7 +99,12 @@ module.exports = grammar({
   ],
 
   // Externals listed here must have a matching branch in
-  // `src/scanner.c` AND be referenced by at least one rule below.
+  // `src/scanner.c` AND be referenced by at least one rule below
+  // (`_command_named_key` included). The one exception is
+  // `_error_sentinel`: no rule references it, and it exists so the
+  // scanner can detect error recovery, when tree-sitter marks every
+  // external valid. It is kept last here and in the scanner's
+  // `TokenType` enum, and the two orders must match.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -115,6 +120,13 @@ module.exports = grammar({
     $.block_comment,
     $.groovydoc_comment,
     $._record_keyword,
+    // §5.5 — `name:` key of a named argument in a parenthesis-free call.
+    // Scanner-side so the newline before a Spock label (`result` then
+    // `where:`) is not swallowed, and so `Type name =` stays a declaration.
+    $._command_named_key,
+    // Never referenced by a rule: valid only during error recovery, when
+    // the scanner must not emit context-sensitive tokens.
+    $._error_sentinel,
   ],
 
   conflicts: $ => [
@@ -232,17 +244,45 @@ module.exports = grammar({
     // §5.5 — command_chain is the parenthesis-free method-call
     // form (`println 'hello'`, `events 'a', 'b', 'c'`). v1 is
     // intentionally conservative: receiver is a bare identifier
-    // and arguments are restricted to literal-shaped expressions
-    // and closures (no risk of mis-parsing `foo bar` as a command
-    // call on a bare identifier). Multi-argument lists are supported
-    // (comma-separated literal arguments per Gradle / Jenkins DSL
-    // idioms). Chained `foo bar baz` and complex argument shapes
-    // land later. Closes a subset of murtaza64 #5.
+    // and the first argument is restricted to literal-shaped
+    // expressions, closures and named arguments (no risk of
+    // mis-parsing `foo bar` as a command call on a bare identifier).
+    // After a comma an argument is a named argument or any
+    // expression: Apache's `argumentListElement` without spread
+    // arguments (`foo 'a', *args` is an ERROR). Chained
+    // `foo bar baz` lands later. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', $._command_argument),
-      repeat(seq(',', field('argument', $._command_argument))),
+      field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
+      repeat(seq(',', field('argument', choice(
+        alias($._command_named_argument, $.named_argument),
+        alias($._command_continued_named_argument, $.named_argument),
+        $._expression,
+      )))),
     )),
+
+    // §5.5 item 3 — named arguments in a parenthesis-free call:
+    // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+    // GORM's `name blank: false, size: 1..100`. The key is an identifier
+    // lexed by the external scanner only when `:` follows on the same
+    // line, so `Type name = …` and a bare statement followed by a Spock
+    // label on the next line are unaffected.
+    _command_named_argument: $ => seq(
+      field('key', alias($._command_named_key, $.identifier)),
+      ':',
+      field('value', $._expression),
+    ),
+
+    // After a comma a newline cannot end the statement, so a key on a
+    // continuation line (`sh script: 'make',` then `returnStdout: true`)
+    // needs no scanner token. Same-line keys normally come from the
+    // scanner; `case` and `default`, which the scanner rejects, reach
+    // this rule on the same line too (`foo 'a', default: 1`).
+    _command_continued_named_argument: $ => seq(
+      field('key', $.identifier),
+      ':',
+      field('value', $._expression),
+    ),
 
     _command_argument: $ => choice(
       $.string_literal,
@@ -258,8 +298,9 @@ module.exports = grammar({
     // labeled_statement and expression_statement alive after
     // `identifier`; the `:` decides. A scanner-token form
     // (`_label_colon`) was attempted but interacted with
-    // not-yet-implemented named-argument command chains
-    // (`archiveArtifacts artifacts: 'x'`); see divergence #5.
+    // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
+    // which now lex their key through `_command_named_key` instead;
+    // see divergence #5.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',

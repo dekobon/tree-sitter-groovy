@@ -5,7 +5,10 @@
 // start with `/`; combining their dispatch keeps the in-grammar lexer
 // from partially consuming the leading `/`. The third is a look-ahead
 // decision the grammar cannot express: `record` is a keyword only
-// when a record header follows it.
+// when a record header follows it. Also handles §6.8
+// COMMAND_NAMED_KEY, the key of a named argument in a
+// parenthesis-free call. ERROR_SENTINEL is never emitted; the parser
+// marks it valid only during error recovery.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -13,13 +16,71 @@
 
 #include "tree_sitter/parser.h"
 
+#include <string.h>
+
 enum TokenType {
     SLASHY_STRING_START,
     LINE_COMMENT,
     BLOCK_COMMENT,
     GROOVYDOC_COMMENT,
     RECORD_KEYWORD,
+    COMMAND_NAMED_KEY,
+    ERROR_SENTINEL,
 };
+
+static inline bool is_ident_start(int32_t c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+        || c == '$';
+}
+
+static inline bool is_ident_part(int32_t c) {
+    return is_ident_start(c) || (c >= '0' && c <= '9');
+}
+
+// SPECIFICATION.md §5.5 — the key of a named argument in a
+// parenthesis-free call (`exclude group: 'a'`). Matches an identifier
+// on the current line that is followed by `:` (not `::`), consuming
+// only the identifier. A newline before the key means a new statement
+// (a Spock `where:` label, say), so no match.
+static bool scan_command_named_key(TSLexer *lexer) {
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, true);
+    }
+    if (!is_ident_start(lexer->lookahead)) {
+        return false;
+    }
+    // Keep the first few chars to reject `case:` / `default:`, which
+    // are switch labels, not keys. Apache's `namedArgLabel` accepts both
+    // keywords, so `foo default: 1` diverges on purpose: the one-liner
+    // `switch (x) { case 1: foo default: bar }` in statements-switch.txt
+    // depends on the rejection.
+    char word[8];
+    unsigned len = 0;
+    while (is_ident_part(lexer->lookahead)) {
+        if (len < sizeof(word)) {
+            word[len] = (char)lexer->lookahead;
+        }
+        len++;
+        lexer->advance(lexer, false);
+    }
+    if ((len == 4 && memcmp(word, "case", 4) == 0)
+        || (len == 7 && memcmp(word, "default", 7) == 0)) {
+        return false;
+    }
+    lexer->mark_end(lexer);
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+        lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead != ':') {
+        return false;
+    }
+    lexer->advance(lexer, false);
+    if (lexer->lookahead == ':') {
+        return false;
+    }
+    lexer->result_symbol = COMMAND_NAMED_KEY;
+    return true;
+}
 
 static inline void advance(TSLexer *lexer) {
     lexer->advance(lexer, false);
@@ -168,6 +229,20 @@ bool tree_sitter_groovy_external_scanner_scan(
     const bool *valid_symbols
 ) {
     (void)payload;
+
+    if (valid_symbols[COMMAND_NAMED_KEY] && !valid_symbols[ERROR_SENTINEL]) {
+        while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+            lexer->advance(lexer, true);
+        }
+        // An identifier is either the key or, once consumed, not something
+        // the code below could start (a comment or slashy string), so stop
+        // here. Falling through after the scan advanced past `b` in
+        // `foo a, b` and a newline made the comment branch emit `b` as a
+        // line_comment, since mark_end had already been called.
+        if (is_ident_start(lexer->lookahead)) {
+            return scan_command_named_key(lexer);
+        }
+    }
 
     // SPECIFICATION.md §6.6 — line / block / groovydoc comments
     // and §6.2 slashy strings. Both start with `/`; combining their

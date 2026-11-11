@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the tree shape there. A method declared with modifiers only outside a
   class body (`final f() { }`, `static f() { }`) now has `f` as its `name`
   instead of as its `return_type`. (#56)
+- Parenthesis-free calls now accept named arguments, as §5.5 specifies:
+  `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+  GORM's `name blank: false, size: 1..100`. After the first argument,
+  an argument may be any expression
+  (`systemProperty 'k', System.getProperty('k')`, `assertEquals 'v', a + b`),
+  and a named argument may start on the line after a comma. A same-line
+  key is lexed by a new external scanner token, `_command_named_key`,
+  which only matches when `:` follows on the same line, so `Type name = …`
+  declarations and a bare statement followed by a Spock label on the next
+  line parse as before. `archiveArtifacts artifacts: 'x'` previously
+  parsed as an expression statement followed by a labeled statement.
+  String keys (`foo 'a': 1`) are not accepted yet. Because an argument
+  after a comma is a full expression, it now continues onto the next line
+  when that line starts with something that can continue an expression:
+  `foo 1, 2` followed by `[a].each { }` parses as `2[a].each { }`
+  (see §6.8). (#57)
 - `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
   `final x` parameter no longer reports `final` as its `type`. (#64)
 - Trait declarations accept an `implements` clause (`trait T implements A, B`). (#65)
