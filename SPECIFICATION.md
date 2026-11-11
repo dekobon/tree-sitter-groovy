@@ -825,8 +825,11 @@ The external scanner is the C file `src/scanner.c`. It exists to
 handle the context-sensitive lexing situations that pure tree-sitter
 grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
-slashy opener, the three comment tokens, and the contextual `record`
-keyword (§6.7); the other tokens listed here are met in-grammar, see
+slashy opener, the three comment tokens, the contextual `record`
+keyword (§6.7), the named-argument key of a parenthesis-free call
+(§6.8), the same-line subscript opener (§6.9), and `ERROR_SENTINEL`,
+which no rule references and which only signals error recovery; the
+other tokens listed here are met in-grammar, see
 `docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
