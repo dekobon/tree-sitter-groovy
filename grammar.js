@@ -7,12 +7,12 @@
  * SPECIFICATION.md at the repository root. Every rule below maps to
  * a section there. Read the spec before making non-trivial changes.
  *
- * The external scanner (src/scanner.c) handles four context-sensitive
+ * The external scanner (src/scanner.c) handles three context-sensitive
  * lexing situations that pure grammar rules cannot disambiguate:
  *   - Slashy-string-start vs. division
- *   - Automatic-semicolon (newline-as-terminator)
- *   - Labelled-statement colon
- *   - Block-comment / Groovydoc single-token emit
+ *   - Line / block / Groovydoc comment single-token emit
+ *   - The contextual `record` keyword, emitted only before a record
+ *     header so the word stays an identifier everywhere else
  * See SPECIFICATION.md §6.
  */
 
@@ -79,6 +79,18 @@ module.exports = grammar({
   // is the contract this rule set will fulfil.
   word: $ => $.identifier,
 
+  // §5.2 — `new` is a hard keyword. Keyword extraction alone still
+  // lexes it as `identifier` wherever the keyword has no action,
+  // which let `def f = (Foo) new T()` after another member split
+  // into a field `= (Foo)` and a method `T()` returning `new`. The
+  // empty `property` set keeps `foo.new` (Apache `namePart`) valid;
+  // `_property_name` also names methods, so `new` is not reserved
+  // where a method name may follow (`def new`, `int new`).
+  reserved: {
+    global: _ => ['new'],
+    property: _ => [],
+  },
+
   extras: $ => [
     /\s/,
     $.line_comment,
@@ -102,6 +114,7 @@ module.exports = grammar({
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
+    $._record_keyword,
   ],
 
   conflicts: $ => [
@@ -251,9 +264,9 @@ module.exports = grammar({
       field('statement', $._statement),
     )),
 
-    // §4 — block of statements, used in control-flow bodies and
-    // (eventually) method bodies. Shares `{ ... }` syntax with
-    // closure (§5.8). A `prec(1, …)` keeps block preferred at use
+    // §4 — block of statements: control-flow, method and constructor
+    // bodies, static / instance initializers. Shares `{ ... }` syntax
+    // with closure (§5.8). A `prec(1, …)` keeps block preferred at use
     // sites where both `block` and a closure-bearing `_statement`
     // are valid alternatives (e.g. the body slot of `if` / `while`).
     block: $ => prec(1, seq(
@@ -545,29 +558,56 @@ module.exports = grammar({
       field('body', $.class_body),
     ),
 
-    // §4 — `{ method* }` for v1. Field declarations, static
-    // initialisers, and inner classes land later.
+    // §4 — member list shared by class / interface / trait / record /
+    // `@interface` bodies and the anonymous inner class body of
+    // `object_creation_expression`.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
     // a no-op member. `;` is anonymous, so it never appears in the AST.
+    //
+    // A bare `block` is an instance initializer. It sits in the member
+    // repeat — here and in the three identical repeats of `enum_body` —
+    // rather than in `_class_member`, because `enum_body` also places
+    // a lone `_class_member` directly after its constants. A block in
+    // that slot is an LR conflict on `A() {` (constructor, or constant
+    // plus initializer) and, once that is resolved, silently accepts
+    // `A { }` (a constant with an anonymous class body, unsupported)
+    // as constant-plus-initializer.
     class_body: $ => seq(
       '{',
-      repeat(choice($._class_member, ';')),
+      repeat(choice($._class_member, $.block, ';')),
       '}',
     ),
 
-    // A nested enum (`static enum EventType { … }` inside a domain
-    // class) is common enough in real Groovy that leaving it out
-    // silently misparses `enum` as a field_declaration's type name.
-    // Nested class/interface/trait land separately (bigger surface,
-    // own conflict set) — out of scope here.
+    // Nested type declarations are members, as in Apache's
+    // `memberDeclaration`. Each kind must be listed: a declaration
+    // keyword with no action at member start lexes as an identifier,
+    // so `class Inner { … }` would silently parse as a field `Inner`
+    // of type `class` followed by an instance initializer block, and
+    // a nested `record R(int x) { }` as a method `R` returning
+    // `record`. The record keyword comes from the scanner (§6.7), so
+    // listing it here does not reserve `record` as a member name.
+    //
+    // The price: `trait` and `sealed` are keywords wherever a member
+    // can start, as they already are where a statement can. A member
+    // cannot open with one of them as a plain identifier, with or
+    // without modifiers (`static trait = 1`, `sealed() { }`), nor use
+    // one as the name after `modifier(s) Type`, because `private Foo`
+    // is already a complete field (`private boolean sealed` is an
+    // ERROR; `boolean sealed` is not). See divergence 12. No
+    // `conflicts` entry is needed.
     _class_member: $ => choice(
       $.method_declaration,
       $.field_declaration,
       $.constructor_declaration,
       $.static_initializer,
       $.enum_declaration,
+      $.class_declaration,
+      $.interface_declaration,
+      $.trait_declaration,
+      $.record_declaration,
+      $.annotation_type_declaration,
     ),
 
     // §4 — constructors share the method_declaration shape but have
@@ -693,10 +733,22 @@ module.exports = grammar({
     // GROOVY-9306), and newlines are extras here, so the member
     // simply follows the last constant. `A,` directly before a
     // member is rejected, as in Groovy. With no constants the body
-    // is an ordinary member list. The member list is spelled three
-    // times rather than shared with `class_body` through a hidden
-    // rule: a new rule renumbers the aux symbols and ~100 symbol ids,
-    // which a patch release must not do.
+    // is an ordinary member list.
+    //
+    // An instance initializer (`block`) is accepted wherever the
+    // member list repeats — after `;`, after a first member, or with
+    // no constants — but not directly after a constant. Newlines are
+    // extras, so `A\n{ … }` (in the .g4 a constant, then an
+    // initializer) cannot be told from `A { … }` (a constant with an
+    // anonymous class body, unsupported); both stay errors.
+    //
+    // The three member repeats are spelled out, and must stay
+    // identical to the one in `class_body`, so that the generator
+    // folds all four into one aux symbol (`aux_sym_class_body_repeat1`).
+    // A differing copy, or a hidden rule that is not inlined, adds a
+    // symbol and renumbers every id after it — the alias kinds
+    // `named_argument`, `quoted_identifier` and `type_identifier`
+    // included — which a patch release must not do.
     enum_declaration: $ => seq(
       repeat($.annotation),
       repeat($._modifier),
@@ -713,11 +765,11 @@ module.exports = grammar({
           repeat(seq(',', $.enum_constant)),
           optional(choice(
             ',',
-            seq(optional(','), ';', repeat(choice($._class_member, ';'))),
-            seq($._class_member, repeat(choice($._class_member, ';'))),
+            seq(optional(','), ';', repeat(choice($._class_member, $.block, ';'))),
+            seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
           )),
         ),
-        repeat(choice($._class_member, ';')),
+        repeat(choice($._class_member, $.block, ';')),
       ),
       '}',
     ),
@@ -733,22 +785,51 @@ module.exports = grammar({
     // with an `[enum_constant, _type]` conflict: both yield the same
     // tree on every valid shape, but the GLR form silently accepts
     // `A\n B` (constants missing their comma, which Groovy rejects) as
-    // a field `A B`, where this form reports the ERROR.
+    // a field `A B`, where this form reports the ERROR. Annotations
+    // share the prefix with an annotated member; the same precedence
+    // decides after them, so `@Foo A\n int x` is a constant and a
+    // field.
     enum_constant: $ => prec(1, seq(
+      repeat($.annotation),
       field('name', $.identifier),
       optional(field('arguments', $.argument_list)),
     )),
 
-    // §4 — record (Groovy 4+). `record Name(Type a, Type b) [{ body }]`.
-    // `record` is a contextual keyword — tree-sitter's word: directive
-    // keeps `record` usable as a plain identifier elsewhere.
-    record_declaration: $ => prec.right(seq(
+    // §4 — record (Groovy 4+), after Apache's `classDeclaration`:
+    // `[modifiers] record Name[<T>](Type a, Type b) [implements I] [{ body }]`.
+    // Records cannot `extends`, and the body is optional here where
+    // Groovy requires it.
+    // §5.2 / §6.7 — `record` is a contextual keyword. The keyword
+    // comes from the external scanner, which emits it only when a
+    // name follows on the same line and `(` or `<` after that; in
+    // every other position the word lexes as `identifier`. A grammar literal
+    // cannot do this: keyword extraction yields the keyword wherever
+    // it has an action, which made `record.key()` at statement start,
+    // and `private Record record` once record_declaration became a
+    // class member, errors. The alias keeps the anonymous `record`
+    // node that the queries capture.
+    //
+    // The dynamic precedence settles a GLR tie the scanner creates.
+    // After `private Record`, the `[variable_declarator, _type]`
+    // conflict forks on the next word: `record` is the field's name
+    // in one branch and a type in the other. When a record header
+    // follows on the next line, the first branch lexes its `record`
+    // as the keyword and the second as that field's name, and both
+    // survive (`private Record` / `record record` / constructor
+    // `Inner(int x) { }` is a valid member list). Without a weight,
+    // which tree wins depends on tree shape, and a comment between
+    // the two lines flipped it. Favouring the record declaration is
+    // right whenever both parse.
+    record_declaration: $ => prec.dynamic(1, prec.right(seq(
       repeat($.annotation),
-      'record',
+      repeat($._modifier),
+      alias($._record_keyword, 'record'),
       field('name', $.identifier),
+      optional(field('type_parameters', $.type_parameters)),
       field('components', $.record_components),
+      optional($.super_interfaces),
       optional(field('body', $.class_body)),
-    )),
+    ))),
 
     record_components: $ => seq(
       '(',
@@ -1041,15 +1122,34 @@ module.exports = grammar({
       ))));
     },
 
-    // §3.2 / §5.15 — `new Foo(args)`. We only handle the plain
-    // constructor-call form here; array creation `new Foo[10]`,
-    // generic types, and array initialisers land later. PREC.PRIMARY
-    // so it composes with the access tier from the left
-    // (`new Foo().bar`).
+    // §3.2 — `new Foo(args)` and the anonymous inner class
+    // `new Foo(args) { members }`. Array creation `new Foo[10]` and
+    // array initialisers land later. PREC.PRIMARY only labels the
+    // §3.1 tier. The number decides nothing: the rule's one conflict
+    // (below) is against itself, where it cancels out, and
+    // `new Foo().bar` composes without any precedence.
+    //
+    // The optional body takes every `{` that follows the arguments.
+    // Right associativity does that statically — the shift into
+    // `class_body` beats reducing the bodiless form — so no conflict
+    // is declared and the closure reading never forks.
+    //
+    // Apache is narrower. Its `creator` has no `nls` before the body,
+    // so `new T()\n{ … }` is a closure called on the new object
+    // (observed on Groovy 4.0.33). By the same grammar a same-line
+    // `{` whose content cannot be class members should be one too
+    // (`new T() { x -> x }`; not run through the compiler). Here both
+    // are read as a body, usually with an ERROR in it (divergence 11).
+    // Parsing them needs a declared conflict on this rule with
+    // `prec.dynamic` on the body, and that form was not taken: a body
+    // holding one member `class_body` cannot parse, or one still
+    // being typed, would then fall back silently to the closure tree
+    // that #68 reported.
     object_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
       'new',
       field('type', choice($._type, alias($._diamond_type, $.generic_type))),
       field('arguments', $.argument_list),
+      optional(field('body', $.class_body)),
     )),
 
     // §3.2 — Apache's createdName permits diamond, but ordinary types
@@ -1190,7 +1290,7 @@ module.exports = grammar({
     // keywords, or special chars. `map."key with spaces"` and
     // `def "abstract"() { … }` both rely on this.
     _property_name: $ => choice(
-      $.identifier,
+      reserved('property', $.identifier),
       alias($.string_literal, $.quoted_identifier),
     ),
 

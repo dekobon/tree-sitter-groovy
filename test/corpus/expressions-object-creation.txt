@@ -108,3 +108,545 @@ print(new Foo())
         (object_creation_expression
           type: (type_identifier)
           arguments: (argument_list))))))
+
+==================
+Anonymous inner class as a field initialiser (#68)
+==================
+
+class X {
+    public Runnable r = new Runnable() {
+        public int x
+        void run() {}
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (object_creation_expression
+            type: (type_identifier)
+            arguments: (argument_list)
+            body: (class_body
+              (field_declaration
+                type: (type_identifier)
+                (variable_declarator
+                  name: (identifier)))
+              (method_declaration
+                return_type: (type_identifier)
+                name: (identifier)
+                parameters: (formal_parameters)
+                body: (block)))))))))
+
+==================
+Anonymous inner class with an empty body
+==================
+
+new Foo() { }
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body))))
+
+==================
+Anonymous inner class on a generic type
+==================
+
+def c = new Comparator<String>() {
+    int compare(String a, String b) { 0 }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        arguments: (argument_list)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters
+              (formal_parameter
+                type: (type_identifier)
+                name: (identifier))
+              (formal_parameter
+                type: (type_identifier)
+                name: (identifier)))
+            body: (block
+              (expression_statement
+                (number_literal)))))))))
+
+==================
+Anonymous inner class on a qualified type with constructor arguments
+==================
+
+new a.b.Base(1, name) {
+    @Override
+    String toString() { "base" }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (argument_list
+        (number_literal)
+        (identifier))
+      body: (class_body
+        (method_declaration
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          return_type: (type_identifier)
+          name: (identifier)
+          parameters: (formal_parameters)
+          body: (block
+            (expression_statement
+              (string_literal
+                (string_fragment)))))))))
+
+==================
+Anonymous inner class as a call argument
+==================
+
+executor.submit(new Runnable() {
+    void run() { work() }
+})
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters)
+              body: (block
+                (expression_statement
+                  (method_invocation
+                    function: (identifier)
+                    arguments: (argument_list)))))))))))
+
+==================
+Member access on an anonymous inner class
+==================
+
+new Runnable() { void run() { } }.run()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters)
+              body: (block))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+Returning an anonymous inner class
+==================
+
+def make() {
+    return new Runnable() {
+        void run() { }
+    }
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters)
+              body: (block))))))))
+
+==================
+Anonymous inner class with an instance initializer (double-brace)
+==================
+
+def m = new HashMap() {{ put(1, 2) }}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (block
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list
+                  (number_literal)
+                  (number_literal))))))))))
+
+==================
+Anonymous inner class nested in an anonymous inner class
+==================
+
+new Outer() {
+    Inner make() {
+        new Inner() {
+            int depth = 2
+        }
+    }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body
+        (method_declaration
+          return_type: (type_identifier)
+          name: (identifier)
+          parameters: (formal_parameters)
+          body: (block
+            (expression_statement
+              (object_creation_expression
+                type: (type_identifier)
+                arguments: (argument_list)
+                body: (class_body
+                  (field_declaration
+                    type: (type_identifier)
+                    (variable_declarator
+                      name: (identifier)
+                      value: (number_literal))))))))))))
+
+==================
+Anonymous inner class body with comments and brace characters in a string
+==================
+
+new Foo() /* why */ {
+    // a member
+    String s = "}{"
+    /** doc */
+    void f() { }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      (block_comment)
+      body: (class_body
+        (line_comment)
+        (field_declaration
+          type: (type_identifier)
+          (variable_declarator
+            name: (identifier)
+            value: (string_literal
+              (string_fragment))))
+        (groovydoc_comment)
+        (method_declaration
+          return_type: (type_identifier)
+          name: (identifier)
+          parameters: (formal_parameters)
+          body: (block))))))
+
+==================
+Anonymous inner class inside a GString interpolation
+==================
+
+"${new Object() { String toString() { 'x' } }}"
+
+---
+
+(source_file
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters)
+              body: (block
+                (expression_statement
+                  (string_literal))))))))))
+
+==================
+Trailing closure after a call is not an anonymous class body
+==================
+
+foo() { }
+new Foo().bar { }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Trailing closure after an anonymous inner class body
+==================
+
+def x = new Foo() { } { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body))
+        closure: (closure)))))
+
+==================
+Anonymous inner class body on the next line inside parentheses
+==================
+
+button.addActionListener(new ActionListener()
+{
+    void actionPerformed(ActionEvent e) { run() }
+})
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)
+          body: (class_body
+            (method_declaration
+              return_type: (type_identifier)
+              name: (identifier)
+              parameters: (formal_parameters
+                (formal_parameter
+                  type: (type_identifier)
+                  name: (identifier)))
+              body: (block
+                (expression_statement
+                  (method_invocation
+                    function: (identifier)
+                    arguments: (argument_list)))))))))))
+
+==================
+Trailing closure on the line after new is unsupported
+:error
+==================
+
+def list = new ArrayList()
+{ list.add(1) }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (ERROR
+            (qualified_type
+              (type_identifier)
+              (type_identifier))
+            (number_literal)))))))
+
+==================
+Cast of an object creation in a field initialiser after another member
+==================
+
+class C {
+    int a
+    def f = (Foo) new T()
+    def g = (Foo) new T(a, b)
+    private final Handler h = (Handler) new DefaultHandler() { void m() { } }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list
+                (identifier)
+                (identifier))))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)
+              body: (class_body
+                (method_declaration
+                  return_type: (type_identifier)
+                  name: (identifier)
+                  parameters: (formal_parameters)
+                  body: (block))))))))))
+
+==================
+Cast of an object creation in an anonymous inner class body
+==================
+
+def o = new O() {
+    def a = 1
+    def f = (Foo) new T()
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (field_declaration
+            (variable_declarator
+              name: (identifier)
+              value: (number_literal)))
+          (field_declaration
+            (variable_declarator
+              name: (identifier)
+              value: (parenthesized_type_cast
+                type: (type_identifier)
+                value: (object_creation_expression
+                  type: (type_identifier)
+                  arguments: (argument_list))))))))))
+
+==================
+Property, safe-navigation and method-pointer names spelled new
+==================
+
+foo.new
+foo?.new
+foo.&new
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (identifier)))
+  (expression_statement
+    (method_pointer_expression
+      object: (identifier)
+      method: (identifier))))
+
+==================
+The keyword new is not a parameter name
+:error
+==================
+
+def f(new) { }
+
+---
