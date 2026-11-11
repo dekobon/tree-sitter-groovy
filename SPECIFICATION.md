@@ -393,7 +393,7 @@ fix relative to *both* parent grammars.
 | Method definition (with body) | port from murtaza64 | |
 | Multi-assignment | **new** | `def (a, b) = expr` and `(a, b) = expr`. Closes murtaza64 #22. |
 | Local variable declaration | port from both | including `def` and explicit types |
-| Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`. |
+| Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
 | `while` / `do-while` | port | |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`) or a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
@@ -683,7 +683,12 @@ Escape rules:
 ### 5.8 Closure parameters and the `it` shorthand
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
-binds `it`. The grammar rule:
+binds `it`. A parameter has the shape of a method parameter, as in
+Apache's grammar (`formalParameterList`): annotations, `final`, `def`
+or a type (varargs included), the name, and a default
+(`{ String sep = ',', def xs -> … }`). Until the `->`, the parameter
+list and a body that opens with a declaration or an assignment
+(`{ a = 1 }`) parse side by side. The grammar rule:
 
 ```js
 closure: $ => seq('{',

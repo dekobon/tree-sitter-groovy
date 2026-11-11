@@ -177,6 +177,13 @@ module.exports = grammar({
     // tree-sitter report it unnecessary. Regenerate without it to
     // confirm that still holds.
     [$.formal_parameter, $._expression],
+    // `{ final x -> }` vs. a closure body opening with a modified
+    // declaration; the `->` decides.
+    [$._modifier, $.closure_parameter],
+    // `{ a = 1 -> }` (a default) vs. `{ a = 1 }` (an assignment).
+    [$._expression, $.closure_parameter],
+    [$._initialized_declarator, $.closure_parameter],
+    [$.variable_declarator, $.closure_parameter],
   ],
 
   rules: {
@@ -1586,7 +1593,11 @@ module.exports = grammar({
     // form; `{ a, b -> body }` has identifier parameters;
     // `{ String a, int b -> body }` has typed parameters; `{ body }`
     // has no `->` and an implicit `it` parameter (we do NOT emit a
-    // synthetic `it` per §5.8). Default values and varargs land later.
+    // synthetic `it` per §5.8). A parameter takes what a method
+    // parameter does (Apache's closure uses `formalParameterList`):
+    // annotations, `final`, `def` or a type (varargs included), and a
+    // default. The body may open with the same words, so the `->`
+    // decides between the two readings.
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
@@ -1603,8 +1614,11 @@ module.exports = grammar({
     ),
 
     closure_parameter: $ => seq(
-      optional(field('type', $._type)),
+      repeat($.annotation),
+      optional('final'),
+      optional(choice('def', field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
+      optional(seq('=', field('default', $._expression))),
     ),
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.

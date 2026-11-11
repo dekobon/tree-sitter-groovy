@@ -240,3 +240,108 @@ list.inject(0) { acc, x -> acc + x }
           (binary_expression
             left: (identifier)
             right: (identifier)))))))
+
+==================
+Closure parameters with def and final
+==================
+
+xs.each { def k, final String v -> k + v }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier))
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (identifier)))))))
+
+==================
+Closure parameters with defaults
+==================
+
+xs.each { String prefix, int width = 8 -> prefix }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure varargs and annotated parameters
+==================
+
+xs.each { @Lazy x, String... rest -> x }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier))
+          (closure_parameter
+            type: (varargs_type
+              (type_identifier))
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure body opening with an assignment
+==================
+
+xs.each { a = 1
+  a + 1 }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (number_literal)))
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (number_literal)))))))
