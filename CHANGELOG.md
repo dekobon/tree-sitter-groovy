@@ -12,6 +12,159 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
   `final x` parameter no longer reports `final` as its `type`. (#64)
 
+## [0.5.0] - 2026-11-10
+
+### Added
+
+- Class, interface, trait, record, `@interface`, and enum bodies now
+  accept instance initializer blocks — `class C { { init() } }`. The
+  block is a bare `block` child of `class_body` or `enum_body`, next
+  to the existing `static_initializer`; previously it closed the
+  class early on a `MISSING "}"`. In an enum the block may follow
+  `;`, another member, or an empty constant list, but not a constant
+  directly (`A\n{ … }` stays an error; write `A;`). A block on the
+  line after a field *with* an initialiser (`int x = 5\n{ … }`) is
+  not an initializer but that expression's trailing closure, the
+  reading Apache's grammar gives it too — end the field with `;` to
+  get the initializer; see `docs/divergences-from-spec.md` §11.
+
+  The block also follows a field with no initialiser on the same
+  line, so `int x { … }` and a record's compact constructor
+  (`public Name { … }`, unsupported) parse as a field plus a block
+  with no `ERROR`, where v0.4.0 reported one. (#68)
+- Nested type declarations are now class members: `static class
+  Config { … }`, a member `interface`, `trait`, `record` or
+  `@interface`, at any depth, in class, interface, trait, record,
+  `@interface`, enum, and anonymous class bodies, joining the nested
+  enum. Previously `_class_member` had no type-declaration
+  alternatives, so a nested type was an `ERROR` node and broke the
+  rest of the class body. They use the top-level node kinds
+  (`class_declaration` and so on) as children of `class_body` /
+  `enum_body`. This reserves `sealed` and `trait` at member start;
+  see Changed below. `record` is not reserved: its keyword comes
+  from the scanner only before a record header (see Fixed below).
+
+  No node kind is added by either entry. (#60, #68)
+- `record_declaration` takes the rest of Apache's `classDeclaration`
+  shape: modifiers before `record` (`public record P(int x) { }`,
+  `static record Q(int y) { }` as a member), type parameters
+  (`record Pair<A, B>(A left, B right)`, in the `type_parameters`
+  field), and an `implements` clause (a `super_interfaces` child, as
+  on classes). Each was an `ERROR` or a silent `method_declaration`
+  before. `node-types.json` adds `type_parameters` to the fields and
+  `super_interfaces` to the children of `record_declaration`.
+  (#60, #68)
+- Enum constants accept annotations: `enum E { @Deprecated A, B }`
+  was an `ERROR` that took the rest of the body with it. The
+  annotations are `annotation` children of `enum_constant`, before
+  its `name`; `node-types.json` adds them to its children. (#60, #68)
+
+### Changed
+
+- **BREAKING:** a `{` after the arguments of `new T(...)` is now
+  always an anonymous class body (see Fixed below), which changes
+  trees for input that parsed without an error at v0.4.0.
+  `new Foo() { }`, and any body made only of members that are also
+  valid statements, move from `method_invocation` / `closure` to
+  `object_creation_expression` / `class_body`. Calls such as
+  `new Foo().bar { }` and `foo() { }` keep their trailing closure.
+
+  Groovy is narrower about the body than this grammar: it calls a
+  closure on the new object when the `{` starts a later line (outside
+  parentheses and brackets) or holds something that cannot be a class
+  body. `new ArrayList()\n{ list.add(1) }` and `new T() { x -> x }`
+  therefore move from a `method_invocation` with a `closure` to a
+  `class_body` with an `ERROR` in it; write
+  `new ArrayList().call { … }` to keep the call. See
+  `docs/divergences-from-spec.md` §11. (#68)
+- **BREAKING:** `sealed` and `trait` are keywords wherever a class
+  member can start, as they already were at statement start; the
+  nested type declarations above need them there. Input that parsed
+  at v0.4.0 and is now an `ERROR`: a field named `sealed` or `trait`
+  after a modifier (`private boolean sealed`,
+  `static final String trait = "x"`), a member that opens with one
+  of the words (`static trait = 1`, `sealed() { }`), and a first
+  enum constant so named (`enum E { trait, B }`). `boolean sealed`
+  and `String trait`, with no modifier, still parse; see
+  `docs/divergences-from-spec.md` §12. (#68)
+- **BREAKING:** a record header inside a class, interface, trait,
+  enum or anonymous class body is now a `record_declaration`.
+  `record Point(int x) { }` as a member parsed at v0.4.0, with no
+  `ERROR`, as a `method_declaration` named `Point` with return type
+  `record`; so did a method whose return type is spelled `record`
+  (`record foo() { }`, `private record bar() { }`), which takes the
+  same tree now. `record_declaration` joins the child lists of `class_body`
+  and `enum_body` in `node-types.json`. In the other direction,
+  `record` with a line break or a line comment before the name, then
+  `Point(int x) { }` on the next line, was a `record_declaration` at
+  v0.4.0 and now reads as a method declaration with return type
+  `record`; Groovy rejects that input (`SPECIFICATION.md` §6.7).
+  (#60, #68)
+- **BREAKING:** `def f = (Foo) new T()` after another class member
+  is now a `parenthesized_type_cast` around the creation (see Fixed
+  below). At v0.4.0 that input parsed without an `ERROR` as a field
+  `f = (Foo)` followed by a method `T()`; the tree changes for input
+  that parsed. (#68)
+- The `record` keyword is an external-scanner token
+  (`alias($._record_keyword, 'record')`) instead of a grammar
+  literal. The anonymous `record` node and the `"record" @keyword`
+  capture are unchanged, but the generated parser's terminal symbol
+  ids 55–150 shift down by one and `sym__record_keyword` is appended
+  at 150; non-terminal ids, `SYMBOL_COUNT`, and field ids are the
+  same as at v0.4.0. Other entries in this release that describe
+  ids as unchanged refer to their own change only. (#60, #68)
+
+### Fixed
+
+- `record` is usable as a name. The word was a keyword wherever a
+  record declaration could start, so `record.key()` and `record = 5`
+  at statement start were `ERROR`s, and making records class members
+  would have done the same to `private Record record`,
+  `public void record() { }` and a first enum constant named `record`.
+  The keyword now comes from the external scanner, which emits it
+  only when a name follows on the same line and `(` after that, with
+  comments allowed in between and a line break allowed before the
+  `(` (`SPECIFICATION.md` §6.7); everywhere else the word is an
+  identifier. One residual, an `ERROR` at v0.4.0 too: a command-style
+  call whose argument is a call (`record Point(1, 2)`) reads as a
+  record header. (#60, #68)
+
+- Anonymous inner classes now parse. `new Runnable() { … }` had no
+  production. At v0.3.0 the body was cut loose from the creation: in
+  the reported field initialiser it spilled into the enclosing class
+  behind an `ERROR`, in a script or method body it became a separate
+  closure statement with no `ERROR` at all. Since v0.4.0 the
+  trailing-closure call of #49 claimed it, yielding a
+  `method_invocation` whose `closure` held the class members — a tree
+  that looked like a valid call and carried an `ERROR` only when a
+  member was not also a valid statement.
+  `object_creation_expression` gains an optional `body` field holding
+  a `class_body`, and every `{` that follows the arguments of
+  `new T(...)` is read as that body. Together with the instance
+  initializer above this covers double-brace initialisation
+  (`new HashMap() {{ put(1, 2) }}`). Trees change for some input
+  that already parsed without an error; see Changed above.
+
+  Still unsupported, as before: enum constants with an anonymous
+  class body (`A { … }`) and qualified creation
+  (`outer.new Inner(...)`). Symbol and field ids are unchanged by
+  this fix. (#68)
+
+- A cast in front of `new` in a field initialiser that follows
+  another member now parses as a cast. `def f = (Foo) new T()` after
+  an earlier field or method was split, with no `ERROR`, into a field
+  `f = (Foo)` and a method `T()` with return type `new`, whenever the
+  arguments could pass for parameters (none, or bare names); the
+  tree change is listed under Changed above. `new` is
+  now a reserved word: it is the keyword everywhere except where a
+  property or method name can stand (`foo.new`, `def new() { }`, and
+  with them `def new = 1`). Input that used it as any other
+  identifier (`def f(new) { }`, `import a.new.B`, `x as new`) is now
+  an `ERROR`; none of that is valid Groovy. A statement that opens
+  with `outer.new Inner()` now reads as a property access and a call,
+  as it already did after `=`, instead of a method declaration.
+  Symbol and field ids are unchanged. (#68)
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
@@ -362,7 +515,8 @@ for full details.
 - `a\n+ b` joins as one expression rather than splitting into two
   statements.
 
-[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/dekobon/tree-sitter-groovy/compare/v0.2.1...v0.2.2
