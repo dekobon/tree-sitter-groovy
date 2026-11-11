@@ -118,6 +118,8 @@ module.exports = grammar({
   ],
 
   conflicts: $ => [
+    // `final def x` / `final x = 1` in a block vs. a modified member at top level.
+    [$._modifier, $.local_variable_declaration],
     // See SPECIFICATION.md §7. Populated as rules accumulate.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
@@ -669,11 +671,19 @@ module.exports = grammar({
     // prec(1) wins over local_variable_declaration when `(` follows
     // the name, so `def f() { … }` at script-top-level parses as a
     // method rather than a `def f` variable followed by `(…) { … }`.
+    // Modifiers alone (no `def`, no return type) also introduce a
+    // method outside a class body: `final f() { }`. In a class body
+    // that shape stays a constructor_declaration.
     method_declaration: $ => prec.right(2, seq(
       repeat($.annotation),
-      repeat($._modifier),
-      optional(field('type_parameters', $.method_type_parameters)),
-      choice('def', field('return_type', $._type)),
+      choice(
+        seq(
+          repeat($._modifier),
+          optional(field('type_parameters', $.method_type_parameters)),
+          choice('def', field('return_type', $._type)),
+        ),
+        repeat1($._modifier),
+      ),
       field('name', $._property_name),
       field('parameters', $.formal_parameters),
       optional($.throws_clause),
@@ -878,16 +888,48 @@ module.exports = grammar({
     // would conflict with method_invocation `Type(x)` and is
     // disallowed in v1. Multiple declarators per statement
     // (`def a = 1, b = 2`) are supported in all three forms.
+    // `final` is the only modifier accepted here.
+    // `final x = 1` with no type or `def` is the modifier-only form;
+    // the variable is dynamically typed, as with `def`. `final` also
+    // allows the typed form without an initializer (`final String
+    // name`, a blank final), with a single declarator.
+    // Newlines do not end either form, so these read wrongly with no
+    // ERROR node:
+    // - `final x` followed by a line that starts with an identifier
+    //   reads `x` as the type and that identifier as the name. `y = 2`
+    //   becomes `final x y = 2`, the same resolution modifier-only
+    //   fields get (`static x` then `y = 1`), and inside a block
+    //   `foo()` becomes a method declaration `x foo()`.
+    // - `final String name` followed by `name = 'a'` or `foo()` is a
+    //   variable named `String` followed by `name name = 'a'` or by a
+    //   method declaration `name foo()`. This happens at script top
+    //   level, and inside a block when a comment follows the
+    //   declaration.
+    // - A typed `final` local on the line after a comment splits into
+    //   a variable named after the type and an assignment, as typed
+    //   locals without `final` already do.
     local_variable_declaration: $ => prec.right(choice(
       seq(
+        optional('final'),
         choice('def', 'var'),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       seq(
+        optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
+      ),
+      seq(
+        'final',
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
+      ),
+      seq(
+        'final',
+        field('type', $._type),
+        field('name', $.identifier),
       ),
     )),
 
@@ -945,6 +987,7 @@ module.exports = grammar({
     for_in_statement: $ => seq(
       'for',
       '(',
+      optional('final'),
       optional(choice('def', field('type', $._type))),
       field('variable', $.identifier),
       choice('in', ':'),

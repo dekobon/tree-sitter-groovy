@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- `final` is now accepted on local variable declarations: `final String
+  name = 'a'`, `final def n = 1`, the modifier-only form `final x = 1`
+  (dynamically typed, as with `def`), and the blank form `final String
+  name`. Previously a local starting with `final` was an `ERROR` node. In
+  a `for` header (`for (final x in xs)`, `for (final i = 0; ...)`)
+  `final` was read as a type name; it is now a modifier, which changes
+  the tree shape there. A method declared with modifiers only outside a
+  class body (`final f() { }`, `static f() { }`) now has `f` as its `name`
+  instead of as its `return_type`. (#56)
 - `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
   `final x` parameter no longer reports `final` as its `type`. (#64)
 - Trait declarations accept an `implements` clause (`trait T implements A, B`). (#65)
