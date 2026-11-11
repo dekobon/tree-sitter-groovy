@@ -846,6 +846,7 @@ enum TokenType {
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
   COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
+  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -1064,6 +1065,33 @@ Known limitations:
   followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
   chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The
   dangling comma was an `ERROR` before.
+
+### 6.9 SUBSCRIPT_OPEN — implementation contract
+
+Emitted wherever a `[` may follow, and never during error recovery
+(`ERROR_SENTINEL` valid). Skips spaces and tabs but not newlines; if
+the next character is `[`, consumes it. Subscripts and array types
+accept only this token. List and map literals accept it and the
+in-grammar `[`, so a `[` on the same line resolves as it did with a
+single token. At a newline it emits nothing, so the in-grammar `[`
+lexes instead and starts a list or map literal: Groovy ends a statement
+at a newline, which is what lets a Grails controller action return
+`[model: value]` on its own line.
+
+Two known differences from Groovy are accepted. The scanner is
+stateless, so a newline before `[` ends the expression everywhere,
+including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a`
+followed by `[0])` on the next line. Groovy's lexer ignores newlines
+inside `(…)`, `[…]` and `?[…]`, so `foo(a` followed by `[0])` on the
+next line, `[a` followed by `[0]]`, and the array-type forms `(String`
+followed by `[]) x` and `def m(String` followed by `[] a) { }` are
+valid Groovy and an `ERROR` here (pinned in
+`test/corpus/operators-subscript.txt` and
+`test/corpus/declarations-array-types.txt`). Matching Groovy needs a
+stack of open parentheses, brackets and braces in the scanner. A block
+comment at the start of the `[` line also hides the newline before it:
+`a` followed by `/* c */ [0]` on the next line parses as a subscript,
+where Groovy ends the statement at the newline.
 
 ---
 

@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   when that line starts with something that can continue an expression:
   `foo 1, 2` followed by `[a].each { }` parses as `2[a].each { }`
   (see §6.8). (#57)
+- A `[` that starts a new line now begins a list or map literal instead
+  of subscripting the previous statement, so a Grails controller action
+  ending in `[model: value]` parses. A `[` on the same line as the token
+  before it, with or without spaces or tabs between them, parses as
+  before. The rule also holds inside `(…)` and `[…]`, where Groovy ignores
+  newlines, so a subscript or array type continued on a new line there
+  (`foo(a` then `[0])`) is now an `ERROR`; see `SPECIFICATION.md` §6.9.
+  Implemented as an external scanner token, `_subscript_open`. (#63)
 - `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
   `final x` parameter no longer reports `final` as its `type`. (#64)
 - Trait declarations accept an `implements` clause (`trait T implements A, B`). (#65)

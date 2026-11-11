@@ -7,8 +7,10 @@
 // decision the grammar cannot express: `record` is a keyword only
 // when a record header follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, the key of a named argument in a
-// parenthesis-free call. ERROR_SENTINEL is never emitted; the parser
-// marks it valid only during error recovery.
+// parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
+// line as the token before it. ERROR_SENTINEL is never emitted; the
+// parser marks it valid only during error recovery, where
+// COMMAND_NAMED_KEY and SUBSCRIPT_OPEN are suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -25,6 +27,7 @@ enum TokenType {
     GROOVYDOC_COMMENT,
     RECORD_KEYWORD,
     COMMAND_NAMED_KEY,
+    SUBSCRIPT_OPEN,
     ERROR_SENTINEL,
 };
 
@@ -230,9 +233,25 @@ bool tree_sitter_groovy_external_scanner_scan(
 ) {
     (void)payload;
 
-    if (valid_symbols[COMMAND_NAMED_KEY] && !valid_symbols[ERROR_SENTINEL]) {
+    // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY
+    // (§5.5). Both skip only spaces and tabs, the same-line whitespace
+    // of Groovy's lexer; at a newline we fall through to the branches
+    // below. Their first characters (`[` vs. an identifier start) are
+    // disjoint, so one whitespace skip serves both.
+    bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
+    bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
+    if ((wants_subscript || wants_named_key)
+        && !valid_symbols[ERROR_SENTINEL]) {
         while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
             lexer->advance(lexer, true);
+        }
+        // SPECIFICATION.md §5.10 — a `[` on the current line can continue
+        // the expression (subscript or array type). After a newline the
+        // in-grammar `[` starts a list or map literal instead.
+        if (wants_subscript && lexer->lookahead == '[') {
+            lexer->advance(lexer, false);
+            lexer->result_symbol = SUBSCRIPT_OPEN;
+            return true;
         }
         // An identifier is either the key or, once consumed, not something
         // the code below could start (a comment or slashy string), so stop
@@ -244,7 +263,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         // line: `foo record: 1` is a named argument, while a record header
         // there is not valid Groovy. A `record` on the next line is not
         // reached here, since only spaces and tabs are skipped.
-        if (is_ident_start(lexer->lookahead)) {
+        if (wants_named_key && is_ident_start(lexer->lookahead)) {
             return scan_command_named_key(lexer);
         }
     }

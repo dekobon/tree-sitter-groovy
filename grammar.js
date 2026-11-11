@@ -100,11 +100,11 @@ module.exports = grammar({
 
   // Externals listed here must have a matching branch in
   // `src/scanner.c` AND be referenced by at least one rule below
-  // (`_command_named_key` included). The one exception is
-  // `_error_sentinel`: no rule references it, and it exists so the
-  // scanner can detect error recovery, when tree-sitter marks every
-  // external valid. It is kept last here and in the scanner's
-  // `TokenType` enum, and the two orders must match.
+  // (`_command_named_key` and `_subscript_open` included). The one
+  // exception is `_error_sentinel`: no rule references it, and it
+  // exists so the scanner can detect error recovery, when tree-sitter
+  // marks every external valid. It is kept last here and in the
+  // scanner's `TokenType` enum, and the two orders must match.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -124,6 +124,10 @@ module.exports = grammar({
     // Scanner-side so the newline before a Spock label (`result` then
     // `where:`) is not swallowed, and so `Type name =` stays a declaration.
     $._command_named_key,
+    // §5.10 — `[` on the same line as the token before it (spaces and tabs
+    // allowed). A `[` after a newline isn't one and can only start a list or
+    // map literal: a statement, not a subscript of the line above.
+    $._subscript_open,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1287,7 +1291,7 @@ module.exports = grammar({
       repeat1(seq('.', alias($.identifier, $.type_identifier))),
     )),
 
-    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, '[', ']')),
+    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, alias($._subscript_open, '['), ']')),
 
     // §4 / §5.14 — Java-style generic type arguments. Allows nested
     // generics (`Map<String, List<Integer>>`) and bounded wildcards
@@ -1471,9 +1475,12 @@ module.exports = grammar({
     // explicit ask of dekobon #247 for the `?[]` row. Both at
     // PREC.POSTFIX, left-associative — `a[b][c]` parses as
     // `(a[b])[c]`.
+    // `[` must be on the object's line (see `_subscript_open`): a Grails
+    // controller action that ends in `[model: value]` on its own line returns
+    // a map; it isn't a subscript of the statement before it.
     subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
-      '[',
+      alias($._subscript_open, '['),
       field('index', $._expression),
       ']',
     )),
@@ -1481,6 +1488,9 @@ module.exports = grammar({
     // `?[` is one token. `a ? [b] : c` (with space) still parses
     // as ternary plus list because tree-sitter's lexer never
     // crosses a whitespace boundary to extend a multi-char token.
+    // Unlike `[` (see `_subscript_open`), `?[` may still follow a
+    // newline: no statement starts with `?[`, so there is nothing
+    // to split off.
     safe_subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
       '?[',
@@ -1698,8 +1708,11 @@ module.exports = grammar({
     // form (see map_literal). Tree-sitter splits the parse between
     // list_literal and map_literal until a `:` or `]` disambiguates;
     // the conflict declaration above keeps both alternatives alive.
+    // Either `[` token opens a literal, so a same-line `[` resolves as
+    // it did with one token: `if (a) { } [1].each { }` is still a block
+    // followed by a list, not a subscripted closure.
     list_literal: $ => seq(
-      '[',
+      choice('[', alias($._subscript_open, '[')),
       optional(seq(
         $._expression,
         repeat(seq(',', $._expression)),
@@ -1717,7 +1730,7 @@ module.exports = grammar({
     map_literal: $ => {
       const entry = choice($.map_entry, $.spread_map_entry);
       return seq(
-        '[',
+        choice('[', alias($._subscript_open, '[')),
         choice(
           ':',
           seq(

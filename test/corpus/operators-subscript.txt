@@ -150,3 +150,101 @@ a[i] + 1
         object: (identifier)
         index: (identifier))
       right: (number_literal))))
+
+==================
+List literal on a new line is not a subscript
+==================
+
+def index() {
+  def items = service.list()
+  [items: items, total: items.size()]
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (method_invocation
+            function: (field_access
+              object: (identifier)
+              field: (identifier))
+            arguments: (argument_list))))
+      (expression_statement
+        (map_literal
+          (map_entry
+            key: (identifier)
+            value: (identifier))
+          (map_entry
+            key: (identifier)
+            value: (method_invocation
+              function: (field_access
+                object: (identifier)
+                field: (identifier))
+              arguments: (argument_list))))))))
+
+==================
+Subscript with a space before the bracket
+==================
+
+if (math [op]) { a[0][1] }
+
+---
+
+(source_file
+  (if_statement
+    condition: (subscript_expression
+      object: (identifier)
+      index: (identifier))
+    consequence: (block
+      (expression_statement
+        (subscript_expression
+          object: (subscript_expression
+            object: (identifier)
+            index: (number_literal))
+          index: (number_literal))))))
+
+==================
+Subscript continued on a new line inside parentheses is unsupported
+:error
+==================
+
+foo(a
+  [0])
+
+---
+
+==================
+Subscript continued on a new line inside brackets is unsupported
+:error
+==================
+
+[a
+  [0]]
+
+---
+
+==================
+List literal on the same line after a block is not a subscript
+==================
+
+if (a) { } [1].each { }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (number_literal))
+        field: (identifier))
+      closure: (closure))))

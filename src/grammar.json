@@ -4109,7 +4109,12 @@
             "name": "_type"
           },
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_subscript_open"
+            },
+            "named": false,
             "value": "["
           },
           {
@@ -4748,7 +4753,12 @@
             }
           },
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_subscript_open"
+            },
+            "named": false,
             "value": "["
           },
           {
@@ -6437,8 +6447,22 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "["
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "["
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_subscript_open"
+              },
+              "named": false,
+              "value": "["
+            }
+          ]
         },
         {
           "type": "CHOICE",
@@ -6495,8 +6519,22 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "["
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "["
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_subscript_open"
+              },
+              "named": false,
+              "value": "["
+            }
+          ]
         },
         {
           "type": "CHOICE",
@@ -7285,6 +7323,10 @@
     {
       "type": "SYMBOL",
       "name": "_command_named_key"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_subscript_open"
     },
     {
       "type": "SYMBOL",
