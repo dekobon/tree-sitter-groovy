@@ -2295,6 +2295,76 @@
                               }
                             }
                           ]
+                        },
+                        {
+                          "type": "SEQ",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": ","
+                            },
+                            {
+                              "type": "CHOICE",
+                              "members": [
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "method_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "field_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "static_initializer"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "enum_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "class_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "interface_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "trait_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "record_declaration"
+                                },
+                                {
+                                  "type": "SYMBOL",
+                                  "name": "annotation_type_declaration"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "REPEAT",
+                              "content": {
+                                "type": "CHOICE",
+                                "members": [
+                                  {
+                                    "type": "SYMBOL",
+                                    "name": "_class_member"
+                                  },
+                                  {
+                                    "type": "SYMBOL",
+                                    "name": "block"
+                                  },
+                                  {
+                                    "type": "STRING",
+                                    "value": ";"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
                         }
                       ]
                     },
