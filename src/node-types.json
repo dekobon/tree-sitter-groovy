@@ -1804,6 +1804,18 @@
       "required": false,
       "types": [
         {
+          "type": "annotation_type_declaration",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "class_declaration",
+          "named": true
+        },
+        {
           "type": "constructor_declaration",
           "named": true
         },
@@ -1816,11 +1828,23 @@
           "named": true
         },
         {
+          "type": "interface_declaration",
+          "named": true
+        },
+        {
           "type": "method_declaration",
           "named": true
         },
         {
+          "type": "record_declaration",
+          "named": true
+        },
+        {
           "type": "static_initializer",
+          "named": true
+        },
+        {
+          "type": "trait_declaration",
           "named": true
         }
       ]
@@ -3115,6 +3139,18 @@
       "required": false,
       "types": [
         {
+          "type": "annotation_type_declaration",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "class_declaration",
+          "named": true
+        },
+        {
           "type": "constructor_declaration",
           "named": true
         },
@@ -3131,11 +3167,23 @@
           "named": true
         },
         {
+          "type": "interface_declaration",
+          "named": true
+        },
+        {
           "type": "method_declaration",
           "named": true
         },
         {
+          "type": "record_declaration",
+          "named": true
+        },
+        {
           "type": "static_initializer",
+          "named": true
+        },
+        {
+          "type": "trait_declaration",
           "named": true
         }
       ]
@@ -3165,6 +3213,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -8768,6 +8826,16 @@
           }
         ]
       },
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "class_body",
+            "named": true
+          }
+        ]
+      },
       "type": {
         "multiple": false,
         "required": true,
@@ -10029,6 +10097,16 @@
             "named": true
           }
         ]
+      },
+      "type_parameters": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type_parameters",
+            "named": true
+          }
+        ]
       }
     },
     "children": {
@@ -10037,6 +10115,10 @@
       "types": [
         {
           "type": "annotation",
+          "named": true
+        },
+        {
+          "type": "super_interfaces",
           "named": true
         }
       ]
