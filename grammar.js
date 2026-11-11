@@ -713,8 +713,10 @@ module.exports = grammar({
     // on framework-facing methods), optional type, optional varargs
     // marker (`Type... name`), and optional default value
     // (`name = expr`).
+    // `final` is the only modifier accepted here.
     formal_parameter: $ => seq(
       repeat($.annotation),
+      optional('final'),
       optional(field('type', choice($._type, $.varargs_type))),
       field('name', $.identifier),
       optional(seq('=', field('default', $._expression))),

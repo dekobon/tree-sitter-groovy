@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
+  `final x` parameter no longer reports `final` as its `type`. (#64)
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

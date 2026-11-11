@@ -248,3 +248,63 @@ ResponseEntity get(@PathVariable("id") Long id, @RequestBody Map body) { }
         type: (type_identifier)
         name: (identifier)))
     body: (block)))
+
+==================
+Final parameters
+==================
+
+def f(final String a, final b) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))
+
+==================
+Final parameter after an annotation
+==================
+
+def f(@Lazy final Resolver r) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name (identifier)))
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+Final constructor parameter
+==================
+
+class A {
+  A(final String a) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block)))))
