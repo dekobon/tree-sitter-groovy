@@ -305,7 +305,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
-| `new` | `object_creation_expression` | `type`, `arguments` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. |
+| `new` | `object_creation_expression` | `type`, `arguments`, `body` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. The optional `body` is the `class_body` of an anonymous inner class (`new Runnable() { … }`); a `{` after the arguments is always that body, never a trailing closure (#68). That is wider than Groovy, which calls a closure on the new object when the `{` starts a later line or cannot be a class body (`docs/divergences-from-spec.md` §11). Qualified creation (`outer.new Inner(...)`) has no production. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -384,10 +384,10 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | constants list, then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
-| `record` declaration | **new** | `record Name(Type a, Type b) { … }`. Groovy 4+. |
+| `enum` declaration | **new** | constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
+| `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
@@ -487,6 +487,12 @@ identifier_or_contextual: $ => choice($.identifier, 'var', 'record',
 …and uses `identifier_or_contextual` everywhere the lexer might
 otherwise hide a usable identifier behind a keyword (variable names,
 property accesses, named arguments).
+
+The implementation takes a different route for `record`: the keyword
+is an external-scanner token emitted only before a record header
+(§6.7), so the word lexes as a plain `identifier` in every other
+position and no fallback choice is needed. The same technique is
+available to the other contextual words.
 
 Quoted identifiers (`map."key with spaces"`, `def "test name"() { … }`)
 are supported by allowing a string-literal in identifier position
@@ -709,14 +715,16 @@ scanner branches are avoided):
   matching Groovy's rule.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
-  (`repeat(choice($._class_member, ';'))`). It never appears as a named
+  (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
+  and `enum_body`, where the `block` is an instance initializer). It
+  never appears as a named
   node in the AST, so wherever it attaches the named-node tree is
   identical. This covers terminators (`x();`), separators (`x(); y()`),
   empty statements (`;`, `;;`), and empty / terminated members
   (`class C { ; }`, `void f();`, `int x = 1;`). The list contexts are
   `source_file`, `block`, `closure`, the classic `switch`
-  `case`/`default` bodies, and the class / interface / trait / enum
-  member bodies.
+  `case`/`default` bodies, and the two member bodies, `class_body`
+  and `enum_body`.
 - Three single-statement (non-list) bodies take an explicit
   `optional(';')` so their terminator is not claimed by the *enclosing*
   list or rejected before a required follow-on token: the braceless
@@ -808,9 +816,12 @@ syntax error in expression position, by §5.5).
 ## 6. External scanner design
 
 The external scanner is the C file `src/scanner.c`. It exists to
-handle the four context-sensitive lexing situations that pure
-tree-sitter grammar rules cannot disambiguate. Each token below has a
-single emit/no-emit decision per call.
+handle the context-sensitive lexing situations that pure tree-sitter
+grammar rules cannot disambiguate. Each token below has a single
+emit/no-emit decision per call. The implementation exports the
+slashy opener, the three comment tokens, and the contextual `record`
+keyword (§6.7); the other tokens listed here are met in-grammar, see
+`docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
 
@@ -824,8 +835,10 @@ enum TokenType {
   GSTRING_BODY,           // §5.7 — literal fragment of a double-quoted string
   GSTRING_INTERPOLATION_START, // `${` or `$` followed by identifier
   LABEL_COLON,            // §5.3 — colon that closes a statement label
+  LINE_COMMENT,           // §6.6 — `//` to end of line, single token
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
+  RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
 };
 ```
 
@@ -932,6 +945,61 @@ in murtaza64's grammar requires at least one whitespace character
 after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
 both fail. A scanner-driven token simply consumes from the opener to
 the matching `*/` regardless of intermediate content.
+
+### 6.7 RECORD_KEYWORD — implementation contract
+
+Apache's `identifier` rule lists `RECORD`, so `record` names fields,
+methods, variables and enum constants (`private Record record`,
+`record.key()`). With `word: $.identifier`, tree-sitter substitutes
+a keyword literal for the identifier wherever that keyword has an
+action in the current parse state, and it cannot fall back once the
+rule behind the keyword fails to match. Because `record_declaration`
+is a statement and a class member, a literal `'record'` would be the
+keyword at every statement and member start, which is exactly where
+those identifier uses begin. The scanner makes the choice instead.
+
+```text
+Emit RECORD_KEYWORD when, from the current position:
+  - the next six characters are `record`, and the character after
+    them is not an identifier character ([A-Za-z0-9_$]); then
+  - at least one of: spaces, tabs, block comments — but no line
+    break and no line comment, because `classDeclaration` in
+    GroovyParser.g4 has no `nls` between RECORD and the name; then
+  - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
+    class); then either
+  - `<` immediately (type parameters; the grammar's `type_parameters`
+    opener is `token.immediate` as well), or
+  - any mix of spaces, tabs, line breaks, block and line comments
+    (the rule has `nls` before `formalParameters`) and then `(`.
+The token is `record` alone: `mark_end` is called after it and the
+look-ahead is not kept. On any other input return false; the
+in-grammar lexer then reads the word as `identifier`.
+```
+
+The grammar binds the token as `alias($._record_keyword, 'record')`,
+so the anonymous `record` node, `node-types.json`, and the query
+capture `"record" @keyword` are the same as with a literal.
+
+Known residuals:
+
+- A command-style call whose argument is itself a call,
+  `record Point(1, 2)`, matches the pattern and parses as a record
+  header with an `ERROR` in its components. It was an error at
+  v0.4.0 too, where `record` was a keyword at every statement start
+  regardless of what followed.
+- A method with no modifier whose return type is spelled `record`
+  (`record foo() { … }`) reads as a record declaration, as it did at
+  v0.4.0 at statement start; in a class body it was a method there.
+- A line break or a line comment anywhere between `record` and the
+  name (after a block comment too), with the name and `(` on the
+  next line, is not a header: the word is an identifier and the rest
+  reads as a method declaration with return type `record`. Groovy
+  rejects that input; v0.4.0 read it as a record because comments
+  and newlines are `extras` around a literal keyword.
+- With modifiers accepted before `record`, a method whose modifiers
+  are followed by a return type spelled `record`
+  (`private record bar() { … }`) reads as a record declaration too;
+  it was a method at v0.4.0.
 
 ---
 

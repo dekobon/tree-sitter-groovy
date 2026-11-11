@@ -72,3 +72,725 @@ record Point(int x, int y) {
         parameters: (formal_parameters)
         body: (block
           (expression_statement (identifier)))))))
+
+==================
+Record used as an identifier at statement start
+==================
+
+record.key()
+record = 5
+record(1)
+records = 1
+recordValue = 2
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Local variable named record beside a local record in a method body
+==================
+
+def f() {
+    def record = 1
+    record Local(int x) { }
+    record.hashCode()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list))))))
+
+==================
+Record header with a space before the components
+==================
+
+record Point (int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Command-style call named record with a call argument reads as a record header
+:error
+==================
+
+record Point(1, 2)
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (ERROR
+        (number_literal)
+        (number_literal)))))
+
+==================
+Field named record then a comment then a nested record
+==================
+
+class Holder {
+    private Record record
+    // the comment used to flip this tree
+    record Inner(int x) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (line_comment)
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Nested records with and without a body followed by a field
+==================
+
+class Shapes {
+    record Point(int x, int y) { }
+    record Pair(Object left, Object right)
+    int after = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Nested record with its body on the next line
+==================
+
+class C {
+    record Point(int x)
+    {
+        int manhattan() { x }
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Record inside an anonymous class body
+==================
+
+def task = new Runnable() {
+    record Step(int n) { }
+    void run() { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (record_declaration
+            name: (identifier)
+            components: (record_components
+              (record_component
+                type: (type_identifier)
+                name: (identifier)))
+            body: (class_body))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Records inside enum bodies after the constants
+==================
+
+enum Planet {
+    MERCURY, VENUS
+    record Orbit(int days) { }
+}
+
+enum Moon {
+    LUNA;
+    record Phase(int day) { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Nested records with modifiers beside fields named record after a modifier
+==================
+
+class C {
+    static record P(int x) { }
+    @Foo private static record Q(int y)
+    static record = 5
+    private record
+}
+public record Top(int x) { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (record_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Generic records and records implementing interfaces
+==================
+
+record Pair<A, B>(A left, B right) { }
+record Point(int x) implements Serializable, Comparable<Point> { }
+record Both<T>(T value) implements Supplier<T> { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier))
+      (type_parameter
+        name: (type_identifier)))
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier))
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    (super_interfaces
+      (type_identifier)
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    (super_interfaces
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (class_body)))
+
+==================
+Method with a modifier and return type spelled record reads as a record
+:error
+==================
+
+class C {
+    private record bar() { 1 }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components)
+        body: (class_body
+          (ERROR
+            (number_literal)))))))
+
+==================
+Record headers with comments and a line break before the components
+==================
+
+record /* name */ Point(int x) { }
+record Pair /* components */ (int x) { }
+record Next
+(int x) { }
+record Line // trailing
+(int x) { }
+record /*
+ * multi-line
+ */ Doc(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    (block_comment)
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    (block_comment)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    name: (identifier)
+    (line_comment)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (record_declaration
+    (block_comment)
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Nested record header with comments in both gaps and the body on the next line
+==================
+
+class Holder {
+    record /* c */ Inner /* d */ (int x)
+    {
+        int y
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        (block_comment)
+        name: (identifier)
+        (block_comment)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier))))))))
+
+==================
+Record header separated by tabs
+==================
+
+record	Tab	(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+A line break directly after record is not a record header
+==================
+
+record
+Point(int x) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+A line comment directly after record is not a record header
+==================
+
+record // c
+Point(int x) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    (line_comment)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+Modifier-only fields named record before a nested record
+==================
+
+class Ties {
+    static record
+    record P(int x) { }
+    private Record
+    record Inner(int x) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Annotated records at top level and as a member
+==================
+
+@Immutable record Top(int x) { }
+
+class C {
+    @Foo @Bar
+    record Nested(int y) { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Records inside interface, trait and annotation type bodies
+==================
+
+interface I {
+    record Pair(int a, int b) { }
+}
+trait T {
+    record Triple(int a, int b, int c) { }
+}
+@interface A {
+    record Meta(String name) { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Nested record recovers after a rejected field named sealed
+==================
+
+class C {
+    private boolean sealed
+    record After(int x) { }
+    int following
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (ERROR)
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))

@@ -139,3 +139,368 @@ class Foo {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block (expression_statement (number_literal)))))))
+
+==================
+Nested class with fields, a constructor, and a method (#68)
+==================
+
+class Computer {
+    static class Cpu extends Part implements Serializable {
+        private final int cores = 4
+        String model
+
+        Cpu(String model) {
+            this.model = model
+        }
+
+        int threads() { cores * 2 }
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)
+              value: (number_literal)))
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (constructor_declaration
+            name: (identifier)
+            parameters: (formal_parameters
+              (formal_parameter
+                type: (type_identifier)
+                name: (identifier)))
+            body: (block
+              (expression_statement
+                (assignment_expression
+                  left: (field_access
+                    object: (identifier)
+                    field: (identifier))
+                  right: (identifier)))))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block
+              (expression_statement
+                (binary_expression
+                  left: (identifier)
+                  right: (number_literal))))))))))
+
+==================
+Nested interface, trait, annotation type, and generic class (#68)
+==================
+
+class Shapes {
+    sealed interface Shape permits Box { }
+    trait Named { String label() { 'x' } }
+    @interface Marker { }
+    static final class Box<T> implements Shape { T value }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (interface_declaration
+        name: (identifier)
+        (permits_clause
+          (type_identifier))
+        body: (class_body))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block
+              (expression_statement
+                (string_literal))))))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body))
+      (class_declaration
+        name: (identifier)
+        type_parameters: (type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier))))))))
+
+==================
+Nested types inside an anonymous inner class and an enum body (#68)
+==================
+
+def task = new Runnable() {
+    class Helper { int n }
+    void run() { }
+}
+
+enum Planet {
+    MERCURY, VENUS
+    static class Orbit { }
+    interface Visitor { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (class_declaration
+            name: (identifier)
+            body: (class_body
+              (field_declaration
+                type: (type_identifier)
+                (variable_declarator
+                  name: (identifier)))))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Members named record, trait, and sealed next to a nested class
+==================
+
+class Flags {
+    def record = 1
+    String trait
+    boolean sealed = false
+    static record = 5
+    Object record() { null }
+    class Inner { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (boolean_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (null_literal))))
+      (class_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Fields and methods named record after a modifier and a type
+==================
+
+class Flags {
+    private Record record
+    private final Record record = null
+    public void record() { }
+    private Record record() { null }
+    int following
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (null_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (null_literal))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Field named sealed after a modifier and a type is unsupported
+:error
+==================
+
+class C {
+    private boolean sealed
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (ERROR))))
+
+==================
+Nested static class
+==================
+
+class Outer {
+  static class Config {
+    String name
+    def go() { }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (method_declaration
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Nested interface, trait, record and annotation type
+==================
+
+class Outer {
+  interface Service { }
+  trait Greeter { }
+  record Point(int x, int y) { }
+  @interface Marker { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier))
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Doubly nested class with superclass and interfaces
+==================
+
+class A {
+  private static class B extends Base implements Runnable {
+    class C { }
+  }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body
+          (class_declaration
+            name: (identifier)
+            body: (class_body)))))))
