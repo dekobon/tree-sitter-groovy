@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Fixed
+
+- A method with modifiers and a return type that follows a comment in a
+  class body (`// note` then `public void run() { }`) is a
+  `method_declaration` again. Since #61 it could parse, with no `ERROR`,
+  as a modifier-only `field_declaration` named after the return type
+  (`public void`) followed by a `constructor_declaration` named after the
+  method. The modifier-only field now loses to any other complete
+  reading; `static TTL = 900` still parses as a field. (#84)
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

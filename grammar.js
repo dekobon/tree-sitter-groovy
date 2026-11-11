@@ -655,12 +655,17 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
-      seq(
+      // Lose to any other complete reading. `public void run() { }`
+      // also parses as this field (`public void`) followed by a
+      // constructor `run`; without a dynamic precedence on either side
+      // the tie-break compares tree shapes, so a comment before the
+      // member was enough to pick the split.
+      prec.dynamic(-1, seq(
         repeat($.annotation),
         repeat1($._modifier),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
-      ),
+      )),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()
