@@ -7,17 +7,51 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `final` on the variable of a `for` header is now a
+  modifier instead of a type name, which changes trees for input that
+  parsed without an `ERROR` at v0.5.0. `for (final x in xs)` and
+  `for (final i = 0; ...)` no longer have `final` as their `type`; in
+  the C-style form the name and value also move into a
+  `variable_declarator`. A method declared with modifiers only outside
+  a class body (`final f() { }`, `static f() { }`) now has `f` as its
+  `name`; at v0.5.0 `f` was its `return_type` and `name` was a
+  zero-width `quoted_identifier`. (#56)
+- **BREAKING:** a parenthesis-free call whose only argument is a named
+  argument (`archiveArtifacts artifacts: 'x'`, `foo a: 1`) is now a
+  `command_chain` with a `named_argument`. At v0.5.0 it parsed without
+  an `ERROR` as an expression statement followed by a labeled
+  statement. After a comma, the last argument now continues onto a next
+  line that starts with `(`, `{`, `-` or `+`, where v0.5.0 started a
+  new statement: `foo 1, 2` followed by `(a)` parses as the call
+  `2(a)`. A next line that starts with `[` is still a new statement
+  (#63); `SPECIFICATION.md` §6.8 lists every case. (#57)
+- **BREAKING:** a `[` that starts a new line no longer subscripts the
+  expression before it. `x` followed by `[a]` on the next line was a
+  `subscript_expression` at v0.5.0 and is now an expression statement
+  followed by a `list_literal`. The rule also holds inside `(…)` and
+  `[…]`, where Groovy ignores newlines, so a subscript or array type
+  continued on a new line there (`foo(a` then `[0])`) parsed at v0.5.0
+  and is now an `ERROR`; see `SPECIFICATION.md` §6.9. (#63)
+- **BREAKING:** an untyped `final` parameter (`def f(final a)`) no
+  longer reports `final` as its `type`; the `formal_parameter` has only
+  a `name`. (#64)
+- Three external scanner tokens are added: `_command_named_key` (#57),
+  `_subscript_open` (#63) and `_error_sentinel` (both), so most symbol
+  ids above 69 in the generated parser change and `SYMBOL_COUNT` goes
+  from 308 to 313. Node names and field ids are unchanged. In
+  `node-types.json`, `command_chain`'s `argument` field lists every
+  expression kind and `named_argument`, and `trait_declaration` gains a
+  `super_interfaces` child. (#57, #63, #65)
+
 ### Fixed
 
 - `final` is now accepted on local variable declarations: `final String
   name = 'a'`, `final def n = 1`, the modifier-only form `final x = 1`
   (dynamically typed, as with `def`), and the blank form `final String
-  name`. Previously a local starting with `final` was an `ERROR` node. In
-  a `for` header (`for (final x in xs)`, `for (final i = 0; ...)`)
-  `final` was read as a type name; it is now a modifier, which changes
-  the tree shape there. A method declared with modifiers only outside a
-  class body (`final f() { }`, `static f() { }`) now has `f` as its `name`
-  instead of as its `return_type`. (#56)
+  name`. Previously a local starting with `final` was an `ERROR` node.
+  (#56)
 - Parenthesis-free calls now accept named arguments, as §5.5 specifies:
   `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
   GORM's `name blank: false, size: 1..100`. After the first argument,
@@ -27,24 +61,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   key is lexed by a new external scanner token, `_command_named_key`,
   which only matches when `:` follows on the same line, so `Type name = …`
   declarations and a bare statement followed by a Spock label on the next
-  line parse as before. `archiveArtifacts artifacts: 'x'` previously
-  parsed as an expression statement followed by a labeled statement.
-  String keys (`foo 'a': 1`) are not accepted yet. Because an argument
-  after a comma is a full expression, it now continues onto the next line
-  when that line starts with something that can continue an expression:
-  `foo 1, 2` followed by `(a)` parses as the call `2(a)` (see §6.8). A
-  line that starts with `[` is a new statement instead; see the
-  `_subscript_open` entry below. (#57)
+  line parse as before. String keys (`foo 'a': 1`) are not accepted yet.
+  (#57)
 - A `[` that starts a new line now begins a list or map literal instead
   of subscripting the previous statement, so a Grails controller action
   ending in `[model: value]` parses. A `[` on the same line as the token
   before it, with or without spaces or tabs between them, parses as
-  before. The rule also holds inside `(…)` and `[…]`, where Groovy ignores
-  newlines, so a subscript or array type continued on a new line there
-  (`foo(a` then `[0])`) is now an `ERROR`; see `SPECIFICATION.md` §6.9.
-  Implemented as an external scanner token, `_subscript_open`. (#63)
-- `final` is now accepted on method and constructor parameters (`def f(final String a)`). An untyped
-  `final x` parameter no longer reports `final` as its `type`. (#64)
+  before. Implemented as an external scanner token, `_subscript_open`.
+  (#63)
+- `final` is now accepted on method and constructor parameters (`def f(final String a)`). (#64)
 - Trait declarations accept an `implements` clause (`trait T implements A, B`). (#65)
 
 ## [0.5.0] - 2026-11-10
