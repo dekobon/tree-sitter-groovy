@@ -1053,14 +1053,14 @@ Known limitations:
   argument is a full expression, and expressions do not stop at a newline,
   so a next line that starts with something that can continue an expression
   joins the last argument, even a literal one. `foo 1, 2` followed by a
-  line reading `[a].each { }` parses as `2[a].each { }`, and `foo 'a', 'b'`
-  followed by `[x, y].each { }` is an `ERROR`. The same happens when the
-  next line starts with `(` (a call on the argument), `{` (a trailing
-  closure), `-` or `+` (a binary operator), `in`, `as` or `instanceof`.
-  A chain with one argument (`foo 'a'` then `[x, y].each { }`) is not
-  affected. Expressions outside command chains already behave this way:
-  `def x = 'b'` followed by `[a].each { }` is a subscript on `'b'`. The
-  same-line subscript rule proposed in #63 would remove the `[` case only.
+  line reading `(a)` parses as the call `2(a)`. The same happens when the
+  next line starts with `{` (a trailing closure), `-` or `+` (a binary
+  operator), `in`, `as` or `instanceof`. A next line that starts with `[`
+  is not affected: a `[` after a newline never subscripts (§6.9), so
+  `foo 1, 2` followed by `[a].each { }` is two statements. A chain with
+  one argument (`foo 'a'` then `(a)`) is not affected either. Expressions
+  outside command chains already behave this way: `def x = 'b'` followed
+  by `(a)` is a call on `'b'`.
 - A dangling comma takes the first token of the next statement. `foo a: 1,`
   followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
   chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The

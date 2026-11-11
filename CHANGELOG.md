@@ -32,8 +32,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   String keys (`foo 'a': 1`) are not accepted yet. Because an argument
   after a comma is a full expression, it now continues onto the next line
   when that line starts with something that can continue an expression:
-  `foo 1, 2` followed by `[a].each { }` parses as `2[a].each { }`
-  (see §6.8). (#57)
+  `foo 1, 2` followed by `(a)` parses as the call `2(a)` (see §6.8). A
+  line that starts with `[` is a new statement instead; see the
+  `_subscript_open` entry below. (#57)
 - A `[` that starts a new line now begins a list or map literal instead
   of subscripting the previous statement, so a Grails controller action
   ending in `[model: value]` parses. A `[` on the same line as the token
