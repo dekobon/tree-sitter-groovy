@@ -418,3 +418,29 @@ foo 'a', x ? 1 : 2
       condition: (identifier)
       consequence: (number_literal)
       alternative: (number_literal))))
+
+==================
+Named argument keyed record and a record declaration after a receiver
+==================
+
+foo record: 1
+foo
+record R(int x) {}
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (identifier))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))

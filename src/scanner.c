@@ -239,6 +239,11 @@ bool tree_sitter_groovy_external_scanner_scan(
         // here. Falling through after the scan advanced past `b` in
         // `foo a, b` and a newline made the comment branch emit `b` as a
         // line_comment, since mark_end had already been called.
+        // RECORD_KEYWORD can be valid here too, after a statement-start
+        // identifier (`foo` then `record R(…)`). The key wins on the same
+        // line: `foo record: 1` is a named argument, while a record header
+        // there is not valid Groovy. A `record` on the next line is not
+        // reached here, since only spaces and tabs are skipped.
         if (is_ident_start(lexer->lookahead)) {
             return scan_command_named_key(lexer);
         }
