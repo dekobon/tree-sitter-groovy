@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- Enum declarations accept an `implements` clause
+  (`enum Color implements Shaded, Comparable<Color> { … }`), as a
+  `super_interfaces` child, as on classes. Previously the clause was
+  an `ERROR`, and with a generic interface the enum's `name` became
+  the type argument: `enum Level implements Supplier<String>` was
+  named `String`. `node-types.json` adds `super_interfaces` to the
+  children of `enum_declaration`. (#77)
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

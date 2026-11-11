@@ -806,3 +806,86 @@ enum J {
         type: (type_identifier)
         (variable_declarator
           name: (identifier))))))
+
+==================
+Enum implementing interfaces
+==================
+
+enum Color implements Shaded, Comparable<Color> {
+    RED(1), GREEN(2)
+    final int code
+    Color(int code) { this.code = code }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    (super_interfaces
+      (type_identifier)
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier))))))))
+
+==================
+Annotated enum implementing a generic interface
+==================
+
+@CompileStatic
+public enum Level implements Supplier<String> { LOW, HIGH; String get() { name() } }
+
+---
+
+(source_file
+  (enum_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    (super_interfaces
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
