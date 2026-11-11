@@ -444,3 +444,43 @@ record R(int x) {}
         type: (type_identifier)
         name: (identifier)))
     body: (class_body)))
+
+==================
+List on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+[a].each { }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (identifier))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Parenthesis on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+(a)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (method_invocation
+      function: (number_literal)
+      arguments: (argument_list
+        (identifier)))))
