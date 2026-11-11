@@ -1798,7 +1798,7 @@ module.exports = grammar({
     ),
 
     _gstring_dollar_path: _ => token.immediate(
-      /\$[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*/,
+      /\$[\p{XID_Start}_][\p{XID_Continue}]*(\.[\p{XID_Start}_][\p{XID_Continue}]*)*/,
     ),
 
     // §5.7 / §6.3 — `${expression}` interpolation.
@@ -1841,6 +1841,9 @@ module.exports = grammar({
       /[0-9][0-9_]*[GgLlIiDdFf]?/,
     )),
 
-    identifier: _ => /[A-Za-z_$][A-Za-z0-9_$]*/,
+    // Groovy's lexer takes any Java letter (`isJavaIdentifierStart` /
+    // `isJavaIdentifierPart`), not only ASCII; `XID_Start` and
+    // `XID_Continue` are the Unicode classes closest to those.
+    identifier: _ => /[\p{XID_Start}_$][\p{XID_Continue}$]*/,
   },
 });

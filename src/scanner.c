@@ -33,10 +33,14 @@ static inline bool is_inline_space(int32_t c) {
     return c == ' ' || c == '\t';
 }
 
-// Mirrors the grammar's `identifier` token, /[A-Za-z_$][A-Za-z0-9_$]*/.
+// Mirrors the grammar's `identifier` token,
+// /[\p{XID_Start}_$][\p{XID_Continue}$]*/. Without Unicode tables,
+// every non-ASCII code point counts as an identifier character: the
+// scanner only looks for a name between `record` and `(`, and no
+// non-ASCII character outside a name can appear there.
 static inline bool is_identifier_start(int32_t c) {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-        || c == '_' || c == '$';
+        || c == '_' || c == '$' || c > 0x7F;
 }
 
 static inline bool is_identifier_char(int32_t c) {
