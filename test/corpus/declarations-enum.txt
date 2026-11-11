@@ -616,3 +616,193 @@ class C {
             name: (identifier)
             parameters: (formal_parameters)
             body: (block (expression_statement (string_literal)))))))))
+
+==================
+Enum instance initializer after the constants
+==================
+
+enum E {
+    A, B;
+    { init() }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Enum instance initializers after a member and with no constants
+==================
+
+enum E {
+    A, B
+    void f() { }
+    { init() }
+    static { load() }
+}
+
+enum F {
+    { init() }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant name: (identifier))
+      (enum_constant name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Enum constants named record
+==================
+
+enum E { record, B }
+enum F { A, record }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier)))))
+
+==================
+Annotated enum constants
+==================
+
+enum G { @Deprecated A, B }
+enum H { @Foo A(1), @Bar @Baz B }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))))
+
+==================
+Annotated enum constant followed by members
+==================
+
+enum I {
+    @Deprecated A,
+    B
+    int x
+    @Override String toString() { 'x' }
+}
+enum J {
+    @Deprecated A
+    int x
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))

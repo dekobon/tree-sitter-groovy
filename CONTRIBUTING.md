@@ -27,8 +27,9 @@ npx tree-sitter test
 ### External scanner (`src/scanner.c`)
 
 The scanner is hand-written and survives regeneration. It handles
-context-sensitive lexing (slashy vs. division, GString interpolation,
-comments). Edit it directly when the change is in its domain.
+context-sensitive lexing (slashy vs. division, comments, and the
+contextual `record` keyword, see `SPECIFICATION.md` §6.7). Edit it
+directly when the change is in its domain.
 
 ### Queries (`queries/groovy/*.scm`)
 

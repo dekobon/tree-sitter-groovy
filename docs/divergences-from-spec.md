@@ -16,9 +16,9 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
-| §5.2 Contextual keywords | **Mostly done** | `var`, `record`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
+| §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
 | §5.5 Command chains | **Done** | multi-arg form supported. |
@@ -34,10 +34,11 @@ reasoning here.
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
-| §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below). |
+| §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted in this session but coupled to a not-yet-implemented named-argument command-chain (`archiveArtifacts artifacts: 'x'`), which the workaround grammar path quietly absorbed. Reverted to grammar precedence; v2 work is named-args + scanner token together. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
-| §6.7 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
+| §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
+| §6.8 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
 | §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -165,12 +166,17 @@ calls out:
 | `foo()\n.bar()` (leading-dot chain) | parses as one method invocation (line-continuation) |
 | `a\n+ b` (leading-operator) | currently parses as one binary expression — see edge case below |
 
-The one observable difference from the spec's scanner-token design
+One observable difference from the spec's scanner-token design
 is the leading-operator edge case: `a\n+ b` greedily joins as
 `a + b` rather than splitting. Idiomatic Groovy keeps continuation
 operators at the end of the previous line (`a +\n  b`), so the
 case rarely appears in real code; a stricter scanner-driven
 AUTOMATIC_SEMICOLON is a v2 improvement.
+
+The other is a `{` that opens the next line: it joins the previous
+expression where the §6.4 contract as written would end the
+statement. After a call that is Apache's reading too; after
+`new T(...)` it is not (see #11).
 
 ---
 
@@ -358,8 +364,223 @@ the parser layer.
    fails, or
 2. The grammar gains a feature flag that opts the file into
    Groovy-5 mode (e.g. via shebang or a leading directive), at
-   which point the keyword rules can be unconditionally active.
+   which point the keyword rules can be unconditionally active, or
+3. Each word gets the treatment `record` has (spec §6.7): an
+   external-scanner token emitted only when the construct's own
+   shape follows (`async {`, `await <expr>`, `defer {`), so the word
+   lexes as an identifier everywhere else. The scanner decides by
+   look-ahead, which is exactly the fallback the lexer layer lacks.
 
 Until then, code containing `val` / `async` / `await` / `defer`
 parses with these tokens as plain identifiers, which matches the
 behaviour of Groovy 2.x–4.x compilers.
+
+---
+
+## 11. A `{` on the next line continues the previous expression
+
+**Apache `GroovyParser.g4`** allows a line break before a trailing
+closure but not before an anonymous class body (rules quoted from
+the 4.0.x branch; `master` spells `nls` as `NL*`):
+
+- `pathExpression` ends in `(pathElement)*`, and `pathElement` is
+  `nls ( … | closureOrLambdaExpression ) | arguments | …`, with the
+  comment "Can always append a block, as foo{bar}". The `nls` lets
+  the closure start on a later line.
+- `creator` is
+  `createdName ( nls arguments anonymousInnerClassDeclaration[0]? | … )`.
+  Nothing separates the arguments from the class body, so the body
+  cannot follow an `NL` token.
+- `GroovyLexer.g4` hides `NL` while the innermost open bracket is
+  `(`, `[` or `?[` ("Inside (...) and [...] but not {...}, ignore
+  newlines"; the resource list of `try (…)` is excepted), so there a
+  line break before either `{` does not count.
+
+The Groovy 3.0 release notes ("Nested code blocks") say the same of
+calls: a block after a method call is its closure argument "even
+after a new line", and the previous statement may need a terminating
+`;` when a separate block is meant. Parsed by Groovy 4.0.33,
+
+```groovy
+def list = new ArrayList()
+{ list.add(1) }
+```
+
+is one statement, `def list = new ArrayList().call({ ... })`, and no
+anonymous class is created; `new Foo() { }`, with the `{` on the
+same line, creates one. Those two results were observed. Everything
+else this section says about Groovy is read off `GroovyParser.g4`.
+
+**Spec §6.4** would end the statement instead: its
+AUTOMATIC_SEMICOLON contract emits the terminator at a line break
+outside `(` and `[` unless the next token is a binary operator, a
+dot, `?` or `:`, and `{` is not on that list. For a trailing closure
+it is the contract that departs from Apache, not the grammar.
+
+**Current implementation**: newlines are `extras` (§5.10), so the
+parser cannot see the line break and a `{` binds the same way on
+either line.
+
+After a call, a name or a literal the `{` joins that expression,
+which is Apache's reading. `foo()` with `{ x }` on the next line is
+one call with a trailing closure, and so is an Allman-style
+Jenkinsfile or Gradle block (`node('linux')` with its `{ … }`
+opening the next line). In a class body the same holds after a field
+initialiser:
+
+```groovy
+class A {
+    int x = 5
+    {
+        x = 6
+    }
+}
+```
+
+parses without an `ERROR` as a field whose value is the call
+`5 { x = 6 }`, not as a field followed by an instance initializer.
+The instance initializer (a bare `block` in `class_body`) is
+recognised where nothing before it can take the `{`: at the start
+of the body, after a member that ends in `}` (a method or
+constructor with a body, another initializer, a nested type), after
+a field with no initialiser (`int x`), and after a `;`. A block
+after a bodiless method (`abstract void f()`) becomes that method's
+body, which Apache's `(nls methodBody)?` allows as well.
+
+Two places in a member list do differ from Apache:
+
+- **A field with no initialiser.** A `{ … }` on the *same* line is
+  an instance initializer here too, so `int x { … }` and
+  `void run { … }` (parentheses forgotten) parse without an `ERROR`;
+  Apache's `classBody` wants a `sep` between members. In a record
+  body this hides an unsupported construct: the compact canonical
+  constructor `public Name { … }` parses as a modifier-only field
+  `Name` followed by an initializer block.
+- **An enum constant.** `enum_body` takes the initializer wherever
+  its member list repeats — after `;`, after a first member, or
+  with no constants — but not directly after a constant. With the
+  line break invisible, `A` followed by `{ … }` on the next line
+  (in Apache a constant, then an initializer) cannot be told from
+  `A { … }` (a constant with an anonymous class body, which has no
+  production), and both stay errors. Write `A;` first.
+
+The larger divergence is after `new T(...)`: every `{` that follows
+the arguments is the anonymous class body. Apache instead has a
+closure called on the new object when
+
+- the `{` starts a later line, outside parentheses and brackets.
+  Here the `ArrayList` input above gets `{ list.add(1) }` as the
+  class body of an anonymous `ArrayList` subclass, with an `ERROR`
+  for the statement inside it; or
+- the `{` is on the same line but its content cannot be a class
+  body, as in `new T() { x -> x }` (ANTLR skips the optional
+  `anonymousInnerClassDeclaration` when it cannot match). Here that
+  is a `class_body` with an `ERROR` in it.
+
+v0.4.0 parsed both as a call with a trailing closure. A next-line
+block made of members,
+
+```groovy
+def r = new Runnable()
+{
+    void run() { }
+}
+```
+
+is accepted as an anonymous class without an error, although
+`creator` cannot produce one there. Directly inside parentheses or
+brackets (`foo(new T()` with the body opening the next line) the
+line break changes nothing in either parser.
+
+Workaround: where the closure reading after `new T(...)` is wanted,
+wrap the creation in parentheses (`(new ArrayList())`, then the
+`{`) or spell the call out (`new ArrayList().call { … }`). A `;`
+after `new T(...)` makes the block a separate statement, which is
+not Groovy's reading of the original. For an instance initializer
+after `int x = 5`, end the field with `;` or put the block where
+nothing before it can take the `{`, as in Groovy.
+
+**Action**: none for the trailing closure. A newline-aware token
+for that `{` would move the grammar away from Apache and break the
+Allman-style calls above, and so would an AUTOMATIC_SEMICOLON built
+to the §6.4 contract as written; the contract has to treat a `{` as
+continuing the expression first.
+
+For `new T(...)` two routes are open, neither taken yet. A declared
+conflict on `object_creation_expression` with `prec.dynamic` on the
+body restores both closure forms, but any body with an error in it
+(a member `class_body` cannot parse, or one still being typed) then
+falls back without an `ERROR` to the call-with-closure tree that #68
+reported. A newline-aware scanner token would refuse the body after
+a line break; it has to track the enclosing bracket, because
+Apache's lexer hides the break inside `(` and `[`, and it does
+nothing for the same-line form.
+
+One `new` form never reaches `object_creation_expression`, so a `{`
+after it is not a class body either. Qualified creation,
+`def i = outer.new Inner(...) { … }` (Apache `pathElement`:
+`DOT nls NEW creator[1]`), has no production. `.new` reads as a
+property access and `Inner(...) { … }` as a separate call with a
+trailing closure, with no `ERROR`, with or without a body. As a call
+argument the form is an `ERROR`. This predates #68.
+
+---
+
+## 12. `sealed` and `trait` are keywords where a member can start
+
+**Apache `GroovyParser.g4`** lets both words name things: its
+`identifier` rule lists `SEALED` and `TRAIT` next to `Identifier`,
+so `private boolean sealed` and `String trait` are ordinary fields.
+**Spec §5.2** asks for the same through an
+`identifier_or_contextual` fallback.
+
+**Current implementation**: the declaration rules spell the words
+as literals, and with `word: $.identifier` the lexer hands back the
+keyword wherever the parser could accept it, with no fallback to
+`identifier`. That was already so where a statement can start:
+`boolean sealed = true` in a method body, and a statement that
+opens with a variable named `trait`, are errors at v0.4.0 too
+(`def sealed = 1` is not).
+
+Nested type declarations (#60, #68) extend it to member lists. A
+nested `class`, `interface`, `trait`, `record` or `@interface` has
+to be a member, because otherwise its keyword lexes as an identifier
+and `class Inner { … }` parses, with no `ERROR`, as a field `Inner`
+of type `class` followed by an instance initializer block. With the
+productions in place `sealed` and `trait` are keywords wherever a
+member can start:
+
+| Input in a class body | Result |
+|---|---|
+| `boolean sealed`, `String trait`, `def sealed = 1` | field, as before |
+| `int x, trait`, `List<String> sealed`, `@Lazy List sealed` | field, as before |
+| `void sealed() { }`, parameters and property accesses named `sealed` / `trait` | as before |
+| `private boolean sealed`, `private String trait = "x"` | `ERROR` (a field at v0.4.0) |
+| `public static final int sealed = 1` | `ERROR` (a field at v0.4.0) |
+| `static trait = 1`, `private trait`, `sealed() { }` | `ERROR` (parsed at v0.4.0) |
+| `enum E { trait, B }`, `enum E { sealed }` | `ERROR` (constants at v0.4.0) |
+
+The rows that fail share one shape. A field needs no type after a
+modifier, so `private boolean` is already a complete field named
+`boolean`, a new member may start right after it, and the lexer
+prefers the keyword. Without a modifier the type cannot stand
+alone, the next word can only be the name, and it stays an
+identifier. The first constant of an enum sits where a member could
+start too; a later one (`enum E { A, sealed }`) does not.
+
+`record` escapes the table because its keyword is not a grammar
+literal: the external scanner emits it only when a name follows on
+the same line and `(` after that (spec §6.7), so `private Record record`,
+`public void record() { }` and `enum E { record, B }` all parse and
+a nested `record R(int x) { }` is a `record_declaration`.
+
+**Action**: give `sealed` and `trait` the same treatment — a scanner
+token emitted only when the word opens a declaration (`sealed class`,
+`sealed interface`, `trait Name {`), so the literal disappears from
+the lexer and the word is an identifier elsewhere. The alternative,
+accepting the words as names through an aliased keyword
+(`alias('sealed', $.identifier)`) in the declarator and
+enum-constant positions, was tried for `record` and rejected: after
+`private boolean` it is a genuine LR(1) conflict that needs a
+declared conflict, and it still leaves `public void record() { }` an
+error because the method name position wants `_property_name`.
