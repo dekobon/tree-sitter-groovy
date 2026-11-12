@@ -559,3 +559,218 @@ a / b
     (binary_expression
       left: (identifier)
       right: (identifier))))
+
+==================
+Double-quoted string that starts with two slashes
+==================
+
+x = "//div[@id]"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Double-quoted string that starts with a space and two slashes
+==================
+
+x = " // c"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Double-quoted string that starts with a block comment opener
+==================
+
+x = "/* c */ d"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Glob after a brace interpolation is not a groovydoc comment
+==================
+
+x = "${d}/**/*.xml"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Glob after a dollar interpolation is not a groovydoc comment
+==================
+
+x = "$d/**/*.xml"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Two slashes after an interpolation are not a line comment
+==================
+
+x = "${a}//b"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Block comment text after an interpolation is not a comment
+==================
+
+x = "a ${b} /* c */ d"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Triple-double-quoted string with a line that starts with two slashes
+==================
+
+x = """
+// c
+"""
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Dollar-slashy string with two slashes after an interpolation
+==================
+
+x = $/${a}//b/$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Double-quoted string that starts with a line escape and two slashes
+==================
+
+x = "\
+//c"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Double-quoted string that starts with a line escape and a block comment
+==================
+
+x = "\
+/*c*/"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Triple-double-quoted string that starts with a line escape and a groovydoc comment
+==================
+
+x = """\
+/**c*/"""
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Comment inside a brace interpolation is still a comment
+==================
+
+x = "a${b /* c */}d"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier)
+          (block_comment))
+        (string_fragment)))))

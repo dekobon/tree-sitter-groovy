@@ -6936,6 +6936,10 @@
                 },
                 "named": true,
                 "value": "string_fragment"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_string_body"
               }
             ]
           }
@@ -7077,6 +7081,10 @@
                 },
                 "named": true,
                 "value": "string_fragment"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_string_body"
               }
             ]
           }
@@ -7157,6 +7165,10 @@
                 },
                 "named": true,
                 "value": "string_fragment"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_string_body"
               }
             ]
           }
@@ -7283,6 +7295,10 @@
                 },
                 "named": true,
                 "value": "string_fragment"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_string_body"
               }
             ]
           }
@@ -7446,6 +7462,10 @@
     {
       "type": "SYMBOL",
       "name": "_subscript_open"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_string_body"
     },
     {
       "type": "SYMBOL",

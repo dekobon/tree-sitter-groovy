@@ -839,9 +839,10 @@ grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 keyword (§6.7), the named-argument key of a parenthesis-free call
-(§6.8), the same-line subscript opener (§6.9), and `ERROR_SENTINEL`,
-which no rule references and which only signals error recovery; the
-other tokens listed here are met in-grammar, see
+(§6.8), the same-line subscript opener (§6.9), `STRING_BODY` (§6.10),
+which is never emitted and only marks a string body, and
+`ERROR_SENTINEL`, which no rule references and which only signals
+error recovery; the other tokens listed here are met in-grammar, see
 `docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
@@ -862,6 +863,7 @@ enum TokenType {
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
   COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -1114,6 +1116,24 @@ stack of open parentheses, brackets and braces in the scanner. A block
 comment at the start of the `[` line also hides the newline before it:
 `a` followed by `/* c */ [0]` on the next line parses as a subscript,
 where Groovy ends the statement at the newline.
+
+### 6.10 STRING_BODY — implementation contract
+
+Never emitted. `"…"`, `"""…"""`, `/…/` and `$/…/$` are lexed in pieces
+so that interpolations become child nodes, and the parser calls the
+scanner at the start of every piece. Comments are `extras`, so they are
+valid there as everywhere else. At v0.5.0 the scanner therefore emitted
+a comment whenever a piece started with `//` or `/*`, with or without
+whitespace before it: `"//div"` lost its closing quote to a line
+comment, and `"${dir}/**/*.xml"` held a `groovydoc_comment`.
+
+Every body lists `_string_body` among its segments, so the token is
+valid exactly where a segment may start. When it is valid and
+`ERROR_SENTINEL` is not, the scanner returns without emitting anything
+and the in-grammar lexer reads the text. Inside `${…}` the token is not
+valid, so a comment there is still a comment. During error recovery
+every external is valid and the check is skipped, as for the other
+context-sensitive tokens.
 
 ---
 

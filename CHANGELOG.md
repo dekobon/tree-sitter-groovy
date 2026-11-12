@@ -62,6 +62,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`private final int v`, `// note`, `String m() { }`) is now that
   field and that method. It was a field named `int`, a field named
   `String` of type `v`, and a constructor `m`. (#87)
+- **BREAKING:** comment-like text in a string body is now part of a
+  `string_fragment` (see Fixed below), which changes trees for input
+  that parsed without an `ERROR` at v0.5.0. `"${dir}/**/*.xml"` and
+  `"/* c */ d"` held a `groovydoc_comment` or a `block_comment` in
+  place of that text, and a line that starts with `//` inside
+  `"""…"""` was a `line_comment`. (#87)
 - **BREAKING:** outside a class body, a method declaration with no
   body now gives way to statements (see Fixed below), which changes
   trees for input that parsed without an `ERROR` at v0.5.0. `x`
@@ -69,13 +75,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line, were a `method_declaration` whose return type was `x` or
   `println`. Each is now an expression statement followed by a call.
   (#87)
-- Three external scanner tokens are added: `_command_named_key` (#57),
-  `_subscript_open` (#63) and `_error_sentinel` (both), so most symbol
-  ids above 69 in the generated parser change and `SYMBOL_COUNT` goes
-  from 308 to 313. Node names and field ids are unchanged. In
-  `node-types.json`, `command_chain`'s `argument` field lists every
-  expression kind and `named_argument`, and `trait_declaration` gains a
-  `super_interfaces` child. (#57, #63, #65)
+- Four external scanner tokens are added: `_command_named_key` (#57),
+  `_subscript_open` (#63), `_string_body` (#87) and `_error_sentinel`
+  (#57, #63), so most symbol ids above 69 in the generated parser
+  change and `SYMBOL_COUNT` goes from 308 to 314. Node names and field
+  ids are unchanged. In `node-types.json`, `command_chain`'s `argument`
+  field lists every expression kind and `named_argument`, and
+  `trait_declaration` gains a `super_interfaces` child.
+  (#57, #63, #65, #87)
 
 ### Fixed
 
@@ -130,6 +137,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   where nothing else parses: in a class body, for abstract and
   interface methods. A script method with no body (`String foo()`),
   which Groovy rejects, now parses as two expression statements. (#87)
+- The scanner no longer emits a comment inside a string body.
+  `"//div[@id]"`, `" // c"` and `"${a}//b"` were an `ERROR`, because a
+  line comment took the closing quote. `"${dir}/**/*.xml"`,
+  `"/* c */ d"` and a `//` line inside `"""…"""` parsed with a comment
+  node in place of the text. The bodies of `"…"`, `"""…"""`, `/…/` and
+  `$/…/$` now reference a new external token, `_string_body`, which is
+  never emitted; where it is valid the scanner emits nothing. A
+  comment inside `${…}` is still a comment. (#87)
 - A line escape, `\` at the end of a line, is now whitespace, as in
   Groovy's lexer; it was an `ERROR`. The line after it continues the
   current one, so `x \` followed by `[0]` is a subscript and `foo \`

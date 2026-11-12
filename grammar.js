@@ -59,6 +59,10 @@ const PREC = {
  * The text rule differs (single-quoted bans newlines, triple-quoted
  * allows them) but every other alternative is identical.
  *
+ * `_string_body` is never emitted. Listing it here makes it valid
+ * wherever a body segment may start, which is how the external scanner
+ * learns that it is inside a string (SPECIFICATION.md §6.10).
+ *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} textRule The flavour-specific literal-text rule.
  * @returns {ChoiceRule} The shared body-segment choice.
@@ -69,6 +73,7 @@ function gstringPart($, textRule) {
     $.gstring_dollar_interpolation,
     $.gstring_brace_interpolation,
     alias($._gstring_literal_dollar, $.string_fragment),
+    $._string_body,
   );
 }
 
@@ -103,11 +108,13 @@ module.exports = grammar({
 
   // Externals listed here must have a matching branch in
   // `src/scanner.c` AND be referenced by at least one rule below
-  // (`_command_named_key` and `_subscript_open` included). The one
-  // exception is `_error_sentinel`: no rule references it, and it
-  // exists so the scanner can detect error recovery, when tree-sitter
-  // marks every external valid. It is kept last here and in the
-  // scanner's `TokenType` enum, and the two orders must match.
+  // (`_command_named_key` and `_subscript_open` included). There are
+  // two exceptions. No rule references `_error_sentinel`: it exists so
+  // the scanner can detect error recovery, when tree-sitter marks
+  // every external valid. It is kept last here and in the scanner's
+  // `TokenType` enum, and the two orders must match. The scanner never
+  // emits `_string_body`: a string body references it so that the
+  // scanner can tell it is inside one.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -132,6 +139,11 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
+    // §6.10 — never emitted: valid only between the quotes of a string
+    // whose body is lexed in pieces. Comments are extras, so the parser
+    // offers them there too; the scanner must emit nothing, or `//` and
+    // `/*` at a piece boundary become comments.
+    $._string_body,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,

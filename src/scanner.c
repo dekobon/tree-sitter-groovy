@@ -8,9 +8,11 @@
 // when a record header follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, the key of a named argument in a
 // parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
-// line as the token before it. ERROR_SENTINEL is never emitted; the
-// parser marks it valid only during error recovery, where
-// COMMAND_NAMED_KEY and SUBSCRIPT_OPEN are suppressed.
+// line as the token before it. STRING_BODY (§6.10) is never emitted;
+// it is valid only inside a string body, where the scanner emits
+// nothing. ERROR_SENTINEL is never emitted either; the parser marks it
+// valid only during error recovery, where COMMAND_NAMED_KEY,
+// SUBSCRIPT_OPEN and the STRING_BODY check are suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -28,6 +30,7 @@ enum TokenType {
     RECORD_KEYWORD,
     COMMAND_NAMED_KEY,
     SUBSCRIPT_OPEN,
+    STRING_BODY,
     ERROR_SENTINEL,
 };
 
@@ -266,6 +269,17 @@ bool tree_sitter_groovy_external_scanner_scan(
     const bool *valid_symbols
 ) {
     (void)payload;
+
+    // SPECIFICATION.md §6.10 — STRING_BODY is valid only between the
+    // quotes of a string whose body is lexed in pieces. Comments are
+    // extras, so the parser offers them there as well, and this
+    // function is called at every piece boundary. Without this check a
+    // body that starts with `//` or `/*`, or has one after an
+    // interpolation, lost that text to a comment token. The body
+    // belongs to the in-grammar lexer.
+    if (valid_symbols[STRING_BODY] && !valid_symbols[ERROR_SENTINEL]) {
+        return false;
+    }
 
     // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY
     // (§5.5). Both skip only spaces, tabs and line escapes, the
