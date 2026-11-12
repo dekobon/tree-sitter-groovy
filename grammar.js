@@ -713,7 +713,7 @@ module.exports = grammar({
       // splitting `private final int v\n C() {}` after `int`. The
       // weight is above a method body's: the split reading holds a
       // method (`v C() {}`), which would otherwise tie.
-      prec.dynamic(2, seq(
+      prec.dynamic(4, seq(
         repeat($.annotation),
         repeat($._modifier),
         choice('def', field('type', $._type)),
@@ -743,7 +743,10 @@ module.exports = grammar({
     // expression `String` followed by the call `f() { }`, and
     // `def f(a) { }` as a variable `f` followed by the cast
     // `(a) { }`. Without a weight, a comment before the method made
-    // the split win.
+    // the split win. The weight is above the blank final local's
+    // (`final Type name`, see local_variable_declaration):
+    // `final String f(a) { }` is also that local followed by the cast
+    // `(a) { }`.
     //
     // A method without a body carries a negative one. Its tokens are
     // also `x` followed by the call `foo()`, and outside a class body
@@ -767,7 +770,7 @@ module.exports = grammar({
       );
       return prec.right(2, choice(
         prec.dynamic(-1, signature),
-        prec.dynamic(1, seq(signature, field('body', $.block))),
+        prec.dynamic(3, seq(signature, field('body', $.block))),
       ));
     },
 
@@ -992,6 +995,10 @@ module.exports = grammar({
     //   becomes `final x y = 2`, the same resolution modifier-only
     //   fields get (`static x` then `y = 1`), and `String s = 'a'`
     //   becomes `final x String` followed by `s = 'a'`.
+    // - `final String name` followed by a line reading `foo() { }` is
+    //   `final String` followed by the method `name foo() { }`. A
+    //   method with a body outranks the blank form, so that
+    //   `final String f(a) { }` stays a method (see method_declaration).
     // - A bare `x` followed by a line reading `y = 1` is the typed
     //   declaration `x y = 1`.
     local_variable_declaration: $ => prec.right(choice(

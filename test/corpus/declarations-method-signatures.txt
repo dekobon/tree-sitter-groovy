@@ -407,6 +407,47 @@ void b() { }
     body: (block)))
 
 ==================
+Final typed script method with an untyped parameter
+==================
+
+final String f(a) { a }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Final typed script method with a default parameter and a throws clause
+==================
+
+final String f(a = 1) throws E { a }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal)))
+    (throws_clause
+      (type_identifier))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
 Call on the line after a bare identifier is not a method
 ==================
 
