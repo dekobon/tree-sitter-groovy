@@ -3257,6 +3257,10 @@
         {
           "type": "annotation",
           "named": true
+        },
+        {
+          "type": "super_interfaces",
+          "named": true
         }
       ]
     }

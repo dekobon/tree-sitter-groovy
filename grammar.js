@@ -856,6 +856,7 @@ module.exports = grammar({
       repeat($._modifier),
       'enum',
       field('name', $.identifier),
+      optional($.super_interfaces),
       field('body', $.enum_body),
     ),
 
