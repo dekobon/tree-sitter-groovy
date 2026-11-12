@@ -277,7 +277,20 @@ same reason: `String f() { }` also parses as the expression `String`
 followed by the call `f() { }`, and `def f(a) { }` as a variable `f`
 followed by the cast `(a) { }`. Here too the reverse case loses: a
 bare `x` followed by `foo() { }` on the next line is the method
-`x foo() { }`.
+`x foo() { }`. The method's weight is above the blank final's, because
+`final String f(a) { }` is also `final String f` followed by the cast
+`(a) { }`. That costs the blank final one case: `final String name`
+followed by `foo() { }` on the next line is `final String` followed by
+the method `name foo() { }`.
+
+In a class body the weights rank a typed field above a method with a
+body, and give a field with modifiers only a negative weight. Without
+the first, `private final int v` followed by a constructor was
+`private final int` and a method `v C() { }`. Without the second, the
+same field followed by a comment and a member that starts with a
+modifier (`private String w`, `public A() { }`, `static { }`) was
+`private final int`, a field of type `v` named after that modifier,
+and the rest: a keyword is an identifier wherever it has no action.
 
 A method declaration without a body carries a negative dynamic
 precedence, so `x` followed by `foo()` on the next line is two

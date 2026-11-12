@@ -57,11 +57,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `/* note */`, then `def skip(task) { true }` was a variable `skip`
   followed by a cast of a closure; `String call() { 'x' }` in the same
   position was the expression `String` followed by a call with a
-  closure. Trees change inside a class body too: a field with a
-  modifier and no initializer, then a comment, then a method
-  (`private final int v`, `// note`, `String m() { }`) is now that
-  field and that method. It was a field named `int`, a field named
-  `String` of type `v`, and a constructor `m`. (#87)
+  closure. (#87)
+- **BREAKING:** in a class body, a field with a modifier and no
+  initializer is no longer split when a comment follows it and the
+  next member is a method or starts with a modifier (see Fixed below),
+  which changes trees for input that parsed without an `ERROR` at
+  v0.5.0. `private int v // one` followed by `private String w` was a
+  field named `int`, a field of type `v` named `private`, and a field
+  `String w`; it is now the two fields. The same holds before a
+  constructor or method with a modifier (`public A() { }`,
+  `static m() { }`), a `static { }` block and a nested type, and
+  before a method with a return type (`String m() { }`). (#87)
 - **BREAKING:** comment-like text in a string body is now part of a
   `string_fragment` (see Fixed below), which changes trees for input
   that parsed without an `ERROR` at v0.5.0. `"${dir}/**/*.xml"` and
@@ -137,11 +143,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `String call() { 'x' }` parsed as the expression `String` and the
   call `call() { 'x' }`, and `def skip(task) { true }` as a variable
   and a cast of a closure. A method with a body now carries a dynamic
-  precedence, and the typed field's rises from 1 to 2 so that
-  `private final int v` followed by a constructor is still a field and
-  a constructor. The two weights also fix a class body in which a
-  comment stands between a field with a modifier and no initializer
-  and the method after it. (#87)
+  precedence. It is above the blank final local's, so that
+  `final String f(a) { }` stays a method, and below the typed field's,
+  so that `private final int v` followed by a constructor is still a
+  field and a constructor. (#87)
+- In a class body, a field with a modifier and no initializer is no
+  longer split when a comment follows it. `private final int v`, then
+  `/** doc */`, then `public A(int v) { }` parsed as a field named
+  `int`, a field of type `v` named `public`, and a constructor; two
+  commented fields in a row (`private int v // one`, then
+  `private String w`) were split the same way. A keyword is an
+  identifier wherever it has no action, so both readings held one
+  typed field and nothing ranked them. A field with modifiers only now
+  carries a negative dynamic precedence. (#87)
 - A bare identifier followed by a call is no longer a method
   declaration with no body. `result` followed by `noExceptionThrown()`
   on the next line, and `println foo()` on one line, parsed as a
