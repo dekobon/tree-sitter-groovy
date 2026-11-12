@@ -405,3 +405,108 @@ void b() { }
     name: (identifier)
     parameters: (formal_parameters)
     body: (block)))
+
+==================
+Call on the line after a bare identifier is not a method
+==================
+
+x
+foo()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Call with arguments on the line after a bare identifier is not a method
+==================
+
+x
+foo(a, b)
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)))))
+
+==================
+Call on the line after a labeled bare expression is not a method
+==================
+
+then:
+result
+noExceptionThrown()
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Call on the line after an untyped blank final is not a method
+==================
+
+def m() {
+  final x
+  foo()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+Method with no body after another member in an interface
+==================
+
+interface I {
+  String a() // note
+  int b()
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (line_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))

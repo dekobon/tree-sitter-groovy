@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`private final int v`, `// note`, `String m() { }`) is now that
   field and that method. It was a field named `int`, a field named
   `String` of type `v`, and a constructor `m`. (#87)
+- **BREAKING:** outside a class body, a method declaration with no
+  body now gives way to statements (see Fixed below), which changes
+  trees for input that parsed without an `ERROR` at v0.5.0. `x`
+  followed by `foo()` on the next line, and `println foo()` on one
+  line, were a `method_declaration` whose return type was `x` or
+  `println`. Each is now an expression statement followed by a call.
+  (#87)
 - Three external scanner tokens are added: `_command_named_key` (#57),
   `_subscript_open` (#63) and `_error_sentinel` (both), so most symbol
   ids above 69 in the generated parser change and `SYMBOL_COUNT` goes
@@ -115,6 +122,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a constructor. The two weights also fix a class body in which a
   comment stands between a field with a modifier and no initializer
   and the method after it. (#87)
+- A bare identifier followed by a call is no longer a method
+  declaration with no body. `result` followed by `noExceptionThrown()`
+  on the next line, and `println foo()` on one line, parsed as a
+  method whose return type was the first word. A method with no body
+  now carries a negative dynamic precedence, so it is chosen only
+  where nothing else parses: in a class body, for abstract and
+  interface methods. A script method with no body (`String foo()`),
+  which Groovy rejects, now parses as two expression statements. (#87)
 
 ## [0.5.0] - 2026-11-10
 

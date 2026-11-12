@@ -727,8 +727,13 @@ module.exports = grammar({
     // expression `String` followed by the call `f() { }`, and
     // `def f(a) { }` as a variable `f` followed by the cast
     // `(a) { }`. Without a weight, a comment before the method made
-    // the split win. A method without a body gets none: outside a
-    // class body it is not valid Groovy.
+    // the split win.
+    //
+    // A method without a body carries a negative one. Its tokens are
+    // also `x` followed by the call `foo()`, and outside a class body
+    // only that reading is valid Groovy: a script method needs a
+    // body. In a class body nothing competes, so abstract and
+    // interface methods are unaffected.
     method_declaration: $ => {
       const signature = seq(
         repeat($.annotation),
@@ -745,7 +750,7 @@ module.exports = grammar({
         optional($.throws_clause),
       );
       return prec.right(2, choice(
-        signature,
+        prec.dynamic(-1, signature),
         prec.dynamic(1, seq(signature, field('body', $.block))),
       ));
     },
@@ -969,9 +974,8 @@ module.exports = grammar({
     // - `final x` followed by a line that starts with an identifier
     //   reads `x` as the type and that identifier as the name. `y = 2`
     //   becomes `final x y = 2`, the same resolution modifier-only
-    //   fields get (`static x` then `y = 1`); `String s = 'a'` becomes
-    //   `final x String` followed by `s = 'a'`; and `foo()` becomes a
-    //   method declaration `x foo()`.
+    //   fields get (`static x` then `y = 1`), and `String s = 'a'`
+    //   becomes `final x String` followed by `s = 'a'`.
     // - A bare `x` followed by a line reading `y = 1` is the typed
     //   declaration `x y = 1`.
     local_variable_declaration: $ => prec.right(choice(

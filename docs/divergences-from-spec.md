@@ -278,6 +278,15 @@ followed by the cast `(a) { }`. Here too the reverse case loses: a
 bare `x` followed by `foo() { }` on the next line is the method
 `x foo() { }`.
 
+A method declaration without a body carries a negative dynamic
+precedence, so `x` followed by `foo()` on the next line is two
+statements, as is `println foo()` on one line. Outside a class body a
+method needs a body, so only the statement reading is valid Groovy.
+The cost is on invalid input: `String foo()` with no body, which
+Groovy rejects in a script, parses as `String` followed by `foo()`
+with no `ERROR`. In a class body nothing competes with the method, so
+abstract and interface methods are unaffected.
+
 **Action**: lift this restriction once we have a sound
 disambiguation strategy. Likely path: a conflict declaration on
 `[$.local_variable_declaration, $.method_invocation]` plus a
