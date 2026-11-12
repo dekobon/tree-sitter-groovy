@@ -259,6 +259,17 @@ positional argument) without a 2-token lookahead.
 Workaround: users can use `def x` or `var x` for the no-init form;
 the typed form requires `= value`. Real-world Groovy code almost
 universally uses `=` initializers on local declarations anyway.
+`final Type x` is the exception: a blank final is accepted, with a
+single declarator.
+
+Because a newline is whitespace (#3), the tokens of a typed
+declaration also parse as two statements: `String s = 'a'` as the
+expression `String` followed by `s = 'a'`. The typed forms carry a
+dynamic precedence, so the declaration wins whenever both parse;
+without it a comment before the declaration changed the result. The
+cost is the reverse case: a bare `x` followed by `y = 1` on the next
+line is the declaration `x y = 1`, and `final a` followed by
+`String b = 'y'` is `final a String` followed by `b = 'y'`.
 
 **Action**: lift this restriction once we have a sound
 disambiguation strategy. Likely path: a conflict declaration on

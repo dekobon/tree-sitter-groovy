@@ -938,21 +938,27 @@ module.exports = grammar({
     // the variable is dynamically typed, as with `def`. `final` also
     // allows the typed form without an initializer (`final String
     // name`, a blank final), with a single declarator.
-    // Newlines do not end either form, so these read wrongly with no
-    // ERROR node:
+    //
+    // The typed forms carry a dynamic precedence because their tokens
+    // also parse another way: `String s = 'a'` as the expression
+    // `String` followed by `s = 'a'`, and `final String s = 'a'` as
+    // the modifier-only `final String` followed by `s = 'a'`. Without
+    // a weight, which tree wins depends on tree shape, and a comment
+    // before the declaration flipped it. The blank form ranks above
+    // the initialized one, or `final String name` followed by
+    // `name = 'a'` would tie with `final String` followed by
+    // `name name = 'a'`.
+    //
+    // Newlines do not end a declaration, so these read wrongly with
+    // no ERROR node:
     // - `final x` followed by a line that starts with an identifier
     //   reads `x` as the type and that identifier as the name. `y = 2`
     //   becomes `final x y = 2`, the same resolution modifier-only
-    //   fields get (`static x` then `y = 1`), and inside a block
-    //   `foo()` becomes a method declaration `x foo()`.
-    // - `final String name` followed by `name = 'a'` or `foo()` is a
-    //   variable named `String` followed by `name name = 'a'` or by a
-    //   method declaration `name foo()`. This happens at script top
-    //   level, and inside a block when a comment follows the
-    //   declaration.
-    // - A typed `final` local on the line after a comment splits into
-    //   a variable named after the type and an assignment, as typed
-    //   locals without `final` already do.
+    //   fields get (`static x` then `y = 1`); `String s = 'a'` becomes
+    //   `final x String` followed by `s = 'a'`; and `foo()` becomes a
+    //   method declaration `x foo()`.
+    // - A bare `x` followed by a line reading `y = 1` is the typed
+    //   declaration `x y = 1`.
     local_variable_declaration: $ => prec.right(choice(
       seq(
         optional('final'),
@@ -960,22 +966,22 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
-      seq(
+      prec.dynamic(1, seq(
         optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
-      ),
+      )),
       seq(
         'final',
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
-      seq(
+      prec.dynamic(2, seq(
         'final',
         field('type', $._type),
         field('name', $.identifier),
-      ),
+      )),
     )),
 
     _initialized_declarator: $ => seq(

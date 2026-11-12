@@ -2837,49 +2837,53 @@
             ]
           },
           {
-            "type": "SEQ",
-            "members": [
-              {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "final"
-                  },
-                  {
-                    "type": "BLANK"
-                  }
-                ]
-              },
-              {
-                "type": "FIELD",
-                "name": "type",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_type"
-                }
-              },
-              {
-                "type": "SYMBOL",
-                "name": "_initialized_declarator"
-              },
-              {
-                "type": "REPEAT",
-                "content": {
-                  "type": "SEQ",
+            "type": "PREC_DYNAMIC",
+            "value": 1,
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "CHOICE",
                   "members": [
                     {
                       "type": "STRING",
-                      "value": ","
+                      "value": "final"
                     },
                     {
-                      "type": "SYMBOL",
-                      "name": "_initialized_declarator"
+                      "type": "BLANK"
                     }
                   ]
+                },
+                {
+                  "type": "FIELD",
+                  "name": "type",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_type"
+                  }
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_initialized_declarator"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": ","
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_initialized_declarator"
+                      }
+                    ]
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "type": "SEQ",
@@ -2911,29 +2915,33 @@
             ]
           },
           {
-            "type": "SEQ",
-            "members": [
-              {
-                "type": "STRING",
-                "value": "final"
-              },
-              {
-                "type": "FIELD",
-                "name": "type",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_type"
+            "type": "PREC_DYNAMIC",
+            "value": 2,
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "final"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "type",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_type"
+                  }
+                },
+                {
+                  "type": "FIELD",
+                  "name": "name",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  }
                 }
-              },
-              {
-                "type": "FIELD",
-                "name": "name",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "identifier"
-                }
-              }
-            ]
+              ]
+            }
           }
         ]
       }
