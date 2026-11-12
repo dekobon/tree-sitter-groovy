@@ -158,8 +158,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Groovy's lexer; it was an `ERROR`. The line after it continues the
   current one, so `x \` followed by `[0]` is a subscript and `foo \`
   followed by `a: 1` is a named-argument call. A `\` before a lone
-  `\r` is still an `ERROR`. A `\` that ends the file is skipped with
-  no `ERROR`. (#87)
+  `\r` is still an `ERROR` when more input follows. At the very end of
+  the file a `\`, alone or with a `\r` after it, is skipped with no
+  `ERROR`. (#87)
 
 ## [0.5.0] - 2026-11-10
 

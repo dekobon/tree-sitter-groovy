@@ -733,9 +733,10 @@ scanner branches are avoided):
   line continues the current one: `x \` followed by `[0]` is a
   subscript, and `foo \` followed by `a: 1` is a named-argument call.
   A `\` anywhere else outside a string is an `ERROR`. Two cases differ
-  from Apache. A `\` before a lone `\r` is an `ERROR`. A `\` that ends
-  the file is skipped with no `ERROR`, because the lexer has already
-  taken it as the start of the pattern.
+  from Apache. A `\` before a lone `\r` is an `ERROR` when more input
+  follows the `\r`. At the very end of the file a `\`, alone or with a
+  `\r` after it, is skipped with no `ERROR`, because the lexer has
+  already taken it as the start of the pattern.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
   (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
