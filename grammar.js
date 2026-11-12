@@ -1955,15 +1955,25 @@ module.exports = grammar({
     // `$$` (literal `$`), `$/` (literal `/`), and any other
     // non-`/` non-`$` char. The closer `/$` is `token.immediate`
     // so it always wins over text when `/` is followed by `$`.
+    //
+    // A run of slashes is text only up to an ordinary character
+    // (`a//b`). The text token must not take a `/` that the closer
+    // needs, and a regex cannot look ahead, so the slashes of a run
+    // that ends at `$` are lexed one at a time: for `//$` the single
+    // `/` matches first, then `/$` is the longer match and closes
+    // the string. Each such slash is its own `string_fragment`.
     _dollar_slashy_string: $ => seq(
       '$/',
-      repeat(gstringPart($, $._dollar_slashy_text)),
+      repeat(choice(
+        gstringPart($, $._dollar_slashy_text),
+        alias(token.immediate('/'), $.string_fragment),
+      )),
       token.immediate('/$'),
     ),
 
     _dollar_slashy_text: _ => token.immediate(repeat1(choice(
       /[^/$]/,
-      /\/[^$]/,
+      /\/+[^/$]/,
       /\$\$/,
       /\$\//,
     ))),

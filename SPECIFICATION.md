@@ -687,6 +687,11 @@ Escape rules:
 - `${expr}` → interpolation.
 - `/$` (only when followed by no further content within the literal)
   → terminator.
+- `/` directly before the terminator is text: `$/a//$` holds `a/`. The
+  text token cannot look ahead, so it ends before a run of slashes
+  that reaches `$`. Each slash of that run except the last is then a
+  `string_fragment` of its own, and the last one starts the
+  terminator.
 
 ### 5.8 Closure parameters and the `it` shorthand
 

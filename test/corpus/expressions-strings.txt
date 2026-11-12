@@ -757,6 +757,85 @@ x = """\
         (string_fragment)))))
 
 ==================
+Dollar-slashy string whose text ends in a slash
+==================
+
+x = $/a//$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (string_fragment)))))
+
+==================
+Dollar-slashy string that holds only a slash
+==================
+
+x = $///$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Dollar-slashy string that holds block comment text
+==================
+
+x = $//*c*//$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (string_fragment)))))
+
+==================
+Dollar-slashy string with a slash after an interpolation
+==================
+
+x = $/${a}//$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Dollar-slashy string with slashes inside the text is one fragment
+==================
+
+x = $/a//b/c/$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
 Comment inside a brace interpolation is still a comment
 ==================
 

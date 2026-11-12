@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `"/* c */ d"` held a `groovydoc_comment` or a `block_comment` in
   place of that text, and a line that starts with `//` inside
   `"""…"""` was a `line_comment`. (#87)
+- **BREAKING:** a dollar-slashy string whose text ends in two or more
+  slashes has more `string_fragment` children (see Fixed below), which
+  changes trees for input that parsed without an `ERROR` at v0.5.0.
+  `$/a///$` was one fragment, `a//`; it is now `a` and one fragment
+  for each slash. (#87)
 - **BREAKING:** outside a class body, a method declaration with no
   body now gives way to statements (see Fixed below), which changes
   trees for input that parsed without an `ERROR` at v0.5.0. `x`
@@ -145,6 +150,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `$/…/$` now reference a new external token, `_string_body`, which is
   never emitted; where it is valid the scanner emits nothing. A
   comment inside `${…}` is still a comment. (#87)
+- A dollar-slashy string whose text ends in a slash now parses:
+  `$/a//$` holds `a/`. It was an `ERROR`, because the text token took
+  the slash that the closing `/$` needs. A slash directly before the
+  closer is now a `string_fragment` of its own. (#87)
 - A line escape, `\` at the end of a line, is now whitespace, as in
   Groovy's lexer; it was an `ERROR`. The line after it continues the
   current one, so `x \` followed by `[0]` is a subscript and `foo \`

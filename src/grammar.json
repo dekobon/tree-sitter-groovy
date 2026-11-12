@@ -7271,34 +7271,51 @@
             "type": "CHOICE",
             "members": [
               {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_dollar_slashy_text"
+                    },
+                    "named": true,
+                    "value": "string_fragment"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "gstring_dollar_interpolation"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "gstring_brace_interpolation"
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_gstring_literal_dollar"
+                    },
+                    "named": true,
+                    "value": "string_fragment"
+                  },
+                  {
+                    "type": "SYMBOL",
+                    "name": "_string_body"
+                  }
+                ]
+              },
+              {
                 "type": "ALIAS",
                 "content": {
-                  "type": "SYMBOL",
-                  "name": "_dollar_slashy_text"
+                  "type": "IMMEDIATE_TOKEN",
+                  "content": {
+                    "type": "STRING",
+                    "value": "/"
+                  }
                 },
                 "named": true,
                 "value": "string_fragment"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "gstring_dollar_interpolation"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "gstring_brace_interpolation"
-              },
-              {
-                "type": "ALIAS",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_gstring_literal_dollar"
-                },
-                "named": true,
-                "value": "string_fragment"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "_string_body"
               }
             ]
           }
@@ -7325,7 +7342,7 @@
             },
             {
               "type": "PATTERN",
-              "value": "\\/[^$]"
+              "value": "\\/+[^/$]"
             },
             {
               "type": "PATTERN",
