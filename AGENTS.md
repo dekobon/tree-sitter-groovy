@@ -138,7 +138,7 @@ Markdown docs), also run the applicable tooling check:
 taplo format --check    # TOML formatting (config: .taplo.toml)
 typos                   # spell-check (config: .typos.toml)
 cargo deny check        # licenses, advisories, sources (config: deny.toml)
-markdownlint-cli2       # Markdown lint (config: .markdownlint-cli2.jsonc)
+markdownlint-cli2 "**/*.md"  # Markdown lint (config: .markdownlint-cli2.jsonc)
 ```
 
 If grammar / scanner changed, run `npx tree-sitter test` until clean.

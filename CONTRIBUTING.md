@@ -69,7 +69,7 @@ If you changed repo-level config (TOML, Markdown):
 ```bash
 typos
 taplo format --check
-markdownlint-cli2
+markdownlint-cli2 "**/*.md"
 ```
 
 ## Commit messages
