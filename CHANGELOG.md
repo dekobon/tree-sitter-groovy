@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   field lists every expression kind and `named_argument`, and
   `trait_declaration` gains a `super_interfaces` child.
   (#57, #63, #65, #87)
+- **BREAKING:** `def` on a closure parameter after the first
+  (`{ String k, def v -> }`) used to parse with no `ERROR`, the word
+  read as the parameter's `type` (a `type_identifier` with the text
+  `def`). It is now the anonymous `def` keyword and the parameter has
+  no `type`, as a `def` local or `for` variable has. (#79)
 
 ### Fixed
 
@@ -219,6 +224,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   where it was literal text with a `$` before; that is the only tree
   change for input that already parsed. The contextual `record`
   keyword accepts a non-ASCII record name. No symbol is added. (#78)
+- Closure parameters take what a method parameter takes: `def`
+  (`{ def b -> }`), `final`, annotations, varargs
+  (`{ String... args -> }`) and a default (`{ a = 1 -> }`,
+  `{ String prefix, int width = 8 -> }`). Each was an `ERROR` before.
+  `closure_parameter` gains a `default` field, and its `type` field
+  can hold a `varargs_type`. A closure body that opens with
+  `final def a = 1`, which this grammar does not accept as a local,
+  now recovers with a `MISSING "->"` instead of an `ERROR`. (#79)
 
 ## [0.5.0] - 2026-11-10
 
