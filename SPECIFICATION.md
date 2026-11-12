@@ -574,8 +574,10 @@ The resolution we adopt:
    A named-arg key is an identifier; Apache also accepts string keys
    (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
    nested command chains, and an identifier or other non-literal
-   expression as the first positional argument, since `foo bar` with
-   no comma is a typed declaration.
+   expression as the first positional argument: `foo bar` is also how
+   a typed declaration starts (`Type name = …`), and the parser cannot
+   tell the two apart before the `=`. A bare `foo bar` parses as two
+   expression statements.
 4. **Chain continuation**: after the first call, subsequent `name`
    tokens become property/method dispatches. The Apache grammar uses
    `commandArgument: pathElement+ argumentList?` for the chain
@@ -1045,9 +1047,10 @@ Known limitations:
   grammar's continuation rule takes the keyword as a plain identifier.
 - The keys `new`, `true`, `false`, `null` and `switch` are accepted on the
   same line as the preceding argument (`foo a: 1, new: 2`) but are an
-  `ERROR` on a continuation line (`foo a: 1,` then `new: 2`). The keys
-  `this`, `super`, `if`, `def`, `in` and `as` are accepted in both
-  positions.
+  `ERROR` on a continuation line (`foo a: 1,` then `new: 2`). `non-sealed`
+  is an `ERROR` in both positions, because `-` cannot be part of an
+  identifier. Every other keyword is accepted in both positions (`if`,
+  `def`, `in`, `as`, `final`, `class`), as are `this` and `super`.
 - A block or groovydoc comment before a label defeats the newline guard.
   The comment branch consumes the newline when it emits the comment, so
   `result` followed by a line reading `/* note */ where:` or
@@ -1058,12 +1061,16 @@ Known limitations:
   joins the last argument, even a literal one. `foo 1, 2` followed by a
   line reading `(a)` parses as the call `2(a)`. The same happens when the
   next line starts with `{` (a trailing closure), `-` or `+` (a binary
-  operator), `in`, `as` or `instanceof`. A next line that starts with `[`
-  is not affected: a `[` after a newline never subscripts (§6.9), so
-  `foo 1, 2` followed by `[a].each { }` is two statements. A chain with
-  one argument (`foo 'a'` then `(a)`) is not affected either. Expressions
-  outside command chains already behave this way: `def x = 'b'` followed
-  by `(a)` is a call on `'b'`.
+  operator), `++` or `--` (a postfix update: `foo 1, 2` followed by `++x`
+  parses as `2++` and then `x`), `in`, `as` or `instanceof`. A next line
+  that starts with `[` is not affected: a `[` after a newline never
+  subscripts (§6.9), so `foo 1, 2` followed by `[a].each { }` is two
+  statements. A chain whose one argument is positional (`foo 'a'` then
+  `(a)`) is not affected either, because that argument is not a full
+  expression. The value of a named argument is one, so it joins even as
+  the only argument: `foo a: 1` followed by `(b)` has the value `1(b)`.
+  Expressions outside command chains already behave this way:
+  `def x = 'b'` followed by `(a)` is a call on `'b'`.
 - A dangling comma takes the first token of the next statement. `foo a: 1,`
   followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
   chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The
