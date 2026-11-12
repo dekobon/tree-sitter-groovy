@@ -345,3 +345,202 @@ xs.each { a = 1
           (binary_expression
             left: (identifier)
             right: (number_literal)))))))
+
+==================
+Closure parameters with an untyped default
+==================
+
+xs.each { a = 1 -> a }
+xs.each { a, b = 2 -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure parameters with final and no type
+==================
+
+xs.each { final a -> a }
+xs.each { @Lazy final x -> x }
+xs.each { final def a -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure def parameter after the first has no type
+==================
+
+xs.each { String k, def v -> k }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure body opening with a declaration
+==================
+
+xs.each { def a = 1, b = 2 }
+xs.each { String a = 'x', b = 'y' }
+xs.each { def a, b }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)
+            value: (number_literal))
+          (variable_declarator
+            name: (identifier)
+            value: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (string_literal)
+          name: (identifier)
+          value: (string_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier))
+          (variable_declarator
+            name: (identifier)))))))
+
+==================
+Closure body opening with a final declaration
+==================
+
+xs.each { final def a = 1 }
+xs.each { final a = 1 }
+xs.each { final String a = 'x' }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)
+            value: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)
+            value: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (string_literal))))))

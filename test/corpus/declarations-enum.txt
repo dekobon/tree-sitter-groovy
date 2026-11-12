@@ -339,6 +339,124 @@ enum Mode {
             (identifier)))))))
 
 ==================
+Enum static initializer and nested types directly after a trailing comma
+==================
+
+enum E1 { A, static { init() } }
+enum E2 { A, class Inner { } }
+enum E3 { A, interface I { } }
+enum E4 { A, enum N { X } }
+enum E5 { A, trait T { } }
+enum E6 { A, record R(int x) { } }
+enum E7 { A, @interface M { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Enum annotated method directly after a trailing comma
+==================
+
+enum E { A, @Deprecated static int n() { 1 } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (number_literal)))))))
+
+==================
+Enum typed field with no modifier after a trailing comma is an error
+:error
+==================
+
+enum E {
+    A,
+    String x
+}
+
+---
+
+==================
 Enum constants then stray semicolons and members
 ==================
 

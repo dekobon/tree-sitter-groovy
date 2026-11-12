@@ -58,6 +58,21 @@ println "値は$名前"
         value: (identifier)))))
 
 ==================
+GString interpolation of a dotted non-ASCII path
+==================
+
+println "$名前.属性"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
 Record with a non-ASCII name
 ==================
 

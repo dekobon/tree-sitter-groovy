@@ -44,10 +44,12 @@ def reload() {
               operand: (identifier))))))))
 
 ==================
-Synchronized method modifier is not a statement
+Synchronized as a method modifier in a class body and in a script
 ==================
 
 class C { static synchronized int n() { 1 } }
+synchronized int m() { 1 }
+synchronized f() { }
 
 ---
 
@@ -61,4 +63,52 @@ class C { static synchronized int n() { 1 } }
         parameters: (formal_parameters)
         body: (block
           (expression_statement
-            (number_literal)))))))
+            (number_literal))))))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (number_literal))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+Synchronized statement in a closure and with a call as the lock
+==================
+
+xs.each { synchronized (registry.lockFor(it)) { done = true } }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (synchronized_statement
+          lock: (method_invocation
+            function: (field_access
+              object: (identifier)
+              field: (identifier))
+            arguments: (argument_list
+              (identifier)))
+          body: (block
+            (expression_statement
+              (assignment_expression
+                left: (identifier)
+                right: (boolean_literal)))))))))
+
+==================
+Synchronized statement without a block body is an error
+:error
+==================
+
+synchronized (lock) foo()
+
+---
