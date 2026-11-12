@@ -67,7 +67,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   that parsed without an `ERROR` at v0.5.0. `"${dir}/**/*.xml"` and
   `"/* c */ d"` held a `groovydoc_comment` or a `block_comment` in
   place of that text, and a line that starts with `//` inside
-  `"""…"""` was a `line_comment`. (#87)
+  `"""…"""` was a `line_comment`. In a slashy string the comment could
+  also take the closing `/`, so the string now ends earlier, at its
+  first unescaped `/` as in Groovy: `/$a/**/b/` was one string that
+  held a `groovydoc_comment`, and is now `/$a/ ** /b/`. Where the rest
+  of the line is not an expression, as in `/$a/*c*//`, input that
+  parsed at v0.5.0 is now an `ERROR`. (#87)
 - **BREAKING:** in a dollar-slashy string, a run of slashes before `$`
   now ends at the closing `/$` (see Fixed below), which changes trees
   for input that parsed without an `ERROR` at v0.5.0. The string can
