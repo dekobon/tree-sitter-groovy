@@ -692,6 +692,12 @@ Escape rules:
   that reaches `$`. Each slash of that run except the last is then a
   `string_fragment` of its own, and the last one starts the
   terminator.
+- `$` directly before the terminator, as in `$/a$/$`, is not
+  supported. Groovy reads `$/$` there as an escaped terminator when a
+  later `/$` exists, and as the text `$` and the terminator when none
+  does. This grammar reads `$/` as the escaped slash in both cases, so
+  the second case is an `ERROR`. Write `$$` for the dollar:
+  `$/a$$/$`.
 
 ### 5.8 Closure parameters and the `it` shorthand
 
