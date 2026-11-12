@@ -967,6 +967,111 @@ enum F {
             arguments: (argument_list)))))))
 
 ==================
+Enum constants named sealed and trait
+==================
+
+enum E1 { trait, B }
+enum E2 { sealed }
+enum E3 { A, sealed, B }
+enum E4 { A, trait(1) }
+enum E5 { A, @Deprecated trait }
+enum E6 { sealed; int x }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Enum sealed and trait declarations where a constant could stand
+==================
+
+enum E1 { trait T { } }
+enum E2 { sealed interface I { } }
+enum E3 { A, trait T { } }
+enum E4 { A, sealed class S { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
 Enum constants named record
 ==================
 

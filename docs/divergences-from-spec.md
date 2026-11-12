@@ -600,15 +600,23 @@ member can start:
 | `private boolean sealed`, `private String trait = "x"` | `ERROR` (a field at v0.4.0) |
 | `public static final int sealed = 1` | `ERROR` (a field at v0.4.0) |
 | `static trait = 1`, `private trait`, `sealed() { }` | `ERROR` (parsed at v0.4.0) |
-| `enum E { trait, B }`, `enum E { sealed }` | `ERROR` (constants at v0.4.0) |
+| `enum E { trait, B }`, `enum E { sealed }`, `enum E { A, sealed }` | constants (the first two an `ERROR` at v0.5.0) |
 
 The rows that fail share one shape. A field needs no type after a
 modifier, so `private boolean` is already a complete field named
 `boolean`, a new member may start right after it, and the lexer
 prefers the keyword. Without a modifier the type cannot stand
 alone, the next word can only be the name, and it stays an
-identifier. The first constant of an enum sits where a member could
-start too; a later one (`enum E { A, sealed }`) does not.
+identifier.
+
+An enum constant sits where a member could start too: the first one,
+and since #89 every one after a `,`. `enum_constant` therefore takes
+the two keywords as a name, aliased to `identifier`, at a lower
+precedence than the declarations, so `sealed class` and `trait T {`
+are still declarations there. One shape stays an `ERROR`, as at
+v0.5.0: a constant named `trait` followed, with no `;` or `,`, by a
+member that starts with a name (`trait` then `int f() { }` on the
+next line), which reads as a trait declaration.
 
 `record` escapes the table because its keyword is not a grammar
 literal: the external scanner emits it only when a name follows on
@@ -621,8 +629,9 @@ token emitted only when the word opens a declaration (`sealed class`,
 `sealed interface`, `trait Name {`), so the literal disappears from
 the lexer and the word is an identifier elsewhere. The alternative,
 accepting the words as names through an aliased keyword
-(`alias('sealed', $.identifier)`) in the declarator and
-enum-constant positions, was tried for `record` and rejected: after
+(`alias('sealed', $.identifier)`), is in place for enum constants,
+where it needs no declared conflict. In the declarator position it
+was tried for `record` and rejected: after
 `private boolean` it is a genuine LR(1) conflict that needs a
 declared conflict, and it still leaves `public void record() { }` an
 error because the method name position wants `_property_name`.

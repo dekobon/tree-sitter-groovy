@@ -235,6 +235,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   can hold a `varargs_type`. A closure body that opens with
   `final def a = 1`, which this grammar does not accept as a local,
   now recovers with a `MISSING "->"` instead of an `ERROR`. (#79)
+- An enum constant named `sealed` or `trait` is a constant again
+  (`enum E { trait, B }`, `enum E { sealed }`). The first constant so
+  named has been an `ERROR` since v0.5.0, where the two words became
+  keywords at member start. `enum_constant` now takes either keyword
+  as its name, as an `identifier`. A `sealed class` or `trait T { }`
+  in the same position is still a declaration; see
+  `docs/divergences-from-spec.md` §12. (#68, #89)
 
 ## [0.5.0] - 2026-11-10
 

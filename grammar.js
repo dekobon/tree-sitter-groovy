@@ -966,11 +966,23 @@ module.exports = grammar({
     // share the prefix with an annotated member; the same precedence
     // decides after them, so `@Foo A\n int x` is a constant and a
     // field.
-    enum_constant: $ => prec(1, seq(
-      repeat($.annotation),
-      field('name', $.identifier),
-      optional(field('arguments', $.argument_list)),
-    )),
+    enum_constant: $ => choice(
+      prec(1, seq(
+        repeat($.annotation),
+        field('name', $.identifier),
+        optional(field('arguments', $.argument_list)),
+      )),
+      // `sealed` and `trait` are keywords wherever a member can start
+      // (divergence 12): at the first constant and, since #89, after
+      // every `,`. A constant may still have either name, so the
+      // keyword is accepted as one. The negative precedence gives way
+      // to a declaration when one follows: `sealed class`, `trait T {`.
+      prec(-1, seq(
+        repeat($.annotation),
+        field('name', alias(choice('sealed', 'trait'), $.identifier)),
+        optional(field('arguments', $.argument_list)),
+      )),
+    ),
 
     // §4 — record (Groovy 4+), after Apache's `classDeclaration`:
     // `[modifiers] record Name[<T>](Type a, Type b) [implements I] [{ body }]`.
