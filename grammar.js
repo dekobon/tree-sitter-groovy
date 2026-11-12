@@ -720,12 +720,18 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
-      seq(
+      // The negative weight settles the split that the typed weight
+      // cannot. `private final int v` followed by `public A() { }` is
+      // also `private final int`, a field `v public` and a constructor
+      // `A() { }`: a keyword is an identifier wherever it has no
+      // action. Both readings hold one typed field, so they tied, and
+      // a comment between the two members made the split win.
+      prec.dynamic(-1, seq(
         repeat($.annotation),
         repeat1($._modifier),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
-      ),
+      )),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()
