@@ -694,8 +694,10 @@ module.exports = grammar({
     // would collide with a plain expression_statement.
     field_declaration: $ => choice(
       // Prefer the typed field when both parses succeed, rather than
-      // splitting `private final int v\n C() {}` after `int`.
-      prec.dynamic(1, seq(
+      // splitting `private final int v\n C() {}` after `int`. The
+      // weight is above a method body's: the split reading holds a
+      // method (`v C() {}`), which would otherwise tie.
+      prec.dynamic(2, seq(
         repeat($.annotation),
         repeat($._modifier),
         choice('def', field('type', $._type)),
@@ -719,21 +721,34 @@ module.exports = grammar({
     // Modifiers alone (no `def`, no return type) also introduce a
     // method outside a class body: `final f() { }`. In a class body
     // that shape stays a constructor_declaration.
-    method_declaration: $ => prec.right(2, seq(
-      repeat($.annotation),
-      choice(
-        seq(
-          repeat($._modifier),
-          optional(field('type_parameters', $.method_type_parameters)),
-          choice('def', field('return_type', $._type)),
+    //
+    // A method with a body carries a dynamic precedence because its
+    // tokens also parse as statements: `String f() { }` as the
+    // expression `String` followed by the call `f() { }`, and
+    // `def f(a) { }` as a variable `f` followed by the cast
+    // `(a) { }`. Without a weight, a comment before the method made
+    // the split win. A method without a body gets none: outside a
+    // class body it is not valid Groovy.
+    method_declaration: $ => {
+      const signature = seq(
+        repeat($.annotation),
+        choice(
+          seq(
+            repeat($._modifier),
+            optional(field('type_parameters', $.method_type_parameters)),
+            choice('def', field('return_type', $._type)),
+          ),
+          repeat1($._modifier),
         ),
-        repeat1($._modifier),
-      ),
-      field('name', $._property_name),
-      field('parameters', $.formal_parameters),
-      optional($.throws_clause),
-      optional(field('body', $.block)),
-    )),
+        field('name', $._property_name),
+        field('parameters', $.formal_parameters),
+        optional($.throws_clause),
+      );
+      return prec.right(2, choice(
+        signature,
+        prec.dynamic(1, seq(signature, field('body', $.block))),
+      ));
+    },
 
     // §4 / §5.14 — method-level generic type parameters
     // (`<T> T identity(T x) { x }`). Distinct from `type_parameters`

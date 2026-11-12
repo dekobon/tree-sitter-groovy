@@ -271,6 +271,13 @@ cost is the reverse case: a bare `x` followed by `y = 1` on the next
 line is the declaration `x y = 1`, and `final a` followed by
 `String b = 'y'` is `final a String` followed by `b = 'y'`.
 
+A method declaration with a body carries a dynamic precedence for the
+same reason: `String f() { }` also parses as the expression `String`
+followed by the call `f() { }`, and `def f(a) { }` as a variable `f`
+followed by the cast `(a) { }`. Here too the reverse case loses: a
+bare `x` followed by `foo() { }` on the next line is the method
+`x foo() { }`.
+
 **Action**: lift this restriction once we have a sound
 disambiguation strategy. Likely path: a conflict declaration on
 `[$.local_variable_declaration, $.method_invocation]` plus a

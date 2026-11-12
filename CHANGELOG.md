@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   an `ERROR` at v0.5.0. `foo()`, then `// note`, then `String s = 'a'`
   on its own line was the expression statement `String` followed by
   the assignment `s = 'a'`. (#87)
+- **BREAKING:** a method declaration with a body, outside a class body
+  and with a comment between it and the statement before it, is now a
+  `method_declaration` (see Fixed below), which changes trees for
+  input that parsed without an `ERROR` at v0.5.0. `foo()`, then
+  `/* note */`, then `def skip(task) { true }` was a variable `skip`
+  followed by a cast of a closure; `String call() { 'x' }` in the same
+  position was the expression `String` followed by a call with a
+  closure. (#87)
 - Three external scanner tokens are added: `_command_named_key` (#57),
   `_subscript_open` (#63) and `_error_sentinel` (both), so most symbol
   ids above 69 in the generated parser change and `SYMBOL_COUNT` goes
@@ -85,6 +93,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   dynamic precedence. This also keeps `final String s = 'a'` whole
   after a comment, and the blank `final String name` whole when a
   comment or an assignment follows it. (#87)
+- A method declaration with a body, outside a class body, is no longer
+  split when a comment precedes it. After a comment,
+  `String call() { 'x' }` parsed as the expression `String` and the
+  call `call() { 'x' }`, and `def skip(task) { true }` as a variable
+  and a cast of a closure. A method with a body now carries a dynamic
+  precedence, and the typed field's rises from 1 to 2 so that
+  `private final int v` followed by a constructor is still a field and
+  a constructor. (#87)
 
 ## [0.5.0] - 2026-11-10
 

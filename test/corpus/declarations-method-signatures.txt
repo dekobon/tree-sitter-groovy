@@ -308,3 +308,100 @@ class A {
             type: (type_identifier)
             name: (identifier)))
         body: (block)))))
+
+==================
+Typed script method after a groovydoc comment
+==================
+
+import a.B
+
+/** doc */
+String call() { 'x' }
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)))
+  (groovydoc_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (string_literal)))))
+
+==================
+Script method with an untyped parameter after a block comment
+==================
+
+foo()
+
+/* note */
+def skip(task) { true }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block_comment)
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (boolean_literal)))))
+
+==================
+Typed script method with a throws clause after a trailing comment
+==================
+
+foo() // note
+String bar() throws E { }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (line_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    (throws_clause
+      (type_identifier))
+    body: (block)))
+
+==================
+Void script method after a line comment
+==================
+
+def a() { }
+
+// note
+void b() { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (line_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
