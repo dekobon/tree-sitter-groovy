@@ -201,6 +201,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`public void`) followed by a `constructor_declaration` named after the
   method. The modifier-only field now loses to any other complete
   reading; `static TTL = 900` still parses as a field. (#84)
+- An enum member directly after a trailing comma (`A, B,` then
+  `private final int weight`), which Groovy 2.x accepts, is a member
+  again. Since v0.4.0 it parsed, with no `ERROR`, as an extra
+  `enum_constant` named after the first modifier (`private`), followed
+  by the member without that modifier. A constructor in that position
+  (`A,` then `private E(int w) { }`) is still a parse error. (#88)
 
 ## [0.5.0] - 2026-11-10
 

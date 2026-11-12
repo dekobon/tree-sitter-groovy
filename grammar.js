@@ -833,9 +833,19 @@ module.exports = grammar({
     // members follow after `;`, `,;`, or nothing at all — Groovy's
     // own parser treats the newline as the separator (GROOVY-7773,
     // GROOVY-9306), and newlines are extras here, so the member
-    // simply follows the last constant. `A,` directly before a
-    // member is rejected, as in Groovy. With no constants the body
+    // simply follows the last constant. With no constants the body
     // is an ordinary member list.
+    //
+    // Groovy 2.x also accepts a member directly after a trailing `,`
+    // (`A, B,\n private int x`); Groovy 3+ rejects it. Without this
+    // alternative the modifier had no action after the `,`, lexed as
+    // an identifier, and became a constant named `private` with no
+    // ERROR. The first member here is any `_class_member` except a
+    // constructor: `B(x) { … }` after a `,` is a constant with an
+    // anonymous class body in every Groovy (unsupported, so an
+    // ERROR), not a constructor. `prec(1)` on `enum_constant` keeps a
+    // bare identifier after the `,` a constant, so `A,\n String x`,
+    // which every Groovy rejects, stays an ERROR.
     //
     // An instance initializer (`block`) is accepted wherever the
     // member list repeats — after `;`, after a first member, or with
@@ -870,6 +880,21 @@ module.exports = grammar({
             ',',
             seq(optional(','), ';', repeat(choice($._class_member, $.block, ';'))),
             seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
+            seq(
+              ',',
+              choice(
+                $.method_declaration,
+                $.field_declaration,
+                $.static_initializer,
+                $.enum_declaration,
+                $.class_declaration,
+                $.interface_declaration,
+                $.trait_declaration,
+                $.record_declaration,
+                $.annotation_type_declaration,
+              ),
+              repeat(choice($._class_member, $.block, ';')),
+            ),
           )),
         ),
         repeat(choice($._class_member, $.block, ';')),
