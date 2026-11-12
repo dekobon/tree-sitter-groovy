@@ -7362,6 +7362,10 @@
       "value": "\\s"
     },
     {
+      "type": "PATTERN",
+      "value": "\\\\\\r?\\n"
+    },
+    {
       "type": "SYMBOL",
       "name": "line_comment"
     },

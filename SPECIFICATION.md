@@ -721,6 +721,16 @@ scanner branches are avoided):
   two adjacent complete statements (`x()` then `y()`) need no explicit
   separator. Inside `(`/`[`/`{` a newline is likewise just whitespace,
   matching Groovy's rule.
+- **Line escape**: a `\` directly before a line break (`\n` or `\r\n`)
+  is whitespace, as in Apache's lexer (`WS : ([ \t]+ | LineEscape+)`).
+  It is a second pattern in `extras`, and the scanner's same-line
+  tokens (§6.7–§6.9) skip it as they skip spaces and tabs, so the next
+  line continues the current one: `x \` followed by `[0]` is a
+  subscript, and `foo \` followed by `a: 1` is a named-argument call.
+  A `\` anywhere else outside a string is an `ERROR`. Two cases differ
+  from Apache. A `\` before a lone `\r` is an `ERROR`. A `\` that ends
+  the file is skipped with no `ERROR`, because the lexer has already
+  taken it as the start of the pattern.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
   (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
@@ -976,15 +986,17 @@ those identifier uses begin. The scanner makes the choice instead.
 Emit RECORD_KEYWORD when, from the current position:
   - the next six characters are `record`, and the character after
     them is not an identifier character ([A-Za-z0-9_$]); then
-  - at least one of: spaces, tabs, block comments — but no line
-    break and no line comment, because `classDeclaration` in
-    GroovyParser.g4 has no `nls` between RECORD and the name; then
+  - at least one of: spaces, tabs, line escapes (§5.10), block
+    comments — but no line break and no line comment, because
+    `classDeclaration` in GroovyParser.g4 has no `nls` between RECORD
+    and the name; then
   - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
     class); then either
   - `<` immediately (type parameters; the grammar's `type_parameters`
     opener is `token.immediate` as well), or
-  - any mix of spaces, tabs, line breaks, block and line comments
-    (the rule has `nls` before `formalParameters`) and then `(`.
+  - any mix of spaces, tabs, line escapes, line breaks, block and
+    line comments (the rule has `nls` before `formalParameters`) and
+    then `(`.
 The token is `record` alone: `mark_end` is called after it and the
 look-ahead is not kept. On any other input return false; the
 in-grammar lexer then reads the word as `identifier`.
@@ -1018,10 +1030,10 @@ Known residuals:
 ### 6.8 COMMAND_NAMED_KEY — implementation contract
 
 Emitted only where a command chain argument may start, and never during
-error recovery (`ERROR_SENTINEL` valid). Skips spaces and tabs but not
-newlines, consumes an identifier, marks the token end, then looks ahead
-past spaces and tabs for a single `:` (a following second `:` means a
-method reference, so no emit). `case` and `default` are rejected so a
+error recovery (`ERROR_SENTINEL` valid). Skips spaces, tabs and line
+escapes (§5.10) but not newlines, consumes an identifier, marks the
+token end, then looks ahead past the same whitespace for a single `:`
+(a following second `:` means a method reference, so no emit). `case` and `default` are rejected so a
 switch label after a statement on the same line stays a label.
 
 Keeping the key scanner-side gives the parser a distinct lookahead token,
@@ -1079,8 +1091,8 @@ Known limitations:
 ### 6.9 SUBSCRIPT_OPEN — implementation contract
 
 Emitted wherever a `[` may follow, and never during error recovery
-(`ERROR_SENTINEL` valid). Skips spaces and tabs but not newlines; if
-the next character is `[`, consumes it. Subscripts and array types
+(`ERROR_SENTINEL` valid). Skips spaces, tabs and line escapes (§5.10)
+but not newlines; if the next character is `[`, consumes it. Subscripts and array types
 accept only this token. List and map literals accept it and the
 in-grammar `[`, so a `[` on the same line resolves as it did with a
 single token. At a newline it emits nothing, so the in-grammar `[`

@@ -93,6 +93,9 @@ module.exports = grammar({
 
   extras: $ => [
     /\s/,
+    // §5.10 — a line escape, `\` at the end of a line. Groovy's lexer
+    // skips it as it skips spaces and tabs.
+    /\\\r?\n/,
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
@@ -124,9 +127,10 @@ module.exports = grammar({
     // Scanner-side so the newline before a Spock label (`result` then
     // `where:`) is not swallowed, and so `Type name =` stays a declaration.
     $._command_named_key,
-    // §5.10 — `[` on the same line as the token before it (spaces and tabs
-    // allowed). A `[` after a newline isn't one and can only start a list or
-    // map literal: a statement, not a subscript of the line above.
+    // §5.10 — `[` on the same line as the token before it (spaces, tabs and
+    // line escapes allowed). A `[` after a newline isn't one and can only
+    // start a list or map literal: a statement, not a subscript of the line
+    // above.
     $._subscript_open,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.

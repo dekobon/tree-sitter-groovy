@@ -40,14 +40,41 @@ static inline bool is_ident_part(int32_t c) {
     return is_ident_start(c) || (c >= '0' && c <= '9');
 }
 
+// SPECIFICATION.md §5.10 — a line escape, `\` followed by a line
+// break, is whitespace to Groovy's lexer (GroovyLexer.g4
+// `WS : ([ \t]+ | LineEscape+)`), so the line after it continues the
+// current one. Skips spaces, tabs and line escapes. Returns false at a
+// `\` that does not start a line escape: the `\` is consumed by then
+// and no token starts with one, so the caller must return false to
+// make the lexer rewind.
+static bool skip_same_line_space(TSLexer *lexer, bool skip) {
+    for (;;) {
+        if (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+            lexer->advance(lexer, skip);
+            continue;
+        }
+        if (lexer->lookahead != '\\') {
+            return true;
+        }
+        lexer->advance(lexer, skip);
+        if (lexer->lookahead == '\r') {
+            lexer->advance(lexer, skip);
+        }
+        if (lexer->lookahead != '\n') {
+            return false;
+        }
+        lexer->advance(lexer, skip);
+    }
+}
+
 // SPECIFICATION.md §5.5 — the key of a named argument in a
 // parenthesis-free call (`exclude group: 'a'`). Matches an identifier
 // on the current line that is followed by `:` (not `::`), consuming
 // only the identifier. A newline before the key means a new statement
 // (a Spock `where:` label, say), so no match.
 static bool scan_command_named_key(TSLexer *lexer) {
-    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
-        lexer->advance(lexer, true);
+    if (!skip_same_line_space(lexer, true)) {
+        return false;
     }
     if (!is_ident_start(lexer->lookahead)) {
         return false;
@@ -71,8 +98,8 @@ static bool scan_command_named_key(TSLexer *lexer) {
         return false;
     }
     lexer->mark_end(lexer);
-    while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
-        lexer->advance(lexer, false);
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
     }
     if (lexer->lookahead != ':') {
         return false;
@@ -108,15 +135,21 @@ static inline bool is_identifier_char(int32_t c) {
 }
 
 // Skips the trivia Groovy's lexer hides inside a record header:
-// spaces, tabs and block comments, plus line breaks and line comments
-// when `newlines` is set. Returns false on a `/` that opens neither
-// comment kind (a slashy string or division cannot be part of a
-// header) and on an unterminated block comment.
+// spaces, tabs, line escapes and block comments, plus line breaks and
+// line comments when `newlines` is set. Returns false on a `/` that
+// opens neither comment kind (a slashy string or division cannot be
+// part of a header), on a `\` that is not a line escape, and on an
+// unterminated block comment.
 static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
     for (;;) {
-        while (is_inline_space(lexer->lookahead)
-            || (newlines
-                && (lexer->lookahead == '\n' || lexer->lookahead == '\r'))) {
+        for (;;) {
+            if (!skip_same_line_space(lexer, false)) {
+                return false;
+            }
+            if (!newlines
+                || (lexer->lookahead != '\n' && lexer->lookahead != '\r')) {
+                break;
+            }
             advance(lexer);
         }
         if (lexer->lookahead != '/') {
@@ -176,7 +209,8 @@ static bool scan_record_header(TSLexer *lexer) {
         return false;
     }
     lexer->mark_end(lexer);
-    if (!is_inline_space(lexer->lookahead) && lexer->lookahead != '/') {
+    if (!is_inline_space(lexer->lookahead) && lexer->lookahead != '/'
+        && lexer->lookahead != '\\') {
         return false;
     }
     if (!skip_header_trivia(lexer, false)) {
@@ -234,16 +268,17 @@ bool tree_sitter_groovy_external_scanner_scan(
     (void)payload;
 
     // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY
-    // (§5.5). Both skip only spaces and tabs, the same-line whitespace
-    // of Groovy's lexer; at a newline we fall through to the branches
-    // below. Their first characters (`[` vs. an identifier start) are
-    // disjoint, so one whitespace skip serves both.
+    // (§5.5). Both skip only spaces, tabs and line escapes, the
+    // same-line whitespace of Groovy's lexer; at a newline we fall
+    // through to the branches below. Their first characters (`[` vs. an
+    // identifier start) are disjoint, so one whitespace skip serves
+    // both.
     bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
     if ((wants_subscript || wants_named_key)
         && !valid_symbols[ERROR_SENTINEL]) {
-        while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
-            lexer->advance(lexer, true);
+        if (!skip_same_line_space(lexer, true)) {
+            return false;
         }
         // SPECIFICATION.md §5.10 — a `[` on the current line can continue
         // the expression (subscript or array type). After a newline the
@@ -262,7 +297,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         // identifier (`foo` then `record R(…)`). The key wins on the same
         // line: `foo record: 1` is a named argument, while a record header
         // there is not valid Groovy. A `record` on the next line is not
-        // reached here, since only spaces and tabs are skipped.
+        // reached here, since a newline is not skipped.
         if (wants_named_key && is_ident_start(lexer->lookahead)) {
             return scan_command_named_key(lexer);
         }
@@ -287,8 +322,16 @@ bool tree_sitter_groovy_external_scanner_scan(
         return false;
     }
 
-    while (is_whitespace(lexer->lookahead)) {
-        lexer->advance(lexer, true);
+    // A line escape is whitespace too, so a comment, a slashy string or
+    // `record` may follow one.
+    while (is_whitespace(lexer->lookahead) || lexer->lookahead == '\\') {
+        if (lexer->lookahead == '\\') {
+            if (!skip_same_line_space(lexer, true)) {
+                return false;
+            }
+        } else {
+            lexer->advance(lexer, true);
+        }
     }
     if (lexer->lookahead == 'r' && wants_record) {
         // An `r` can never open a comment or a slashy string, so

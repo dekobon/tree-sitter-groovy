@@ -130,6 +130,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   where nothing else parses: in a class body, for abstract and
   interface methods. A script method with no body (`String foo()`),
   which Groovy rejects, now parses as two expression statements. (#87)
+- A line escape, `\` at the end of a line, is now whitespace, as in
+  Groovy's lexer; it was an `ERROR`. The line after it continues the
+  current one, so `x \` followed by `[0]` is a subscript and `foo \`
+  followed by `a: 1` is a named-argument call. A `\` before a lone
+  `\r` is still an `ERROR`. A `\` that ends the file is skipped with
+  no `ERROR`. (#87)
 
 ## [0.5.0] - 2026-11-10
 

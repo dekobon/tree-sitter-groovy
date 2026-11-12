@@ -1,0 +1,190 @@
+==================
+Line escape inside a binary expression
+==================
+
+x = a + \
+  b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Two line escapes in a row
+==================
+
+x = a + \
+\
+  b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+Line escape before a method chain
+==================
+
+s = 'a' \
+  .toUpperCase()
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (field_access
+          object: (string_literal)
+          field: (identifier))
+        arguments: (argument_list)))))
+
+==================
+Subscript after a line escape
+==================
+
+x \
+[a]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (identifier))))
+
+==================
+Subscript after a line escape and indentation
+==================
+
+x \
+  [a]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (identifier))))
+
+==================
+Named argument after a line escape
+==================
+
+foo \
+  a: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named argument colon after a line escape
+==================
+
+foo a \
+  : 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Line comment after a line escape
+==================
+
+x = 1 \
+  // note
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (line_comment))
+
+==================
+Block comment after a line escape
+==================
+
+x = 1 \
+  /* note */
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (block_comment))
+
+==================
+Slashy string after a line escape
+==================
+
+x = \
+  /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
+Record keyword followed by a line escape
+==================
+
+record \
+  Point(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Backslash that does not end the line is an error
+:error
+==================
+
+x = 1 \ 2
+
+---
