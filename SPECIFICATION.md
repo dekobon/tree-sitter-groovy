@@ -412,7 +412,7 @@ fix relative to *both* parent grammars.
 | `pipeline { … }` followed by anything | port + fix | Promote `pipeline` to a regular statement, drop `optional($.pipeline)`-at-EOF. Closes #37. |
 | Annotation usage `@Foo(args)` | port | including `@Foo` and `@Foo.Bar(x = 1)`. |
 | Shebang line | port from amaanq | `#! …\n` at start of file. |
-| Line comment `// …` | port | |
+| Line comment `// …` | port | Ends before `\n` or `\r`, so a lone CR ends the line as it does for Groovy's lexer, and in a CRLF file the `\r` is not part of the comment. |
 | Block comment `/* … */` | **fixed** | Single `block_comment` token. Must accept `/**/` and `/***/`. Closes murtaza64 #16. |
 | Groovydoc `/** … */` | port from murtaza64 (but tokenised) | Single `groovydoc_comment` token; tag parsing is out of scope per §1.2(1). |
 

@@ -127,6 +127,10 @@ static inline bool is_inline_space(int32_t c) {
     return c == ' ' || c == '\t';
 }
 
+static inline bool is_line_break(int32_t c) {
+    return c == '\n' || c == '\r';
+}
+
 // Mirrors the grammar's `identifier` token,
 // /[\p{XID_Start}_$][\p{XID_Continue}$]*/. Without Unicode tables,
 // every non-ASCII code point counts as an identifier character: the
@@ -153,8 +157,7 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
             if (!skip_same_line_space(lexer, false)) {
                 return false;
             }
-            if (!newlines
-                || (lexer->lookahead != '\n' && lexer->lookahead != '\r')) {
+            if (!newlines || !is_line_break(lexer->lookahead)) {
                 break;
             }
             advance(lexer);
@@ -181,7 +184,7 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
                 }
             }
         } else if (newlines && lexer->lookahead == '/') {
-            while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+            while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
                 advance(lexer);
             }
         } else {
@@ -387,8 +390,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         advance(lexer);
         // EOF-bounded loop: lexer->eof() guarantees termination on
         // unterminated input. Do not tighten without preserving the
-        // EOF guard.
-        while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+        // EOF guard. A lone `\r` ends the line too, as in Groovy's
+        // lexer (`LineTerminator`), so the comment stops before it.
+        while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
             advance(lexer);
         }
         lexer->result_symbol = LINE_COMMENT;
@@ -490,7 +494,7 @@ bool tree_sitter_groovy_external_scanner_scan(
             found_close = true;
             break;
         }
-        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+        if (is_line_break(lexer->lookahead)) {
             break;
         }
         advance(lexer);

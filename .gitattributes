@@ -12,3 +12,6 @@ Package.swift linguist-generated
 
 # CRLF line endings are the test input here.
 test/corpus/expressions-command-chain-crlf.txt -text
+
+# A lone CR inside a line is the test input here.
+test/corpus/comments-cr.txt -text

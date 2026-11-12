@@ -242,6 +242,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as its name, as an `identifier`. A `sealed class` or `trait T { }`
   in the same position is still a declaration; see
   `docs/divergences-from-spec.md` §12. (#68, #89)
+- A line comment ends at a lone `\r`, as it does for Groovy's lexer.
+  It ended only at `\n`, so in a file with CR line endings
+  `foo() // c` followed by `bar()` lost `bar()` to the comment, with
+  no `ERROR`. A line comment between `record Name` and `(` had the
+  same problem. In a CRLF file the `\r` is no longer part of the
+  `line_comment` node, which is one byte shorter.
 
 ## [0.5.0] - 2026-11-10
 
