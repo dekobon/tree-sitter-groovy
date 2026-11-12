@@ -188,3 +188,16 @@ Backslash that does not end the line is an error
 x = 1 \ 2
 
 ---
+
+==================
+Backslash at the end of the input is skipped
+==================
+
+x = 1 \
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
