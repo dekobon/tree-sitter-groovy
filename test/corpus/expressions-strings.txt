@@ -757,6 +757,25 @@ x = """\
         (string_fragment)))))
 
 ==================
+Slashy string ends at its first unescaped slash
+==================
+
+x = /$a/**/b/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (string_literal
+          (gstring_dollar_interpolation
+            value: (identifier)))
+        right: (string_literal
+          (string_fragment))))))
+
+==================
 Dollar-slashy string whose text ends in a slash
 ==================
 
