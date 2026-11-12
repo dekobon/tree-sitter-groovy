@@ -77,6 +77,32 @@ function gstringPart($, textRule) {
   );
 }
 
+/**
+ * The members of a type body, listed once. `enum_body` repeats the
+ * list for the member directly after a trailing comma, where a plain
+ * constructor is not allowed (see `enum_declaration`), and the two
+ * lists must not drift apart.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral | null} constructor The constructor rule for
+ *   this position, or null where a constructor cannot appear.
+ * @returns {RuleOrLiteral[]} The member rules, in a fixed order.
+ */
+function classMembers($, constructor) {
+  return [
+    $.method_declaration,
+    $.field_declaration,
+    ...(constructor ? [constructor] : []),
+    $.static_initializer,
+    $.enum_declaration,
+    $.class_declaration,
+    $.interface_declaration,
+    $.trait_declaration,
+    $.record_declaration,
+    $.annotation_type_declaration,
+  ];
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -651,7 +677,7 @@ module.exports = grammar({
     // a no-op member. `;` is anonymous, so it never appears in the AST.
     //
     // A bare `block` is an instance initializer. It sits in the member
-    // repeat — here and in the three identical repeats of `enum_body` —
+    // repeat — here and in the four identical repeats of `enum_body` —
     // rather than in `_class_member`, because `enum_body` also places
     // a lone `_class_member` directly after its constants. A block in
     // that slot is an LR conflict on `A() {` (constructor, or constant
@@ -681,18 +707,7 @@ module.exports = grammar({
     // is already a complete field (`private boolean sealed` is an
     // ERROR; `boolean sealed` is not). See divergence 12. No
     // `conflicts` entry is needed.
-    _class_member: $ => choice(
-      $.method_declaration,
-      $.field_declaration,
-      $.constructor_declaration,
-      $.static_initializer,
-      $.enum_declaration,
-      $.class_declaration,
-      $.interface_declaration,
-      $.trait_declaration,
-      $.record_declaration,
-      $.annotation_type_declaration,
-    ),
+    _class_member: $ => choice(...classMembers($, $.constructor_declaration)),
 
     // §4 — constructors share the method_declaration shape but have
     // no return type and the name matches the enclosing class. We
@@ -875,9 +890,9 @@ module.exports = grammar({
     // initializer) cannot be told from `A { … }` (a constant with an
     // anonymous class body, unsupported); both stay errors.
     //
-    // The three member repeats are spelled out, and must stay
+    // The four member repeats are spelled out, and must stay
     // identical to the one in `class_body`, so that the generator
-    // folds all four into one aux symbol (`aux_sym_class_body_repeat1`).
+    // folds all five into one aux symbol (`aux_sym_class_body_repeat1`).
     // A differing copy, or a hidden rule that is not inlined, adds a
     // symbol and renumbers every id after it — the alias kinds
     // `named_argument`, `quoted_identifier` and `type_identifier`
@@ -903,17 +918,7 @@ module.exports = grammar({
             seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
             seq(
               ',',
-              choice(
-                $.method_declaration,
-                $.field_declaration,
-                $.static_initializer,
-                $.enum_declaration,
-                $.class_declaration,
-                $.interface_declaration,
-                $.trait_declaration,
-                $.record_declaration,
-                $.annotation_type_declaration,
-              ),
+              choice(...classMembers($, null)),
               repeat(choice($._class_member, $.block, ';')),
             ),
           )),
