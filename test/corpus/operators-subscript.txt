@@ -248,3 +248,54 @@ if (a) { } [1].each { }
           (number_literal))
         field: (identifier))
       closure: (closure))))
+
+==================
+Subscript after a block comment on the next line
+==================
+
+a
+/* c */ [0]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      (block_comment)
+      index: (number_literal))))
+
+==================
+Safe subscript on the next line
+==================
+
+x
+?[0]
+
+---
+
+(source_file
+  (expression_statement
+    (safe_subscript_expression
+      object: (identifier)
+      index: (number_literal))))
+
+==================
+Subscript continued on a new line inside a condition is unsupported
+:error
+==================
+
+if (a
+  [0]) { }
+
+---
+
+==================
+Subscript continued on a new line inside an interpolation is unsupported
+:error
+==================
+
+"${y
+  [0]}"
+
+---

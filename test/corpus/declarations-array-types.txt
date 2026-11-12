@@ -106,3 +106,13 @@ Array type continued on a new line inside parentheses is unsupported
   []) x
 
 ---
+
+==================
+Array type continued on a new line in a parameter is unsupported
+:error
+==================
+
+def m(String
+  [] a) { }
+
+---

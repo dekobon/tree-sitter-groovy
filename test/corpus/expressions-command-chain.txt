@@ -484,3 +484,208 @@ foo 1, 2
       function: (number_literal)
       arguments: (argument_list
         (identifier)))))
+
+==================
+Prefix increment on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+++x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (update_expression
+      operand: (number_literal)))
+  (expression_statement
+    (identifier)))
+
+==================
+Prefix decrement on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+--x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (update_expression
+      operand: (number_literal)))
+  (expression_statement
+    (identifier)))
+
+==================
+Parenthesis on the line after a single named argument
+==================
+
+foo a: 1
+(b)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (method_invocation
+        function: (number_literal)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
+Label after a block comment on the next line becomes a named argument
+==================
+
+foo
+/* note */ where: x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    (block_comment)
+    argument: (named_argument
+      key: (identifier)
+      value: (identifier))))
+
+==================
+Label after a groovydoc comment on the next line becomes a named argument
+==================
+
+foo
+/** note */ where: x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    (groovydoc_comment)
+    argument: (named_argument
+      key: (identifier)
+      value: (identifier))))
+
+==================
+Named argument with the key default after a comma
+==================
+
+foo 'a', default: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named argument with the key case after a comma
+==================
+
+foo a: 1, case: 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named arguments with the keys this and if on continuation lines
+==================
+
+foo a: 1,
+  this: 2,
+  if: 3
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named argument with the key new on a continuation line is unsupported
+:error
+==================
+
+foo a: 1,
+  new: 2
+
+---
+
+==================
+Dangling comma takes the first token of the next statement
+==================
+
+foo a: 1,
+
+bar b: 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Spread argument in a command chain is unsupported
+:error
+==================
+
+foo 'a', *args
+
+---
+
+==================
+Spread map argument in a command chain is unsupported
+:error
+==================
+
+foo a: 1, *:m
+
+---
+
+==================
+String key in a command chain is unsupported
+:error
+==================
+
+foo 'a': 1
+
+---
