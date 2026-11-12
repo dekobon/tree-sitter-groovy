@@ -72,8 +72,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `string_fragment` (see Fixed below), which changes trees for input
   that parsed without an `ERROR` at v0.5.0. `"${dir}/**/*.xml"` and
   `"/* c */ d"` held a `groovydoc_comment` or a `block_comment` in
-  place of that text, and a line that starts with `//` inside
-  `"""…"""` was a `line_comment`. In a slashy string the comment could
+  place of that text, and `//` at the start of a `"""…"""` body, or
+  directly after an interpolation in one, was a `line_comment`. In a
+  slashy string the comment could
   also take the closing `/`, so the string now ends earlier, at its
   first unescaped `/` as in Groovy: `/$a/**/b/` was one string that
   held a `groovydoc_comment`, and is now `/$a/ ** /b/`. Where the rest
@@ -167,8 +168,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - The scanner no longer emits a comment inside a string body.
   `"//div[@id]"`, `" // c"` and `"${a}//b"` were an `ERROR`, because a
   line comment took the closing quote. `"${dir}/**/*.xml"`,
-  `"/* c */ d"` and a `//` line inside `"""…"""` parsed with a comment
-  node in place of the text. The bodies of `"…"`, `"""…"""`, `/…/` and
+  `"/* c */ d"` and a `"""…"""` body that starts with a `//` line
+  parsed with a comment node in place of the text. The bodies of `"…"`, `"""…"""`, `/…/` and
   `$/…/$` now reference a new external token, `_string_body`, which is
   never emitted; where it is valid the scanner emits nothing. A
   comment inside `${…}` is still a comment. (#87)
