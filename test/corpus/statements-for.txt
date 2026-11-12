@@ -235,3 +235,67 @@ for (def i = 0; i < 3; i++) { a() }
         (method_invocation
           function: (identifier)
           arguments: (argument_list))))))
+
+==================
+For-in with a final loop variable
+==================
+
+for (final line in lines) { }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+For-in with a final typed loop variable
+==================
+
+for (final String line in lines) { }
+
+---
+
+(source_file
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+For-in with a final loop variable and a colon
+==================
+
+for (final x : xs) { }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+Classic for with a final typed init
+==================
+
+for (final int i = 0; i < n; i++) { }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block)))

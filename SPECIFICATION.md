@@ -565,11 +565,19 @@ The resolution we adopt:
 2. **First token is an identifier or property-access chain**, not
    any expression — so `(x + y) z` is a syntax error, not a juxt-call
    on a parenthesised expression.
-3. **Argument forms allowed**: positional args (literals, identifiers,
-   dotted paths, closures), named args (`k: v` where `k` is an
-   identifier or string), and trailing closure. Disallowed: nested
-   command chains, ternaries with unparenthesised conditions inside
-   the argument list (forces `f (a ? b : c)`).
+3. **Argument forms allowed**: the first argument is a literal, a
+   closure, or a named arg (`k: v`). After a comma an argument is a
+   named arg or any expression (`assertEquals 'v', a + b`,
+   `foo 'a', x ? 1 : 2`). That is Apache's `argumentListElement`
+   without spread arguments: `foo 'a', *args` and `foo a: 1, *:m`
+   are an `ERROR`.
+   A named-arg key is an identifier; Apache also accepts string keys
+   (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
+   nested command chains, and an identifier or other non-literal
+   expression as the first positional argument: `foo bar` is also how
+   a typed declaration starts (`Type name = …`), and the parser cannot
+   tell the two apart before the `=`. A bare `foo bar` parses as two
+   expression statements.
 4. **Chain continuation**: after the first call, subsequent `name`
    tokens become property/method dispatches. The Apache grammar uses
    `commandArgument: pathElement+ argumentList?` for the chain
@@ -679,6 +687,18 @@ Escape rules:
 - `${expr}` → interpolation.
 - `/$` (only when followed by no further content within the literal)
   → terminator.
+- `/` directly before the terminator is text: `$/a//$` holds `a/`. The
+  text token cannot look ahead, so it ends before a run of slashes
+  that reaches `$`. Each slash of that run except the last is then a
+  `string_fragment` of its own, and the last one starts the
+  terminator.
+- `$` directly before the terminator, as in `$/a$/$`, is not
+  supported. When a later `/$` exists in the file, Groovy runs the
+  string on to it, and the text holds `a/$` and what follows. When
+  none exists, Groovy ends the string there and the text is `a$`. This
+  grammar always reads `$/` as the escaped slash, so it matches the
+  first case and the second is an `ERROR`. Write `$$` for the dollar:
+  `$/a$$/$`.
 
 ### 5.8 Closure parameters and the `it` shorthand
 
@@ -713,6 +733,17 @@ scanner branches are avoided):
   two adjacent complete statements (`x()` then `y()`) need no explicit
   separator. Inside `(`/`[`/`{` a newline is likewise just whitespace,
   matching Groovy's rule.
+- **Line escape**: a `\` directly before a line break (`\n` or `\r\n`)
+  is whitespace, as in Apache's lexer (`WS : ([ \t]+ | LineEscape+)`).
+  It is a second pattern in `extras`, and the scanner's same-line
+  tokens (§6.7–§6.9) skip it as they skip spaces and tabs, so the next
+  line continues the current one: `x \` followed by `[0]` is a
+  subscript, and `foo \` followed by `a: 1` is a named-argument call.
+  A `\` anywhere else outside a string is an `ERROR`. Two cases differ
+  from Apache. A `\` before a lone `\r` is an `ERROR` when more input
+  follows the `\r`. At the very end of the file a `\`, alone or with a
+  `\r` after it, is skipped with no `ERROR`, because the lexer has
+  already taken it as the start of the pattern.
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
   (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
@@ -819,8 +850,12 @@ The external scanner is the C file `src/scanner.c`. It exists to
 handle the context-sensitive lexing situations that pure tree-sitter
 grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
-slashy opener, the three comment tokens, and the contextual `record`
-keyword (§6.7); the other tokens listed here are met in-grammar, see
+slashy opener, the three comment tokens, the contextual `record`
+keyword (§6.7), the named-argument key of a parenthesis-free call
+(§6.8), the same-line subscript opener (§6.9), `STRING_BODY` (§6.10),
+which is never emitted and only marks a string body, and
+`ERROR_SENTINEL`, which no rule references and which only signals
+error recovery; the other tokens listed here are met in-grammar, see
 `docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
@@ -839,6 +874,10 @@ enum TokenType {
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
+  COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
+  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
+  ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
 
@@ -962,15 +1001,17 @@ those identifier uses begin. The scanner makes the choice instead.
 Emit RECORD_KEYWORD when, from the current position:
   - the next six characters are `record`, and the character after
     them is not an identifier character ([A-Za-z0-9_$]); then
-  - at least one of: spaces, tabs, block comments — but no line
-    break and no line comment, because `classDeclaration` in
-    GroovyParser.g4 has no `nls` between RECORD and the name; then
+  - at least one of: spaces, tabs, line escapes (§5.10), block
+    comments — but no line break and no line comment, because
+    `classDeclaration` in GroovyParser.g4 has no `nls` between RECORD
+    and the name; then
   - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
     class); then either
   - `<` immediately (type parameters; the grammar's `type_parameters`
     opener is `token.immediate` as well), or
-  - any mix of spaces, tabs, line breaks, block and line comments
-    (the rule has `nls` before `formalParameters`) and then `(`.
+  - any mix of spaces, tabs, line escapes, line breaks, block and
+    line comments (the rule has `nls` before `formalParameters`) and
+    then `(`.
 The token is `record` alone: `mark_end` is called after it and the
 look-ahead is not kept. On any other input return false; the
 in-grammar lexer then reads the word as `identifier`.
@@ -1000,6 +1041,112 @@ Known residuals:
   are followed by a return type spelled `record`
   (`private record bar() { … }`) reads as a record declaration too;
   it was a method at v0.4.0.
+
+### 6.8 COMMAND_NAMED_KEY — implementation contract
+
+Emitted only where a command chain argument may start, and never during
+error recovery (`ERROR_SENTINEL` valid). Skips spaces, tabs and line
+escapes (§5.10) but not newlines, consumes an identifier, marks the
+token end, then looks ahead past the same whitespace for a single `:`
+(a following second `:` means a method reference, so no emit). `case` and `default` are rejected so a
+switch label after a statement on the same line stays a label.
+
+Keeping the key scanner-side gives the parser a distinct lookahead token,
+so `Type name = …` stays a declaration without a precedence change, and a
+bare statement followed by a label on the next line (Spock's `where:`)
+stays two statements.
+
+After a comma the statement cannot end, so a key on a continuation line
+(`sh script: 'make',` then `returnStdout: true`) is matched in the grammar
+as a plain identifier followed by `:` and needs no scanner token.
+
+Known limitations:
+
+- String keys (`foo 'a': 1`, `foo "$k": 1`) are an `ERROR`. Apache's
+  `namedArgPrimary` accepts them.
+- `case` and `default` cannot be keys as the first argument. Apache's
+  `namedArgLabel` accepts every keyword, so `foo default: 1` is a
+  named-argument call there and an expression statement plus a label here.
+  The divergence is deliberate: the one-line
+  `switch (x) { case 1: foo default: bar }` depends on it. After a comma
+  both are accepted as keys (`foo 'a', default: 1`, `foo a: 1, case: 2`),
+  on the same line or the next: the scanner still rejects them, and the
+  grammar's continuation rule takes the keyword as a plain identifier.
+- The keys `new`, `true`, `false`, `null` and `switch` are accepted on the
+  same line as the preceding argument (`foo a: 1, new: 2`) but are an
+  `ERROR` on a continuation line (`foo a: 1,` then `new: 2`). `non-sealed`
+  is an `ERROR` in both positions, because `-` cannot be part of an
+  identifier. Every other keyword is accepted in both positions (`if`,
+  `def`, `in`, `as`, `final`, `class`), as are `this` and `super`.
+- A block or groovydoc comment before a label defeats the newline guard.
+  The comment branch consumes the newline when it emits the comment, so
+  `result` followed by a line reading `/* note */ where:` or
+  `/** note */ where:` parses as a command chain with key `where`.
+- A trailing argument continues onto the next line. After a comma an
+  argument is a full expression, and expressions do not stop at a newline,
+  so a next line that starts with something that can continue an expression
+  joins the last argument, even a literal one. `foo 1, 2` followed by a
+  line reading `(a)` parses as the call `2(a)`. The same happens when the
+  next line starts with `{` (a trailing closure), `-` or `+` (a binary
+  operator), `++` or `--` (a postfix update: `foo 1, 2` followed by `++x`
+  parses as `2++` and then `x`), `in`, `as` or `instanceof`. A next line
+  that starts with `[` is not affected: a `[` after a newline never
+  subscripts (§6.9), so `foo 1, 2` followed by `[a].each { }` is two
+  statements. A chain whose one argument is positional (`foo 'a'` then
+  `(a)`) is not affected either, because that argument is not a full
+  expression. The value of a named argument is one, so it joins even as
+  the only argument: `foo a: 1` followed by `(b)` has the value `1(b)`.
+  Expressions outside command chains already behave this way:
+  `def x = 'b'` followed by `(a)` is a call on `'b'`.
+- A dangling comma takes the first token of the next statement. `foo a: 1,`
+  followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
+  chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The
+  dangling comma was an `ERROR` before.
+
+### 6.9 SUBSCRIPT_OPEN — implementation contract
+
+Emitted wherever a `[` may follow, and never during error recovery
+(`ERROR_SENTINEL` valid). Skips spaces, tabs and line escapes (§5.10)
+but not newlines; if the next character is `[`, consumes it. Subscripts and array types
+accept only this token. List and map literals accept it and the
+in-grammar `[`, so a `[` on the same line resolves as it did with a
+single token. At a newline it emits nothing, so the in-grammar `[`
+lexes instead and starts a list or map literal: Groovy ends a statement
+at a newline, which is what lets a Grails controller action return
+`[model: value]` on its own line.
+
+Two known differences from Groovy are accepted. The scanner is
+stateless, so a newline before `[` ends the expression everywhere,
+including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a`
+followed by `[0])` on the next line. Groovy's lexer ignores newlines
+inside `(…)`, `[…]` and `?[…]`, so `foo(a` followed by `[0])` on the
+next line, `[a` followed by `[0]]`, and the array-type forms `(String`
+followed by `[]) x` and `def m(String` followed by `[] a) { }` are
+valid Groovy and an `ERROR` here (pinned in
+`test/corpus/operators-subscript.txt` and
+`test/corpus/declarations-array-types.txt`). Matching Groovy needs a
+stack of open parentheses, brackets and braces in the scanner. A block
+comment at the start of the `[` line also hides the newline before it:
+`a` followed by `/* c */ [0]` on the next line parses as a subscript,
+where Groovy ends the statement at the newline.
+
+### 6.10 STRING_BODY — implementation contract
+
+Never emitted. `"…"`, `"""…"""`, `/…/` and `$/…/$` are lexed in pieces
+so that interpolations become child nodes, and the parser calls the
+scanner at the start of every piece. Comments are `extras`, so they are
+valid there as everywhere else. At v0.5.0 the scanner therefore emitted
+a comment whenever a piece started with `//` or `/*`, with or without
+whitespace before it: `"//div"` lost its closing quote to a line
+comment, and `"${dir}/**/*.xml"` held a `groovydoc_comment`.
+
+Every body lists `_string_body` among its segments, so the token is
+valid exactly where a segment may start. When it is valid and
+`ERROR_SENTINEL` is not, the scanner returns without emitting anything
+and the in-grammar lexer reads the text. Inside `${…}` the token is not
+valid, so a comment there is still a comment. During error recovery
+every external is valid and the check is skipped, as for the other
+context-sensitive tokens.
 
 ---
 

@@ -181,3 +181,292 @@ int x = 1, y = 2
     value: (number_literal)
     name: (identifier)
     value: (number_literal)))
+
+==================
+Final local with type
+==================
+
+def m() {
+  final String name = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        value: (string_literal)))))
+
+==================
+Final local with def
+==================
+
+def m() {
+  final def n = 1
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Modifier-only final local
+==================
+
+def m() {
+  final source = '''
+x
+'''
+  final a = 1, b = 2
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Blank final local with type
+==================
+
+def m() {
+  final String name
+  name = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (string_literal))))))
+
+==================
+Blank final local with generic type
+==================
+
+def m() {
+  final List<String> xs
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))))
+
+==================
+Final locals inside a closure body
+==================
+
+xs.each {
+  final y = it
+  final String s = y
+}
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)
+            value: (identifier)))
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (identifier))))))
+
+==================
+Typed local on the line after a comment
+==================
+
+foo()
+// note
+String s = 'a'
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (line_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+Typed local after a statement with a trailing comment
+==================
+
+int y = 1 // note
+String s = 'a'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (line_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+Final typed local after a statement with a trailing comment
+==================
+
+def m() {
+  foo() // note
+  final String s = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (line_comment)
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        value: (string_literal)))))
+
+==================
+Blank final local with a trailing comment
+==================
+
+def m() {
+  final String name // note
+  name = 'a'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (line_comment)
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (string_literal))))))
+
+==================
+Blank final local at script top level
+==================
+
+final String name
+name = 'a'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal))))
+
+==================
+Blank final local at script top level before a call
+==================
+
+final String name
+foo()
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Untyped blank final before a typed local reads as a typed blank final
+==================
+
+final a
+String b = 'y'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal))))

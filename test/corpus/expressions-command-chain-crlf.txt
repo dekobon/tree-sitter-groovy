@@ -1,0 +1,68 @@
+==================
+Named arguments continued on the next line (CRLF)
+==================
+
+sh script: 'make',
+   returnStdout: true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (boolean_literal))))
+
+==================
+Label on the line after a command chain stays a label (CRLF)
+==================
+
+foo 'a', b
+c: d
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (identifier))))
+
+==================
+Named argument after a line escape (CRLF)
+==================
+
+foo \
+  a: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Subscript after a line escape (CRLF)
+==================
+
+x \
+[a]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (identifier))))

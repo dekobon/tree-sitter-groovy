@@ -21,7 +21,7 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Done** | multi-arg form supported. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported. String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). |
 | §5.6 Optional parentheses | **Done** | command_chain at statement level. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Done** | typed and untyped, no synthetic `it`. |
@@ -35,9 +35,12 @@ reasoning here.
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
-| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted in this session but coupled to a not-yet-implemented named-argument command-chain (`archiveArtifacts artifacts: 'x'`), which the workaround grammar path quietly absorbed. Reverted to grammar precedence; v2 work is named-args + scanner token together. |
+| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
 | §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
+| §6.8 COMMAND_NAMED_KEY | **Done** | emitted only for an identifier followed by `:` on the same line, never during error recovery; limitations are in the §5.5 row above and spec §6.8. |
+| §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
+| §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -257,6 +260,46 @@ positional argument) without a 2-token lookahead.
 Workaround: users can use `def x` or `var x` for the no-init form;
 the typed form requires `= value`. Real-world Groovy code almost
 universally uses `=` initializers on local declarations anyway.
+`final Type x` is the exception: a blank final is accepted, with a
+single declarator.
+
+Because a newline is whitespace (#3), the tokens of a typed
+declaration also parse as two statements: `String s = 'a'` as the
+expression `String` followed by `s = 'a'`. The typed forms carry a
+dynamic precedence, so the declaration wins whenever both parse;
+without it a comment before the declaration changed the result. The
+cost is the reverse case: a bare `x` followed by `y = 1` on the next
+line is the declaration `x y = 1`, and `final a` followed by
+`String b = 'y'` is `final a String` followed by `b = 'y'`.
+
+A method declaration with a body carries a dynamic precedence for the
+same reason: `String f() { }` also parses as the expression `String`
+followed by the call `f() { }`, and `def f(a) { }` as a variable `f`
+followed by the cast `(a) { }`. Here too the reverse case loses: a
+bare `x` followed by `foo() { }` on the next line is the method
+`x foo() { }`. The method's weight is above the blank final's, because
+`final String f(a) { }` is also `final String f` followed by the cast
+`(a) { }`. That costs the blank final one case: `final String name`
+followed by `foo() { }` on the next line is `final String` followed by
+the method `name foo() { }`.
+
+In a class body the weights rank a typed field above a method with a
+body, and give a field with modifiers only a negative weight. Without
+the first, `private final int v` followed by a constructor was
+`private final int` and a method `v C() { }`. Without the second, the
+same field followed by a comment and a member that starts with a
+modifier (`private String w`, `public A() { }`, `static { }`) was
+`private final int`, a field of type `v` named after that modifier,
+and the rest: a keyword is an identifier wherever it has no action.
+
+A method declaration without a body carries a negative dynamic
+precedence, so `x` followed by `foo()` on the next line is two
+statements, as is `println foo()` on one line. Outside a class body a
+method needs a body, so only the statement reading is valid Groovy.
+The cost is on invalid input: `String foo()` with no body, which
+Groovy rejects in a script, parses as `String` followed by `foo()`
+with no `ERROR`. In a class body nothing competes with the method, so
+abstract and interface methods are unaffected.
 
 **Action**: lift this restriction once we have a sound
 disambiguation strategy. Likely path: a conflict declaration on

@@ -119,3 +119,27 @@ public final String toString() { name }
     parameters: (formal_parameters)
     body: (block
       (expression_statement (identifier)))))
+
+==================
+Modifier-only methods at script top level
+==================
+
+final f() { }
+
+private static g(a) { a }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))

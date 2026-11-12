@@ -122,7 +122,7 @@ log 'starting', 42, true
     argument: (boolean_literal)))
 
 ==================
-Named-argument command chain (v1 fallback shape)
+Named-argument command chain
 ==================
 
 archiveArtifacts artifacts: 'build/**/*'
@@ -130,7 +130,562 @@ archiveArtifacts artifacts: 'build/**/*'
 ---
 
 (source_file
-  (expression_statement (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))))
+
+==================
+Command chain with named arguments
+==================
+
+exclude group: 'org.slf4j', module: 'slf4j-api'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))))
+
+==================
+Command chain with named arguments of any expression value
+==================
+
+name blank: false, size: 1..100
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (boolean_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (range_expression
+        start: (number_literal)
+        end: (number_literal)))))
+
+==================
+Command chain mixing positional and named arguments
+==================
+
+archiveArtifacts 'build/*.jar', fingerprint: true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (identifier)
+      value: (boolean_literal))))
+
+==================
+Command chain with a method call after the first argument
+==================
+
+systemProperty 'k', System.getProperty('k')
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (string_literal)))))
+
+==================
+Bare statement before a Spock label stays separate
+==================
+
+def "t"() {
+  expect:
+  result
+
+  where:
+  result << [true]
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters)
+    body: (block
+      (labeled_statement
+        label: (identifier)
+        statement: (expression_statement
+          (identifier)))
+      (labeled_statement
+        label: (identifier)
+        statement: (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (list_literal
+              (boolean_literal))))))))
+
+==================
+Typed declaration is not a named-argument call
+==================
+
+String name = 'a'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+Command chain with a subscript after the first argument
+==================
+
+assertEquals 'v', params['k']
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (subscript_expression
+      object: (identifier)
+      index: (string_literal))))
+
+==================
+Comment after a command chain's last argument
+==================
+
+assertEquals 'v', x
+// note
+assert y
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (identifier))
+  (line_comment)
+  (assert_statement
+    (identifier)))
+
+==================
+Named arguments continued on the next line
+==================
+
+sh script: 'make',
+   returnStdout: true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (string_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (boolean_literal))))
+
+==================
+Named arguments continued over three lines
+==================
+
+foo a: 1,
+    b: 2,
+    c: 3
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Label on the line after a command chain stays a label
+==================
+
+foo 'a', b
+c: d
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (identifier))
   (labeled_statement
     label: (identifier)
-    statement: (expression_statement (string_literal))))
+    statement: (expression_statement
+      (identifier))))
+
+==================
+Command chain with a binary expression after the first argument
+==================
+
+assertEquals 'v', a + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Command chain with a subscript operand after the first argument
+==================
+
+foo 'a', b[0] + 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (binary_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (number_literal))
+      right: (number_literal))))
+
+==================
+Command chain with a constructor call after the first argument
+==================
+
+foo 'a', new Bar(1)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (number_literal)))))
+
+==================
+Command chain with a ternary after the first argument
+==================
+
+foo 'a', x ? 1 : 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal))))
+
+==================
+Named argument keyed record and a record declaration after a receiver
+==================
+
+foo record: 1
+foo
+record R(int x) {}
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (identifier))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+List on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+[a].each { }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (identifier))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Parenthesis on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+(a)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (method_invocation
+      function: (number_literal)
+      arguments: (argument_list
+        (identifier)))))
+
+==================
+Prefix increment on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+++x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (update_expression
+      operand: (number_literal)))
+  (expression_statement
+    (identifier)))
+
+==================
+Prefix decrement on the line after a multi-argument command chain
+==================
+
+foo 1, 2
+--x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (update_expression
+      operand: (number_literal)))
+  (expression_statement
+    (identifier)))
+
+==================
+Parenthesis on the line after a single named argument
+==================
+
+foo a: 1
+(b)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (method_invocation
+        function: (number_literal)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
+Label after a block comment on the next line becomes a named argument
+==================
+
+foo
+/* note */ where: x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    (block_comment)
+    argument: (named_argument
+      key: (identifier)
+      value: (identifier))))
+
+==================
+Label after a groovydoc comment on the next line becomes a named argument
+==================
+
+foo
+/** note */ where: x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    (groovydoc_comment)
+    argument: (named_argument
+      key: (identifier)
+      value: (identifier))))
+
+==================
+Named argument with the key default after a comma
+==================
+
+foo 'a', default: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named argument with the key case after a comma
+==================
+
+foo a: 1, case: 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named arguments with the keys this and if on continuation lines
+==================
+
+foo a: 1,
+  this: 2,
+  if: 3
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named argument with the key new on a continuation line is unsupported
+:error
+==================
+
+foo a: 1,
+  new: 2
+
+---
+
+==================
+Dangling comma takes the first token of the next statement
+==================
+
+foo a: 1,
+
+bar b: 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Spread argument in a command chain is unsupported
+:error
+==================
+
+foo 'a', *args
+
+---
+
+==================
+Spread map argument in a command chain is unsupported
+:error
+==================
+
+foo a: 1, *:m
+
+---
+
+==================
+String key in a command chain is unsupported
+:error
+==================
+
+foo 'a': 1
+
+---

@@ -7,6 +7,184 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `final` on the variable of a `for` header is now a
+  modifier instead of a type name, which changes trees for input that
+  parsed without an `ERROR` at v0.5.0. `for (final x in xs)` and
+  `for (final i = 0; ...)` no longer have `final` as their `type`; in
+  the C-style form the name and value also move into a
+  `variable_declarator`. A method declared with modifiers only outside
+  a class body (`final f() { }`, `static f() { }`) now has `f` as its
+  `name`; at v0.5.0 `f` was its `return_type` and `name` was a
+  zero-width `quoted_identifier`. (#56)
+- **BREAKING:** a parenthesis-free call whose only argument is a named
+  argument (`archiveArtifacts artifacts: 'x'`, `foo a: 1`) is now a
+  `command_chain` with a `named_argument`. At v0.5.0 it parsed without
+  an `ERROR` as an expression statement followed by a labeled
+  statement. A label after a block or groovydoc comment, on the line
+  after a bare statement (`result`, then `/* note */ where: x`), now
+  takes the same shape; v0.5.0 kept two statements there. After a
+  comma, an argument is now a full expression. On the same line,
+  `foo 1, 2 + 3` is one chain whose last argument is `2 + 3`; v0.5.0
+  ended the chain at `2` and started the statement `+ 3`. The last
+  argument also continues onto a next line that starts with `(`, `{`,
+  `-`, `+`, `++` or `--`, where v0.5.0 started a new statement:
+  `foo 1, 2` followed by `(a)` parses as the call `2(a)`, and followed
+  by `++x` as `2++` and then `x`. A next line that starts with `[` is
+  still a new statement (#63); `SPECIFICATION.md` §6.8 lists every
+  case. (#57)
+- **BREAKING:** a `[` that starts a new line no longer subscripts the
+  expression before it. `x` followed by `[a]` on the next line was a
+  `subscript_expression` at v0.5.0 and is now an expression statement
+  followed by a `list_literal`. The rule also holds inside `(…)` and
+  `[…]`, where Groovy ignores newlines, so a subscript or array type
+  continued on a new line there (`foo(a` then `[0])`) parsed at v0.5.0
+  and is now an `ERROR`; see `SPECIFICATION.md` §6.9. (#63)
+- **BREAKING:** an untyped `final` parameter (`def f(final a)`) no
+  longer reports `final` as its `type`; the `formal_parameter` has only
+  a `name`. (#64)
+- **BREAKING:** a typed local declaration with a comment between it
+  and the statement before it is now a `local_variable_declaration`
+  (see Fixed below), which changes trees for input that parsed without
+  an `ERROR` at v0.5.0. `foo()`, then `// note`, then `String s = 'a'`
+  on its own line was the expression statement `String` followed by
+  the assignment `s = 'a'`. (#87)
+- **BREAKING:** a method declaration with a body, outside a class body
+  and with a comment between it and the statement before it, is now a
+  `method_declaration` (see Fixed below), which changes trees for
+  input that parsed without an `ERROR` at v0.5.0. `foo()`, then
+  `/* note */`, then `def skip(task) { true }` was a variable `skip`
+  followed by a cast of a closure; `String call() { 'x' }` in the same
+  position was the expression `String` followed by a call with a
+  closure. (#87)
+- **BREAKING:** in a class body, a field with a modifier and no
+  initializer is no longer split when a comment follows it and the
+  next member is a method or starts with a modifier (see Fixed below),
+  which changes trees for input that parsed without an `ERROR` at
+  v0.5.0. `private int v // one` followed by `private String w` was a
+  field named `int`, a field of type `v` named `private`, and a field
+  `String w`; it is now the two fields. The same holds before a
+  constructor or method with a modifier (`public A() { }`,
+  `static m() { }`), a `static { }` block and a nested type, and
+  before a method with a return type (`String m() { }`). (#87)
+- **BREAKING:** comment-like text in a string body is now part of a
+  `string_fragment` (see Fixed below), which changes trees for input
+  that parsed without an `ERROR` at v0.5.0. `"${dir}/**/*.xml"` and
+  `"/* c */ d"` held a `groovydoc_comment` or a `block_comment` in
+  place of that text, and `//` at the start of a `"""…"""` body, or
+  directly after an interpolation in one, was a `line_comment`. In a
+  slashy string the comment could
+  also take the closing `/`, so the string now ends earlier, at its
+  first unescaped `/` as in Groovy: `/$a/**/b/` was one string that
+  held a `groovydoc_comment`, and is now `/$a/ ** /b/`. Where the rest
+  of the line is not an expression, as in `/$a/*c*//`, input that
+  parsed at v0.5.0 is now an `ERROR`. (#87)
+- **BREAKING:** in a dollar-slashy string, a run of slashes before `$`
+  now ends at the closing `/$` (see Fixed below), which changes trees
+  for input that parsed without an `ERROR` at v0.5.0. The string can
+  end earlier: `$/a//$//$` was one string, and is now the string
+  `$/a//$` followed by the line comment `//$`. Text that ends in two
+  or more slashes has more `string_fragment` children: `$/a///$` was
+  one fragment, `a//`, and is now `a` and one fragment for each slash.
+  (#87)
+- **BREAKING:** outside a class body, a method declaration with no
+  body now gives way to statements (see Fixed below), which changes
+  trees for input that parsed without an `ERROR` at v0.5.0. `x`
+  followed by `foo()` on the next line, and `println foo()` on one
+  line, were a `method_declaration` whose return type was `x` or
+  `println`. Each is now an expression statement followed by a call.
+  (#87)
+- Four external scanner tokens are added: `_command_named_key` (#57),
+  `_subscript_open` (#63), `_string_body` (#87) and `_error_sentinel`
+  (#57, #63), so most symbol ids above 69 in the generated parser
+  change and `SYMBOL_COUNT` goes from 308 to 314. Node names and field
+  ids are unchanged. In `node-types.json`, `command_chain`'s `argument`
+  field lists every expression kind and `named_argument`, and
+  `trait_declaration` gains a `super_interfaces` child.
+  (#57, #63, #65, #87)
+
+### Fixed
+
+- `final` is now accepted on local variable declarations: `final String
+  name = 'a'`, `final def n = 1`, the modifier-only form `final x = 1`
+  (dynamically typed, as with `def`), and the blank form `final String
+  name`. Previously a local starting with `final` was an `ERROR` node.
+  (#56)
+- Parenthesis-free calls now accept named arguments, as §5.5 specifies:
+  `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+  GORM's `name blank: false, size: 1..100`. After the first argument,
+  an argument may be any expression
+  (`systemProperty 'k', System.getProperty('k')`, `assertEquals 'v', a + b`),
+  and a named argument may start on the line after a comma. A same-line
+  key is lexed by a new external scanner token, `_command_named_key`,
+  which only matches when `:` follows on the same line, so `Type name = …`
+  declarations and a bare statement followed by a Spock label on the next
+  line parse as before, unless a block or groovydoc comment stands
+  before the label (see Changed above). String keys (`foo 'a': 1`) are
+  not accepted yet. (#57)
+- A `[` that starts a new line now begins a list or map literal instead
+  of subscripting the previous statement, so a Grails controller action
+  ending in `[model: value]` parses. A `[` on the same line as the token
+  before it, with or without spaces or tabs between them, parses as
+  before. Implemented as an external scanner token, `_subscript_open`.
+  (#63)
+- `final` is now accepted on method and constructor parameters (`def f(final String a)`). (#64)
+- Trait declarations accept an `implements` clause (`trait T implements A, B`). (#65)
+- A typed local declaration after a comment is no longer split in two.
+  `int y = 1 // note` followed by `String s = 'a'` parsed the second
+  line as the expression `String` and the assignment `s = 'a'`: both
+  readings are valid, nothing ranked them, and a comment changed which
+  one won. The typed forms of `local_variable_declaration` now carry a
+  dynamic precedence. This also keeps `final String s = 'a'` whole
+  after a comment, and the blank `final String name` whole when a
+  comment or an assignment follows it. (#87)
+- A method declaration with a body, outside a class body, is no longer
+  split when a comment precedes it. After a comment,
+  `String call() { 'x' }` parsed as the expression `String` and the
+  call `call() { 'x' }`, and `def skip(task) { true }` as a variable
+  and a cast of a closure. A method with a body now carries a dynamic
+  precedence. It is above the blank final local's, so that
+  `final String f(a) { }` stays a method, and below the typed field's,
+  so that `private final int v` followed by a constructor is still a
+  field and a constructor. (#87)
+- In a class body, a field with a modifier and no initializer is no
+  longer split when a comment follows it. `private final int v`, then
+  `/** doc */`, then `public A(int v) { }` parsed as a field named
+  `int`, a field of type `v` named `public`, and a constructor; two
+  commented fields in a row (`private int v // one`, then
+  `private String w`) were split the same way. A keyword is an
+  identifier wherever it has no action, so both readings held one
+  typed field and nothing ranked them. A field with modifiers only now
+  carries a negative dynamic precedence. (#87)
+- A bare identifier followed by a call is no longer a method
+  declaration with no body. `result` followed by `noExceptionThrown()`
+  on the next line, and `println foo()` on one line, parsed as a
+  method whose return type was the first word. A method with no body
+  now carries a negative dynamic precedence, so it is chosen only
+  where nothing else parses: in a class body, for abstract and
+  interface methods. A script method with no body (`String foo()`),
+  which Groovy rejects, now parses as two expression statements. (#87)
+- The scanner no longer emits a comment inside a string body.
+  `"//div[@id]"`, `" // c"` and `"${a}//b"` were an `ERROR`, because a
+  line comment took the closing quote. `"${dir}/**/*.xml"`,
+  `"/* c */ d"` and a `"""…"""` body that starts with a `//` line
+  parsed with a comment node in place of the text. The bodies of `"…"`, `"""…"""`, `/…/` and
+  `$/…/$` now reference a new external token, `_string_body`, which is
+  never emitted; where it is valid the scanner emits nothing. A
+  comment inside `${…}` is still a comment. (#87)
+- A dollar-slashy string whose text ends in a slash now parses:
+  `$/a//$` holds `a/`. It was an `ERROR`, because the text token took
+  the slash that the closing `/$` needs. A slash directly before the
+  closer is now a `string_fragment` of its own. (#87)
+- A line escape, `\` at the end of a line, is now whitespace, as in
+  Groovy's lexer; it was an `ERROR`. The line after it continues the
+  current one, so `x \` followed by `[0]` is a subscript and `foo \`
+  followed by `a: 1` is a named-argument call. A `\` before a lone
+  `\r` is still an `ERROR` when more input follows. At the very end of
+  the file a `\`, alone or with a `\r` after it, is skipped with no
+  `ERROR`. (#87)
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

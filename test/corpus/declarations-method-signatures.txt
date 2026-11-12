@@ -248,3 +248,306 @@ ResponseEntity get(@PathVariable("id") Long id, @RequestBody Map body) { }
         type: (type_identifier)
         name: (identifier)))
     body: (block)))
+
+==================
+Final parameters
+==================
+
+def f(final String a, final b) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))
+
+==================
+Final parameter after an annotation
+==================
+
+def f(@Lazy final Resolver r) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name (identifier)))
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+Final constructor parameter
+==================
+
+class A {
+  A(final String a) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Typed script method after a groovydoc comment
+==================
+
+import a.B
+
+/** doc */
+String call() { 'x' }
+
+---
+
+(source_file
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier)))
+  (groovydoc_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (string_literal)))))
+
+==================
+Script method with an untyped parameter after a block comment
+==================
+
+foo()
+
+/* note */
+def skip(task) { true }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block_comment)
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (boolean_literal)))))
+
+==================
+Typed script method with a throws clause after a trailing comment
+==================
+
+foo() // note
+String bar() throws E { }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (line_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    (throws_clause
+      (type_identifier))
+    body: (block)))
+
+==================
+Void script method after a line comment
+==================
+
+def a() { }
+
+// note
+void b() { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (line_comment)
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+Final typed script method with an untyped parameter
+==================
+
+final String f(a) { a }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Final typed script method with a default parameter and a throws clause
+==================
+
+final String f(a = 1) throws E { a }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal)))
+    (throws_clause
+      (type_identifier))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Call on the line after a bare identifier is not a method
+==================
+
+x
+foo()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Call with arguments on the line after a bare identifier is not a method
+==================
+
+x
+foo(a, b)
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)))))
+
+==================
+Call on the line after a labeled bare expression is not a method
+==================
+
+then:
+result
+noExceptionThrown()
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Call on the line after an untyped blank final is not a method
+==================
+
+def m() {
+  final x
+  foo()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+Method with no body after another member in an interface
+==================
+
+interface I {
+  String a() // note
+  int b()
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (line_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))

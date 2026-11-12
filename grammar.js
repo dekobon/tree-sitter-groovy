@@ -59,6 +59,10 @@ const PREC = {
  * The text rule differs (single-quoted bans newlines, triple-quoted
  * allows them) but every other alternative is identical.
  *
+ * `_string_body` is never emitted. Listing it here makes it valid
+ * wherever a body segment may start, which is how the external scanner
+ * learns that it is inside a string (SPECIFICATION.md §6.10).
+ *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} textRule The flavour-specific literal-text rule.
  * @returns {ChoiceRule} The shared body-segment choice.
@@ -69,6 +73,7 @@ function gstringPart($, textRule) {
     $.gstring_dollar_interpolation,
     $.gstring_brace_interpolation,
     alias($._gstring_literal_dollar, $.string_fragment),
+    $._string_body,
   );
 }
 
@@ -93,13 +98,23 @@ module.exports = grammar({
 
   extras: $ => [
     /\s/,
+    // §5.10 — a line escape, `\` at the end of a line. Groovy's lexer
+    // skips it as it skips spaces and tabs.
+    /\\\r?\n/,
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
   ],
 
   // Externals listed here must have a matching branch in
-  // `src/scanner.c` AND be referenced by at least one rule below.
+  // `src/scanner.c` AND be referenced by at least one rule below
+  // (`_command_named_key` and `_subscript_open` included). There are
+  // two exceptions. No rule references `_error_sentinel`: it exists so
+  // the scanner can detect error recovery, when tree-sitter marks
+  // every external valid. It is kept last here and in the scanner's
+  // `TokenType` enum, and the two orders must match. The scanner never
+  // emits `_string_body`: a string body references it so that the
+  // scanner can tell it is inside one.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -115,9 +130,28 @@ module.exports = grammar({
     $.block_comment,
     $.groovydoc_comment,
     $._record_keyword,
+    // §5.5 — `name:` key of a named argument in a parenthesis-free call.
+    // Scanner-side so the newline before a Spock label (`result` then
+    // `where:`) is not swallowed, and so `Type name =` stays a declaration.
+    $._command_named_key,
+    // §5.10 — `[` on the same line as the token before it (spaces, tabs and
+    // line escapes allowed). A `[` after a newline isn't one and can only
+    // start a list or map literal: a statement, not a subscript of the line
+    // above.
+    $._subscript_open,
+    // §6.10 — never emitted: valid only between the quotes of a string
+    // whose body is lexed in pieces. Comments are extras, so the parser
+    // offers them there too; the scanner must emit nothing, or `//` and
+    // `/*` at a piece boundary become comments.
+    $._string_body,
+    // Never referenced by a rule: valid only during error recovery, when
+    // the scanner must not emit context-sensitive tokens.
+    $._error_sentinel,
   ],
 
   conflicts: $ => [
+    // `final def x` / `final x = 1` in a block vs. a modified member at top level.
+    [$._modifier, $.local_variable_declaration],
     // See SPECIFICATION.md §7. Populated as rules accumulate.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
@@ -230,17 +264,45 @@ module.exports = grammar({
     // §5.5 — command_chain is the parenthesis-free method-call
     // form (`println 'hello'`, `events 'a', 'b', 'c'`). v1 is
     // intentionally conservative: receiver is a bare identifier
-    // and arguments are restricted to literal-shaped expressions
-    // and closures (no risk of mis-parsing `foo bar` as a command
-    // call on a bare identifier). Multi-argument lists are supported
-    // (comma-separated literal arguments per Gradle / Jenkins DSL
-    // idioms). Chained `foo bar baz` and complex argument shapes
-    // land later. Closes a subset of murtaza64 #5.
+    // and the first argument is restricted to literal-shaped
+    // expressions, closures and named arguments (no risk of
+    // mis-parsing `foo bar` as a command call on a bare identifier).
+    // After a comma an argument is a named argument or any
+    // expression: Apache's `argumentListElement` without spread
+    // arguments (`foo 'a', *args` is an ERROR). Chained
+    // `foo bar baz` lands later. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', $._command_argument),
-      repeat(seq(',', field('argument', $._command_argument))),
+      field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
+      repeat(seq(',', field('argument', choice(
+        alias($._command_named_argument, $.named_argument),
+        alias($._command_continued_named_argument, $.named_argument),
+        $._expression,
+      )))),
     )),
+
+    // §5.5 item 3 — named arguments in a parenthesis-free call:
+    // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
+    // GORM's `name blank: false, size: 1..100`. The key is an identifier
+    // lexed by the external scanner only when `:` follows on the same
+    // line, so `Type name = …` and a bare statement followed by a Spock
+    // label on the next line are unaffected.
+    _command_named_argument: $ => seq(
+      field('key', alias($._command_named_key, $.identifier)),
+      ':',
+      field('value', $._expression),
+    ),
+
+    // After a comma a newline cannot end the statement, so a key on a
+    // continuation line (`sh script: 'make',` then `returnStdout: true`)
+    // needs no scanner token. Same-line keys normally come from the
+    // scanner; `case` and `default`, which the scanner rejects, reach
+    // this rule on the same line too (`foo 'a', default: 1`).
+    _command_continued_named_argument: $ => seq(
+      field('key', $.identifier),
+      ':',
+      field('value', $._expression),
+    ),
 
     _command_argument: $ => choice(
       $.string_literal,
@@ -256,8 +318,9 @@ module.exports = grammar({
     // labeled_statement and expression_statement alive after
     // `identifier`; the `:` decides. A scanner-token form
     // (`_label_colon`) was attempted but interacted with
-    // not-yet-implemented named-argument command chains
-    // (`archiveArtifacts artifacts: 'x'`); see divergence #5.
+    // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
+    // which now lex their key through `_command_named_key` instead;
+    // see divergence #5.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',
@@ -468,6 +531,7 @@ module.exports = grammar({
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
       optional($.extends_interfaces),
+      optional($.super_interfaces),
       optional($.permits_clause),
       field('body', $.class_body),
     ),
@@ -514,8 +578,7 @@ module.exports = grammar({
       repeat(seq(',', $._type)),
     ),
 
-    // §4 — trait / interface extend multiple interfaces (no
-    // `implements` keyword in that position).
+    // §4 — trait / interface list their super-interfaces with `extends`.
     extends_interfaces: $ => seq(
       'extends',
       $._type,
@@ -647,20 +710,28 @@ module.exports = grammar({
     // would collide with a plain expression_statement.
     field_declaration: $ => choice(
       // Prefer the typed field when both parses succeed, rather than
-      // splitting `private final int v\n C() {}` after `int`.
-      prec.dynamic(1, seq(
+      // splitting `private final int v\n C() {}` after `int`. The
+      // weight is above a method body's: the split reading holds a
+      // method (`v C() {}`), which would otherwise tie.
+      prec.dynamic(4, seq(
         repeat($.annotation),
         repeat($._modifier),
         choice('def', field('type', $._type)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
-      seq(
+      // The negative weight settles the split that the typed weight
+      // cannot. `private final int v` followed by `public A() { }` is
+      // also `private final int`, a field `v public` and a constructor
+      // `A() { }`: a keyword is an identifier wherever it has no
+      // action. Both readings hold one typed field, so they tied, and
+      // a comment between the two members made the split win.
+      prec.dynamic(-1, seq(
         repeat($.annotation),
         repeat1($._modifier),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
-      ),
+      )),
     ),
 
     // §4 — `def name(params) body`. Typed return type (`String foo()
@@ -669,16 +740,45 @@ module.exports = grammar({
     // prec(1) wins over local_variable_declaration when `(` follows
     // the name, so `def f() { … }` at script-top-level parses as a
     // method rather than a `def f` variable followed by `(…) { … }`.
-    method_declaration: $ => prec.right(2, seq(
-      repeat($.annotation),
-      repeat($._modifier),
-      optional(field('type_parameters', $.method_type_parameters)),
-      choice('def', field('return_type', $._type)),
-      field('name', $._property_name),
-      field('parameters', $.formal_parameters),
-      optional($.throws_clause),
-      optional(field('body', $.block)),
-    )),
+    // Modifiers alone (no `def`, no return type) also introduce a
+    // method outside a class body: `final f() { }`. In a class body
+    // that shape stays a constructor_declaration.
+    //
+    // A method with a body carries a dynamic precedence because its
+    // tokens also parse as statements: `String f() { }` as the
+    // expression `String` followed by the call `f() { }`, and
+    // `def f(a) { }` as a variable `f` followed by the cast
+    // `(a) { }`. Without a weight, a comment before the method made
+    // the split win. The weight is above the blank final local's
+    // (`final Type name`, see local_variable_declaration):
+    // `final String f(a) { }` is also that local followed by the cast
+    // `(a) { }`.
+    //
+    // A method without a body carries a negative one. Its tokens are
+    // also `x` followed by the call `foo()`, and outside a class body
+    // only that reading is valid Groovy: a script method needs a
+    // body. In a class body nothing competes, so abstract and
+    // interface methods are unaffected.
+    method_declaration: $ => {
+      const signature = seq(
+        repeat($.annotation),
+        choice(
+          seq(
+            repeat($._modifier),
+            optional(field('type_parameters', $.method_type_parameters)),
+            choice('def', field('return_type', $._type)),
+          ),
+          repeat1($._modifier),
+        ),
+        field('name', $._property_name),
+        field('parameters', $.formal_parameters),
+        optional($.throws_clause),
+      );
+      return prec.right(2, choice(
+        prec.dynamic(-1, signature),
+        prec.dynamic(3, seq(signature, field('body', $.block))),
+      ));
+    },
 
     // §4 / §5.14 — method-level generic type parameters
     // (`<T> T identity(T x) { x }`). Distinct from `type_parameters`
@@ -713,8 +813,10 @@ module.exports = grammar({
     // on framework-facing methods), optional type, optional varargs
     // marker (`Type... name`), and optional default value
     // (`name = expr`).
+    // `final` is the only modifier accepted here.
     formal_parameter: $ => seq(
       repeat($.annotation),
+      optional('final'),
       optional(field('type', choice($._type, $.varargs_type))),
       field('name', $.identifier),
       optional(seq('=', field('default', $._expression))),
@@ -876,17 +978,58 @@ module.exports = grammar({
     // would conflict with method_invocation `Type(x)` and is
     // disallowed in v1. Multiple declarators per statement
     // (`def a = 1, b = 2`) are supported in all three forms.
+    // `final` is the only modifier accepted here.
+    // `final x = 1` with no type or `def` is the modifier-only form;
+    // the variable is dynamically typed, as with `def`. `final` also
+    // allows the typed form without an initializer (`final String
+    // name`, a blank final), with a single declarator.
+    //
+    // The typed forms carry a dynamic precedence because their tokens
+    // also parse another way: `String s = 'a'` as the expression
+    // `String` followed by `s = 'a'`, and `final String s = 'a'` as
+    // the modifier-only `final String` followed by `s = 'a'`. Without
+    // a weight, which tree wins depends on tree shape, and a comment
+    // before the declaration flipped it. The blank form ranks above
+    // the initialized one, or `final String name` followed by
+    // `name = 'a'` would tie with `final String` followed by
+    // `name name = 'a'`.
+    //
+    // Newlines do not end a declaration, so these read wrongly with
+    // no ERROR node:
+    // - `final x` followed by a line that starts with an identifier
+    //   reads `x` as the type and that identifier as the name. `y = 2`
+    //   becomes `final x y = 2`, the same resolution modifier-only
+    //   fields get (`static x` then `y = 1`), and `String s = 'a'`
+    //   becomes `final x String` followed by `s = 'a'`.
+    // - `final String name` followed by a line reading `foo() { }` is
+    //   `final String` followed by the method `name foo() { }`. A
+    //   method with a body outranks the blank form, so that
+    //   `final String f(a) { }` stays a method (see method_declaration).
+    // - A bare `x` followed by a line reading `y = 1` is the typed
+    //   declaration `x y = 1`.
     local_variable_declaration: $ => prec.right(choice(
       seq(
+        optional('final'),
         choice('def', 'var'),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
-      seq(
+      prec.dynamic(1, seq(
+        optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
+      )),
+      seq(
+        'final',
+        $.variable_declarator,
+        repeat(seq(',', $.variable_declarator)),
       ),
+      prec.dynamic(2, seq(
+        'final',
+        field('type', $._type),
+        field('name', $.identifier),
+      )),
     )),
 
     _initialized_declarator: $ => seq(
@@ -943,6 +1086,7 @@ module.exports = grammar({
     for_in_statement: $ => seq(
       'for',
       '(',
+      optional('final'),
       optional(choice('def', field('type', $._type))),
       field('variable', $.identifier),
       choice('in', ':'),
@@ -1201,7 +1345,7 @@ module.exports = grammar({
       repeat1(seq('.', alias($.identifier, $.type_identifier))),
     )),
 
-    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, '[', ']')),
+    array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, alias($._subscript_open, '['), ']')),
 
     // §4 / §5.14 — Java-style generic type arguments. Allows nested
     // generics (`Map<String, List<Integer>>`) and bounded wildcards
@@ -1385,9 +1529,12 @@ module.exports = grammar({
     // explicit ask of dekobon #247 for the `?[]` row. Both at
     // PREC.POSTFIX, left-associative — `a[b][c]` parses as
     // `(a[b])[c]`.
+    // `[` must be on the object's line (see `_subscript_open`): a Grails
+    // controller action that ends in `[model: value]` on its own line returns
+    // a map; it isn't a subscript of the statement before it.
     subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
-      '[',
+      alias($._subscript_open, '['),
       field('index', $._expression),
       ']',
     )),
@@ -1395,6 +1542,9 @@ module.exports = grammar({
     // `?[` is one token. `a ? [b] : c` (with space) still parses
     // as ternary plus list because tree-sitter's lexer never
     // crosses a whitespace boundary to extend a multi-char token.
+    // Unlike `[` (see `_subscript_open`), `?[` may still follow a
+    // newline: no statement starts with `?[`, so there is nothing
+    // to split off.
     safe_subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
       '?[',
@@ -1612,8 +1762,11 @@ module.exports = grammar({
     // form (see map_literal). Tree-sitter splits the parse between
     // list_literal and map_literal until a `:` or `]` disambiguates;
     // the conflict declaration above keeps both alternatives alive.
+    // Either `[` token opens a literal, so a same-line `[` resolves as
+    // it did with one token: `if (a) { } [1].each { }` is still a block
+    // followed by a list, not a subscripted closure.
     list_literal: $ => seq(
-      '[',
+      choice('[', alias($._subscript_open, '[')),
       optional(seq(
         $._expression,
         repeat(seq(',', $._expression)),
@@ -1631,7 +1784,7 @@ module.exports = grammar({
     map_literal: $ => {
       const entry = choice($.map_entry, $.spread_map_entry);
       return seq(
-        '[',
+        choice('[', alias($._subscript_open, '[')),
         choice(
           ':',
           seq(
@@ -1815,15 +1968,25 @@ module.exports = grammar({
     // `$$` (literal `$`), `$/` (literal `/`), and any other
     // non-`/` non-`$` char. The closer `/$` is `token.immediate`
     // so it always wins over text when `/` is followed by `$`.
+    //
+    // A run of slashes is text only up to an ordinary character
+    // (`a//b`). The text token must not take a `/` that the closer
+    // needs, and a regex cannot look ahead, so the slashes of a run
+    // that ends at `$` are lexed one at a time: for `//$` the single
+    // `/` matches first, then `/$` is the longer match and closes
+    // the string. Each such slash is its own `string_fragment`.
     _dollar_slashy_string: $ => seq(
       '$/',
-      repeat(gstringPart($, $._dollar_slashy_text)),
+      repeat(choice(
+        gstringPart($, $._dollar_slashy_text),
+        alias(token.immediate('/'), $.string_fragment),
+      )),
       token.immediate('/$'),
     ),
 
     _dollar_slashy_text: _ => token.immediate(repeat1(choice(
       /[^/$]/,
-      /\/[^$]/,
+      /\/+[^/$]/,
       /\$\$/,
       /\$\//,
     ))),

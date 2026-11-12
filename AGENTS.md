@@ -39,10 +39,14 @@ The default branch is **`main`**.
 - `src/scanner.c` — hand-written external scanner. Handles the
   context-sensitive lexing situations from `SPECIFICATION.md` §6 that
   the grammar cannot: slashy-vs-division, the line / block / Groovydoc
-  comment single-token emit, and the contextual `record` keyword,
-  which is emitted only before a record header (§6.7). GString
-  interpolation, automatic semicolons and label colons are handled
-  in-grammar (`docs/divergences-from-spec.md`). Symbols are
+  comment single-token emit, the contextual `record` keyword, which
+  is emitted only before a record header (§6.7), the key of a named
+  argument in a parenthesis-free call, which needs `:` on the same
+  line (§6.8), and a subscript `[` on the same line as the
+  expression before it (§6.9). Inside a string body it emits nothing
+  (§6.10). GString interpolation, automatic semicolons and label
+  colons are handled in-grammar
+  (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does
   NOT rewrite `scanner.c`, so these symbols are stable across
   regenerations.
@@ -135,7 +139,7 @@ Markdown docs), also run the applicable tooling check:
 taplo format --check    # TOML formatting (config: .taplo.toml)
 typos                   # spell-check (config: .typos.toml)
 cargo deny check        # licenses, advisories, sources (config: deny.toml)
-markdownlint-cli2       # Markdown lint (config: .markdownlint-cli2.jsonc)
+markdownlint-cli2 "**/*.md"  # Markdown lint (config: .markdownlint-cli2.jsonc)
 ```
 
 If grammar / scanner changed, run `npx tree-sitter test` until clean.
