@@ -22,11 +22,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   argument (`archiveArtifacts artifacts: 'x'`, `foo a: 1`) is now a
   `command_chain` with a `named_argument`. At v0.5.0 it parsed without
   an `ERROR` as an expression statement followed by a labeled
-  statement. After a comma, the last argument now continues onto a next
-  line that starts with `(`, `{`, `-` or `+`, where v0.5.0 started a
-  new statement: `foo 1, 2` followed by `(a)` parses as the call
-  `2(a)`. A next line that starts with `[` is still a new statement
-  (#63); `SPECIFICATION.md` §6.8 lists every case. (#57)
+  statement. A label after a block or groovydoc comment, on the line
+  after a bare statement (`result`, then `/* note */ where: x`), now
+  takes the same shape; v0.5.0 kept two statements there. After a
+  comma, an argument is now a full expression. On the same line,
+  `foo 1, 2 + 3` is one chain whose last argument is `2 + 3`; v0.5.0
+  ended the chain at `2` and started the statement `+ 3`. The last
+  argument also continues onto a next line that starts with `(`, `{`,
+  `-`, `+`, `++` or `--`, where v0.5.0 started a new statement:
+  `foo 1, 2` followed by `(a)` parses as the call `2(a)`, and followed
+  by `++x` as `2++` and then `x`. A next line that starts with `[` is
+  still a new statement (#63); `SPECIFICATION.md` §6.8 lists every
+  case. (#57)
 - **BREAKING:** a `[` that starts a new line no longer subscripts the
   expression before it. `x` followed by `[a]` on the next line was a
   `subscript_expression` at v0.5.0 and is now an expression statement
@@ -75,8 +82,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   key is lexed by a new external scanner token, `_command_named_key`,
   which only matches when `:` follows on the same line, so `Type name = …`
   declarations and a bare statement followed by a Spock label on the next
-  line parse as before. String keys (`foo 'a': 1`) are not accepted yet.
-  (#57)
+  line parse as before, unless a block or groovydoc comment stands
+  before the label (see Changed above). String keys (`foo 'a': 1`) are
+  not accepted yet. (#57)
 - A `[` that starts a new line now begins a list or map literal instead
   of subscripting the previous statement, so a Grails controller action
   ending in `[model: value]` parses. A `[` on the same line as the token
