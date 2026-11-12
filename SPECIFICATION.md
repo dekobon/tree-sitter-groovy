@@ -443,10 +443,17 @@ type_suffix      = one-of  G g L l I i D d F f
 
 ### 5.2 Identifiers and reserved-but-contextual words
 
-An identifier is `/[\p{XID_Start}_$][\p{XID_Continue}$]*/`. Groovy's
-lexer takes any Java letter (`isJavaIdentifierStart` /
-`isJavaIdentifierPart`), so non-ASCII names such as `名前` or `café`
-are identifiers; the Unicode `XID_*` classes are the nearest match.
+An identifier starts with a character of the Unicode general
+categories L, Nl, Sc or Pc, and continues with those or Nd, Mn or Mc.
+That is the rule of Groovy's lexer (`GroovyLexer.g4` `JavaLetter` and
+`JavaLetterOrDigit`): Java's `isJavaIdentifierStart` and
+`isJavaIdentifierPart`, without the identifier-ignorable characters.
+`$` is in Sc and `_` in Pc, so non-ASCII names such as `名前`, `café`
+and `€uro` are identifiers, and `a·b` (a middle dot, Po) is not. The
+Unicode `XID_*` classes differ from this rule in both directions and
+are not used. `grammar.js` writes the ASCII characters out before the
+classes (`identifierPattern`); that is for lexer speed and does not
+change the set.
 
 Groovy's keyword set, derived from `apache/groovy:GroovyLexer.g4`
 lines 400–501, splits into three groups:

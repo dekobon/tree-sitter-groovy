@@ -54,6 +54,41 @@ const PREC = {
 };
 /* eslint-enable no-multi-spaces */
 
+/*
+ * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
+ * `JavaLetterOrDigit`: Java's `Character.isJavaIdentifierStart` and
+ * `isJavaIdentifierPart` without the identifier-ignorable characters.
+ * In Unicode general categories that is L, Nl, Sc and Pc to start a
+ * name, and Nd, Mn and Mc as well to continue it. `$` is in Sc and
+ * `_` is in Pc.
+ */
+const ID_START = String.raw`\p{L}\p{Nl}\p{Sc}\p{Pc}`;
+const ID_PART = ID_START + String.raw`\p{Nd}\p{Mn}\p{Mc}`;
+
+/**
+ * The source of an identifier pattern, in Rust regex syntax.
+ *
+ * The ASCII characters are spelled out and come first, so that the
+ * lexer has a state that loops on them with plain comparisons. The
+ * Unicode classes compile to a binary search over several hundred
+ * ranges; written as one class, every character of every ASCII name
+ * went through that search, which made the lexer about 2.5 times
+ * slower per identifier character.
+ *
+ * @param {boolean} dollar Whether `$` is an identifier character. It
+ *   is not in a GString `$name` path (GroovyLexer.g4
+ *   `IdentifierInGString`).
+ * @returns {string} The pattern source.
+ */
+function identifierPattern(dollar) {
+  const asciiStart = dollar ? 'A-Za-z_$' : 'A-Za-z_';
+  const asciiPart = asciiStart + '0-9';
+  const otherStart = String.raw`[${ID_START}--[\x00-\x7F]]`;
+  const otherPart = String.raw`[${ID_PART}--[\x00-\x7F]]`;
+  const anyPart = `[${asciiPart}${otherPart}]`;
+  return `(?:[${asciiStart}][${asciiPart}]*(?:${otherPart}${anyPart}*)?|${otherStart}${anyPart}*)`;
+}
+
 /**
  * GString body segment choice shared between `"..."` and `"""..."""`.
  * The text rule differs (single-quoted bans newlines, triple-quoted
@@ -2044,9 +2079,9 @@ module.exports = grammar({
       )),
     ),
 
-    _gstring_dollar_path: _ => token.immediate(
-      /\$[\p{XID_Start}_][\p{XID_Continue}]*(\.[\p{XID_Start}_][\p{XID_Continue}]*)*/,
-    ),
+    _gstring_dollar_path: _ => token.immediate(new RustRegex(
+      String.raw`\$${identifierPattern(false)}(?:\.${identifierPattern(false)})*`,
+    )),
 
     // §5.7 / §6.3 — `${expression}` interpolation.
     gstring_brace_interpolation: $ => seq(
@@ -2098,9 +2133,8 @@ module.exports = grammar({
       /[0-9][0-9_]*[GgLlIiDdFf]?/,
     )),
 
-    // Groovy's lexer takes any Java letter (`isJavaIdentifierStart` /
-    // `isJavaIdentifierPart`), not only ASCII; `XID_Start` and
-    // `XID_Continue` are the Unicode classes closest to those.
-    identifier: _ => /[\p{XID_Start}_$][\p{XID_Continue}$]*/,
+    // Groovy's lexer takes any Java letter, not only ASCII; see
+    // `identifierPattern` above for the classes.
+    identifier: _ => new RustRegex(identifierPattern(true)),
   },
 });

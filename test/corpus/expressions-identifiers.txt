@@ -88,3 +88,92 @@ record 点(int x) { }
         type: (type_identifier)
         name: (identifier)))
     body: (class_body)))
+
+==================
+Identifier characters outside letters: currency, connector, mark, digit, letter number
+==================
+
+def €uro = 1
+def a‿b = 2
+def é = 3
+def x٣ = 4
+def 𝒳 = 5
+def Ⅷ = 6
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+A middle dot is not an identifier character
+:error
+==================
+
+def a·b = 1
+
+---
+
+==================
+A zero width space is not an identifier character
+:error
+==================
+
+def a​b = 1
+
+---
+
+==================
+A non-ASCII digit cannot start an identifier
+:error
+==================
+
+def ٣x = 1
+
+---
+
+==================
+GString interpolation of names with a currency sign and a combining mark
+==================
+
+println "$€uro $名前.属性́ $a$b"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (gstring_dollar_interpolation
+        value: (identifier)))))

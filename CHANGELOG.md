@@ -220,13 +220,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (#88, #89)
 - Identifiers accept non-ASCII letters, as Groovy's lexer does (any
   Java letter): `void test名前を確認する() { }`, `def café = 1`.
-  The token is `/[\p{XID_Start}_$][\p{XID_Continue}$]*/`; before,
+  A name starts with a character of the Unicode general categories L,
+  Nl, Sc or Pc and continues with those or Nd, Mn or Mc, which is the
+  lexer's own rule (`€uro` is a name, `a·b` is not); before,
   the first non-ASCII letter was an `ERROR`, and in a method name it
   took the method with it. A `$` interpolation in a GString reads the
   same characters, so `"値は$名前です"` now interpolates `名前です`
   where it was literal text with a `$` before; that is the only tree
   change for input that already parsed. The contextual `record`
-  keyword accepts a non-ASCII record name. No symbol is added. (#78)
+  keyword accepts a non-ASCII record name. No symbol is added.
+  (#78, #82)
 - Closure parameters take what a method parameter takes: `def`
   (`{ def b -> }`), `final`, annotations, varargs
   (`{ String... args -> }`) and a default (`{ a = 1 -> }`,
