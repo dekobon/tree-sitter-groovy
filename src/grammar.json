@@ -7354,7 +7354,7 @@
       "type": "IMMEDIATE_TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "\\$[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*"
+        "value": "\\$[\\p{XID_Start}_][\\p{XID_Continue}]*(\\.[\\p{XID_Start}_][\\p{XID_Continue}]*)*"
       }
     },
     "gstring_brace_interpolation": {
@@ -7509,7 +7509,7 @@
     },
     "identifier": {
       "type": "PATTERN",
-      "value": "[A-Za-z_$][A-Za-z0-9_$]*"
+      "value": "[\\p{XID_Start}_$][\\p{XID_Continue}$]*"
     }
   },
   "extras": [

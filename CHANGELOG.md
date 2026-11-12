@@ -210,6 +210,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `enum_constant` named after the first modifier (`private`), followed
   by the member without that modifier. A constructor in that position
   (`A,` then `private E(int w) { }`) is still a parse error. (#88)
+- Identifiers accept non-ASCII letters, as Groovy's lexer does (any
+  Java letter): `void test名前を確認する() { }`, `def café = 1`.
+  The token is `/[\p{XID_Start}_$][\p{XID_Continue}$]*/`; before,
+  the first non-ASCII letter was an `ERROR`, and in a method name it
+  took the method with it. A `$` interpolation in a GString reads the
+  same characters, so `"値は$名前です"` now interpolates `名前です`
+  where it was literal text with a `$` before; that is the only tree
+  change for input that already parsed. The contextual `record`
+  keyword accepts a non-ASCII record name. No symbol is added. (#78)
 
 ## [0.5.0] - 2026-11-10
 

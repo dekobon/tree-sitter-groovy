@@ -1,0 +1,75 @@
+==================
+Non-ASCII method name
+==================
+
+class T {
+  void test名前を確認する() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Non-ASCII local variable
+==================
+
+def café = 1
+café++
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (update_expression
+      operand: (identifier))))
+
+==================
+GString interpolation of a non-ASCII name
+==================
+
+def 名前 = 'x'
+println "値は$名前"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+Record with a non-ASCII name
+==================
+
+record 点(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))

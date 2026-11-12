@@ -443,6 +443,11 @@ type_suffix      = one-of  G g L l I i D d F f
 
 ### 5.2 Identifiers and reserved-but-contextual words
 
+An identifier is `/[\p{XID_Start}_$][\p{XID_Continue}$]*/`. Groovy's
+lexer takes any Java letter (`isJavaIdentifierStart` /
+`isJavaIdentifierPart`), so non-ASCII names such as `名前` or `café`
+are identifiers; the Unicode `XID_*` classes are the nearest match.
+
 Groovy's keyword set, derived from `apache/groovy:GroovyLexer.g4`
 lines 400–501, splits into three groups:
 
@@ -610,7 +615,9 @@ escape sequences, and interpolation segments. Two interpolation
 forms:
 
 - `$identifier` — followed by an immediate identifier (with optional
-  dotted property access, no method call).
+  dotted property access, no method call). The identifier follows
+  §5.2, without `$`, so `"値は$名前です"` interpolates `名前です`, as
+  in Groovy.
 - `${ expression }` — full expression, recursively parsed.
 
 Grammar:
@@ -1001,13 +1008,14 @@ those identifier uses begin. The scanner makes the choice instead.
 ```text
 Emit RECORD_KEYWORD when, from the current position:
   - the next six characters are `record`, and the character after
-    them is not an identifier character ([A-Za-z0-9_$]); then
+    them is not an identifier character (as below); then
   - at least one of: spaces, tabs, line escapes (§5.10), block
     comments — but no line break and no line comment, because
     `classDeclaration` in GroovyParser.g4 has no `nls` between RECORD
     and the name; then
-  - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
-    class); then either
+  - an identifier (the grammar's own class, §5.2, with every
+    non-ASCII code point counted as an identifier character); then
+    either
   - `<` immediately (type parameters; the grammar's `type_parameters`
     opener is `token.immediate` as well), or
   - any mix of spaces, tabs, line escapes, line breaks, block and
