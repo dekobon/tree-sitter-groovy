@@ -228,3 +228,30 @@ class Person {
         body: (block
           (expression_statement
             (string_literal (string_fragment))))))))
+
+==================
+Modified field with no initializer before a comment and a method
+==================
+
+class R {
+  private final int v
+  // note
+  String m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (line_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
