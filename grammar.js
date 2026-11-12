@@ -220,6 +220,10 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
+    // §6.11 — the `)` of a cast, emitted only when something follows it
+    // on the same line. A cast cannot continue onto the next line, so
+    // `x = (a)` followed by `foo()` is two statements.
+    $._cast_close,
     // §6.10 — never emitted: valid only between the quotes of a string
     // whose body is lexed in pieces. Comments are extras, so the parser
     // offers them there too; the scanner must emit nothing, or `//` and
@@ -1435,12 +1439,24 @@ module.exports = grammar({
     // by tree-sitter's GLR; declared as a conflict if needed).
     // PREC.UNARY right-associative so `(Foo) -x` parses as
     // `(Foo)(-x)` and the type binds to the rightward expression.
-    parenthesized_type_cast: $ => prec.right(PREC.UNARY, seq(
+    //
+    // The operand must start on the line of the `)`, as in Apache's
+    // `castParExpression castOperandExpression`, which has no `nls`
+    // between the two: `x = (a)` followed by `foo()` is two
+    // statements. `_cast_close` (§6.11) is that `)`.
+    //
+    // The dynamic precedence makes the cast win when both readings
+    // parse, which is Apache's order of alternatives: `(a) + b`,
+    // `(a) [0]` and `(a) (b)` are casts. Without it nothing ranked
+    // the two, and which one won depended on the stack order. Inside
+    // a closure or block, `a = (int) y` followed by a line that
+    // starts with a literal lost the cast once #83 added its forks.
+    parenthesized_type_cast: $ => prec.dynamic(1, prec.right(PREC.UNARY, seq(
       '(',
       field('type', $._type),
-      ')',
+      alias($._cast_close, ')'),
       field('value', $._expression),
-    )),
+    ))),
 
     // §4 — `_type`. Supports unqualified type identifiers,
     // qualified types (`java.util.List`), array types
@@ -1942,9 +1958,16 @@ module.exports = grammar({
     ),
 
     // §3.2 PRIMARY — `( expr )`. Distinct from `parenthesized_type_cast`
-    // (§5.15), which lands once we have `_type`. The parser disambiguates
-    // by what's inside the parens.
-    parenthesized_expression: $ => seq('(', $._expression, ')'),
+    // (§5.15); the parser disambiguates by what's inside the parens
+    // and after them. `_cast_close` is the `)` that has something
+    // after it on its line (§6.11). It closes this rule too, so that
+    // `(a) * b` and `((a))` stay open to both readings; a cast accepts
+    // no other `)`.
+    parenthesized_expression: $ => seq(
+      '(',
+      $._expression,
+      choice(')', alias($._cast_close, ')')),
+    ),
 
     // §3.2 — single `unary_expression` node kind but two precedence
     // alternatives, matching Apache §3.1:

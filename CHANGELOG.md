@@ -121,6 +121,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   read as the parameter's `type` (a `type_identifier` with the text
   `def`). It is now the anonymous `def` keyword and the parameter has
   no `type`, as a `def` local or `for` variable has. (#79)
+- **BREAKING:** a cast no longer continues onto the next line, and on
+  one line it wins wherever it parses (see Fixed below). Both change
+  trees for input that parsed without an `ERROR` at v0.5.0. `x = (a)`
+  followed by `foo()` on the next line was a
+  `parenthesized_type_cast` whose value was the call; it is now a
+  `parenthesized_expression` and a second statement. `x = (int) c`
+  followed by `b = 1` on the next line was the parenthesized
+  expression `(int)` and a declaration `c b = 1`; it is now a cast
+  and an assignment.
 
 ### Fixed
 
@@ -251,6 +260,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   no `ERROR`. A line comment between `record Name` and `(` had the
   same problem. In a CRLF file the `\r` is no longer part of the
   `line_comment` node, which is one byte shorter.
+- A C-style cast follows Groovy's two rules. Its operand must start on
+  the line of the `)`: `x = (a)` followed by `foo()` on the next line
+  parsed, with no `ERROR`, as a cast of `foo()`, because newlines are
+  whitespace to the grammar. A new external scanner token,
+  `_cast_close`, is the `)` that has something after it on its line;
+  a line escape continues the line and a line comment ends it. On one
+  line the cast now wins whenever it parses (`(a) + b`, `(a) [0]`,
+  `(a) (b)`), as in Apache's grammar. The two readings were unranked
+  before, so the result depended on the surrounding code, and
+  `a = (int) y` at the start of a closure lost the cast when the next
+  line began with a literal.
 
 ## [0.5.0] - 2026-11-10
 

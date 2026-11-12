@@ -852,8 +852,8 @@ Conflicts with C++ `::`-scoped names are not relevant in Groovy.
 `(String) x` — C-style cast. Distinct from `x as String`. Grammar:
 
 ```js
-parenthesized_type_cast: $ => prec.right(PREC.UNARY, seq(
-  '(', $._type, ')', $.expression))
+parenthesized_type_cast: $ => prec.dynamic(1, prec.right(PREC.UNARY, seq(
+  '(', $._type, alias($._cast_close, ')'), $._expression)))
 ```
 
 Ambiguity with parenthesized expression: `(a) b` could be a cast
@@ -861,6 +861,18 @@ Ambiguity with parenthesized expression: `(a) b` could be a cast
 GLR: if `a` matches `_type`, prefer the cast; otherwise it's a
 parenthesized expression followed by a juxt-call (which is a
 syntax error in expression position, by §5.5).
+
+Two rules settle it, both from Apache's
+`castParExpression castOperandExpression`:
+
+- The operand starts on the line of the `)`. `x = (a)` followed by
+  `foo()` on the next line is two statements. The scanner token
+  `CAST_CLOSE` (§6.11) carries this.
+- On one line the cast wins wherever it parses, as the cast
+  alternative comes first in Apache's `expression`: `(a) + b`,
+  `(a) [0]` and `(a) (b)` are casts, `(a) * b` and `(a).size()` are
+  not. The dynamic precedence carries this; without it the two
+  readings were unranked and the result depended on the context.
 
 ---
 
@@ -872,7 +884,8 @@ grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 keyword (§6.7), the named-argument key of a parenthesis-free call
-(§6.8), the same-line subscript opener (§6.9), `STRING_BODY` (§6.10),
+(§6.8), the same-line subscript opener (§6.9), the `)` of a cast
+(§6.11), `STRING_BODY` (§6.10),
 which is never emitted and only marks a string body, and
 `ERROR_SENTINEL`, which no rule references and which only signals
 error recovery; the other tokens listed here are met in-grammar, see
@@ -896,6 +909,7 @@ enum TokenType {
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
   COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
@@ -1168,6 +1182,30 @@ and the in-grammar lexer reads the text. Inside `${…}` the token is not
 valid, so a comment there is still a comment. During error recovery
 every external is valid and the check is skipped, as for the other
 context-sensitive tokens.
+
+### 6.11 CAST_CLOSE — implementation contract
+
+A cast needs its operand on the line of its `)`.
+`castParExpression castOperandExpression` in GroovyParser.g4 has no
+`nls` between the two, so `x = (a)` followed by `foo()` on the next
+line is two statements. Newlines are `extras` here, so the grammar
+alone read that input as a cast of `foo()`, with no `ERROR`.
+
+```text
+Emit CAST_CLOSE for a `)` when, after it:
+  - any spaces, tabs and line escapes (§5.10) are skipped, and
+  - the next character is not a line break, not the end of the input,
+    and not the `//` of a line comment.
+A `/*` counts as something on the line. The comment is not read, so an
+unterminated one is not scanned to the end of the input.
+On any other input return false; the in-grammar lexer then reads `)`.
+```
+
+`parenthesized_type_cast` closes only with this token.
+`parenthesized_expression` closes with either, so `(a) * b`, `((a))`
+and `foo((a), b)` stay open to both readings until the next token
+decides. The token is aliased to `)` and the tree is the same either
+way. It is not emitted during error recovery.
 
 ---
 

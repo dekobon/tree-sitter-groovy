@@ -8,11 +8,13 @@
 // when a record header follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, the key of a named argument in a
 // parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
-// line as the token before it. STRING_BODY (§6.10) is never emitted;
+// line as the token before it, and §6.11 CAST_CLOSE, the `)` of a
+// cast whose operand starts on the same line. STRING_BODY (§6.10) is
+// never emitted;
 // it is valid only inside a string body, where the scanner emits
 // nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
-// SUBSCRIPT_OPEN and the STRING_BODY check are suppressed.
+// SUBSCRIPT_OPEN, CAST_CLOSE and the STRING_BODY check are suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -30,6 +32,7 @@ enum TokenType {
     RECORD_KEYWORD,
     COMMAND_NAMED_KEY,
     SUBSCRIPT_OPEN,
+    CAST_CLOSE,
     STRING_BODY,
     ERROR_SENTINEL,
 };
@@ -243,6 +246,29 @@ static bool scan_record_header(TSLexer *lexer) {
     return lexer->lookahead == '(';
 }
 
+// SPECIFICATION.md §6.11 — the `)` of a cast, already consumed when
+// this is called. A cast needs its operand on the same line:
+// `castParExpression castOperandExpression` in GroovyParser.g4 has no
+// `nls` between the two, so `x = (a)` followed by `foo()` on the next
+// line is two statements. Spaces, tabs and line escapes may come
+// first. A line comment ends the line. A block comment counts as
+// something on the line; it is not read, so that an unterminated one
+// is not scanned to the end of the input here.
+static bool cast_operand_follows(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    if (!skip_same_line_space(lexer, false)) {
+        return true;
+    }
+    if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+        return false;
+    }
+    if (lexer->lookahead == '/') {
+        advance(lexer);
+        return lexer->lookahead != '/';
+    }
+    return true;
+}
+
 void *tree_sitter_groovy_external_scanner_create(void) {
     return NULL;
 }
@@ -339,7 +365,10 @@ bool tree_sitter_groovy_external_scanner_scan(
         || valid_symbols[GROOVYDOC_COMMENT];
     bool wants_slashy = valid_symbols[SLASHY_STRING_START];
     bool wants_record = valid_symbols[RECORD_KEYWORD];
-    if (!wants_comment && !wants_slashy && !wants_record) {
+    bool wants_cast_close = valid_symbols[CAST_CLOSE]
+        && !valid_symbols[ERROR_SENTINEL];
+    if (!wants_comment && !wants_slashy && !wants_record
+        && !wants_cast_close) {
         return false;
     }
 
@@ -370,6 +399,17 @@ bool tree_sitter_groovy_external_scanner_scan(
             return false;
         }
         lexer->result_symbol = RECORD_KEYWORD;
+        return true;
+    }
+    if (lexer->lookahead == ')' && wants_cast_close) {
+        // On `false` the runtime rewinds and the in-grammar lexer reads
+        // a plain `)`, which closes a parenthesized expression but not
+        // a cast.
+        advance(lexer);
+        if (!cast_operand_follows(lexer)) {
+            return false;
+        }
+        lexer->result_symbol = CAST_CLOSE;
         return true;
     }
     if (lexer->lookahead != '/') {

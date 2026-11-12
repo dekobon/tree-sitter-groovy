@@ -4366,36 +4366,45 @@
       ]
     },
     "parenthesized_type_cast": {
-      "type": "PREC_RIGHT",
-      "value": 14,
+      "type": "PREC_DYNAMIC",
+      "value": 1,
       "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "STRING",
-            "value": "("
-          },
-          {
-            "type": "FIELD",
-            "name": "type",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_type"
+        "type": "PREC_RIGHT",
+        "value": 14,
+        "content": {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "("
+            },
+            {
+              "type": "FIELD",
+              "name": "type",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_type"
+              }
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_cast_close"
+              },
+              "named": false,
+              "value": ")"
+            },
+            {
+              "type": "FIELD",
+              "name": "value",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_expression"
+              }
             }
-          },
-          {
-            "type": "STRING",
-            "value": ")"
-          },
-          {
-            "type": "FIELD",
-            "name": "value",
-            "content": {
-              "type": "SYMBOL",
-              "name": "_expression"
-            }
-          }
-        ]
+          ]
+        }
       }
     },
     "_type": {
@@ -7087,8 +7096,22 @@
           "name": "_expression"
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": ")"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_cast_close"
+              },
+              "named": false,
+              "value": ")"
+            }
+          ]
         }
       ]
     },
@@ -7812,6 +7835,10 @@
     {
       "type": "SYMBOL",
       "name": "_subscript_open"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_cast_close"
     },
     {
       "type": "SYMBOL",

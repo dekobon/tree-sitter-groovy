@@ -87,3 +87,219 @@ Parens around bare identifier is parenthesized_expression
   (expression_statement
     (parenthesized_expression
       (identifier))))
+
+==================
+A cast operand on the next line is a new statement
+==================
+
+x = (a)
+foo()
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A line comment after the parenthesis ends the line for a cast
+==================
+
+x = (int) // c
+a
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (line_comment)
+  (expression_statement
+    (identifier)))
+
+==================
+A cast continues after a line escape and after a block comment
+==================
+
+x = (int) \
+  a
+y = (String) /* c */ b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        (block_comment)
+        value: (identifier)))))
+
+==================
+A cast wins over a parenthesized expression on the same line
+==================
+
+x = (a) + b
+y = (a) [0]
+z = (a) (b)
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (unary_expression
+          operand: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (list_literal
+          (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (parenthesized_expression
+          (identifier))))))
+
+==================
+Parentheses before something that cannot start a cast operand
+==================
+
+x = (a) * b
+y = (a).size()
+z = ((a))
+foo((a), (b))
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (parenthesized_expression
+          (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (field_access
+          object: (parenthesized_expression
+            (identifier))
+          field: (identifier))
+        arguments: (argument_list))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (parenthesized_expression
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_expression
+          (identifier))
+        (parenthesized_expression
+          (identifier))))))
+
+==================
+Cast as the first statement of a closure or block, before a line that starts with a literal
+==================
+
+x = { it = (int) y
+  1 }
+if (c) { a = (int) y
+  'done' }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (parenthesized_type_cast
+              type: (type_identifier)
+              value: (identifier))))
+        (expression_statement
+          (number_literal)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (expression_statement
+        (string_literal)))))
+
+==================
+Parenthesized expression at the end of a line before an if statement
+==================
+
+foo { cfg = c ? d : (y.y)
+  if (y.y.x) { a() } else { b() } }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (ternary_expression
+            condition: (identifier)
+            consequence: (identifier)
+            alternative: (parenthesized_expression
+              (field_access
+                object: (identifier)
+                field: (identifier))))))
+      (if_statement
+        condition: (field_access
+          object: (field_access
+            object: (identifier)
+            field: (identifier))
+          field: (identifier))
+        consequence: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        alternative: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
