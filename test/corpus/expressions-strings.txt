@@ -857,6 +857,30 @@ x = $/a//$//$
   (line_comment))
 
 ==================
+Dollar-slashy string with a dollar before the terminator is unsupported
+:error
+==================
+
+x = $/a$/$
+
+---
+
+==================
+Dollar-slashy string with an escaped dollar before the terminator
+==================
+
+x = $/a$$/$
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)))))
+
+==================
 Dollar-slashy string with slashes inside the text is one fragment
 ==================
 
