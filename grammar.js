@@ -245,6 +245,7 @@ module.exports = grammar({
       $.assert_statement,
       $.yield_statement,
       $.try_statement,
+      $.synchronized_statement,
       $.class_declaration,
       $.trait_declaration,
       $.interface_declaration,
@@ -454,6 +455,16 @@ module.exports = grammar({
       field('body', $.block),
       repeat($.catch_clause),
       optional($.finally_clause),
+    ),
+
+    // §4 — `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`).
+    // The body must be a block.
+    synchronized_statement: $ => seq(
+      'synchronized',
+      '(',
+      field('lock', $._expression),
+      ')',
+      field('body', $.block),
     ),
 
     // §4 — `try (Foo f = expr; Bar b = expr) { … }`. Resources

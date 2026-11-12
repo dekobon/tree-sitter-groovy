@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the type argument: `enum Level implements Supplier<String>` was
   named `String`. `node-types.json` adds `super_interfaces` to the
   children of `enum_declaration`. (#77)
+- `synchronized_statement` for Java's synchronized block,
+  `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`), with
+  `lock` and `body` fields. Previously the statement was an `ERROR`. (#76)
 
 ### Changed
 
