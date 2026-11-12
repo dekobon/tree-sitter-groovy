@@ -103,6 +103,26 @@ function classMembers($, constructor) {
   ];
 }
 
+/**
+ * A constructor. The enum position directly after a trailing comma
+ * requires at least one modifier (see `enum_declaration`); everywhere
+ * else modifiers are optional.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} modifiers The modifier list for this position.
+ * @returns {PrecRightRule} The constructor rule body.
+ */
+function constructorDeclaration($, modifiers) {
+  return prec.right(3, seq(
+    repeat($.annotation),
+    modifiers,
+    field('name', $.identifier),
+    field('parameters', $.formal_parameters),
+    optional($.throws_clause),
+    field('body', $.block),
+  ));
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -716,14 +736,9 @@ module.exports = grammar({
     // tell constructors apart from methods. `prec(3, …)` wins over
     // both field and method when the identifier is followed by `(`
     // and no return type precedes it.
-    constructor_declaration: $ => prec.right(3, seq(
-      repeat($.annotation),
-      repeat($._modifier),
-      field('name', $.identifier),
-      field('parameters', $.formal_parameters),
-      optional($.throws_clause),
-      field('body', $.block),
-    )),
+    constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
+
+    _modified_constructor_declaration: $ => constructorDeclaration($, repeat1($._modifier)),
 
     // §4 — `static { … }` class-body initializer block. Runs once
     // when the class is loaded. Distinct node kind so downstream
@@ -876,12 +891,17 @@ module.exports = grammar({
     // (`A, B,\n private int x`); Groovy 3+ rejects it. Without this
     // alternative the modifier had no action after the `,`, lexed as
     // an identifier, and became a constant named `private` with no
-    // ERROR. The first member here is any `_class_member` except a
-    // constructor: `B(x) { … }` after a `,` is a constant with an
+    // ERROR. The first member here is any `_class_member`, but a
+    // constructor needs at least one modifier. `B(x) { … }` after a
+    // `,`, with or without annotations, is a constant with an
     // anonymous class body in every Groovy (unsupported, so an
-    // ERROR), not a constructor. `prec(1)` on `enum_constant` keeps a
-    // bare identifier after the `,` a constant, so `A,\n String x`,
-    // which every Groovy rejects, stays an ERROR.
+    // ERROR), not a constructor. With a modifier it cannot be a
+    // constant, and with no constructor form here `private B(x) { }`
+    // parsed, with no ERROR, as a method named `B`: the modifier-only
+    // form of `method_declaration` took it. `prec(1)` on
+    // `enum_constant` keeps a bare identifier after the `,` a
+    // constant, so `A,\n String x`, which every Groovy rejects, stays
+    // an ERROR.
     //
     // An instance initializer (`block`) is accepted wherever the
     // member list repeats — after `;`, after a first member, or with
@@ -918,7 +938,10 @@ module.exports = grammar({
             seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
             seq(
               ',',
-              choice(...classMembers($, null)),
+              choice(...classMembers(
+                $,
+                alias($._modified_constructor_declaration, $.constructor_declaration),
+              )),
               repeat(choice($._class_member, $.block, ';')),
             ),
           )),

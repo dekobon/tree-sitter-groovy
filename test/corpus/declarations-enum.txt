@@ -445,6 +445,87 @@ enum E { A, @Deprecated static int n() { 1 } }
             (number_literal)))))))
 
 ==================
+Enum constructor with a modifier directly after a trailing comma
+==================
+
+enum E1 { A(1), B(2), private E1(int w) { } }
+enum E2 { A, @Inject private E2() throws X { } }
+enum E3 {
+    A,
+    // doc
+    private E3(int w) { this.w = w }
+    private final int w
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        (throws_clause
+          (type_identifier))
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (line_comment)
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Enum constructor with only an annotation after a trailing comma is an error
+:error
+==================
+
+enum E { A, @Inject E() { } }
+
+---
+
+==================
 Enum typed field with no modifier after a trailing comma is an error
 :error
 ==================
