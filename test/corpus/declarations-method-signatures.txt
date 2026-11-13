@@ -611,3 +611,45 @@ Varargs parameter with no type is not accepted (divergence 14)
 def m(... rest) { }
 
 ---
+
+==================
+Parameter named var, and a parameter with the type underscore
+==================
+
+def f(var) { }
+def g(var, int n) { }
+def h(final var = 1) { }
+def k(_ x) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))

@@ -365,3 +365,28 @@ try (final Foo r = open()) { } catch (final IOException | RuntimeException e) { 
           (type_identifier))
         name: (identifier))
       body: (block))))
+
+==================
+Catch parameter and resource named var
+==================
+
+try { } catch (var) { }
+try (var = open()) { }
+
+---
+
+(source_file
+  (try_statement
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        name: (identifier))
+      body: (block)))
+  (try_statement
+    resources: (resource_specification
+      (resource
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block)))

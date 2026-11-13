@@ -834,3 +834,76 @@ Closure varargs parameter with no type is not accepted (divergence 14)
 xs.each { ... args -> args }
 
 ---
+
+==================
+Underscore as an ordinary name at the start of a closure and of a block
+==================
+
+def c = { _ = 1 }
+if (c) { _ }
+xs.each { _ -> 1 }
+xs.each { _, b -> b }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure parameter named var
+==================
+
+xs.each { a, var -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))

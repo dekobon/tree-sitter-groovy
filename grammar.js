@@ -174,18 +174,34 @@ function constructorDeclaration($, modifiers) {
  * type. Those are not accepted (divergence 14).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
- * @returns {SeqRule} The parameter rule body.
+ * @returns {ChoiceRule} The parameter rule body.
  */
 function parameter($) {
-  return seq(
-    repeat($.annotation),
-    optional('final'),
-    optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
-    // `_` is a literal after an annotation where a statement can start
-    // (see `_placeholder_declarator`), which is also where an
-    // annotated closure parameter starts: `{ @A _ -> }`.
-    field('name', choice($.identifier, alias('_', $.identifier))),
-    optional(seq('=', field('default', $._expression))),
+  const defaultValue = optional(seq('=', field('default', $._expression)));
+  return choice(
+    seq(
+      repeat($.annotation),
+      optional('final'),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
+          field('name', $.identifier),
+        ),
+        // `var` is a contextual keyword and a valid name: `def f(var)`.
+        // With no name after it, it is the name.
+        field('name', alias('var', $.identifier)),
+      ),
+      defaultValue,
+    ),
+    // `_` is a literal directly after an annotation where a statement
+    // can start (see `_placeholder_declarator`), and an annotated
+    // closure parameter starts there too: `{ @A _ -> }`. Anywhere
+    // else in a parameter `_` is an ordinary identifier.
+    seq(
+      repeat1($.annotation),
+      field('name', alias('_', $.identifier)),
+      defaultValue,
+    ),
   );
 }
 
@@ -639,8 +655,14 @@ module.exports = grammar({
 
     resource: $ => seq(
       optional('final'),
-      optional(choice('def', 'var', field('type', $._type))),
-      field('name', $.identifier),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', $._type))),
+          field('name', $.identifier),
+        ),
+        // `var` alone is the name: `try (var = open())`.
+        field('name', alias('var', $.identifier)),
+      ),
       '=',
       field('value', $._expression),
     ),
@@ -659,8 +681,14 @@ module.exports = grammar({
     // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
       optional('final'),
-      optional(choice('def', 'var', field('type', choice($._type, $.multi_type)))),
-      field('name', $.identifier),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', choice($._type, $.multi_type)))),
+          field('name', $.identifier),
+        ),
+        // `var` alone is the name: `catch (var)`.
+        field('name', alias('var', $.identifier)),
+      ),
     ),
 
     multi_type: $ => seq(
