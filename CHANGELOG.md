@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   an `ERROR`, and with a generic interface the enum's `name` became
   the type argument: `enum Level implements Supplier<String>` was
   named `String`. `node-types.json` adds `super_interfaces` to the
-  children of `enum_declaration`. (#77)
+  children of `enum_declaration`. (#77, #81)
 - `synchronized_statement` for Java's synchronized block,
   `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`), with
-  `lock` and `body` fields. Previously the statement was an `ERROR`. (#76)
+  `lock` and `body` fields. Previously the statement parsed as a
+  `method_declaration` with a missing name: `synchronized` read as a
+  modifier and `(lock)` as the parameters. (#76, #80)
 - `tree-sitter.json` declares the tags query, so `tree-sitter tags`
   works from a checkout and `test/tags/` is run by `tree-sitter test`.
 
@@ -110,19 +112,48 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line, were a `method_declaration` whose return type was `x` or
   `println`. Each is now an expression statement followed by a call.
   (#87)
-- Four external scanner tokens are added: `_command_named_key` (#57),
-  `_subscript_open` (#63), `_string_body` (#87) and `_error_sentinel`
-  (#57, #63), so most symbol ids above 69 in the generated parser
-  change and `SYMBOL_COUNT` goes from 308 to 314. Node names and field
-  ids are unchanged. In `node-types.json`, `command_chain`'s `argument`
-  field lists every expression kind and `named_argument`, and
-  `trait_declaration` gains a `super_interfaces` child.
-  (#57, #63, #65, #87)
-- **BREAKING:** `def` on a closure parameter after the first
-  (`{ String k, def v -> }`) used to parse with no `ERROR`, the word
-  read as the parameter's `type` (a `type_identifier` with the text
-  `def`). It is now the anonymous `def` keyword and the parameter has
-  no `type`, as a `def` local or `for` variable has. (#79)
+- Six external scanner tokens are added: `_command_named_key` (#57),
+  `_subscript_open` (#63), `_string_body` (#87), `_error_sentinel`
+  (#57, #63), and `_cast_close` and `_not_in` (see Fixed below).
+  `_command_named_key` is an empty token; the key after it is an
+  ordinary `identifier`. One named node is added,
+  `synchronized_statement` (#76), and one field, `lock`. Most symbol
+  ids above 69 in the generated parser change, `SYMBOL_COUNT` goes
+  from 308 to 321 and `FIELD_COUNT` from 44 to 45, so field ids after
+  `lock` change too. In `node-types.json`: `command_chain`'s
+  `argument` field lists every expression kind and `named_argument`;
+  `trait_declaration` and `enum_declaration` gain a `super_interfaces`
+  child; `closure_parameter` gains a `default` field, `annotation`
+  children and `varargs_type` in its `type` field;
+  `local_variable_declaration`, `import_declaration` and
+  `package_declaration` gain `annotation` children; and the anonymous
+  operator of `membership_expression` is of kind `!in`.
+  (#57, #63, #65, #76, #77, #79, #87)
+- **BREAKING:** `def` or `final` on a closure parameter after the
+  first (`{ String k, def v -> }`, `{ a, final b -> }`) used to parse
+  with no `ERROR`, the word read as the parameter's `type` (a
+  `type_identifier` with the text `def` or `final`). It is now the
+  anonymous keyword and the parameter has no `type`, as a `def` local
+  or `for` variable has. (#79, #83)
+- **BREAKING:** a `$` interpolation in a GString reads non-ASCII
+  letters (see Fixed below), which changes trees for input that
+  parsed without an `ERROR` at v0.5.0, in all four GString forms.
+  Three shapes change: `"値は$名前です"` was literal text and now
+  holds a `gstring_dollar_interpolation`; in `"$count件"` the
+  interpolated name grows from `count` to `count件`; and in `"$a.名"`
+  the path grows from `a` to `a.名`. (#78, #82)
+- **BREAKING:** in a class body, a method with modifiers and a return
+  type that follows a comment is a `method_declaration` (see Fixed
+  below), which changes trees for input that parsed without an `ERROR`
+  at v0.5.0. `void a() { }`, then `// note`, then
+  `public void run() { }` gave a `field_declaration` named `void` and
+  a `constructor_declaration` named `run`. (#84, #85)
+- **BREAKING:** a member directly after the trailing comma of an
+  enum's constants is a member (see Fixed below), which changes trees
+  for input that parsed without an `ERROR` at v0.5.0. `A, B,` then
+  `private final int weight` gave a third `enum_constant` named
+  `private` and a field `final int weight`; it is now two constants
+  and the field. (#88, #89)
 - **BREAKING:** a cast no longer continues onto the next line, and on
   one line it wins wherever it parses (see Fixed below). Both change
   trees for input that parsed without an `ERROR` at v0.5.0. `x = (a)`
@@ -131,7 +162,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `parenthesized_expression` and a second statement. `x = (int) c`
   followed by `b = 1` on the next line was the parenthesized
   expression `(int)` and a declaration `c b = 1`; it is now a cast
-  and an assignment.
+  and an assignment. (#83)
 - **BREAKING:** `def` and `var` on a method or constructor parameter,
   a `catch` parameter and a `try` resource are keywords instead of a
   type name, which changes trees for input that parsed without an
@@ -140,12 +171,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   with the text `def`); the node has only a `name`. An untyped `final`
   on a `catch` parameter or a resource (`catch (final e)`,
   `try (final r = open())`) was read as a type too and is now a
-  modifier. Closure parameters changed the same way in #79.
+  modifier. Closure parameters changed the same way in #79. (#83)
 - **BREAKING:** in a `"""…"""` string, a quote directly before a `$`
   is now a `string_fragment` of its own (see Fixed below), which
   changes trees for input that parsed without an `ERROR` at v0.5.0.
-  `"""say "$name"""` was one `string_fragment`; it is now the
-  fragments `say ` and `"` followed by a
+  `"""say "$name"""` was one `string_fragment`; it is now two, the
+  text before the quote and the quote itself, followed by a
   `gstring_dollar_interpolation`. A quote before a literal `$`
   (`"""cost "$5" """`) splits the text the same way.
 
@@ -235,7 +266,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as a modifier-only `field_declaration` named after the return type
   (`public void`) followed by a `constructor_declaration` named after the
   method. The modifier-only field now loses to any other complete
-  reading; `static TTL = 900` still parses as a field. (#84)
+  reading; `static TTL = 900` still parses as a field. (#84, #85)
 - An enum member directly after a trailing comma (`A, B,` then
   `private final int weight`), which Groovy accepts up to 4.x, is a
   member again. Since v0.4.0 it parsed, with no `ERROR`, as an extra
@@ -254,9 +285,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   lexer's own rule (`€uro` is a name, `a·b` is not); before,
   the first non-ASCII letter was an `ERROR`, and in a method name it
   took the method with it. A `$` interpolation in a GString reads the
-  same characters, so `"値は$名前です"` now interpolates `名前です`
-  where it was literal text with a `$` before; that is the only tree
-  change for input that already parsed. The contextual `record`
+  same characters, except `$`, so `"値は$名前です"` now interpolates
+  `名前です` where it was literal text with a `$` before; Changed
+  above lists the trees this alters. The contextual `record`
   keyword accepts a non-ASCII record name, and a named argument in a
   parenthesis-free call takes a non-ASCII key (`foo 名前: 1`): the
   scanner token `_command_named_key` is now empty and the in-grammar
@@ -266,9 +297,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`{ String... args -> }`) and a default (`{ a = 1 -> }`,
   `{ String prefix, int width = 8 -> }`). Each was an `ERROR` before.
   `closure_parameter` gains a `default` field, and its `type` field
-  can hold a `varargs_type`. A closure body that opens with
-  `final def a = 1`, which this grammar does not accept as a local,
-  now recovers with a `MISSING "->"` instead of an `ERROR`. (#79)
+  can hold a `varargs_type`. A closure body that opens with a
+  declaration (`{ def a = 1 }`, `{ final def a = 1 }`) is still a
+  `local_variable_declaration`. The parameter list and such a body
+  share their first tokens, and the parser follows both until the `->`
+  or the first token that only one accepts. A closure or block that
+  opens with a declaration of two or more names therefore costs 15% to
+  60% more to parse than at v0.5.0, and about twice for a long list
+  (#74); a declaration of one name and an assignment cost the same as
+  before. On input with an error, a closure can now recover as a
+  parameter list with a missing `->` where it had an `ERROR` node:
+  `{ x = 1, y }`. (#79, #83)
 - An enum constant named `sealed` or `trait` is a constant again
   (`enum E { trait, B }`, `enum E { sealed }`). The first constant so
   named has been an `ERROR` since v0.5.0, where the two words became
@@ -292,12 +331,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `(a) (b)`), as in Apache's grammar. The two readings were unranked
   before, so the result depended on the surrounding code, and
   `a = (int) y` at the start of a closure lost the cast when the next
-  line began with a literal.
+  line began with a literal. (#83)
 - `final` before a type is accepted on a `catch` parameter and on a
   `try` resource (`catch (final Exception e)`,
   `try (final Foo r = open())`); both were an `ERROR`. A closure
   parameter takes `var` (`{ var x -> x }`), which was an `ERROR` too.
-  Method and closure parameters now share one definition.
+  Method and closure parameters now share one definition. (#83)
 - Annotations are accepted on a local or script variable declaration,
   on an `import` and on a `package` declaration: `@Field def x = 1`,
   `@SuppressWarnings('unchecked') List<String> xs = []`,
@@ -323,7 +362,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`implements Supplier<String>`, `extends a.b.Base`); only a bare
   name was. `locals.scm`: a typed local (`String s = 'a'`), a blank
   final and a `try` resource are definitions, and an enum body, a
-  record and a `try` statement are scopes.
+  record and a `try` statement are scopes. (#76, #77, #79)
 - The Python source distribution builds. It held `src/parser.c` and
   `src/scanner.c` without `src/tree_sitter/*.h`, so installing from
   the sdist failed with `tree_sitter/parser.h: No such file or
