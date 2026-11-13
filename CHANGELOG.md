@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - `synchronized_statement` for Java's synchronized block,
   `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`), with
   `lock` and `body` fields. Previously the statement was an `ERROR`. (#76)
+- `tree-sitter.json` declares the tags query, so `tree-sitter tags`
+  works from a checkout and `test/tags/` is run by `tree-sitter test`.
 
 ### Changed
 
@@ -314,6 +316,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   included the character after `!in`. `!in` is now an external scanner
   token, `_not_in`, which reads that character and leaves it. The
   anonymous `!in` node no longer includes the whitespace after it.
+- Queries. `highlights.scm`: `synchronized` as a statement is
+  `@keyword`, where every use of the word was `@keyword.modifier`;
+  `->` and the `...` of a varargs type are `@operator`. `tags.scm`: a
+  generic or qualified super type is a reference
+  (`implements Supplier<String>`, `extends a.b.Base`); only a bare
+  name was. `locals.scm`: a typed local (`String s = 'a'`), a blank
+  final and a `try` resource are definitions, and an enum body, a
+  record and a `try` statement are scopes.
 
 ## [0.5.0] - 2026-11-10
 

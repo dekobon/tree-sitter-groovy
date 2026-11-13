@@ -76,3 +76,21 @@ class Holder {
     record Inner(int x) { }
     // <- keyword
 }
+
+synchronized (lock) { }
+// <- keyword
+
+class Sync {
+    synchronized void run() { }
+    // <- keyword.modifier
+}
+
+xs.each { a, b -> a }
+//             ^ operator
+
+def v(String... rest) { }
+//          ^ operator
+
+def f(def a, var b) { }
+//    ^ keyword
+//           ^ keyword

@@ -9,6 +9,7 @@
       "file-types": ["groovy", "gradle", "gvy", "gy", "jenkinsfile"],
       "injection-regex": "^groovy$",
       "highlights": "queries/groovy/highlights.scm",
+      "tags": "queries/groovy/tags.scm",
       "class-name": "TreeSitterGroovy"
     }
   ],
