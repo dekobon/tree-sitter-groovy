@@ -219,14 +219,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   method. The modifier-only field now loses to any other complete
   reading; `static TTL = 900` still parses as a field. (#84)
 - An enum member directly after a trailing comma (`A, B,` then
-  `private final int weight`), which Groovy 2.x accepts, is a member
-  again. Since v0.4.0 it parsed, with no `ERROR`, as an extra
+  `private final int weight`), which Groovy accepts up to 4.x, is a
+  member again. Since v0.4.0 it parsed, with no `ERROR`, as an extra
   `enum_constant` named after the first modifier (`private`), followed
-  by the member without that modifier. A constructor in that position
-  needs at least one modifier (`A,` then `private E(int w) { }`);
-  without one (`A,` then `E(int w) { }`) it is still a parse error,
-  because it reads as a constant with an anonymous class body.
-  (#88, #89)
+  by the member without that modifier. The member has to start with a
+  modifier, `def` or a declaration keyword. Groovy also takes a member
+  that starts with a type or a name there (`A,` then `String x`, or
+  `E(int w) { }`); those are still a parse error, see
+  `docs/divergences-from-spec.md` §13. A constructor needs an access
+  modifier (`A,` then `private E(int w) { }`); `static f() { }` in
+  that position is a method. (#88, #89)
 - Identifiers accept non-ASCII letters, as Groovy's lexer does (any
   Java letter): `void test名前を確認する() { }`, `def café = 1`.
   A name starts with a character of the Unicode general categories L,

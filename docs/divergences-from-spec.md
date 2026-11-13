@@ -636,3 +636,43 @@ was tried for `record` and rejected: after
 `private boolean` it is a genuine LR(1) conflict that needs a
 declared conflict, and it still leaves `public void record() { }` an
 error because the method name position wants `_property_name`.
+
+---
+
+## 13. A member directly after an enum's trailing comma
+
+**Apache `GroovyParser.g4`**, on the 3.0 and 4.0 branches, has
+`enumConstants (nls COMMA)? sep?` and then the member list, so any
+member may follow the trailing comma with no `;`. The master branch
+(Groovy 5) requires the `;`.
+
+**Current implementation** (#88, #89): after the comma, the first
+member is accepted only when it starts with something that cannot be
+an enum constant: a modifier, `def`, a declaration keyword (`class`,
+`interface`, `enum`, `trait`, `record`, `@interface`), or an
+annotation followed by one of those. `enum_constant` has a static
+precedence that makes a bare name after the comma a constant; its
+comment in `grammar.js` says why that is not a GLR conflict.
+
+Results for the member after `A,`, with Groovy 4.0.32 as the
+reference:
+
+| After `A,` | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `private int x`, `def x = 1`, `static { }`, `class C { }` | member | member |
+| `private E(int w) { }` | constructor | `constructor_declaration` |
+| `static f() { }` | method | `method_declaration` |
+| `List<String> xs`, `String[] xs`, `a.b.C x` | field | field: the type cannot be a constant |
+| `String x`, `int x = 1` | field | `ERROR` |
+| `E(int w) { }`, `@Inject E(int w) { }` | constructor | `ERROR`: reads as a constant with an anonymous class body |
+| `{ init() }` | initializer | `ERROR` |
+| `void f() { }` | method | a constant `void` and a constructor `f`, with no `ERROR` |
+
+The last row is the mirror case that the `enum_constant` comment
+describes for the start of the body: a newline is whitespace, and
+nothing else tells a constant followed by a constructor from a typed
+method.
+
+**Action**: accept every member and an initializer after the comma,
+and prefer the constant only when it parses. That needs a GLR
+conflict limited to this position. Tracked in #TBD-enum-comma.

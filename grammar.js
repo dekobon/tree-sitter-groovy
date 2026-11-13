@@ -140,8 +140,8 @@ function classMembers($, constructor) {
 
 /**
  * A constructor. The enum position directly after a trailing comma
- * requires at least one modifier (see `enum_declaration`); everywhere
- * else modifiers are optional.
+ * requires an access modifier (see `enum_declaration`); everywhere
+ * else any modifiers are optional.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} modifiers The modifier list for this position.
@@ -296,6 +296,9 @@ module.exports = grammar({
     // tree-sitter report it unnecessary. Regenerate without it to
     // confirm that still holds.
     [$.formal_parameter, $._expression],
+    // §4 — after an enum's trailing comma, `private` may open a
+    // constructor (`private E() { }`) or any other member.
+    [$._modifier, $._modified_constructor_declaration],
     // `{ final x -> }` vs. a closure body opening with a modified
     // declaration; the `->` decides.
     [$._modifier, $.closure_parameter],
@@ -777,7 +780,15 @@ module.exports = grammar({
     // and no return type precedes it.
     constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
 
-    _modified_constructor_declaration: $ => constructorDeclaration($, repeat1($._modifier)),
+    // The constructor form for the member directly after an enum's
+    // trailing comma (see `enum_declaration`). Only access modifiers
+    // qualify: `static f() { }` there is a method. The weight is above
+    // a method with a body, which matches the same text through its
+    // modifier-only form.
+    _modified_constructor_declaration: $ => prec.dynamic(4, constructorDeclaration(
+      $,
+      repeat1(choice('public', 'private', 'protected')),
+    )),
 
     // §4 — `static { … }` class-body initializer block. Runs once
     // when the class is loaded. Distinct node kind so downstream
@@ -926,21 +937,27 @@ module.exports = grammar({
     // simply follows the last constant. With no constants the body
     // is an ordinary member list.
     //
-    // Groovy 2.x also accepts a member directly after a trailing `,`
-    // (`A, B,\n private int x`); Groovy 3+ rejects it. Without this
-    // alternative the modifier had no action after the `,`, lexed as
-    // an identifier, and became a constant named `private` with no
-    // ERROR. The first member here is any `_class_member`, but a
-    // constructor needs at least one modifier. `B(x) { … }` after a
-    // `,`, with or without annotations, is a constant with an
-    // anonymous class body in every Groovy (unsupported, so an
-    // ERROR), not a constructor. With a modifier it cannot be a
-    // constant, and with no constructor form here `private B(x) { }`
-    // parsed, with no ERROR, as a method named `B`: the modifier-only
-    // form of `method_declaration` took it. `prec(1)` on
-    // `enum_constant` keeps a bare identifier after the `,` a
-    // constant, so `A,\n String x`, which every Groovy rejects, stays
-    // an ERROR.
+    // Groovy up to 4.x also accepts a member directly after a trailing
+    // `,` (`A, B,\n private int x`): GroovyParser.g4 on those branches
+    // has `enumConstants (nls COMMA)? sep?` before the member list.
+    // Groovy 5 requires a `;`. Without this alternative the modifier
+    // had no action after the `,`, lexed as an identifier, and became
+    // a constant named `private` with no ERROR.
+    //
+    // The alternative is narrower than Groovy, which takes any member
+    // there (divergence 13). `prec(1)` on `enum_constant` keeps a bare
+    // identifier after the `,` a constant, so the member has to start
+    // with something that cannot be one: a modifier, `def`, a
+    // declaration keyword, or an annotation followed by one of those.
+    // `A,\n String x` is an ERROR, and so is an instance initializer.
+    // A constructor needs an access modifier. `B(x) { … }` after a
+    // `,`, with or without annotations, reads as a constant with an
+    // anonymous class body (unsupported, so an ERROR). With an access
+    // modifier it cannot be a constant, and with no constructor form
+    // here `private B(x) { }` parsed, with no ERROR, as a method named
+    // `B`: the modifier-only form of `method_declaration` took it.
+    // Other modifiers do not make a constructor, so `static f() { }`
+    // is a method.
     //
     // An instance initializer (`block`) is accepted wherever the
     // member list repeats — after `;`, after a first member, or with

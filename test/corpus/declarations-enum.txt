@@ -445,7 +445,7 @@ enum E { A, @Deprecated static int n() { 1 } }
             (number_literal)))))))
 
 ==================
-Enum constructor with a modifier directly after a trailing comma
+Enum constructor with an access modifier directly after a trailing comma
 ==================
 
 enum E1 { A(1), B(2), private E1(int w) { } }
@@ -517,7 +517,7 @@ enum E3 {
           name: (identifier))))))
 
 ==================
-Enum constructor with only an annotation after a trailing comma is an error
+Enum constructor with no access modifier after a trailing comma is not accepted (divergence 13)
 :error
 ==================
 
@@ -526,7 +526,38 @@ enum E { A, @Inject E() { } }
 ---
 
 ==================
-Enum typed field with no modifier after a trailing comma is an error
+Enum method with a modifier other than an access modifier after a trailing comma
+==================
+
+enum E1 { A, static f() { } }
+enum E2 { A, private static helper(x) { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Enum typed field with no modifier after a trailing comma is not accepted (divergence 13)
 :error
 ==================
 
