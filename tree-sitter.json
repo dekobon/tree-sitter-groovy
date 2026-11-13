@@ -14,7 +14,7 @@
     }
   ],
   "metadata": {
-    "version": "0.5.0",
+    "version": "0.6.0",
     "license": "Apache-2.0 OR MIT",
     "description": "Apache Groovy grammar for tree-sitter (dekobon fork)",
     "authors": [
