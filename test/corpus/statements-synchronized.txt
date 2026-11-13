@@ -112,3 +112,12 @@ Synchronized statement without a block body is an error
 synchronized (lock) foo()
 
 ---
+
+==================
+Synchronized statement in a class body is an error
+:error
+==================
+
+class C { synchronized (lock) { } }
+
+---

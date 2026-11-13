@@ -627,3 +627,210 @@ list.each { x = 1, y }
           (closure_parameter
             name: (identifier))
           (MISSING "->"))))))
+
+==================
+Closure parameter default that contains an arrow
+==================
+
+xs.each { a = { x -> x + 1 } -> a(2) }
+xs.each { a = { x -> x + 1 } }
+xs.each { a = switch (x) { case 1 -> 2 } -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (binary_expression
+                  left: (identifier)
+                  right: (number_literal))))))
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (binary_expression
+                  left: (identifier)
+                  right: (number_literal)))))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (switch_expression
+              value: (identifier)
+              body: (switch_block
+                (switch_arrow_case
+                  value: (number_literal)
+                  body: (expression_statement
+                    (number_literal)))))))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure parameter list with the arrow on the next line
+==================
+
+xs.each { a, b
+  -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure body opening with an assignment to a property
+==================
+
+xs.each { a.b.c = 1 }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (field_access
+              object: (field_access
+                object: (identifier)
+                field: (identifier))
+              field: (identifier))
+            right: (number_literal)))))))
+
+==================
+Closure first parameter with a default after a type, def and final
+==================
+
+xs.each { String a = 'x' -> a }
+xs.each { def a = 1 -> a }
+xs.each { final a = 1 -> a }
+xs.each { final String a = 'x' -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure parameter with def and a type is not accepted (divergence 14)
+:error
+==================
+
+xs.each { def String x -> x }
+
+---
+
+==================
+Closure parameter with an annotation after final is not accepted (divergence 14)
+:error
+==================
+
+xs.each { final @Deprecated x -> x }
+
+---
+
+==================
+Closure varargs parameter with no type is not accepted (divergence 14)
+:error
+==================
+
+xs.each { ... args -> args }
+
+---

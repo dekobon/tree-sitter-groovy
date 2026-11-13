@@ -1303,3 +1303,21 @@ public enum Level implements Supplier<String> { LOW, HIGH; String get() { name()
             (method_invocation
               function: (identifier)
               arguments: (argument_list))))))))
+
+==================
+Enum with an extends clause is an error
+:error
+==================
+
+enum E extends X { A }
+
+---
+
+==================
+Enum with type parameters is an error
+:error
+==================
+
+enum E<T> { A }
+
+---

@@ -177,3 +177,95 @@ println "$€uro $名前.属性́ $a$b"
         value: (identifier))
       (gstring_dollar_interpolation
         value: (identifier)))))
+
+==================
+Non-ASCII interpolation in triple-quoted, slashy and dollar-slashy strings
+==================
+
+def a = """値 $名前.属性 end"""
+def b = /値 $名前 x/
+def c = $/値 $名前 x/$
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+GString interpolation of an ASCII name that continues with non-ASCII letters
+==================
+
+println "$count件 $café"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+A name that starts with record and continues with a non-ASCII letter
+==================
+
+recordé(1)
+def recordé = 2
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+An emoji is not an identifier
+:error
+==================
+
+def 😀 = 1
+
+---
+
+==================
+A combining mark cannot start an identifier
+:error
+==================
+
+def ́x = 1
+
+---
