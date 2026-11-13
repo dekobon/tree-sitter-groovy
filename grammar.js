@@ -2181,17 +2181,27 @@ module.exports = grammar({
 
     // §5.7 — triple-double GString. Like `_double_quoted_string`
     // but newlines and embedded `"` / `""` are part of the body.
+    //
+    // One or two quotes are text when an ordinary character or an
+    // escape follows them. Before `$` they are lexed one at a time, as
+    // fragments of their own: the text token must not take a `$` that
+    // starts an interpolation (`"""say "$name"""`), and a regex
+    // cannot look ahead. The closer is longer than one quote, so it
+    // still wins at `"""`.
     _triple_double_quoted_string: $ => seq(
       '"""',
-      repeat(gstringPart($, $._triple_gstring_text)),
+      repeat(choice(
+        gstringPart($, $._triple_gstring_text),
+        alias(token.immediate('"'), $.string_fragment),
+      )),
       token.immediate('"""'),
     ),
 
     _triple_gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$]/,
       /\\[\s\S]/,
-      /"[^"]/,
-      /""[^"]/,
+      /"(\\[\s\S]|[^"\\$])/,
+      /""(\\[\s\S]|[^"\\$])/,
     ))),
 
     // §5.7 — `$identifier(.identifier)*` interpolation. The whole

@@ -678,6 +678,13 @@ Consumes characters until:
     are included in the body fragment, not treated as a close.
 ```
 
+The implementation is in-grammar (`_triple_gstring_text`). One or two
+quotes join the text fragment when an ordinary character or an escape
+follows them. Directly before a `$` each quote is a `string_fragment`
+of its own, so that the `$` is left for the interpolation:
+`"""say "$name"""` holds the fragments `say ` and `"` and then the
+interpolation.
+
 **Dollar-slashy edge cases** (from murtaza64's `string.test`):
 
 ```groovy

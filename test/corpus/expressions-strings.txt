@@ -913,3 +913,75 @@ x = "a${b /* c */}d"
           value: (identifier)
           (block_comment))
         (string_fragment)))))
+
+==================
+Triple-quoted GString interpolation directly after an embedded quote
+==================
+
+def s = """hello "$name"""
+def t = """a "${b}" and ""$c.d"" end"""
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment)
+        (string_fragment)
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+Triple-quoted GString with quotes before text and before an escape is one fragment
+==================
+
+def u = """a "b" ""c"" d"""
+def v = """x "\n y \" z"""
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)))))
+
+==================
+Triple-quoted GString with a quote before a literal dollar
+==================
+
+def w = """cost "$5" """
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (string_fragment)
+        (string_fragment)
+        (string_fragment)))))

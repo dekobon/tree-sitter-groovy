@@ -139,6 +139,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   on a `catch` parameter or a resource (`catch (final e)`,
   `try (final r = open())`) was read as a type too and is now a
   modifier. Closure parameters changed the same way in #79.
+- **BREAKING:** in a `"""…"""` string, a quote directly before a `$`
+  is now a `string_fragment` of its own (see Fixed below), which
+  changes trees for input that parsed without an `ERROR` at v0.5.0.
+  `"""say "$name"""` was one `string_fragment`; it is now the
+  fragments `say ` and `"` followed by a
+  `gstring_dollar_interpolation`. A quote before a literal `$`
+  (`"""cost "$5" """`) splits the text the same way.
 
 ### Fixed
 
@@ -298,6 +305,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Inside a closure an annotated declaration recovered, after #79, as a
   parameter list with a missing `->`; it is now a
   `local_variable_declaration`.
+- An interpolation directly after an embedded quote in a `"""…"""`
+  string is an interpolation: `"""say "$name"""` and
+  `"""a "${b}" c"""` parsed, with no `ERROR`, as plain text, because
+  the text token took the `$` together with the quote before it.
 
 ## [0.5.0] - 2026-11-10
 
