@@ -251,6 +251,9 @@ module.exports = grammar({
     // on the same line. A cast cannot continue onto the next line, so
     // `x = (a)` followed by `foo()` is two statements.
     $._cast_close,
+    // §6.12 — the `!in` operator, which needs whitespace or an opening
+    // bracket after it. The scanner reads that character and leaves it.
+    $._not_in,
     // §6.10 — never emitted: valid only between the quotes of a string
     // whose body is lexed in pieces. Comments are extras, so the parser
     // offers them there too; the scanner must emit nothing, or `//` and
@@ -1460,21 +1463,18 @@ module.exports = grammar({
       optional($._dotted_type_tail),
     )),
 
-    // §3.2 — `x in xs` and `x !in xs`. RELATIONAL level. Both
+    // §3.2 / §3.2.2 — `x in xs` and `x !in xs`. RELATIONAL level. Both
     // operators share one node kind; the `operator` field
-    // distinguishes them. `!in` is wrapped in `token(prec(1, …))`
-    // so it lexes as a single token despite the embedded space
-    // requirement implied by §3.2.2's trailing-context rule —
-    // Apache's `NOT_IN` predicate is approximated by requiring at
-    // least one trailing whitespace, `[`, `(`, or `{` after `!in`.
-    // §3.2 / §3.2.2 — `x in xs` and `x !in xs`. `!in` is a single
-    // token whose match requires a trailing whitespace / bracket
-    // character (Apache `NOT_IN` predicate) so `a !inXs` does not
-    // mis-tokenise as `!in` followed by `Xs`.
+    // distinguishes them. `!in` is an operator only before whitespace
+    // or `[`, `(`, `{` (Apache's `NOT_IN` predicate), so that
+    // `a !inXs` is not `!in` followed by `Xs`. The external scanner
+    // makes that check (§6.12) and leaves the character where it is.
+    // As a regex the token had to include it, which made
+    // `a !in[1, 2]` an ERROR: the `[` was part of the operator.
     membership_expression: $ => {
       const ops = [
         'in',
-        token(prec(1, seq('!in', /[ \t\r\n\[({]/))),
+        alias($._not_in, '!in'),
       ];
       return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(
         field('element', $._expression),

@@ -9,12 +9,13 @@
 // COMMAND_NAMED_KEY, the key of a named argument in a
 // parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
 // line as the token before it, and §6.11 CAST_CLOSE, the `)` of a
-// cast whose operand starts on the same line. STRING_BODY (§6.10) is
-// never emitted;
+// cast whose operand starts on the same line, and §6.12 NOT_IN, the
+// `!in` operator. STRING_BODY (§6.10) is never emitted;
 // it is valid only inside a string body, where the scanner emits
 // nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
-// SUBSCRIPT_OPEN, CAST_CLOSE and the STRING_BODY check are suppressed.
+// SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the STRING_BODY check are
+// suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -33,6 +34,7 @@ enum TokenType {
     COMMAND_NAMED_KEY,
     SUBSCRIPT_OPEN,
     CAST_CLOSE,
+    NOT_IN,
     STRING_BODY,
     ERROR_SENTINEL,
 };
@@ -363,8 +365,10 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_record = valid_symbols[RECORD_KEYWORD];
     bool wants_cast_close = valid_symbols[CAST_CLOSE]
         && !valid_symbols[ERROR_SENTINEL];
+    bool wants_not_in = valid_symbols[NOT_IN]
+        && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record
-        && !wants_cast_close) {
+        && !wants_cast_close && !wants_not_in) {
         return false;
     }
 
@@ -395,6 +399,26 @@ bool tree_sitter_groovy_external_scanner_scan(
             return false;
         }
         lexer->result_symbol = RECORD_KEYWORD;
+        return true;
+    }
+    if (lexer->lookahead == '!' && wants_not_in) {
+        // SPECIFICATION.md §6.12 — `!in` is an operator only before
+        // whitespace or an opening bracket (GroovyLexer.g4 `NOT_IN`),
+        // so that `a !inside` is `!` applied to a name. The character
+        // after it is read and not taken: `a !in[1, 2]`.
+        static const char operator[] = "!in";
+        for (const char *c = operator; *c != '\0'; c++) {
+            if (lexer->lookahead != *c) {
+                return false;
+            }
+            advance(lexer);
+        }
+        int32_t next = lexer->lookahead;
+        if (!is_whitespace(next) && next != '[' && next != '('
+            && next != '{') {
+            return false;
+        }
+        lexer->result_symbol = NOT_IN;
         return true;
     }
     if (lexer->lookahead == ')' && wants_cast_close) {

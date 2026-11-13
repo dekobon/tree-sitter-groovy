@@ -309,6 +309,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   string is an interpolation: `"""say "$name"""` and
   `"""a "${b}" c"""` parsed, with no `ERROR`, as plain text, because
   the text token took the `$` together with the quote before it.
+- `!in` directly before a bracket parses: `a !in[1, 2]`, `a !in(b)`
+  and `a !in{ … }` were an `ERROR`, because the operator token
+  included the character after `!in`. `!in` is now an external scanner
+  token, `_not_in`, which reads that character and leaves it. The
+  anonymous `!in` node no longer includes the whitespace after it.
 
 ## [0.5.0] - 2026-11-10
 

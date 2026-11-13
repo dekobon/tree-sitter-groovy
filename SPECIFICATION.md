@@ -367,11 +367,13 @@ bracket. Without this rule, `!instanceofX` would be a single
 identifier-looking token (or the parse would be ambiguous between
 `!instanceof X` and `! instanceofX`).
 
-The tree-sitter external scanner replicates this: `!instanceof` and
-`!in` are scanner-emitted tokens that only fire when the trailing
-character is one of the permitted ones. The grammar rule for the
-unary `!` operator otherwise consumes the `!` and parses the rest
-as an expression.
+`!in` is a token of the external scanner (§6.12), which emits it only
+when the character after it is one of the permitted ones and leaves
+that character in place, so `a !in[1, 2]` and `a !in(b)` parse.
+`!instanceof` is an in-grammar token that includes the whitespace
+after it; it needs no bracket form. The grammar rule for the unary `!`
+operator otherwise consumes the `!` and parses the rest as an
+expression.
 
 ---
 
@@ -904,7 +906,7 @@ emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 keyword (§6.7), the named-argument key of a parenthesis-free call
 (§6.8), the same-line subscript opener (§6.9), the `)` of a cast
-(§6.11), `STRING_BODY` (§6.10),
+(§6.11), the `!in` operator (§6.12), `STRING_BODY` (§6.10),
 which is never emitted and only marks a string body, and
 `ERROR_SENTINEL`, which no rule references and which only signals
 error recovery; the other tokens listed here are met in-grammar, see
@@ -929,6 +931,7 @@ enum TokenType {
   COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
+  NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
@@ -1243,6 +1246,25 @@ On any other input return false; the in-grammar lexer then reads `)`.
 and `foo((a), b)` stay open to both readings until the next token
 decides. The token is aliased to `)` and the tree is the same either
 way. It is not emitted during error recovery.
+
+### 6.12 NOT_IN — implementation contract
+
+GroovyLexer.g4 has
+`NOT_IN: '!in' { isFollowedBy(_input, ' ', '\t', '\r', '\n', '[', '(', '{') }?`,
+so `a !in xs` uses the operator and `!inside` is `!` applied to a
+name.
+
+```text
+Emit NOT_IN for the three characters `!in` when the character after
+them is a space, a tab, a line break, `[`, `(` or `{`. That character
+is read and not consumed.
+On any other input return false; the in-grammar lexer then reads `!`.
+```
+
+The in-grammar form of this token was a regex that had to include the
+character after `!in`. With a `[` or `(` inside the operator,
+`a !in[1, 2]` and `a !in(b)` were an `ERROR`. The token is aliased to
+`!in`. It is not emitted during error recovery.
 
 ---
 

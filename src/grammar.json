@@ -4350,24 +4350,13 @@
                 "type": "FIELD",
                 "name": "operator",
                 "content": {
-                  "type": "TOKEN",
+                  "type": "ALIAS",
                   "content": {
-                    "type": "PREC",
-                    "value": 1,
-                    "content": {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "STRING",
-                          "value": "!in"
-                        },
-                        {
-                          "type": "PATTERN",
-                          "value": "[ \\t\\r\\n\\[({]"
-                        }
-                      ]
-                    }
-                  }
+                    "type": "SYMBOL",
+                    "name": "_not_in"
+                  },
+                  "named": false,
+                  "value": "!in"
                 }
               },
               {
@@ -8094,6 +8083,10 @@
     {
       "type": "SYMBOL",
       "name": "_cast_close"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_not_in"
     },
     {
       "type": "SYMBOL",

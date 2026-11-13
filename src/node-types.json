@@ -7843,6 +7843,10 @@
         "required": true,
         "types": [
           {
+            "type": "!in",
+            "named": false
+          },
+          {
             "type": "in",
             "named": false
           }
@@ -16817,6 +16821,10 @@
   },
   {
     "type": "!==",
+    "named": false
+  },
+  {
+    "type": "!in",
     "named": false
   },
   {
