@@ -653,3 +653,37 @@ def k(_ x) { }
         type: (type_identifier)
         name: (identifier)))
     body: (block)))
+
+==================
+Annotated parameter with the type underscore
+==================
+
+def f(@A _ x) { }
+def c = { @A _ x -> x }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))

@@ -195,11 +195,18 @@ function parameter($) {
     ),
     // `_` is a literal directly after an annotation where a statement
     // can start (see `_placeholder_declarator`), and an annotated
-    // closure parameter starts there too: `{ @A _ -> }`. Anywhere
-    // else in a parameter `_` is an ordinary identifier.
+    // closure parameter starts there too: `{ @A _ -> }`, or with `_`
+    // as the type, `{ @A _ x -> }`. Anywhere else in a parameter `_`
+    // is an ordinary identifier.
     seq(
       repeat1($.annotation),
-      field('name', alias('_', $.identifier)),
+      choice(
+        field('name', alias('_', $.identifier)),
+        seq(
+          field('type', alias('_', $.type_identifier)),
+          field('name', $.identifier),
+        ),
+      ),
       defaultValue,
     ),
   );
@@ -370,6 +377,9 @@ module.exports = grammar({
     // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
+    // `{ @A _ x -> }`, a parameter of type `_`, vs. `{ @A _` as the
+    // declaration of the placeholder followed by a statement `x`.
+    [$._placeholder_declarator, $.closure_parameter],
     // An untyped default, `{ a = 1 -> }` vs. `{ a = 1 }`, needs no
     // entry: see `expression_statement`.
     //

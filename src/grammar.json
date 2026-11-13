@@ -2637,17 +2637,48 @@
               }
             },
             {
-              "type": "FIELD",
-              "name": "name",
-              "content": {
-                "type": "ALIAS",
-                "content": {
-                  "type": "STRING",
-                  "value": "_"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "name",
+                  "content": {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "STRING",
+                      "value": "_"
+                    },
+                    "named": true,
+                    "value": "identifier"
+                  }
                 },
-                "named": true,
-                "value": "identifier"
-              }
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "type",
+                      "content": {
+                        "type": "ALIAS",
+                        "content": {
+                          "type": "STRING",
+                          "value": "_"
+                        },
+                        "named": true,
+                        "value": "type_identifier"
+                      }
+                    },
+                    {
+                      "type": "FIELD",
+                      "name": "name",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "identifier"
+                      }
+                    }
+                  ]
+                }
+              ]
             },
             {
               "type": "CHOICE",
@@ -7285,17 +7316,48 @@
               }
             },
             {
-              "type": "FIELD",
-              "name": "name",
-              "content": {
-                "type": "ALIAS",
-                "content": {
-                  "type": "STRING",
-                  "value": "_"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "name",
+                  "content": {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "STRING",
+                      "value": "_"
+                    },
+                    "named": true,
+                    "value": "identifier"
+                  }
                 },
-                "named": true,
-                "value": "identifier"
-              }
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "type",
+                      "content": {
+                        "type": "ALIAS",
+                        "content": {
+                          "type": "STRING",
+                          "value": "_"
+                        },
+                        "named": true,
+                        "value": "type_identifier"
+                      }
+                    },
+                    {
+                      "type": "FIELD",
+                      "name": "name",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "identifier"
+                      }
+                    }
+                  ]
+                }
+              ]
             },
             {
               "type": "CHOICE",
@@ -8263,6 +8325,10 @@
     ],
     [
       "variable_declarator",
+      "closure_parameter"
+    ],
+    [
+      "_placeholder_declarator",
       "closure_parameter"
     ]
   ],
