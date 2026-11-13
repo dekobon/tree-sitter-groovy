@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   modifier and `(lock)` as the parameters. (#76, #80)
 - `tree-sitter.json` declares the tags query, so `tree-sitter tags`
   works from a checkout and `test/tags/` is run by `tree-sitter test`.
+  (#100)
 
 ### Changed
 
@@ -180,7 +181,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `"""say "$name"""` was one `string_fragment`; it is now two, the
   text before the quote and the quote itself, followed by a
   `gstring_dollar_interpolation`. A quote before a literal `$`
-  (`"""cost "$5" """`) splits the text the same way.
+  (`"""cost "$5" """`) splits the text the same way. (#100)
 
 ### Fixed
 
@@ -322,7 +323,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `foo() // c` followed by `bar()` lost `bar()` to the comment, with
   no `ERROR`. A line comment between `record Name` and `(` had the
   same problem. In a CRLF file the `\r` is no longer part of the
-  `line_comment` node, which is one byte shorter.
+  `line_comment` node, which is one byte shorter. (#100)
 - A C-style cast follows Groovy's two rules. Where a line break can
   end a statement, its operand starts on the line of the `)`:
   `x = (a)` followed by `foo()` on the next line parsed, with no
@@ -352,16 +353,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   an `ERROR`. After annotations alone only the name `_` is accepted.
   Inside a closure an annotated declaration recovered, after #79, as a
   parameter list with a missing `->`; it is now a
-  `local_variable_declaration`.
+  `local_variable_declaration`. (#100)
 - An interpolation directly after an embedded quote in a `"""…"""`
   string is an interpolation: `"""say "$name"""` and
   `"""a "${b}" c"""` parsed, with no `ERROR`, as plain text, because
-  the text token took the `$` together with the quote before it.
+  the text token took the `$` together with the quote before it. (#100)
 - `!in` directly before a bracket parses: `a !in[1, 2]`, `a !in(b)`
   and `a !in{ … }` were an `ERROR`, because the operator token
   included the character after `!in`. `!in` is now an external scanner
   token, `_not_in`, which reads that character and leaves it. The
   anonymous `!in` node no longer includes the whitespace after it.
+  (#100)
 - Queries. `highlights.scm`: `synchronized` as a statement is
   `@keyword`, where every use of the word was `@keyword.modifier`;
   `->` and the `...` of a varargs type are `@operator`. `tags.scm`: a
@@ -374,7 +376,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `src/scanner.c` without `src/tree_sitter/*.h`, so installing from
   the sdist failed with `tree_sitter/parser.h: No such file or
   directory`, and it held no queries. A `MANIFEST.in` adds both.
-  Wheels are built from a checkout, which has both.
+  Wheels are built from a checkout, which has both. (#100)
 
 ## [0.5.0] - 2026-11-10
 
