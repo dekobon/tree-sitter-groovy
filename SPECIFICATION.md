@@ -874,8 +874,11 @@ Conflicts with C++ `::`-scoped names are not relevant in Groovy.
 `(String) x` — C-style cast. Distinct from `x as String`. Grammar:
 
 ```js
-parenthesized_type_cast: $ => prec.dynamic(1, prec.right(PREC.UNARY, seq(
-  '(', $._type, alias($._cast_close, ')'), $._expression)))
+parenthesized_type_cast: $ => choice(
+  prec.dynamic(1, prec.right(PREC.UNARY, seq(
+    '(', $._type, alias($._cast_close, ')'), $._expression))),
+  prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+    '(', $._type, ')', $._expression))))
 ```
 
 Ambiguity with parenthesized expression: `(a) b` could be a cast
@@ -887,14 +890,23 @@ syntax error in expression position, by §5.5).
 Two rules settle it, both from Apache's
 `castParExpression castOperandExpression`:
 
-- The operand starts on the line of the `)`. `x = (a)` followed by
-  `foo()` on the next line is two statements. The scanner token
-  `CAST_CLOSE` (§6.11) carries this.
 - On one line the cast wins wherever it parses, as the cast
   alternative comes first in Apache's `expression`: `(a) + b`,
   `(a) [0]` and `(a) (b)` are casts, `(a) * b` and `(a).size()` are
-  not. The dynamic precedence carries this; without it the two
-  readings were unranked and the result depended on the context.
+  not. The first alternative carries this: it closes with the scanner
+  token `CAST_CLOSE` (§6.11), a `)` with something after it on its
+  line, and has a positive dynamic precedence.
+- The rule has no `nls` between its two parts, so where a line break
+  can end a statement the operand is on the line of the `)`: `x = (a)`
+  followed by `foo()` on the next line is two statements. The second
+  alternative carries this: a cast whose operand is on a later line
+  has a negative dynamic precedence and loses to any other complete
+  reading. Inside `(…)` and `[…]` Groovy ignores line breaks, no
+  other reading parses there, and `foo((String)` followed by `x)` is a
+  cast.
+
+Without the two weights the readings were unranked and the result
+depended on the surrounding code.
 
 ---
 
@@ -1227,11 +1239,12 @@ context-sensitive tokens.
 
 ### 6.11 CAST_CLOSE — implementation contract
 
-A cast needs its operand on the line of its `)`.
 `castParExpression castOperandExpression` in GroovyParser.g4 has no
-`nls` between the two, so `x = (a)` followed by `foo()` on the next
-line is two statements. Newlines are `extras` here, so the grammar
-alone read that input as a cast of `foo()`, with no `ERROR`.
+`nls` between the two, so where a line break can end a statement,
+`x = (a)` followed by `foo()` on the next line is two statements.
+Newlines are `extras` here, so the grammar alone read that input as a
+cast of `foo()`, with no `ERROR`. The token tells the parser whether
+the operand of a possible cast is on the line of its `)`.
 
 ```text
 Emit CAST_CLOSE for a `)` when, after it:
@@ -1243,11 +1256,16 @@ unterminated one is not scanned to the end of the input.
 On any other input return false; the in-grammar lexer then reads `)`.
 ```
 
-`parenthesized_type_cast` closes only with this token.
-`parenthesized_expression` closes with either, so `(a) * b`, `((a))`
-and `foo((a), b)` stay open to both readings until the next token
-decides. The token is aliased to `)` and the tree is the same either
-way. It is not emitted during error recovery.
+`parenthesized_type_cast` and `parenthesized_expression` both close
+with this token or with a plain `)`, so `(a) * b`, `((a))` and
+`foo((a), b)` stay open to both readings until the next token decides.
+The token only sets the rank of the cast (§5.15): above a
+parenthesized expression when it closes with the token, below one
+when it closes with a plain `)`. It cannot forbid the second form,
+because inside `(…)` and `[…]` a line break does not end anything and
+the scanner does not know which brackets enclose it. The token is
+aliased to `)` and the tree is the same either way. It is not emitted
+during error recovery.
 
 ### 6.12 NOT_IN — implementation contract
 

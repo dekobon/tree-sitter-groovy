@@ -254,9 +254,10 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
-    // §6.11 — the `)` of a cast, emitted only when something follows it
-    // on the same line. A cast cannot continue onto the next line, so
-    // `x = (a)` followed by `foo()` is two statements.
+    // §6.11 — a `)` with something after it on the same line. A cast
+    // that closes with it outranks a parenthesized expression; a cast
+    // whose operand is on a later line ranks below one, so `x = (a)`
+    // followed by `foo()` is two statements.
     $._cast_close,
     // §6.12 — the `!in` operator, which needs whitespace or an opening
     // bracket after it. The scanner reads that character and leaves it.
@@ -1555,23 +1556,43 @@ module.exports = grammar({
     // PREC.UNARY right-associative so `(Foo) -x` parses as
     // `(Foo)(-x)` and the type binds to the rightward expression.
     //
-    // The operand must start on the line of the `)`, as in Apache's
-    // `castParExpression castOperandExpression`, which has no `nls`
-    // between the two: `x = (a)` followed by `foo()` is two
-    // statements. `_cast_close` (§6.11) is that `)`.
+    // Two weights rank the cast against the other reading of the same
+    // tokens, a parenthesized expression followed by something. Both
+    // follow Apache's `castParExpression castOperandExpression`.
     //
-    // The dynamic precedence makes the cast win when both readings
-    // parse, which is Apache's order of alternatives: `(a) + b`,
-    // `(a) [0]` and `(a) (b)` are casts. Without it nothing ranked
-    // the two, and which one won depended on the stack order. Inside
-    // a closure or block, `a = (int) y` followed by a line that
-    // starts with a literal lost the cast once #83 added its forks.
-    parenthesized_type_cast: $ => prec.dynamic(1, prec.right(PREC.UNARY, seq(
-      '(',
-      field('type', $._type),
-      alias($._cast_close, ')'),
-      field('value', $._expression),
-    ))),
+    // With the operand on the line of the `)`, the cast wins wherever
+    // it parses, as the cast alternative comes first in Apache's
+    // `expression`: `(a) + b`, `(a) [0]` and `(a) (b)` are casts.
+    // `_cast_close` (§6.11) is the `)` that has something after it on
+    // its line.
+    //
+    // With the operand on a later line, the cast loses to any other
+    // complete reading. Apache's rule has no `nls` between the two
+    // parts, so where a line break can end a statement, `x = (a)`
+    // followed by `foo()` is two statements. Inside `(…)` and `[…]`
+    // Groovy ignores line breaks, and there the cast is the only
+    // reading that parses, so `foo((String)` followed by `x)` is
+    // still a cast. Rejecting the cast outright would lose that case:
+    // the scanner cannot tell which brackets enclose it.
+    //
+    // Without the weights nothing ranked the two readings and the
+    // stack order decided. Inside a closure or block, `a = (int) y`
+    // followed by a line that starts with a literal lost the cast
+    // once #83 added its forks.
+    parenthesized_type_cast: $ => choice(
+      prec.dynamic(1, prec.right(PREC.UNARY, seq(
+        '(',
+        field('type', $._type),
+        alias($._cast_close, ')'),
+        field('value', $._expression),
+      ))),
+      prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+        '(',
+        field('type', $._type),
+        ')',
+        field('value', $._expression),
+      ))),
+    ),
 
     // §4 — `_type`. Supports unqualified type identifiers,
     // qualified types (`java.util.List`), array types
@@ -2071,8 +2092,7 @@ module.exports = grammar({
     // (§5.15); the parser disambiguates by what's inside the parens
     // and after them. `_cast_close` is the `)` that has something
     // after it on its line (§6.11). It closes this rule too, so that
-    // `(a) * b` and `((a))` stay open to both readings; a cast accepts
-    // no other `)`.
+    // `(a) * b` and `((a))` stay open to both readings.
     parenthesized_expression: $ => seq(
       '(',
       $._expression,

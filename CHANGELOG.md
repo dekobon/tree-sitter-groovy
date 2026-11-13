@@ -154,12 +154,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `private final int weight` gave a third `enum_constant` named
   `private` and a field `final int weight`; it is now two constants
   and the field. (#88, #89)
-- **BREAKING:** a cast no longer continues onto the next line, and on
-  one line it wins wherever it parses (see Fixed below). Both change
-  trees for input that parsed without an `ERROR` at v0.5.0. `x = (a)`
-  followed by `foo()` on the next line was a
-  `parenthesized_type_cast` whose value was the call; it is now a
-  `parenthesized_expression` and a second statement. `x = (int) c`
+- **BREAKING:** a cast no longer takes its operand from the next line
+  where a statement could end, and on one line it wins wherever it
+  parses (see Fixed below). Both change trees for input that parsed
+  without an `ERROR` at v0.5.0. `x = (a)` followed by `foo()` on the
+  next line was a `parenthesized_type_cast` whose value was the call;
+  it is now a `parenthesized_expression` and a second statement.
+  `x = (a)` followed by `-1` was a cast of `-1` and is now the
+  subtraction `(a) - 1`. `x = (int) c`
   followed by `b = 1` on the next line was the parenthesized
   expression `(int)` and a declaration `c b = 1`; it is now a cast
   and an assignment. (#83)
@@ -321,14 +323,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   no `ERROR`. A line comment between `record Name` and `(` had the
   same problem. In a CRLF file the `\r` is no longer part of the
   `line_comment` node, which is one byte shorter.
-- A C-style cast follows Groovy's two rules. Its operand must start on
-  the line of the `)`: `x = (a)` followed by `foo()` on the next line
-  parsed, with no `ERROR`, as a cast of `foo()`, because newlines are
-  whitespace to the grammar. A new external scanner token,
-  `_cast_close`, is the `)` that has something after it on its line;
-  a line escape continues the line and a line comment ends it. On one
-  line the cast now wins whenever it parses (`(a) + b`, `(a) [0]`,
-  `(a) (b)`), as in Apache's grammar. The two readings were unranked
+- A C-style cast follows Groovy's two rules. Where a line break can
+  end a statement, its operand starts on the line of the `)`:
+  `x = (a)` followed by `foo()` on the next line parsed, with no
+  `ERROR`, as a cast of `foo()`, because newlines are whitespace to
+  the grammar. A new external scanner token, `_cast_close`, is the `)`
+  that has something after it on its line; a line escape continues
+  the line and a line comment ends it. A cast that closes with a plain
+  `)` loses to any other reading, and is still a cast where there is
+  none, inside `(…)` and `[…]`. On one line the cast now wins
+  whenever it parses (`(a) + b`, `(a) [0]`, `(a) (b)`), as in
+  Apache's grammar. The two readings were unranked
   before, so the result depended on the surrounding code, and
   `a = (int) y` at the start of a closure lost the cast when the next
   line began with a literal. (#83)

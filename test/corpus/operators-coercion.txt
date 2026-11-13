@@ -303,3 +303,39 @@ foo { cfg = c ? d : (y.y)
             (method_invocation
               function: (identifier)
               arguments: (argument_list))))))))
+
+==================
+A cast operand on the next line inside parentheses or brackets is still a cast
+==================
+
+foo((String)
+  x)
+def xs = [(String)
+  x]
+def y = ((String)
+  x)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_expression
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (identifier))))))

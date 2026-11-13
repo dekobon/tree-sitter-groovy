@@ -6,13 +6,12 @@
 // from partially consuming the leading `/`. The third is a look-ahead
 // decision the grammar cannot express: `record` is a keyword only
 // when a record header follows it. Also handles §6.8
-// COMMAND_NAMED_KEY, the key of a named argument in a
-// parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
-// line as the token before it, and §6.11 CAST_CLOSE, the `)` of a
-// cast whose operand starts on the same line, and §6.12 NOT_IN, the
-// `!in` operator. STRING_BODY (§6.10) is never emitted;
-// it is valid only inside a string body, where the scanner emits
-// nothing. ERROR_SENTINEL is never emitted either; the parser marks it
+// COMMAND_NAMED_KEY, an empty token before the key of a named
+// argument in a parenthesis-free call; §6.9 SUBSCRIPT_OPEN, a `[` on
+// the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
+// something after it on its line; and §6.12 NOT_IN, the `!in`
+// operator. STRING_BODY (§6.10) is never emitted; it is valid only
+// inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
 // SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the STRING_BODY check are
 // suppressed.
@@ -244,14 +243,17 @@ static bool scan_record_header(TSLexer *lexer) {
     return lexer->lookahead == '(';
 }
 
-// SPECIFICATION.md §6.11 — the `)` of a cast, already consumed when
-// this is called. A cast needs its operand on the same line:
+// SPECIFICATION.md §6.11 — whether something follows a `)` on its
+// line. The `)` is already consumed when this is called.
 // `castParExpression castOperandExpression` in GroovyParser.g4 has no
-// `nls` between the two, so `x = (a)` followed by `foo()` on the next
-// line is two statements. Spaces, tabs and line escapes may come
-// first. A line comment ends the line. A block comment counts as
-// something on the line; it is not read, so that an unterminated one
-// is not scanned to the end of the input here.
+// `nls` between the two, so where a line break can end a statement,
+// `x = (a)` followed by `foo()` on the next line is two statements.
+// The grammar ranks a cast by this answer; it does not forbid one,
+// because inside `(…)` and `[…]` a line break ends nothing. Spaces,
+// tabs and line escapes may come first. A line comment ends the line.
+// A block comment counts as something on the line; it is not read,
+// so that an unterminated one is not scanned to the end of the input
+// here.
 static bool cast_operand_follows(TSLexer *lexer) {
     lexer->mark_end(lexer);
     if (!skip_same_line_space(lexer, false)) {
@@ -423,8 +425,8 @@ bool tree_sitter_groovy_external_scanner_scan(
     }
     if (lexer->lookahead == ')' && wants_cast_close) {
         // On `false` the runtime rewinds and the in-grammar lexer reads
-        // a plain `)`, which closes a parenthesized expression but not
-        // a cast.
+        // a plain `)`. A cast that closes with one ranks below a
+        // parenthesized expression.
         advance(lexer);
         if (!cast_operand_follows(lexer)) {
             return false;
