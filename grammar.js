@@ -176,7 +176,10 @@ function parameter($) {
     repeat($.annotation),
     optional('final'),
     optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
-    field('name', $.identifier),
+    // `_` is a literal after an annotation where a statement can start
+    // (see `_placeholder_declarator`), which is also where an
+    // annotated closure parameter starts: `{ @A _ -> }`.
+    field('name', choice($.identifier, alias('_', $.identifier))),
     optional(seq('=', field('default', $._expression))),
   );
 }
@@ -328,10 +331,8 @@ module.exports = grammar({
     // block, whose `{` may also open a closure. The `->` decides, or
     // the first token that only one reading accepts.
     //
-    // `{ final x -> }` vs. a body opening with a modified declaration.
-    [$._modifier, $.closure_parameter],
-    // `{ final def x` is also a final local (#56), so all three stay
-    // alive there.
+    // `{ final x -> }` vs. a body opening with a final local (#56) or
+    // with a modified declaration; all three stay alive at `final`.
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
     // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
     // `{ def a, b -> }` vs. `{ def a, b }`. These two fork at every
@@ -1139,6 +1140,7 @@ module.exports = grammar({
     // §4 — package and import. Trailing `;` is optional in Groovy;
     // we accept both forms by not requiring it.
     package_declaration: $ => seq(
+      repeat($.annotation),
       'package',
       field('name', $.qualified_name),
     ),
@@ -1149,6 +1151,7 @@ module.exports = grammar({
     // imports only appear in this position, so the lexer-wide
     // longest-match is safe.
     import_declaration: $ => seq(
+      repeat($.annotation),
       'import',
       optional('static'),
       field('name', $.qualified_name),
@@ -1196,30 +1199,50 @@ module.exports = grammar({
     //   `final String f(a) { }` stays a method (see method_declaration).
     // - A bare `x` followed by a line reading `y = 1` is the typed
     //   declaration `x y = 1`.
+    //
+    // Annotations may come first on every form (Apache
+    // `variableModifier`): `@Field def x = 1` in a script,
+    // `@SuppressWarnings('unchecked') List<String> xs = []` in a body.
     local_variable_declaration: $ => prec.right(choice(
       seq(
+        repeat($.annotation),
         optional('final'),
         choice('def', 'var'),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       prec.dynamic(1, seq(
+        repeat($.annotation),
         optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
       )),
       seq(
+        repeat($.annotation),
         'final',
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       prec.dynamic(2, seq(
+        repeat($.annotation),
         'final',
         field('type', $._type),
         field('name', $.identifier),
       )),
+      prec.dynamic(2, seq(
+        repeat1($.annotation),
+        alias($._placeholder_declarator, $.variable_declarator),
+      )),
     )),
+
+    // `@Library('shared') _`, the Jenkins idiom: an annotation needs a
+    // declaration to stand on, and `_` is the name used for it. Apache
+    // takes any name there (`variableModifiers variableDeclarators`).
+    // Only `_` is accepted here, as a literal: with any identifier,
+    // `@A x` followed by `y = 1` on the next line would also be a typed
+    // local `x y = 1`, and nothing but the line break tells them apart.
+    _placeholder_declarator: $ => field('name', alias('_', $.identifier)),
 
     _initialized_declarator: $ => seq(
       field('name', $.identifier),

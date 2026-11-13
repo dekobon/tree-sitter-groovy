@@ -289,6 +289,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `try (final Foo r = open())`); both were an `ERROR`. A closure
   parameter takes `var` (`{ var x -> x }`), which was an `ERROR` too.
   Method and closure parameters now share one definition.
+- Annotations are accepted on a local or script variable declaration,
+  on an `import` and on a `package` declaration: `@Field def x = 1`,
+  `@SuppressWarnings('unchecked') List<String> xs = []`,
+  `@Grab('g:a:1')` before `import a.B`, and the Jenkins form
+  `@Library('shared') _`, which declares the placeholder `_`. Each was
+  an `ERROR`. After annotations alone only the name `_` is accepted.
+  Inside a closure an annotated declaration recovered, after #79, as a
+  parameter list with a missing `->`; it is now a
+  `local_variable_declaration`.
 
 ## [0.5.0] - 2026-11-10
 

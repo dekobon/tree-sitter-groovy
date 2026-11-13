@@ -25,7 +25,7 @@ reasoning here.
 | §5.6 Optional parentheses | **Done** | command_chain at statement level. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Done** | typed and untyped, no synthetic `it`. |
-| §5.9 Annotations | **Done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked. |
+| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`), and after annotations alone a local declaration takes only the name `_`. |
 | §5.10 Statement terminators | **Equivalent** | newline-as-terminator via `repeat($._statement)` rather than a scanner token (see #3 below). |
 | §5.11 Spread (three positions) | **Done** | `spread_arguments`, `spread_dot_expression`, `spread_map_entry`. |
 | §5.12 `def` positions | **Mostly done** | typed-bare `Type x` (no init) deferred (see #6 below). |
