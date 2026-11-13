@@ -180,13 +180,34 @@ These are documented in detail in
   closure, as in Groovy: end the field with `;` to get an
   initializer block.
 - **`sealed` and `trait` are keywords where a class member can
-  start** -- a field or enum constant named `sealed` or `trait` is an
-  `ERROR` when it follows a modifier (`private boolean sealed`) or
-  opens the member (`static trait = 1`, `enum E { trait }`).
-  `boolean sealed` and `String trait`, with no modifier, parse.
+  start** -- a field named `sealed` or `trait` is an `ERROR` when it
+  follows a modifier (`private boolean sealed`) or opens the member
+  (`static trait = 1`). `boolean sealed` and `String trait`, with no
+  modifier, parse, and so does an enum constant with either name
+  (`enum E { trait, sealed }`).
   `record` is not affected: it is a keyword only directly before a
   record header (`record Name(`), so `private Record record` and
   `record.key()` parse.
+- **A member after an enum's trailing comma must start with a
+  modifier, `def` or a keyword** -- Groovy up to 4.x takes any member
+  there. `A,` followed by `String x` or by `E() { }` is an `ERROR`
+  (#97).
+- **Parameter modifiers have one order** -- annotations, then `final`,
+  then `def`, `var` or a type. `def String x`, `final @A x` and a
+  varargs parameter with no type (`... xs`) are an `ERROR` (#98).
+- **A line break does not end a statement** -- a newline is whitespace
+  to the grammar. Most code is unaffected, because the next token
+  cannot continue the statement. Known cases that read wrongly with no
+  `ERROR`: a bare name followed by a literal on the next line is one
+  parenthesis-free call (#90); a field with a modifier and no type
+  followed by a typed method is a typed field and a constructor (#96);
+  and inside brackets, `(a)` followed by a line that starts with `-`,
+  `+` or `(` is not the cast Groovy reads (#99).
+- **A method with modifiers and no return type is a constructor** --
+  `static f() { }` in a class body is a `constructor_declaration`,
+  and `abstract m()` is an `ERROR` (#91).
+- **Annotations come before modifiers** -- `private @Autowired Foo
+  foo` and `public @interface X { }` are an `ERROR` (#92).
 
 ## Contributing
 

@@ -8,6 +8,8 @@
 ; Scopes — anywhere a new symbol table is opened.
 [
   (class_body)
+  (enum_body)
+  (record_declaration)
   (block)
   (closure)
   (method_declaration)
@@ -16,12 +18,17 @@
   (for_statement)
   (for_in_statement)
   (catch_clause)
+  (try_statement)
 ] @local.scope
 
 ; Definitions — bound names introduced inside their enclosing scope.
 (formal_parameter name: (identifier) @local.definition.parameter)
 (closure_parameter name: (identifier) @local.definition.parameter)
 (variable_declarator name: (identifier) @local.definition.var)
+; A typed local has its name on the declaration itself, with no
+; `variable_declarator`: `String s = 'a'`, `final String s`.
+(local_variable_declaration name: (identifier) @local.definition.var)
+(resource name: (identifier) @local.definition.var)
 (field_declaration
   (variable_declarator name: (identifier) @local.definition.field))
 (for_in_statement variable: (identifier) @local.definition.var)

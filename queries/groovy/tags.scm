@@ -65,3 +65,35 @@
 (super_interfaces (type_identifier) @name) @reference.implementation
 
 (extends_interfaces (type_identifier) @name) @reference.implementation
+
+; A generic super type is tagged by its base, and a qualified one by
+; its last segment: `implements Supplier<String>, a.b.Shaded`.
+(superclass
+  (generic_type base: (type_identifier) @name)) @reference.class
+
+(superclass
+  (qualified_type (type_identifier) @name .)) @reference.class
+
+(superclass
+  (generic_type
+    base: (qualified_type (type_identifier) @name .))) @reference.class
+
+(super_interfaces
+  (generic_type base: (type_identifier) @name)) @reference.implementation
+
+(super_interfaces
+  (qualified_type (type_identifier) @name .)) @reference.implementation
+
+(super_interfaces
+  (generic_type
+    base: (qualified_type (type_identifier) @name .))) @reference.implementation
+
+(extends_interfaces
+  (generic_type base: (type_identifier) @name)) @reference.implementation
+
+(extends_interfaces
+  (qualified_type (type_identifier) @name .)) @reference.implementation
+
+(extends_interfaces
+  (generic_type
+    base: (qualified_type (type_identifier) @name .))) @reference.implementation

@@ -551,3 +551,139 @@ interface I {
         return_type: (type_identifier)
         name: (identifier)
         parameters: (formal_parameters)))))
+
+==================
+Parameters with def and var are untyped
+==================
+
+def m(def x, final def y = 1, var z) { }
+class C { C(def a, final var b) { } }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier))
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Parameter with def and a type is not accepted (divergence 14)
+:error
+==================
+
+def m(def String y) { }
+
+---
+
+==================
+Parameter with an annotation after final is not accepted (divergence 14)
+:error
+==================
+
+def m(final @Deprecated w) { }
+
+---
+
+==================
+Varargs parameter with no type is not accepted (divergence 14)
+:error
+==================
+
+def m(... rest) { }
+
+---
+
+==================
+Parameter named var, and a parameter with the type underscore
+==================
+
+def f(var) { }
+def g(var, int n) { }
+def h(final var = 1) { }
+def k(_ x) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)
+        default: (number_literal)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+Annotated parameter with the type underscore
+==================
+
+def f(@A _ x) { }
+def c = { @A _ x -> x }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))

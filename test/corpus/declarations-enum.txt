@@ -260,6 +260,315 @@ enum E { A, B,; E() { } }
         body: (block)))))
 
 ==================
+Enum members after a trailing comma
+==================
+
+enum Level {
+    LOW(1),
+    HIGH(2),
+
+    // weight per level
+    private final int weight
+
+    Level(int weight) { this.weight = weight }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (line_comment)
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier))))))))
+
+==================
+Enum def members after a trailing comma
+==================
+
+enum Mode {
+    ON,
+    OFF,
+    def label = 'mode'
+    def describe() { label }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (identifier)))))))
+
+==================
+Enum static initializer and nested types directly after a trailing comma
+==================
+
+enum E1 { A, static { init() } }
+enum E2 { A, class Inner { } }
+enum E3 { A, interface I { } }
+enum E4 { A, enum N { X } }
+enum E5 { A, trait T { } }
+enum E6 { A, record R(int x) { } }
+enum E7 { A, @interface M { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Enum annotated method directly after a trailing comma
+==================
+
+enum E { A, @Deprecated static int n() { 1 } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (number_literal)))))))
+
+==================
+Enum constructor with an access modifier directly after a trailing comma
+==================
+
+enum E1 { A(1), B(2), private E1(int w) { } }
+enum E2 { A, @Inject private E2() throws X { } }
+enum E3 {
+    A,
+    // doc
+    private E3(int w) { this.w = w }
+    private final int w
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        (throws_clause
+          (type_identifier))
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (line_comment)
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Enum constructor with no access modifier after a trailing comma is not accepted (divergence 13)
+:error
+==================
+
+enum E { A, @Inject E() { } }
+
+---
+
+==================
+Enum method with a modifier other than an access modifier after a trailing comma
+==================
+
+enum E1 { A, static f() { } }
+enum E2 { A, private static helper(x) { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Enum typed field with no modifier after a trailing comma is not accepted (divergence 13)
+:error
+==================
+
+enum E {
+    A,
+    String x
+}
+
+---
+
+==================
 Enum constants then stray semicolons and members
 ==================
 
@@ -689,6 +998,111 @@ enum F {
             arguments: (argument_list)))))))
 
 ==================
+Enum constants named sealed and trait
+==================
+
+enum E1 { trait, B }
+enum E2 { sealed }
+enum E3 { A, sealed, B }
+enum E4 { A, trait(1) }
+enum E5 { A, @Deprecated trait }
+enum E6 { sealed; int x }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Enum sealed and trait declarations where a constant could stand
+==================
+
+enum E1 { trait T { } }
+enum E2 { sealed interface I { } }
+enum E3 { A, trait T { } }
+enum E4 { A, sealed class S { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
 Enum constants named record
 ==================
 
@@ -806,3 +1220,104 @@ enum J {
         type: (type_identifier)
         (variable_declarator
           name: (identifier))))))
+
+==================
+Enum implementing interfaces
+==================
+
+enum Color implements Shaded, Comparable<Color> {
+    RED(1), GREEN(2)
+    final int code
+    Color(int code) { this.code = code }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    (super_interfaces
+      (type_identifier)
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (number_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier))))))))
+
+==================
+Annotated enum implementing a generic interface
+==================
+
+@CompileStatic
+public enum Level implements Supplier<String> { LOW, HIGH; String get() { name() } }
+
+---
+
+(source_file
+  (enum_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    (super_interfaces
+      (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier))))
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Enum with an extends clause is an error
+:error
+==================
+
+enum E extends X { A }
+
+---
+
+==================
+Enum with type parameters is an error
+:error
+==================
+
+enum E<T> { A }
+
+---

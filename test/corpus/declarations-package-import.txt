@@ -133,3 +133,61 @@ class Foo { }
   (class_declaration
     name: (identifier)
     body: (class_body)))
+
+==================
+Annotated imports
+==================
+
+@Grab('org.x:lib:1.0')
+import org.x.Lib
+@Grab('a:b:1') @GrabExclude('c:d') import static a.B.*
+
+---
+
+(source_file
+  (import_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (string_literal)))
+    name: (qualified_name
+      (identifier)
+      (identifier)
+      (identifier)))
+  (import_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (string_literal)))
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (string_literal)))
+    name: (qualified_name
+      (identifier)
+      (identifier))))
+
+==================
+Annotated package
+==================
+
+@Generated package com.foo
+import a.B
+
+---
+
+(source_file
+  (package_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (qualified_name
+      (identifier)
+      (identifier)))
+  (import_declaration
+    name: (qualified_name
+      (identifier)
+      (identifier))))

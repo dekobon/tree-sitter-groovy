@@ -29,8 +29,9 @@ npx tree-sitter test
 The scanner is hand-written and survives regeneration. It handles
 context-sensitive lexing (slashy vs. division, comments, the
 contextual `record` keyword, named-argument keys in parenthesis-free
-calls, and a same-line subscript `[`; see `SPECIFICATION.md` §6.7–§6.9)
-and emits nothing inside a string body (§6.10).
+calls, a same-line subscript `[`, a `)` that ranks a cast, and the
+`!in` operator; see `SPECIFICATION.md` §6.7–§6.9, §6.11 and §6.12) and emits
+nothing inside a string body (§6.10).
 Edit it directly when the change is in its domain.
 
 ### Queries (`queries/groovy/*.scm`)

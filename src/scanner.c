@@ -6,13 +6,15 @@
 // from partially consuming the leading `/`. The third is a look-ahead
 // decision the grammar cannot express: `record` is a keyword only
 // when a record header follows it. Also handles §6.8
-// COMMAND_NAMED_KEY, the key of a named argument in a
-// parenthesis-free call, and §6.9 SUBSCRIPT_OPEN, a `[` on the same
-// line as the token before it. STRING_BODY (§6.10) is never emitted;
-// it is valid only inside a string body, where the scanner emits
-// nothing. ERROR_SENTINEL is never emitted either; the parser marks it
+// COMMAND_NAMED_KEY, an empty token before the key of a named
+// argument in a parenthesis-free call; §6.9 SUBSCRIPT_OPEN, a `[` on
+// the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
+// something after it on its line; and §6.12 NOT_IN, the `!in`
+// operator. STRING_BODY (§6.10) is never emitted; it is valid only
+// inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
-// SUBSCRIPT_OPEN and the STRING_BODY check are suppressed.
+// SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the STRING_BODY check are
+// suppressed.
 //
 // Stateless — `create` returns NULL and the runtime calls
 // `destroy` / `serialize` / `deserialize` as no-ops. When a future
@@ -30,17 +32,28 @@ enum TokenType {
     RECORD_KEYWORD,
     COMMAND_NAMED_KEY,
     SUBSCRIPT_OPEN,
+    CAST_CLOSE,
+    NOT_IN,
     STRING_BODY,
     ERROR_SENTINEL,
 };
 
-static inline bool is_ident_start(int32_t c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
-        || c == '$';
+// Wider than the grammar's `identifier` token (SPECIFICATION.md
+// §5.2): every non-ASCII code point counts as an identifier
+// character, because the scanner has no Unicode tables. That is safe
+// because the scanner never emits a name. It only looks ahead, for
+// the name of a record header and for the key of a named argument,
+// and the in-grammar lexer then reads the name with the real class.
+// On valid input the two agree: outside strings and comments, a
+// non-ASCII character can only be part of a name. On other input the
+// name the lexer reads is shorter, and the parse fails there.
+static inline bool is_identifier_start(int32_t c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+        || c == '_' || c == '$' || c > 0x7F;
 }
 
-static inline bool is_ident_part(int32_t c) {
-    return is_ident_start(c) || (c >= '0' && c <= '9');
+static inline bool is_identifier_char(int32_t c) {
+    return is_identifier_start(c) || (c >= '0' && c <= '9');
 }
 
 // SPECIFICATION.md §5.10 — a line escape, `\` followed by a line
@@ -70,28 +83,30 @@ static bool skip_same_line_space(TSLexer *lexer, bool skip) {
     }
 }
 
-// SPECIFICATION.md §5.5 — the key of a named argument in a
-// parenthesis-free call (`exclude group: 'a'`). Matches an identifier
-// on the current line that is followed by `:` (not `::`), consuming
-// only the identifier. A newline before the key means a new statement
-// (a Spock `where:` label, say), so no match.
+// SPECIFICATION.md §6.8 — decides that the key of a named argument
+// in a parenthesis-free call (`exclude group: 'a'`) starts here: a
+// name on the current line, followed by `:` and not `::`. The token is
+// empty. `mark_end` fixes it at the start of the name, and the
+// in-grammar lexer reads the name itself, so the key is an identifier
+// by the grammar's own definition, non-ASCII letters included. A
+// newline before the key means a new statement (a Spock `where:`
+// label, say), so the caller does not skip one.
+//
+// The caller has skipped the same-line space and seen an identifier
+// start.
 static bool scan_command_named_key(TSLexer *lexer) {
-    if (!skip_same_line_space(lexer, true)) {
-        return false;
-    }
-    if (!is_ident_start(lexer->lookahead)) {
-        return false;
-    }
+    lexer->mark_end(lexer);
     // Keep the first few chars to reject `case:` / `default:`, which
     // are switch labels, not keys. Apache's `namedArgLabel` accepts both
     // keywords, so `foo default: 1` diverges on purpose: the one-liner
     // `switch (x) { case 1: foo default: bar }` in statements-switch.txt
-    // depends on the rejection.
+    // depends on the rejection. A non-ASCII character is stored as 0,
+    // which matches neither word; cut to a `char` it could.
     char word[8];
     unsigned len = 0;
-    while (is_ident_part(lexer->lookahead)) {
+    while (is_identifier_char(lexer->lookahead)) {
         if (len < sizeof(word)) {
-            word[len] = (char)lexer->lookahead;
+            word[len] = lexer->lookahead <= 0x7F ? (char)lexer->lookahead : 0;
         }
         len++;
         lexer->advance(lexer, false);
@@ -100,7 +115,6 @@ static bool scan_command_named_key(TSLexer *lexer) {
         || (len == 7 && memcmp(word, "default", 7) == 0)) {
         return false;
     }
-    lexer->mark_end(lexer);
     if (!skip_same_line_space(lexer, false)) {
         return false;
     }
@@ -127,14 +141,8 @@ static inline bool is_inline_space(int32_t c) {
     return c == ' ' || c == '\t';
 }
 
-// Mirrors the grammar's `identifier` token, /[A-Za-z_$][A-Za-z0-9_$]*/.
-static inline bool is_identifier_start(int32_t c) {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-        || c == '_' || c == '$';
-}
-
-static inline bool is_identifier_char(int32_t c) {
-    return is_identifier_start(c) || (c >= '0' && c <= '9');
+static inline bool is_line_break(int32_t c) {
+    return c == '\n' || c == '\r';
 }
 
 // Skips the trivia Groovy's lexer hides inside a record header:
@@ -149,8 +157,7 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
             if (!skip_same_line_space(lexer, false)) {
                 return false;
             }
-            if (!newlines
-                || (lexer->lookahead != '\n' && lexer->lookahead != '\r')) {
+            if (!newlines || !is_line_break(lexer->lookahead)) {
                 break;
             }
             advance(lexer);
@@ -177,7 +184,7 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
                 }
             }
         } else if (newlines && lexer->lookahead == '/') {
-            while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+            while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
                 advance(lexer);
             }
         } else {
@@ -234,6 +241,57 @@ static bool scan_record_header(TSLexer *lexer) {
         return false;
     }
     return lexer->lookahead == '(';
+}
+
+// SPECIFICATION.md §6.11 — whether something follows a `)` on its
+// line. The `)` is already consumed when this is called.
+// `castParExpression castOperandExpression` in GroovyParser.g4 has no
+// `nls` between the two, so where a line break can end a statement,
+// `x = (a)` followed by `foo()` on the next line is two statements.
+// The grammar ranks a cast by this answer; it does not forbid one,
+// because inside `(…)` and `[…]` a line break ends nothing. Spaces,
+// tabs, line escapes and block comments that close on the line may
+// come first. A line comment ends the line.
+static bool cast_operand_follows(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    for (;;) {
+        if (!skip_same_line_space(lexer, false)) {
+            return true;
+        }
+        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+            return false;
+        }
+        if (lexer->lookahead != '/') {
+            return true;
+        }
+        advance(lexer);
+        if (lexer->lookahead == '/') {
+            return false;
+        }
+        if (lexer->lookahead != '*') {
+            return true;
+        }
+        // A block comment that closes on this line is skipped, and the
+        // answer depends on what follows it. One that runs past the
+        // end of the line counts as something on the line: Groovy's
+        // lexer drops the comment with its line breaks, and reading
+        // on would scan an unterminated comment to the end of input.
+        advance(lexer);
+        for (;;) {
+            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                return true;
+            }
+            if (lexer->lookahead == '*') {
+                advance(lexer);
+                if (lexer->lookahead == '/') {
+                    advance(lexer);
+                    break;
+                }
+            } else {
+                advance(lexer);
+            }
+        }
+    }
 }
 
 void *tree_sitter_groovy_external_scanner_create(void) {
@@ -312,7 +370,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         // line: `foo record: 1` is a named argument, while a record header
         // there is not valid Groovy. A `record` on the next line is not
         // reached here, since a newline is not skipped.
-        if (wants_named_key && is_ident_start(lexer->lookahead)) {
+        if (wants_named_key && is_identifier_start(lexer->lookahead)) {
             return scan_command_named_key(lexer);
         }
     }
@@ -332,7 +390,12 @@ bool tree_sitter_groovy_external_scanner_scan(
         || valid_symbols[GROOVYDOC_COMMENT];
     bool wants_slashy = valid_symbols[SLASHY_STRING_START];
     bool wants_record = valid_symbols[RECORD_KEYWORD];
-    if (!wants_comment && !wants_slashy && !wants_record) {
+    bool wants_cast_close = valid_symbols[CAST_CLOSE]
+        && !valid_symbols[ERROR_SENTINEL];
+    bool wants_not_in = valid_symbols[NOT_IN]
+        && !valid_symbols[ERROR_SENTINEL];
+    if (!wants_comment && !wants_slashy && !wants_record
+        && !wants_cast_close && !wants_not_in) {
         return false;
     }
 
@@ -365,6 +428,37 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->result_symbol = RECORD_KEYWORD;
         return true;
     }
+    if (lexer->lookahead == '!' && wants_not_in) {
+        // SPECIFICATION.md §6.12 — `!in` is an operator only before
+        // whitespace or an opening bracket (GroovyLexer.g4 `NOT_IN`),
+        // so that `a !inside` is `!` applied to a name. The character
+        // after it is read and not taken: `a !in[1, 2]`.
+        static const char not_in[] = "!in";
+        for (const char *c = not_in; *c != '\0'; c++) {
+            if (lexer->lookahead != *c) {
+                return false;
+            }
+            advance(lexer);
+        }
+        int32_t next = lexer->lookahead;
+        if (!is_whitespace(next) && next != '[' && next != '('
+            && next != '{') {
+            return false;
+        }
+        lexer->result_symbol = NOT_IN;
+        return true;
+    }
+    if (lexer->lookahead == ')' && wants_cast_close) {
+        // On `false` the runtime rewinds and the in-grammar lexer reads
+        // a plain `)`. A cast that closes with one ranks below a
+        // parenthesized expression.
+        advance(lexer);
+        if (!cast_operand_follows(lexer)) {
+            return false;
+        }
+        lexer->result_symbol = CAST_CLOSE;
+        return true;
+    }
     if (lexer->lookahead != '/') {
         return false;
     }
@@ -383,8 +477,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         advance(lexer);
         // EOF-bounded loop: lexer->eof() guarantees termination on
         // unterminated input. Do not tighten without preserving the
-        // EOF guard.
-        while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+        // EOF guard. A lone `\r` ends the line too, as in Groovy's
+        // lexer (`LineTerminator`), so the comment stops before it.
+        while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
             advance(lexer);
         }
         lexer->result_symbol = LINE_COMMENT;
@@ -486,7 +581,7 @@ bool tree_sitter_groovy_external_scanner_scan(
             found_close = true;
             break;
         }
-        if (lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+        if (is_line_break(lexer->lookahead)) {
             break;
         }
         advance(lexer);

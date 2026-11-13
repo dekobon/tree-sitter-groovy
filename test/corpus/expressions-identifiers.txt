@@ -1,0 +1,271 @@
+==================
+Non-ASCII method name
+==================
+
+class T {
+  void test名前を確認する() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Non-ASCII local variable
+==================
+
+def café = 1
+café++
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (update_expression
+      operand: (identifier))))
+
+==================
+GString interpolation of a non-ASCII name
+==================
+
+def 名前 = 'x'
+println "値は$名前"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+GString interpolation of a dotted non-ASCII path
+==================
+
+println "$名前.属性"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+Record with a non-ASCII name
+==================
+
+record 点(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))
+
+==================
+Identifier characters outside letters: currency, connector, mark, digit, letter number
+==================
+
+def €uro = 1
+def a‿b = 2
+def é = 3
+def x٣ = 4
+def 𝒳 = 5
+def Ⅷ = 6
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+A middle dot is not an identifier character
+:error
+==================
+
+def a·b = 1
+
+---
+
+==================
+A zero width space is not an identifier character
+:error
+==================
+
+def a​b = 1
+
+---
+
+==================
+A non-ASCII digit cannot start an identifier
+:error
+==================
+
+def ٣x = 1
+
+---
+
+==================
+GString interpolation of names with a currency sign and a combining mark
+==================
+
+println "$€uro $名前.属性́ $a$b"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+Non-ASCII interpolation in triple-quoted, slashy and dollar-slashy strings
+==================
+
+def a = """値 $名前.属性 end"""
+def b = /値 $名前 x/
+def c = $/値 $名前 x/$
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment)))))
+
+==================
+GString interpolation of an ASCII name that continues with non-ASCII letters
+==================
+
+println "$count件 $café"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (gstring_dollar_interpolation
+        value: (identifier))
+      (string_fragment)
+      (gstring_dollar_interpolation
+        value: (identifier)))))
+
+==================
+A name that starts with record and continues with a non-ASCII letter
+==================
+
+recordé(1)
+def recordé = 2
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+An emoji is not an identifier
+:error
+==================
+
+def 😀 = 1
+
+---
+
+==================
+A combining mark cannot start an identifier
+:error
+==================
+
+def ́x = 1
+
+---

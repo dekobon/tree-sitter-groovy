@@ -42,9 +42,11 @@ The default branch is **`main`**.
   comment single-token emit, the contextual `record` keyword, which
   is emitted only before a record header (§6.7), the key of a named
   argument in a parenthesis-free call, which needs `:` on the same
-  line (§6.8), and a subscript `[` on the same line as the
-  expression before it (§6.9). Inside a string body it emits nothing
-  (§6.10). GString interpolation, automatic semicolons and label
+  line (§6.8), a subscript `[` on the same line as the
+  expression before it (§6.9), a `)` with something after it on its
+  line, which ranks a cast (§6.11), and the `!in` operator, which
+  needs whitespace or a bracket after it (§6.12). Inside a string body
+  it emits nothing (§6.10). GString interpolation, automatic semicolons and label
   colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does

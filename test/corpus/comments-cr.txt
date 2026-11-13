@@ -1,0 +1,36 @@
+==================
+A lone CR ends a line comment
+==================
+
+foo() // cbar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (line_comment)
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A lone CR ends a line comment inside a record header
+==================
+
+record P // c(int x) { }
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    (line_comment)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body)))

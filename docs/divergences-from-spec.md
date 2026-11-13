@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with `def` (the form without it is an `ERROR`, #94) / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -24,12 +24,12 @@ reasoning here.
 | §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported. String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). |
 | §5.6 Optional parentheses | **Done** | command_chain at statement level. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
-| §5.8 Closure params / it | **Done** | typed and untyped, no synthetic `it`. |
-| §5.9 Annotations | **Done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked. |
+| §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
+| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`. |
 | §5.10 Statement terminators | **Equivalent** | newline-as-terminator via `repeat($._statement)` rather than a scanner token (see #3 below). |
 | §5.11 Spread (three positions) | **Done** | `spread_arguments`, `spread_dot_expression`, `spread_map_entry`. |
 | §5.12 `def` positions | **Mostly done** | typed-bare `Type x` (no init) deferred (see #6 below). |
-| §5.13 Trailing commas | **Done** | accepted in list / map / arg / param / enum-constant lists. |
+| §5.13 Trailing commas | **Done** | accepted in list / map / argument / enum-constant lists. A parameter list takes none, as in Apache's `formalParameterList`. |
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
@@ -38,10 +38,12 @@ reasoning here.
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
 | §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
-| §6.8 COMMAND_NAMED_KEY | **Done** | emitted only for an identifier followed by `:` on the same line, never during error recovery; limitations are in the §5.5 row above and spec §6.8. |
+| §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
 | §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
-| §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
+| §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
+| §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
+| §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
 | §9.2 injections.scm | **Done** | groovydoc → javadoc; slashy + dollar-slashy → regex; named-call DSL → sql. |
@@ -72,21 +74,20 @@ fully met. A v2 refactor to true scanner tokens is optional polish.
 [$.trait_declaration, $.class_declaration]
 ```
 
-**Actual `grammar.js` conflicts:**
-
-```
-[$._expression, $._type]
-[$.for_in_statement, $._expression]
-[$.variable_declarator, $._property_name]
-```
+**Actual `grammar.js` conflicts:** the `conflicts` array in
+`grammar.js` is the only list. Each entry has a comment that says which
+two readings it keeps alive and which token decides. This file does not
+repeat it, because a copy here went out of date: it listed three
+entries when the grammar had nine, and fourteen after #83.
 
 The spec's list was an educated guess written before any rule was
 implemented; once the grammar landed, none of the predicted
 conflicts actually fired. Two reasons:
 
-- Several entries (`command_chain`, `_type_arguments`) belong to
-  features that haven't landed yet — generics and juxt-function
-  calls. They will appear with those features.
+- Several entries (`command_chain`, `_type_arguments`) were avoided
+  by how those features were built: a command chain is limited to
+  statement position, and a generic type always carries explicit
+  angle brackets.
 - Other entries (`closure` vs `map_literal`, `trait_declaration` vs
   `class_declaration`, `label` vs `identifier`, `method_reference`
   vs `ternary`) were avoided by using `prec` and structural
@@ -97,22 +98,13 @@ conflicts actually fired. Two reasons:
   position because map-entries live inside `[…]` so cannot
   collide there.
 
-The actual three conflicts are forced by features the spec did
-not have direct prediction-rules for:
+The conflicts that exist come from positions the spec had no rule
+for: a name in parentheses that may be a type or an expression, a
+name after `def` that may be a variable or a method, the first tokens
+of a closure that may be parameters or a statement.
 
-- `[$._expression, $._type]` — `(Foo)` inside parens could be the
-  head of a `parenthesized_type_cast` or a `parenthesized_expression`;
-  resolved by what follows `)`.
-- `[$.for_in_statement, $._expression]` — `for ( identifier …` is
-  either the head of a `for_statement` init expression or the
-  variable of a `for_in_statement`; resolved by `;` vs `in`.
-- `[$.variable_declarator, $._property_name]` — `def identifier` is
-  either a no-init variable or the start of a method name;
-  resolved by `(` (method) vs `=` / `,` / end (variable).
-
-**Action**: keep the spec text as historical record; rely on this
-file plus `grammar.js` comments for the authoritative conflict
-list.
+**Action**: keep the spec text as historical record; the
+authoritative list is `grammar.js`.
 
 ---
 
@@ -210,18 +202,15 @@ positions: generics (`List<String>`), array dimensions
 **Current implementation**:
 - Unqualified identifier types ✓
 - `array_type` (`int[]`, `String[][]`) ✓ (iter 45)
-- `qualified_type` (`java.util.List`) — works in **most** type
-  positions (`new`, `parenthesized_type_cast`, formal parameters)
-  but NOT in `cast_expression` (`x as java.util.Map`) or
+- `qualified_type` (`java.util.List`) — works in every type
+  position, including `cast_expression` (`x as java.util.Map`) and
   `instanceof_expression` (`x instanceof java.lang.Number`). In
-  those slots, tree-sitter's LR(1) chooses `field_access` for the
-  trailing `.Map` over extending the qualified_type, producing
-  `(field_access (cast x as java.util) Map)` rather than
-  `(cast x as java.util.Map)`. The structural ambiguity is real:
-  qualified_type and field_access have identical token sequences
-  and only context distinguishes them, and `cast_expression` at
-  `PREC.RELATIONAL` is looser than `field_access` at
-  `PREC.ACCESS`.
+  those two slots the token sequence is the same as a
+  `field_access` chain, and `PREC.RELATIONAL` is looser than
+  `PREC.ACCESS`, so a plain `_type` there read
+  `(field_access (cast x as java.util) Map)`. They take `_cast_type`
+  instead, whose dotted form (`_dotted_type`, spec §3.2.2) shifts
+  each dot at a precedence tighter than `field_access`.
 - Generics (`List<String>`) ✓ via `generic_type`, with bounded
   wildcards (`? extends Foo`, `? super Bar`), nested arguments
   (`Map<String, List<Integer>>`), qualified bases
@@ -600,15 +589,23 @@ member can start:
 | `private boolean sealed`, `private String trait = "x"` | `ERROR` (a field at v0.4.0) |
 | `public static final int sealed = 1` | `ERROR` (a field at v0.4.0) |
 | `static trait = 1`, `private trait`, `sealed() { }` | `ERROR` (parsed at v0.4.0) |
-| `enum E { trait, B }`, `enum E { sealed }` | `ERROR` (constants at v0.4.0) |
+| `enum E { trait, B }`, `enum E { sealed }`, `enum E { A, sealed }` | constants (the first two an `ERROR` at v0.5.0) |
 
 The rows that fail share one shape. A field needs no type after a
 modifier, so `private boolean` is already a complete field named
 `boolean`, a new member may start right after it, and the lexer
 prefers the keyword. Without a modifier the type cannot stand
 alone, the next word can only be the name, and it stays an
-identifier. The first constant of an enum sits where a member could
-start too; a later one (`enum E { A, sealed }`) does not.
+identifier.
+
+An enum constant sits where a member could start too: the first one,
+and since #89 every one after a `,`. `enum_constant` therefore takes
+the two keywords as a name, aliased to `identifier`, at a lower
+precedence than the declarations, so `sealed class` and `trait T {`
+are still declarations there. One shape stays an `ERROR`, as at
+v0.5.0: a constant named `trait` followed, with no `;` or `,`, by a
+member that starts with a name (`trait` then `int f() { }` on the
+next line), which reads as a trait declaration.
 
 `record` escapes the table because its keyword is not a grammar
 literal: the external scanner emits it only when a name follows on
@@ -621,8 +618,113 @@ token emitted only when the word opens a declaration (`sealed class`,
 `sealed interface`, `trait Name {`), so the literal disappears from
 the lexer and the word is an identifier elsewhere. The alternative,
 accepting the words as names through an aliased keyword
-(`alias('sealed', $.identifier)`) in the declarator and
-enum-constant positions, was tried for `record` and rejected: after
+(`alias('sealed', $.identifier)`), is in place for enum constants,
+where it needs no declared conflict. In the declarator position it
+was tried for `record` and rejected: after
 `private boolean` it is a genuine LR(1) conflict that needs a
 declared conflict, and it still leaves `public void record() { }` an
 error because the method name position wants `_property_name`.
+
+---
+
+## 13. A member directly after an enum's trailing comma
+
+**Apache `GroovyParser.g4`**, on the 3.0 and 4.0 branches, has
+`enumConstants (nls COMMA)? sep?` and then the member list, so any
+member may follow the trailing comma with no `;`. The master branch
+(Groovy 5) requires the `;`.
+
+**Current implementation** (#88, #89): after the comma, the first
+member is accepted only when it starts with something that cannot be
+an enum constant: a modifier, `def`, a declaration keyword (`class`,
+`interface`, `enum`, `trait`, `record`, `@interface`), or an
+annotation followed by one of those. `enum_constant` has a static
+precedence that makes a bare name after the comma a constant; its
+comment in `grammar.js` says why that is not a GLR conflict.
+
+Results for the member after `A,`, with Groovy 4.0.32 as the
+reference:
+
+| After `A,` | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `private int x`, `def x = 1`, `static { }`, `class C { }` | member | member |
+| `private E(int w) { }` | constructor | `constructor_declaration` |
+| `static f() { }` | method | `method_declaration` |
+| `List<String> xs`, `String[] xs`, `a.b.C x` | field | field: the type cannot be a constant |
+| `String x`, `int x = 1` | field | `ERROR` |
+| `E(int w) { }`, `@Inject E(int w) { }` | constructor | `ERROR`: reads as a constant with an anonymous class body |
+| `{ init() }` | initializer | `ERROR` |
+| `void f() { }` | method | a constant `void` and a constructor `f`, with no `ERROR` |
+
+The last row is the mirror case that the `enum_constant` comment
+describes for the start of the body: a newline is whitespace, and
+nothing else tells a constant followed by a constructor from a typed
+method.
+
+**Action**: accept every member and an initializer after the comma,
+and prefer the constant only when it parses. That needs a GLR
+conflict limited to this position. Tracked in #97.
+
+---
+
+## 14. Parameter modifiers in a fixed order
+
+**Apache `GroovyParser.g4`** gives a method parameter and a closure
+parameter one rule, `formalParameter`:
+`variableModifiersOpt type? ELLIPSIS? variableDeclaratorId (ASSIGN expression)?`.
+`variableModifier` is an annotation, `final`, `def` or `var`, in any
+number and order.
+
+**Current implementation**: `formal_parameter` and `closure_parameter`
+share the helper `parameter()` in `grammar.js`: annotations, then
+`final`, then `def`, `var` or a type, the name, and a default.
+
+| Parameter | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `@A final String x = 1`, `def x`, `var x`, `final def x`, `String... xs` | accepted | accepted |
+| `def String x` | accepted | `ERROR` |
+| `final @A x` | accepted | `ERROR` |
+| `... xs`, `def ... xs` | accepted | `ERROR` |
+
+`def` and `var` are keywords in a parameter, so `def f(def x)` has no
+`type`. `catch` parameters and `try` resources take `final` and `def`,
+`var` or a type, with no annotations.
+
+**Action**: accept the modifiers in any order and `...` with no type.
+A closure body can open with the same words, so each added form has to
+be checked against the forks listed in §5.8 of the spec. Tracked in
+#98.
+
+---
+
+## 15. A cast whose operand is on a later line
+
+**Apache `GroovyParser.g4`**: `castParExpression castOperandExpression`
+has no `nls` between its parts. Where a line break is a token, a `)`
+at the end of a line ends the expression. Inside `(…)` and `[…]` the
+lexer drops line breaks, so a cast may continue on the next line
+there.
+
+**Current implementation**: a newline is `extras` whitespace and the
+scanner has no state, so it cannot know which brackets enclose a
+cast. It reports only whether something follows the `)` on its line
+(`_cast_close`, spec §6.11), and `parenthesized_type_cast` is ranked
+by that: above a parenthesized expression when the operand is on the
+line, below every other complete reading when it is not.
+
+| Input | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `x = (a)` then `foo()` | two statements | two statements |
+| `x = (a) /* c */` then `foo()` | two statements | two statements |
+| `x = (int) \` then `y` (a line escape) | cast | cast |
+| `foo((String)` then `x)` | cast | cast: nothing else parses |
+| `foo((a)` then `- b)`, or `+ b)` | cast of `-b` | subtraction `(a) - b` |
+| `foo((a)` then `(b))` | cast of `(b)` | call `(a)(b)`, as at v0.5.0 |
+| `x = (a)` then `(b) y` | `x = a`, then the cast `(b) y` | one assignment, `(a)` cast of `(b) y`, as at v0.5.0 |
+
+At v0.5.0 the two readings were unranked and the stack order decided:
+`x = (a)` followed by `foo()` was a cast of the call.
+
+**Action**: a scanner that tracks bracket depth, which would also give
+the grammar a statement terminator where a line break is significant
+(#90, #96). Tracked in #99.

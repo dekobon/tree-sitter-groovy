@@ -367,11 +367,13 @@ bracket. Without this rule, `!instanceofX` would be a single
 identifier-looking token (or the parse would be ambiguous between
 `!instanceof X` and `! instanceofX`).
 
-The tree-sitter external scanner replicates this: `!instanceof` and
-`!in` are scanner-emitted tokens that only fire when the trailing
-character is one of the permitted ones. The grammar rule for the
-unary `!` operator otherwise consumes the `!` and parses the rest
-as an expression.
+`!in` is a token of the external scanner (§6.12), which emits it only
+when the character after it is one of the permitted ones and leaves
+that character in place, so `a !in[1, 2]` and `a !in(b)` parse.
+`!instanceof` is an in-grammar token that includes the whitespace
+after it; it needs no bracket form. The grammar rule for the unary `!`
+operator otherwise consumes the `!` and parses the rest as an
+expression.
 
 ---
 
@@ -383,26 +385,27 @@ fix relative to *both* parent grammars.
 | Construct | Status | Notes |
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
-| `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D` |
+| `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D`. Annotations may come first (`@Grab('g:a:1') import a.B`), on `package` too. |
 | `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
-| `enum` declaration | **new** | constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55); arrow switch is the typical use site (#36). |
+| `enum` declaration | **new** | optional `implements` clause (`super_interfaces`, as on classes); constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55). A member may also follow a trailing `,` directly, which Groovy accepts up to 4.x and Groovy 5 rejects (#88). This grammar takes a narrower set than Groovy there: a member that starts with a modifier, `def` or a declaration keyword, with annotations before it allowed; a constructor needs an access modifier. A member that starts with a bare name is not accepted: `A,` then `String x` or `E() { }` is an `ERROR`, the second because it reads as a constant with an anonymous class body (`docs/divergences-from-spec.md` §13). Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
-| Multi-assignment | **new** | `def (a, b) = expr` and `(a, b) = expr`. Closes murtaza64 #22. |
-| Local variable declaration | port from both | including `def` and explicit types |
-| Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`. |
+| Multi-assignment | **new** | `def (a, b) = expr`. Closes murtaza64 #22. The form without `def`, `(a, b) = expr`, is not implemented and is an `ERROR` (#94). |
+| Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. |
+| Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
 | `while` / `do-while` | port | |
+| `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`) or a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | |
 | `switch` with `case … :` | port | |
 | `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). |
 | `try` / `catch` / `finally` | port | |
-| Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. |
-| Try-with-resources | **new** | `try (Foo f = …) { … }`. |
+| Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. A catch parameter takes `final` and `def`, `var` or a type. |
+| Try-with-resources | **new** | `try (Foo f = …) { … }`; a resource takes `final` and `def`, `var` or a type. |
 | `return`, `break`, `continue`, `yield` | port | break/continue accept an optional label. |
 | `throw` | port | |
 | `assert e` and `assert e : msg` | port from murtaza64 | power-assertion shape. |
@@ -411,7 +414,7 @@ fix relative to *both* parent grammars.
 | `pipeline { … }` followed by anything | port + fix | Promote `pipeline` to a regular statement, drop `optional($.pipeline)`-at-EOF. Closes #37. |
 | Annotation usage `@Foo(args)` | port | including `@Foo` and `@Foo.Bar(x = 1)`. |
 | Shebang line | port from amaanq | `#! …\n` at start of file. |
-| Line comment `// …` | port | |
+| Line comment `// …` | port | Ends before `\n` or `\r`, so a lone CR ends the line as it does for Groovy's lexer, and in a CRLF file the `\r` is not part of the comment. |
 | Block comment `/* … */` | **fixed** | Single `block_comment` token. Must accept `/**/` and `/***/`. Closes murtaza64 #16. |
 | Groovydoc `/** … */` | port from murtaza64 (but tokenised) | Single `groovydoc_comment` token; tag parsing is out of scope per §1.2(1). |
 
@@ -441,6 +444,18 @@ type_suffix      = one-of  G g L l I i D d F f
   pure suffix.
 
 ### 5.2 Identifiers and reserved-but-contextual words
+
+An identifier starts with a character of the Unicode general
+categories L, Nl, Sc or Pc, and continues with those or Nd, Mn or Mc.
+That is the rule of Groovy's lexer (`GroovyLexer.g4` `JavaLetter` and
+`JavaLetterOrDigit`): Java's `isJavaIdentifierStart` and
+`isJavaIdentifierPart`, without the identifier-ignorable characters.
+`$` is in Sc and `_` in Pc, so non-ASCII names such as `名前`, `café`
+and `€uro` are identifiers, and `a·b` (a middle dot, Po) is not. The
+Unicode `XID_*` classes differ from this rule in both directions and
+are not used. `grammar.js` writes the ASCII characters out before the
+classes (`identifierPattern`); that is for lexer speed and does not
+change the set.
 
 Groovy's keyword set, derived from `apache/groovy:GroovyLexer.g4`
 lines 400–501, splits into three groups:
@@ -609,7 +624,9 @@ escape sequences, and interpolation segments. Two interpolation
 forms:
 
 - `$identifier` — followed by an immediate identifier (with optional
-  dotted property access, no method call).
+  dotted property access, no method call). The identifier follows
+  §5.2, without `$`, so `"値は$名前です"` interpolates `名前です`, as
+  in Groovy.
 - `${ expression }` — full expression, recursively parsed.
 
 Grammar:
@@ -663,6 +680,13 @@ Consumes characters until:
     are included in the body fragment, not treated as a close.
 ```
 
+The implementation is in-grammar (`_triple_gstring_text`). One or two
+quotes join the text fragment when an ordinary character or an escape
+follows them. Directly before a `$` each quote is a `string_fragment`
+of its own, so that the `$` is left for the interpolation:
+`"""say "$name"""` holds two fragments, the text before the quote and
+the quote itself, and then the interpolation.
+
 **Dollar-slashy edge cases** (from murtaza64's `string.test`):
 
 ```groovy
@@ -703,13 +727,27 @@ Escape rules:
 ### 5.8 Closure parameters and the `it` shorthand
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
-binds `it`. The grammar rule:
+binds `it`. A parameter has the shape of a method parameter, as in
+Apache's grammar (`formalParameterList`): annotations, `final`, then
+`def`, `var` or a type (varargs included), the name, and a default
+(`{ String sep = ',', def xs -> … }`). `grammar.js` builds
+`formal_parameter` and `closure_parameter` from one helper,
+`parameter()`. `def` and `var` are keywords there, so such a parameter
+has no `type`. Apache's `variableModifiersOpt` allows more than this
+order; `docs/divergences-from-spec.md` §14 lists what is not accepted.
+Until the `->`, the parameter list and a body that opens with a
+declaration or an assignment (`{ a = 1 }`) parse side by side. The
+grammar rule:
 
 ```js
 closure: $ => seq('{',
-  optional(seq($._closure_parameters, '->')),
-  repeat($.statement),
-  '}')
+  optional($.closure_parameters),
+  repeat(choice($._statement, ';')),
+  '}'),
+
+closure_parameters: $ => seq(
+  optional(seq($.closure_parameter, repeat(seq(',', $.closure_parameter)))),
+  '->'),
 ```
 
 We do **not** emit a synthetic `it` parameter. Downstream tools that
@@ -799,8 +837,11 @@ alternative for `seq('*', $.expression)` inside `argument_list`.
 `def` can prefix:
 
 - a local variable declaration (`def x = …`),
+- a field (`def x` in a class or enum body),
 - a method definition (`def f() { … }`),
-- a closure parameter (`{ def x -> … }`),
+- a method or closure parameter (`def f(def x)`, `{ def x -> … }`),
+- a `for`-in variable, a `catch` parameter and a `try` resource
+  (`for (def x in xs)`, `catch (def e)`, `try (def r = open())`),
 - a multi-assignment (`def (a, b) = …`).
 
 The grammar uses `def` as a token in each rule rather than as a
@@ -810,9 +851,10 @@ slot before `def`; a variable declaration does not).
 
 ### 5.13 Trailing commas
 
-Lists, maps, argument lists, parameter lists, enum constants — all
-accept an optional trailing comma. Use `commaSep1` + `optional(',')`
-in every list rule.
+Lists, maps, argument lists and enum constants accept an optional
+trailing comma. Parameter lists do not, as in Apache's
+`formalParameterList`: `def m(a, b,) { }` is an error. Each list rule
+spells the comma handling out; there is no shared helper.
 
 ### 5.14 Method reference `::`
 
@@ -832,8 +874,11 @@ Conflicts with C++ `::`-scoped names are not relevant in Groovy.
 `(String) x` — C-style cast. Distinct from `x as String`. Grammar:
 
 ```js
-parenthesized_type_cast: $ => prec.right(PREC.UNARY, seq(
-  '(', $._type, ')', $.expression))
+parenthesized_type_cast: $ => choice(
+  prec.dynamic(1, prec.right(PREC.UNARY, seq(
+    '(', $._type, alias($._cast_close, ')'), $._expression))),
+  prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+    '(', $._type, ')', $._expression))))
 ```
 
 Ambiguity with parenthesized expression: `(a) b` could be a cast
@@ -841,6 +886,29 @@ Ambiguity with parenthesized expression: `(a) b` could be a cast
 GLR: if `a` matches `_type`, prefer the cast; otherwise it's a
 parenthesized expression followed by a juxt-call (which is a
 syntax error in expression position, by §5.5).
+
+Two rules settle it, both from Apache's
+`castParExpression castOperandExpression`:
+
+- On one line the cast wins wherever it parses, as the cast
+  alternative comes first in Apache's `expression`: `(a) + b`,
+  `(a) [0]` and `(a) (b)` are casts, `(a) * b` and `(a).size()` are
+  not. The first alternative carries this: it closes with the scanner
+  token `CAST_CLOSE` (§6.11), a `)` with something after it on its
+  line, and has a positive dynamic precedence.
+- The rule has no `nls` between its two parts, so where a line break
+  can end a statement the operand is on the line of the `)`: `x = (a)`
+  followed by `foo()` on the next line is two statements. The second
+  alternative carries this: a cast whose operand is on a later line
+  has a negative dynamic precedence and loses to any other complete
+  reading. Inside `(…)` and `[…]` Groovy ignores line breaks and reads
+  a cast. Here the cast stands there when no other reading parses
+  (`foo((String)` followed by `x)`), and loses when the later line can
+  also continue the expression (`foo((a)` followed by `- b)` is a
+  subtraction); see `docs/divergences-from-spec.md` §15.
+
+Without the two weights the readings were unranked and the result
+depended on the surrounding code.
 
 ---
 
@@ -852,7 +920,8 @@ grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 keyword (§6.7), the named-argument key of a parenthesis-free call
-(§6.8), the same-line subscript opener (§6.9), `STRING_BODY` (§6.10),
+(§6.8), the same-line subscript opener (§6.9), the `)` of a cast
+(§6.11), the `!in` operator (§6.12), `STRING_BODY` (§6.10),
 which is never emitted and only marks a string body, and
 `ERROR_SENTINEL`, which no rule references and which only signals
 error recovery; the other tokens listed here are met in-grammar, see
@@ -874,8 +943,10 @@ enum TokenType {
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
-  COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
+  COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  CAST_CLOSE,             // §6.11 — `)` with something after it on its line
+  NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
@@ -926,7 +997,8 @@ After a `"` or `"""` is consumed in the grammar:
     - matching `"` (or `"""`) → emit BODY (possibly empty), return
     - `\\` followed by any char → consumed as escape
     - `$` followed by `{` → emit BODY, return (caller matches `${`)
-    - `$` followed by `[A-Za-z_]` → emit BODY, return
+    - `$` followed by an identifier start (§5.2, without `$`) → emit
+      BODY, return
     - `\n` is allowed in triple-quoted variants; not in single
       double-quoted (emit ERROR, let grammar handle).
 ```
@@ -1000,13 +1072,14 @@ those identifier uses begin. The scanner makes the choice instead.
 ```text
 Emit RECORD_KEYWORD when, from the current position:
   - the next six characters are `record`, and the character after
-    them is not an identifier character ([A-Za-z0-9_$]); then
+    them is not an identifier character (as below); then
   - at least one of: spaces, tabs, line escapes (§5.10), block
     comments — but no line break and no line comment, because
     `classDeclaration` in GroovyParser.g4 has no `nls` between RECORD
     and the name; then
-  - an identifier ([A-Za-z_$][A-Za-z0-9_$]*, the grammar's own
-    class); then either
+  - a name (§5.2, but with every non-ASCII code point counted as an
+    identifier character; the in-grammar lexer reads the real name
+    afterwards, see §6.8); then either
   - `<` immediately (type parameters; the grammar's `type_parameters`
     opener is `token.immediate` as well), or
   - any mix of spaces, tabs, line escapes, line breaks, block and
@@ -1045,16 +1118,34 @@ Known residuals:
 ### 6.8 COMMAND_NAMED_KEY — implementation contract
 
 Emitted only where a command chain argument may start, and never during
-error recovery (`ERROR_SENTINEL` valid). Skips spaces, tabs and line
-escapes (§5.10) but not newlines, consumes an identifier, marks the
-token end, then looks ahead past the same whitespace for a single `:`
-(a following second `:` means a method reference, so no emit). `case` and `default` are rejected so a
-switch label after a statement on the same line stays a label.
+error recovery (`ERROR_SENTINEL` valid). The token is empty: it says
+that a key starts here, and the in-grammar lexer then reads the key as
+an ordinary `identifier`. The scanner skips spaces, tabs and line
+escapes (§5.10) but not newlines, marks the token end, then looks ahead
+over a name and the same whitespace for a single `:` (a following
+second `:` means a method reference, so no emit). `case` and `default`
+are rejected so a switch label after a statement on the same line stays
+a label.
 
-Keeping the key scanner-side gives the parser a distinct lookahead token,
-so `Type name = …` stays a declaration without a precedence change, and a
-bare statement followed by a label on the next line (Spock's `where:`)
-stays two statements.
+The scanner has no Unicode tables, so its look-ahead counts every
+non-ASCII code point as part of the name. That is wider than §5.2, and
+it is safe because the scanner does not emit the name. On valid input
+the two agree, since outside strings and comments a non-ASCII character
+can only be part of a name. On other input (`foo a` + U+00A0 + `: 1`)
+the lexer reads a shorter name and the parse fails there. The scanner
+used to emit the key itself, with an ASCII-only class. Once #82 made
+non-ASCII names identifiers, `foo 名前: 1` parsed with no `ERROR` as a
+statement and a label.
+
+Keeping the decision scanner-side gives the parser a distinct lookahead
+token, so `Type name = …` stays a declaration without a precedence
+change, and a bare statement followed by a label on the next line
+(Spock's `where:`) stays two statements. A keyword is a valid key:
+after the empty token it has no parse action, so it lexes as an
+identifier, and the key position reserves no word, which covers `new`.
+An empty external token is ignored by the tree-sitter runtime directly
+after a parse error, so a key there is not recognized until the parser
+has shifted another token.
 
 After a comma the statement cannot end, so a key on a continuation line
 (`sh script: 'make',` then `returnStdout: true`) is matched in the grammar
@@ -1148,9 +1239,66 @@ valid, so a comment there is still a comment. During error recovery
 every external is valid and the check is skipped, as for the other
 context-sensitive tokens.
 
+### 6.11 CAST_CLOSE — implementation contract
+
+`castParExpression castOperandExpression` in GroovyParser.g4 has no
+`nls` between the two, so where a line break can end a statement,
+`x = (a)` followed by `foo()` on the next line is two statements.
+Newlines are `extras` here, so the grammar alone read that input as a
+cast of `foo()`, with no `ERROR`. The token tells the parser whether
+the operand of a possible cast is on the line of its `)`.
+
+```text
+Emit CAST_CLOSE for a `)` when, after it:
+  - any spaces, tabs, line escapes (§5.10) and block comments that
+    close on the same line are skipped, and
+  - the next character is not a line break, not the end of the input,
+    and not the `//` of a line comment.
+A block comment that runs past the end of the line counts as something
+on the line: Groovy's lexer drops the comment with its line breaks, and
+reading on would scan an unterminated comment to the end of the input.
+On any other input return false; the in-grammar lexer then reads `)`.
+```
+
+`parenthesized_type_cast` and `parenthesized_expression` both close
+with this token or with a plain `)`, so `(a) * b`, `((a))` and
+`foo((a), b)` stay open to both readings until the next token decides.
+The token only sets the rank of the cast (§5.15): above a
+parenthesized expression when it closes with the token, below one
+when it closes with a plain `)`. It cannot forbid the second form,
+because inside `(…)` and `[…]` a line break does not end anything and
+the scanner does not know which brackets enclose it. The token is
+aliased to `)` and the tree is the same either way. It is not emitted
+during error recovery.
+
+### 6.12 NOT_IN — implementation contract
+
+GroovyLexer.g4 has
+`NOT_IN: '!in' { isFollowedBy(_input, ' ', '\t', '\r', '\n', '[', '(', '{') }?`,
+so `a !in xs` uses the operator and `!inside` is `!` applied to a
+name.
+
+```text
+Emit NOT_IN for the three characters `!in` when the character after
+them is a space, a tab, a line break, `[`, `(` or `{`. That character
+is read and not consumed.
+On any other input return false; the in-grammar lexer then reads `!`.
+```
+
+The in-grammar form of this token was a regex that had to include the
+character after `!in`. With a `[` or `(` inside the operator,
+`a !in[1, 2]` and `a !in(b)` were an `ERROR`. The token is aliased to
+`!in`. It is not emitted during error recovery.
+
 ---
 
 ## 7. Tree-sitter conflict declarations
+
+This list was written before the grammar and is kept as a record of
+the design. None of its entries was needed. The conflicts the grammar
+declares are the `conflicts` array in `grammar.js`, where each entry
+has a comment; `docs/divergences-from-spec.md` §1 says why the two
+differ.
 
 The expected `conflicts` list, in order of root cause:
 
@@ -1336,9 +1484,9 @@ Other per-operator corpus files mandated:
   paired with `def y = (Set) list` to keep cast vs. coercion distinct)
 - `operators-method-pointer.txt` (.&)
 - `operators-direct-field.txt` (.@)
-- `operators-safe-index.txt` (?[])
+- `operators-subscript.txt` ([], ?[])
 - `operators-method-reference.txt` (::)
-- `operators-elvis-assign.txt` (?=)
+- `operators-assignment.txt` (=, the augmented forms, ?=)
 - `operators-implication.txt` (==>)
 - `operators-power.txt` (** including `2 ** 3 ** 2` right-assoc test)
 - `operators-safe-chain-dot.txt` (??.) — Groovy 4+; v2 addition
@@ -1655,11 +1803,11 @@ generate` and committed; the C scanner is hand-authored.
   upstream `tree-sitter` types (fixes murtaza64 #38).
 - `bindings/python/`: `pyproject.toml` + `setup.py` for
   `tree-sitter-groovy` PyPI package.
-- `bindings/rust/`: a `lib.rs` exposing `language()` and a
-  `tree-sitter-groovy` crate published on crates.io. Cargo features:
-  default builds with cc; `prebuilt` feature for binary distribution.
+- `bindings/rust/`: a `lib.rs` exposing the `LANGUAGE` constant, in
+  the `dekobon-tree-sitter-groovy` crate published on crates.io. It
+  builds with `cc` and has no Cargo features.
   **This is the integration target for `dekobon/big-code-analysis`.**
-- `bindings/go/`: a Go module exposing `GetLanguage()`.
+- `bindings/go/`: a Go module exposing `Language()`.
 - `bindings/swift/`: `Package.swift` for SwiftPM consumers.
 
 `tree-sitter.json` declares grammar metadata for editor integration
@@ -1678,10 +1826,10 @@ per the tree-sitter CLI's expected schema (file types `.groovy`,
 - v0.2.0 — Groovy 4 record/sealed support (already in §4; promoted
   to GA when Groovy 4's spec stabilises for both).
 
-semver: tree-sitter grammars are still finding their semver
-conventions; we follow `tree-sitter-java`'s: MINOR for grammar shape
-changes (different S-expressions for existing source), PATCH for
-additive node-types and bug fixes that don't change existing trees.
+semver: the rules are in `AGENTS.md` ("Semantic Versioning") and are
+not repeated here. In short, a change to the tree of input that parsed
+is breaking, a new rule, field or capture is additive, and a fix that
+changes no existing tree is a patch.
 
 The `dekobon/big-code-analysis` pin (currently
 `tree-sitter-groovy = "=0.1.2"` from amaanq) will be moved to this

@@ -1,19 +1,24 @@
 /**
  * @file Apache Groovy grammar for tree-sitter
  * @author Elijah Zupancic <elijah@zupancic.name>
- * @license MIT
+ * @license Apache-2.0 OR MIT
  *
  * The authoritative design document for this grammar is
  * SPECIFICATION.md at the repository root. Every rule below maps to
  * a section there. Read the spec before making non-trivial changes.
  *
- * The external scanner (src/scanner.c) handles three context-sensitive
+ * The external scanner (src/scanner.c) handles the context-sensitive
  * lexing situations that pure grammar rules cannot disambiguate:
  *   - Slashy-string-start vs. division
  *   - Line / block / Groovydoc comment single-token emit
  *   - The contextual `record` keyword, emitted only before a record
  *     header so the word stays an identifier everywhere else
- * See SPECIFICATION.md §6.
+ *   - Three decisions that depend on what shares a line: the key of
+ *     a named argument in a parenthesis-free call, a subscript `[`,
+ *     and the `)` of a cast
+ *   - The `!in` operator, which depends on the character after it
+ * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
+ * the `externals` list below.
  */
 
 /// <reference types="tree-sitter-cli/dsl" />
@@ -54,6 +59,41 @@ const PREC = {
 };
 /* eslint-enable no-multi-spaces */
 
+/*
+ * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
+ * `JavaLetterOrDigit`: Java's `Character.isJavaIdentifierStart` and
+ * `isJavaIdentifierPart` without the identifier-ignorable characters.
+ * In Unicode general categories that is L, Nl, Sc and Pc to start a
+ * name, and Nd, Mn and Mc as well to continue it. `$` is in Sc and
+ * `_` is in Pc.
+ */
+const ID_START = String.raw`\p{L}\p{Nl}\p{Sc}\p{Pc}`;
+const ID_PART = ID_START + String.raw`\p{Nd}\p{Mn}\p{Mc}`;
+
+/**
+ * The source of an identifier pattern, in Rust regex syntax.
+ *
+ * The ASCII characters are spelled out and come first, so that the
+ * lexer has a state that loops on them with plain comparisons. The
+ * Unicode classes compile to a binary search over several hundred
+ * ranges; written as one class, every character of every ASCII name
+ * went through that search, which made the lexer about 2.5 times
+ * slower per identifier character.
+ *
+ * @param {boolean} dollar Whether `$` is an identifier character. It
+ *   is not in a GString `$name` path (GroovyLexer.g4
+ *   `IdentifierInGString`).
+ * @returns {string} The pattern source.
+ */
+function identifierPattern(dollar) {
+  const asciiStart = dollar ? 'A-Za-z_$' : 'A-Za-z_';
+  const asciiPart = asciiStart + '0-9';
+  const otherStart = String.raw`[${ID_START}--[\x00-\x7F]]`;
+  const otherPart = String.raw`[${ID_PART}--[\x00-\x7F]]`;
+  const anyPart = `[${asciiPart}${otherPart}]`;
+  return `(?:[${asciiStart}][${asciiPart}]*(?:${otherPart}${anyPart}*)?|${otherStart}${anyPart}*)`;
+}
+
 /**
  * GString body segment choice shared between `"..."` and `"""..."""`.
  * The text rule differs (single-quoted bans newlines, triple-quoted
@@ -77,11 +117,108 @@ function gstringPart($, textRule) {
   );
 }
 
+/**
+ * The members of a type body, listed once. `enum_body` repeats the
+ * list for the member directly after a trailing comma, where a plain
+ * constructor is not allowed (see `enum_declaration`), and the two
+ * lists must not drift apart.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral | null} constructor The constructor rule for
+ *   this position, or null where a constructor cannot appear.
+ * @returns {RuleOrLiteral[]} The member rules, in a fixed order.
+ */
+function classMembers($, constructor) {
+  return [
+    $.method_declaration,
+    $.field_declaration,
+    ...(constructor ? [constructor] : []),
+    $.static_initializer,
+    $.enum_declaration,
+    $.class_declaration,
+    $.interface_declaration,
+    $.trait_declaration,
+    $.record_declaration,
+    $.annotation_type_declaration,
+  ];
+}
+
+/**
+ * A constructor. The enum position directly after a trailing comma
+ * requires an access modifier (see `enum_declaration`); everywhere
+ * else any modifiers are optional.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} modifiers The modifier list for this position.
+ * @returns {PrecRightRule} The constructor rule body.
+ */
+function constructorDeclaration($, modifiers) {
+  return prec.right(3, seq(
+    repeat($.annotation),
+    modifiers,
+    field('name', $.identifier),
+    field('parameters', $.formal_parameters),
+    optional($.throws_clause),
+    field('body', $.block),
+  ));
+}
+
+/**
+ * A method parameter or a closure parameter. Apache's `closure` takes
+ * the `formalParameterList` of a method, so the two have one shape:
+ * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
+ * included), the name, and a default value.
+ *
+ * Apache's `variableModifiersOpt` is wider: annotations and modifiers
+ * in any order, `def` or `var` together with a type, and `...` with no
+ * type. Those are not accepted (divergence 14).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The parameter rule body.
+ */
+function parameter($) {
+  const defaultValue = optional(seq('=', field('default', $._expression)));
+  return choice(
+    seq(
+      repeat($.annotation),
+      optional('final'),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
+          field('name', $.identifier),
+        ),
+        // `var` is a contextual keyword and a valid name: `def f(var)`.
+        // With no name after it, it is the name.
+        field('name', alias('var', $.identifier)),
+      ),
+      defaultValue,
+    ),
+    // `_` is a literal directly after an annotation where a statement
+    // can start (see `_placeholder_declarator`), and an annotated
+    // closure parameter starts there too: `{ @A _ -> }`, or with `_`
+    // as the type, `{ @A _ x -> }`. Anywhere else in a parameter `_`
+    // is an ordinary identifier.
+    seq(
+      repeat1($.annotation),
+      choice(
+        field('name', alias('_', $.identifier)),
+        seq(
+          field('type', alias('_', $.type_identifier)),
+          field('name', $.identifier),
+        ),
+      ),
+      defaultValue,
+    ),
+  );
+}
+
 module.exports = grammar({
   name: 'groovy',
 
-  // Placeholder for the real implementation. SPECIFICATION.md §3-§7
-  // is the contract this rule set will fulfil.
+  // Keywords are extracted from this token. A keyword is lexed as
+  // such only in a state where it has a parse action, or where it is
+  // reserved (`reserved` below); anywhere else the same text is an
+  // `identifier`. Several comments in this file depend on that.
   word: $ => $.identifier,
 
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
@@ -130,15 +267,24 @@ module.exports = grammar({
     $.block_comment,
     $.groovydoc_comment,
     $._record_keyword,
-    // §5.5 — `name:` key of a named argument in a parenthesis-free call.
-    // Scanner-side so the newline before a Spock label (`result` then
-    // `where:`) is not swallowed, and so `Type name =` stays a declaration.
+    // §5.5 — empty token before the `name:` key of a named argument in
+    // a parenthesis-free call. Scanner-side so the newline before a Spock
+    // label (`result` then `where:`) is not swallowed, and so
+    // `Type name =` stays a declaration.
     $._command_named_key,
     // §5.10 — `[` on the same line as the token before it (spaces, tabs and
     // line escapes allowed). A `[` after a newline isn't one and can only
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
+    // §6.11 — a `)` with something after it on the same line. A cast
+    // that closes with it outranks a parenthesized expression; a cast
+    // whose operand is on a later line ranks below one, so `x = (a)`
+    // followed by `foo()` is two statements.
+    $._cast_close,
+    // §6.12 — the `!in` operator, which needs whitespace or an opening
+    // bracket after it. The scanner reads that character and leaves it.
+    $._not_in,
     // §6.10 — never emitted: valid only between the quotes of a string
     // whose body is lexed in pieces. Comments are extras, so the parser
     // offers them there too; the scanner must emit nothing, or `//` and
@@ -152,7 +298,8 @@ module.exports = grammar({
   conflicts: $ => [
     // `final def x` / `final x = 1` in a block vs. a modified member at top level.
     [$._modifier, $.local_variable_declaration],
-    // See SPECIFICATION.md §7. Populated as rules accumulate.
+    // This array is the authoritative list; SPECIFICATION.md §7 is
+    // the list predicted before the grammar existed.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
     //  always disambiguates within one token of lookahead.)
@@ -211,6 +358,39 @@ module.exports = grammar({
     // tree-sitter report it unnecessary. Regenerate without it to
     // confirm that still holds.
     [$.formal_parameter, $._expression],
+    // §4 — after an enum's trailing comma, `private` may open a
+    // constructor (`private E() { }`) or any other member.
+    [$._modifier, $._modified_constructor_declaration],
+    // §5.8 — a closure's parameter list and a closure body that opens
+    // with a declaration share their first tokens, and so does a
+    // block, whose `{` may also open a closure. The `->` decides, or
+    // the first token that only one reading accepts.
+    //
+    // `{ final x -> }` vs. a body opening with a final local (#56) or
+    // with a modified declaration; all three stay alive at `final`.
+    [$._modifier, $.local_variable_declaration, $.closure_parameter],
+    // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
+    // `{ def a, b -> }` vs. `{ def a, b }`. These two fork at every
+    // `,` of a declaration that opens a closure or block, and both
+    // stacks run to the end of the list: 15% to 60% more work for a
+    // list of two to eight names, about twice for a long one. A list
+    // of one name does not fork.
+    [$._initialized_declarator, $.closure_parameter],
+    [$.variable_declarator, $.closure_parameter],
+    // `{ @A _ x -> }`, a parameter of type `_`, vs. `{ @A _` as the
+    // declaration of the placeholder followed by a statement `x`.
+    [$._placeholder_declarator, $.closure_parameter],
+    // An untyped default, `{ a = 1 -> }` vs. `{ a = 1 }`, needs no
+    // entry: see `expression_statement`.
+    //
+    // Two things keep these forks from changing a valid parse, and a
+    // new rule must keep both. `closure_parameter` carries no dynamic
+    // precedence, so a reading that survives to the `->` wins by being
+    // the only one left. And `->` appears nowhere at the top level of
+    // a closure body: only in `closure_parameters` and in the arrow
+    // forms of `switch`. On invalid input the parameter reading can
+    // win, because a missing `->` is a cheaper repair than an ERROR:
+    // `{ x = 1, y }` recovers as two parameters.
   ],
 
   rules: {
@@ -245,6 +425,7 @@ module.exports = grammar({
       $.assert_statement,
       $.yield_statement,
       $.try_statement,
+      $.synchronized_statement,
       $.class_declaration,
       $.trait_declaration,
       $.interface_declaration,
@@ -283,12 +464,17 @@ module.exports = grammar({
 
     // §5.5 item 3 — named arguments in a parenthesis-free call:
     // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
-    // GORM's `name blank: false, size: 1..100`. The key is an identifier
-    // lexed by the external scanner only when `:` follows on the same
-    // line, so `Type name = …` and a bare statement followed by a Spock
-    // label on the next line are unaffected.
+    // GORM's `name blank: false, size: 1..100`. `_command_named_key`
+    // is an empty token that the external scanner emits before a name
+    // only when `:` follows it on the same line, so `Type name = …` and
+    // a bare statement followed by a Spock label on the next line are
+    // unaffected. The name itself is an ordinary `identifier`. A
+    // keyword is a valid key (Apache `namedArgLabel`): it has no
+    // action after the empty token, so it lexes as an identifier, and
+    // the empty `property` set does the same for the reserved `new`.
     _command_named_argument: $ => seq(
-      field('key', alias($._command_named_key, $.identifier)),
+      $._command_named_key,
+      field('key', reserved('property', $.identifier)),
       ':',
       field('value', $._expression),
     ),
@@ -319,8 +505,8 @@ module.exports = grammar({
     // `identifier`; the `:` decides. A scanner-token form
     // (`_label_colon`) was attempted but interacted with
     // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
-    // which now lex their key through `_command_named_key` instead;
-    // see divergence #5.
+    // which now have their key decided by `_command_named_key`
+    // instead; see the §6.5 row in `docs/divergences-from-spec.md`.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',
@@ -446,14 +632,23 @@ module.exports = grammar({
     // §4 — try / catch / finally. At least one of catch/finally is
     // required per Java/Groovy semantics; the grammar relaxes that
     // to allow a bare `try { … }` and lets downstream tooling
-    // surface the error if needed. Try-with-resources lands later
-    // with local variable declarations.
+    // surface the error if needed.
     try_statement: $ => seq(
       'try',
       optional(field('resources', $.resource_specification)),
       field('body', $.block),
       repeat($.catch_clause),
       optional($.finally_clause),
+    ),
+
+    // §4 — `synchronized (lock) { … }` (Apache `#synchronizedStmtAlt`).
+    // The body must be a block.
+    synchronized_statement: $ => seq(
+      'synchronized',
+      '(',
+      field('lock', $._expression),
+      ')',
+      field('body', $.block),
     ),
 
     // §4 — `try (Foo f = expr; Bar b = expr) { … }`. Resources
@@ -469,8 +664,15 @@ module.exports = grammar({
     ),
 
     resource: $ => seq(
-      optional(field('type', $._type)),
-      field('name', $.identifier),
+      optional('final'),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', $._type))),
+          field('name', $.identifier),
+        ),
+        // `var` alone is the name: `try (var = open())`.
+        field('name', alias('var', $.identifier)),
+      ),
       '=',
       field('value', $._expression),
     ),
@@ -488,8 +690,15 @@ module.exports = grammar({
     // murtaza64 #39. The type itself is optional — Groovy allows a
     // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
-      optional(field('type', choice($._type, $.multi_type))),
-      field('name', $.identifier),
+      optional('final'),
+      choice(
+        seq(
+          optional(choice('def', 'var', field('type', choice($._type, $.multi_type)))),
+          field('name', $.identifier),
+        ),
+        // `var` alone is the name: `catch (var)`.
+        field('name', alias('var', $.identifier)),
+      ),
     ),
 
     multi_type: $ => seq(
@@ -585,9 +794,10 @@ module.exports = grammar({
       repeat(seq(',', $._type)),
     ),
 
-    // §4 — Java-style modifiers. Each one is a hard reserved
-    // keyword (§5.2) so the `word: $.identifier` directive keeps
-    // them from accidentally being treated as identifiers.
+    // §4 — Java-style modifiers. Each one is a hard reserved keyword
+    // in Groovy (§5.2). Here it is a keyword only where a modifier can
+    // stand; anywhere else the word lexes as an identifier, and input
+    // such as `foo(private)` parses with no ERROR (#93).
     _modifier: _ => choice(
       'public',
       'private',
@@ -630,7 +840,7 @@ module.exports = grammar({
     // a no-op member. `;` is anonymous, so it never appears in the AST.
     //
     // A bare `block` is an instance initializer. It sits in the member
-    // repeat — here and in the three identical repeats of `enum_body` —
+    // repeat — here and in the four identical repeats of `enum_body` —
     // rather than in `_class_member`, because `enum_body` also places
     // a lone `_class_member` directly after its constants. A block in
     // that slot is an LR conflict on `A() {` (constructor, or constant
@@ -660,18 +870,7 @@ module.exports = grammar({
     // is already a complete field (`private boolean sealed` is an
     // ERROR; `boolean sealed` is not). See divergence 12. No
     // `conflicts` entry is needed.
-    _class_member: $ => choice(
-      $.method_declaration,
-      $.field_declaration,
-      $.constructor_declaration,
-      $.static_initializer,
-      $.enum_declaration,
-      $.class_declaration,
-      $.interface_declaration,
-      $.trait_declaration,
-      $.record_declaration,
-      $.annotation_type_declaration,
-    ),
+    _class_member: $ => choice(...classMembers($, $.constructor_declaration)),
 
     // §4 — constructors share the method_declaration shape but have
     // no return type and the name matches the enclosing class. We
@@ -680,13 +879,16 @@ module.exports = grammar({
     // tell constructors apart from methods. `prec(3, …)` wins over
     // both field and method when the identifier is followed by `(`
     // and no return type precedes it.
-    constructor_declaration: $ => prec.right(3, seq(
-      repeat($.annotation),
-      repeat($._modifier),
-      field('name', $.identifier),
-      field('parameters', $.formal_parameters),
-      optional($.throws_clause),
-      field('body', $.block),
+    constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
+
+    // The constructor form for the member directly after an enum's
+    // trailing comma (see `enum_declaration`). Only access modifiers
+    // qualify: `static f() { }` there is a method. The weight is above
+    // a method with a body, which matches the same text through its
+    // modifier-only form.
+    _modified_constructor_declaration: $ => prec.dynamic(4, constructorDeclaration(
+      $,
+      repeat1(choice('public', 'private', 'protected')),
     )),
 
     // §4 — `static { … }` class-body initializer block. Runs once
@@ -734,12 +936,11 @@ module.exports = grammar({
       )),
     ),
 
-    // §4 — `def name(params) body`. Typed return type (`String foo()
-    // { … }`) lands once we can disambiguate from local variable
-    // declaration. Modifiers and throws clause similarly defer.
-    // prec(1) wins over local_variable_declaration when `(` follows
-    // the name, so `def f() { … }` at script-top-level parses as a
-    // method rather than a `def f` variable followed by `(…) { … }`.
+    // §4 — `def name(params) body`, or a return type in place of
+    // `def`, with modifiers and a throws clause. The static precedence
+    // wins over local_variable_declaration when `(` follows the name,
+    // so `def f() { … }` at script-top-level parses as a method
+    // rather than a `def f` variable followed by `(…) { … }`.
     // Modifiers alone (no `def`, no return type) also introduce a
     // method outside a class body: `final f() { }`. In a class body
     // that shape stays a constructor_declaration.
@@ -812,15 +1013,11 @@ module.exports = grammar({
     // `@PathVariable`, `@RequestBody`, JPA's `@Param`, … — ubiquitous
     // on framework-facing methods), optional type, optional varargs
     // marker (`Type... name`), and optional default value
-    // (`name = expr`).
-    // `final` is the only modifier accepted here.
-    formal_parameter: $ => seq(
-      repeat($.annotation),
-      optional('final'),
-      optional(field('type', choice($._type, $.varargs_type))),
-      field('name', $.identifier),
-      optional(seq('=', field('default', $._expression))),
-    ),
+    // (`name = expr`). `final` is the only modifier accepted here.
+    // `def` and `var` stand in place of the type and are keywords, so
+    // `def f(def a)` has no `type`. The shape is `parameter()`, shared
+    // with `closure_parameter`.
+    formal_parameter: $ => parameter($),
 
     varargs_type: $ => seq($._type, '...'),
 
@@ -833,9 +1030,30 @@ module.exports = grammar({
     // members follow after `;`, `,;`, or nothing at all — Groovy's
     // own parser treats the newline as the separator (GROOVY-7773,
     // GROOVY-9306), and newlines are extras here, so the member
-    // simply follows the last constant. `A,` directly before a
-    // member is rejected, as in Groovy. With no constants the body
+    // simply follows the last constant. With no constants the body
     // is an ordinary member list.
+    //
+    // Groovy up to 4.x also accepts a member directly after a trailing
+    // `,` (`A, B,\n private int x`): GroovyParser.g4 on those branches
+    // has `enumConstants (nls COMMA)? sep?` before the member list.
+    // Groovy 5 requires a `;`. Without this alternative the modifier
+    // had no action after the `,`, lexed as an identifier, and became
+    // a constant named `private` with no ERROR.
+    //
+    // The alternative is narrower than Groovy, which takes any member
+    // there (divergence 13). `prec(1)` on `enum_constant` keeps a bare
+    // identifier after the `,` a constant, so the member has to start
+    // with something that cannot be one: a modifier, `def`, a
+    // declaration keyword, or an annotation followed by one of those.
+    // `A,\n String x` is an ERROR, and so is an instance initializer.
+    // A constructor needs an access modifier. `B(x) { … }` after a
+    // `,`, with or without annotations, reads as a constant with an
+    // anonymous class body (unsupported, so an ERROR). With an access
+    // modifier it cannot be a constant, and with no constructor form
+    // here `private B(x) { }` parsed, with no ERROR, as a method named
+    // `B`: the modifier-only form of `method_declaration` took it.
+    // Other modifiers do not make a constructor, so `static f() { }`
+    // is a method.
     //
     // An instance initializer (`block`) is accepted wherever the
     // member list repeats — after `;`, after a first member, or with
@@ -844,9 +1062,9 @@ module.exports = grammar({
     // initializer) cannot be told from `A { … }` (a constant with an
     // anonymous class body, unsupported); both stay errors.
     //
-    // The three member repeats are spelled out, and must stay
+    // The four member repeats are spelled out, and must stay
     // identical to the one in `class_body`, so that the generator
-    // folds all four into one aux symbol (`aux_sym_class_body_repeat1`).
+    // folds all five into one aux symbol (`aux_sym_class_body_repeat1`).
     // A differing copy, or a hidden rule that is not inlined, adds a
     // symbol and renumbers every id after it — the alias kinds
     // `named_argument`, `quoted_identifier` and `type_identifier`
@@ -856,6 +1074,7 @@ module.exports = grammar({
       repeat($._modifier),
       'enum',
       field('name', $.identifier),
+      optional($.super_interfaces),
       field('body', $.enum_body),
     ),
 
@@ -869,6 +1088,14 @@ module.exports = grammar({
             ',',
             seq(optional(','), ';', repeat(choice($._class_member, $.block, ';'))),
             seq($._class_member, repeat(choice($._class_member, $.block, ';'))),
+            seq(
+              ',',
+              choice(...classMembers(
+                $,
+                alias($._modified_constructor_declaration, $.constructor_declaration),
+              )),
+              repeat(choice($._class_member, $.block, ';')),
+            ),
           )),
         ),
         repeat(choice($._class_member, $.block, ';')),
@@ -891,11 +1118,23 @@ module.exports = grammar({
     // share the prefix with an annotated member; the same precedence
     // decides after them, so `@Foo A\n int x` is a constant and a
     // field.
-    enum_constant: $ => prec(1, seq(
-      repeat($.annotation),
-      field('name', $.identifier),
-      optional(field('arguments', $.argument_list)),
-    )),
+    enum_constant: $ => choice(
+      prec(1, seq(
+        repeat($.annotation),
+        field('name', $.identifier),
+        optional(field('arguments', $.argument_list)),
+      )),
+      // `sealed` and `trait` are keywords wherever a member can start
+      // (divergence 12): at the first constant and, since #89, after
+      // every `,`. A constant may still have either name, so the
+      // keyword is accepted as one. The negative precedence gives way
+      // to a declaration when one follows: `sealed class`, `trait T {`.
+      prec(-1, seq(
+        repeat($.annotation),
+        field('name', alias(choice('sealed', 'trait'), $.identifier)),
+        optional(field('arguments', $.argument_list)),
+      )),
+    ),
 
     // §4 — record (Groovy 4+), after Apache's `classDeclaration`:
     // `[modifiers] record Name[<T>](Type a, Type b) [implements I] [{ body }]`.
@@ -950,6 +1189,7 @@ module.exports = grammar({
     // §4 — package and import. Trailing `;` is optional in Groovy;
     // we accept both forms by not requiring it.
     package_declaration: $ => seq(
+      repeat($.annotation),
       'package',
       field('name', $.qualified_name),
     ),
@@ -960,6 +1200,7 @@ module.exports = grammar({
     // imports only appear in this position, so the lexer-wide
     // longest-match is safe.
     import_declaration: $ => seq(
+      repeat($.annotation),
       'import',
       optional('static'),
       field('name', $.qualified_name),
@@ -1007,30 +1248,50 @@ module.exports = grammar({
     //   `final String f(a) { }` stays a method (see method_declaration).
     // - A bare `x` followed by a line reading `y = 1` is the typed
     //   declaration `x y = 1`.
+    //
+    // Annotations may come first on every form (Apache
+    // `variableModifier`): `@Field def x = 1` in a script,
+    // `@SuppressWarnings('unchecked') List<String> xs = []` in a body.
     local_variable_declaration: $ => prec.right(choice(
       seq(
+        repeat($.annotation),
         optional('final'),
         choice('def', 'var'),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       prec.dynamic(1, seq(
+        repeat($.annotation),
         optional('final'),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._initialized_declarator)),
       )),
       seq(
+        repeat($.annotation),
         'final',
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       prec.dynamic(2, seq(
+        repeat($.annotation),
         'final',
         field('type', $._type),
         field('name', $.identifier),
       )),
+      prec.dynamic(2, seq(
+        repeat1($.annotation),
+        alias($._placeholder_declarator, $.variable_declarator),
+      )),
     )),
+
+    // `@Library('shared') _`, the Jenkins idiom: an annotation needs a
+    // declaration to stand on, and `_` is the name used for it. Apache
+    // takes any name there (`variableModifiers variableDeclarators`).
+    // Only `_` is accepted here, as a literal: with any identifier,
+    // `@A x` followed by `y = 1` on the next line would also be a typed
+    // local `x y = 1`, and nothing but the line break tells them apart.
+    _placeholder_declarator: $ => field('name', alias('_', $.identifier)),
 
     _initialized_declarator: $ => seq(
       field('name', $.identifier),
@@ -1095,7 +1356,29 @@ module.exports = grammar({
       field('body', choice($.block, $._statement)),
     ),
 
-    expression_statement: $ => $._expression,
+    // A statement that is `name = value` keeps the name unreduced.
+    // A closure can open with the same tokens as a parameter with a
+    // default (`{ a = 1 -> a }`), and so can an `if` / `while` / `for`
+    // block, because its `{` may also open a closure. With `name`
+    // already reduced to an expression, the two readings needed a
+    // fork that ran to the end of the value: 14% to 32% more work for
+    // `ext { version = '1.0' }` or `if (c) { a = 1 }`, and twice the
+    // work for a long value. Here both readings shift the `=` and one
+    // stack parses the value; the token after it decides.
+    //
+    // The form is limited to the start of a statement. Inside an
+    // expression it would take `b = 1` out of `a + b = 1`, which the
+    // operator precedence reads as `(a + b) = 1`.
+    expression_statement: $ => choice(
+      $._expression,
+      alias($._statement_assignment, $.assignment_expression),
+    ),
+
+    _statement_assignment: $ => prec.right(PREC.ASSIGN, seq(
+      field('left', $.identifier),
+      field('operator', '='),
+      field('right', $._expression),
+    )),
 
     // §3.2 PRIMARY — minimal alternative set for now. Every primary
     // expression form from §3.2 / §5 will land in this choice over
@@ -1226,21 +1509,18 @@ module.exports = grammar({
       optional($._dotted_type_tail),
     )),
 
-    // §3.2 — `x in xs` and `x !in xs`. RELATIONAL level. Both
+    // §3.2 / §3.2.2 — `x in xs` and `x !in xs`. RELATIONAL level. Both
     // operators share one node kind; the `operator` field
-    // distinguishes them. `!in` is wrapped in `token(prec(1, …))`
-    // so it lexes as a single token despite the embedded space
-    // requirement implied by §3.2.2's trailing-context rule —
-    // Apache's `NOT_IN` predicate is approximated by requiring at
-    // least one trailing whitespace, `[`, `(`, or `{` after `!in`.
-    // §3.2 / §3.2.2 — `x in xs` and `x !in xs`. `!in` is a single
-    // token whose match requires a trailing whitespace / bracket
-    // character (Apache `NOT_IN` predicate) so `a !inXs` does not
-    // mis-tokenise as `!in` followed by `Xs`.
+    // distinguishes them. `!in` is an operator only before whitespace
+    // or `[`, `(`, `{` (Apache's `NOT_IN` predicate), so that
+    // `a !inXs` is not `!in` followed by `Xs`. The external scanner
+    // makes that check (§6.12) and leaves the character where it is.
+    // As a regex the token had to include it, which made
+    // `a !in[1, 2]` an ERROR: the `[` was part of the operator.
     membership_expression: $ => {
       const ops = [
         'in',
-        token(prec(1, seq('!in', /[ \t\r\n\[({]/))),
+        alias($._not_in, '!in'),
       ];
       return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(
         field('element', $._expression),
@@ -1313,12 +1593,47 @@ module.exports = grammar({
     // by tree-sitter's GLR; declared as a conflict if needed).
     // PREC.UNARY right-associative so `(Foo) -x` parses as
     // `(Foo)(-x)` and the type binds to the rightward expression.
-    parenthesized_type_cast: $ => prec.right(PREC.UNARY, seq(
-      '(',
-      field('type', $._type),
-      ')',
-      field('value', $._expression),
-    )),
+    //
+    // Two weights rank the cast against the other reading of the same
+    // tokens, a parenthesized expression followed by something. Both
+    // follow Apache's `castParExpression castOperandExpression`.
+    //
+    // With the operand on the line of the `)`, the cast wins wherever
+    // it parses, as the cast alternative comes first in Apache's
+    // `expression`: `(a) + b`, `(a) [0]` and `(a) (b)` are casts.
+    // `_cast_close` (§6.11) is the `)` that has something after it on
+    // its line.
+    //
+    // With the operand on a later line, the cast loses to any other
+    // complete reading. Apache's rule has no `nls` between the two
+    // parts, so where a line break can end a statement, `x = (a)`
+    // followed by `foo()` is two statements. Inside `(…)` and `[…]`
+    // Groovy ignores line breaks and reads a cast. Rejecting the cast
+    // outright would lose every such case: the scanner cannot tell
+    // which brackets enclose it. Ranking it last keeps the ones where
+    // nothing else parses, `foo((String)` followed by `x)`. It loses
+    // the ones where the later line can also continue the expression:
+    // `foo((a)` followed by `- b)` is a subtraction here and a cast
+    // in Groovy (divergence 15, #99).
+    //
+    // Without the weights nothing ranked the two readings and the
+    // stack order decided. Inside a closure or block, `a = (int) y`
+    // followed by a line that starts with a literal lost the cast
+    // once #83 added its forks.
+    parenthesized_type_cast: $ => choice(
+      prec.dynamic(1, prec.right(PREC.UNARY, seq(
+        '(',
+        field('type', $._type),
+        alias($._cast_close, ')'),
+        field('value', $._expression),
+      ))),
+      prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+        '(',
+        field('type', $._type),
+        ')',
+        field('value', $._expression),
+      ))),
+    ),
 
     // §4 — `_type`. Supports unqualified type identifiers,
     // qualified types (`java.util.List`), array types
@@ -1500,7 +1815,7 @@ module.exports = grammar({
     // §3.2 / §5.11 — argument list. Positional args are `_expression`;
     // named args (Groovy's `k: v` in call position) are `map_entry`
     // aliased to `named_argument` so downstream tools can tell them
-    // apart from positional values. Spread (`*expr`) lands later.
+    // apart from positional values.
     argument_list: $ => seq(
       '(',
       optional(seq(
@@ -1698,7 +2013,7 @@ module.exports = grammar({
         ['%',   PREC.MULTIPLICATIVE],
         // SHIFT — §3.1 level 6. Ranges (`..`, `..<`, etc.) share
         // this precedence level but use distinct node kinds, so
-        // they live in their own rule (lands later).
+        // they live in their own rule.
         ['<<',  PREC.SHIFT_OR_RANGE],
         ['>>',  PREC.SHIFT_OR_RANGE],
         ['>>>', PREC.SHIFT_OR_RANGE],
@@ -1736,7 +2051,12 @@ module.exports = grammar({
     // form; `{ a, b -> body }` has identifier parameters;
     // `{ String a, int b -> body }` has typed parameters; `{ body }`
     // has no `->` and an implicit `it` parameter (we do NOT emit a
-    // synthetic `it` per §5.8). Default values and varargs land later.
+    // synthetic `it` per §5.8). A parameter takes what a method
+    // parameter does (Apache's closure uses `formalParameterList`):
+    // annotations, `final`, then `def`, `var` or a type (varargs
+    // included), and a default; both rules are `parameter()`. The
+    // body may open with the same words, so the `->` decides between
+    // the two readings.
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
@@ -1752,16 +2072,13 @@ module.exports = grammar({
       '->',
     ),
 
-    closure_parameter: $ => seq(
-      optional(field('type', $._type)),
-      field('name', $.identifier),
-    ),
+    closure_parameter: $ => parameter($),
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.
     // Empty list is `[]`; the empty map literal is the distinct `[:]`
-    // form (see map_literal). Tree-sitter splits the parse between
-    // list_literal and map_literal until a `:` or `]` disambiguates;
-    // the conflict declaration above keeps both alternatives alive.
+    // form (see map_literal). After the first element, a `:` or its
+    // absence tells a list from a map within one token of lookahead,
+    // so no conflict entry is needed.
     // Either `[` token opens a literal, so a same-line `[` resolves as
     // it did with one token: `if (a) { } [1].each { }` is still a block
     // followed by a list, not a subscripted closure.
@@ -1813,9 +2130,15 @@ module.exports = grammar({
     ),
 
     // §3.2 PRIMARY — `( expr )`. Distinct from `parenthesized_type_cast`
-    // (§5.15), which lands once we have `_type`. The parser disambiguates
-    // by what's inside the parens.
-    parenthesized_expression: $ => seq('(', $._expression, ')'),
+    // (§5.15); the parser disambiguates by what's inside the parens
+    // and after them. `_cast_close` is the `)` that has something
+    // after it on its line (§6.11). It closes this rule too, so that
+    // `(a) * b` and `((a))` stay open to both readings.
+    parenthesized_expression: $ => seq(
+      '(',
+      $._expression,
+      choice(')', alias($._cast_close, ')')),
+    ),
 
     // §3.2 — single `unary_expression` node kind but two precedence
     // alternatives, matching Apache §3.1:
@@ -1926,17 +2249,27 @@ module.exports = grammar({
 
     // §5.7 — triple-double GString. Like `_double_quoted_string`
     // but newlines and embedded `"` / `""` are part of the body.
+    //
+    // One or two quotes are text when an ordinary character or an
+    // escape follows them. Before `$` they are lexed one at a time, as
+    // fragments of their own: the text token must not take a `$` that
+    // starts an interpolation (`"""say "$name"""`), and a regex
+    // cannot look ahead. The closer is longer than one quote, so it
+    // still wins at `"""`.
     _triple_double_quoted_string: $ => seq(
       '"""',
-      repeat(gstringPart($, $._triple_gstring_text)),
+      repeat(choice(
+        gstringPart($, $._triple_gstring_text),
+        alias(token.immediate('"'), $.string_fragment),
+      )),
       token.immediate('"""'),
     ),
 
     _triple_gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$]/,
       /\\[\s\S]/,
-      /"[^"]/,
-      /""[^"]/,
+      /"(\\[\s\S]|[^"\\$])/,
+      /""(\\[\s\S]|[^"\\$])/,
     ))),
 
     // §5.7 — `$identifier(.identifier)*` interpolation. The whole
@@ -1950,9 +2283,9 @@ module.exports = grammar({
       )),
     ),
 
-    _gstring_dollar_path: _ => token.immediate(
-      /\$[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*/,
-    ),
+    _gstring_dollar_path: _ => token.immediate(new RustRegex(
+      String.raw`\$${identifierPattern(false)}(?:\.${identifierPattern(false)})*`,
+    )),
 
     // §5.7 / §6.3 — `${expression}` interpolation.
     gstring_brace_interpolation: $ => seq(
@@ -2004,6 +2337,8 @@ module.exports = grammar({
       /[0-9][0-9_]*[GgLlIiDdFf]?/,
     )),
 
-    identifier: _ => /[A-Za-z_$][A-Za-z0-9_$]*/,
+    // Groovy's lexer takes any Java letter, not only ASCII; see
+    // `identifierPattern` above for the classes.
+    identifier: _ => new RustRegex(identifierPattern(true)),
   },
 });

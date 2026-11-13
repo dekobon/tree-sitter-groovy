@@ -97,6 +97,8 @@
   ".@"
   "::"
   "*:"
+  "->"
+  "..."
 ] @operator
 
 ; -- Layer 3: generic identifier fallback --------------------------
@@ -112,10 +114,10 @@
   "instanceof"
 ] @keyword.operator
 
-; `!in` and `!instanceof` are composite tokens (literal + trailing
-; whitespace) per SPECIFICATION.md §3.2.2 lexer rule, so they
-; cannot be referenced as direct anonymous tokens in a `[ … ]`
-; group. Capture them through the operator field instead.
+; `!instanceof` is a composite token (literal + trailing whitespace)
+; per SPECIFICATION.md §3.2.2, so it cannot be referenced as a direct
+; anonymous token in a `[ … ]` group. Capture it, and `!in` with it,
+; through the operator field instead.
 (membership_expression operator: _ @keyword.operator)
 (instanceof_expression operator: _ @keyword.operator)
 
@@ -171,6 +173,10 @@
   "volatile"
   "strictfp"
 ] @keyword.modifier
+
+; `synchronized (lock) { … }` is a statement; the word is a modifier
+; everywhere else.
+(synchronized_statement "synchronized" @keyword)
 
 (shebang) @keyword.directive
 
