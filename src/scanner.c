@@ -433,8 +433,8 @@ bool tree_sitter_groovy_external_scanner_scan(
         // whitespace or an opening bracket (GroovyLexer.g4 `NOT_IN`),
         // so that `a !inside` is `!` applied to a name. The character
         // after it is read and not taken: `a !in[1, 2]`.
-        static const char operator[] = "!in";
-        for (const char *c = operator; *c != '\0'; c++) {
+        static const char not_in[] = "!in";
+        for (const char *c = not_in; *c != '\0'; c++) {
             if (lexer->lookahead != *c) {
                 return false;
             }
