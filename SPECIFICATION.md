@@ -393,7 +393,7 @@ fix relative to *both* parent grammars.
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
-| Multi-assignment | **new** | `def (a, b) = expr` and `(a, b) = expr`. Closes murtaza64 #22. |
+| Multi-assignment | **new** | `def (a, b) = expr`. Closes murtaza64 #22. The form without `def`, `(a, b) = expr`, is not implemented and is an `ERROR` (#94). |
 | Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. |
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
@@ -684,8 +684,8 @@ The implementation is in-grammar (`_triple_gstring_text`). One or two
 quotes join the text fragment when an ordinary character or an escape
 follows them. Directly before a `$` each quote is a `string_fragment`
 of its own, so that the `$` is left for the interpolation:
-`"""say "$name"""` holds the fragments `say ` and `"` and then the
-interpolation.
+`"""say "$name"""` holds two fragments, the text before the quote and
+the quote itself, and then the interpolation.
 
 **Dollar-slashy edge cases** (from murtaza64's `string.test`):
 
@@ -851,9 +851,10 @@ slot before `def`; a variable declaration does not).
 
 ### 5.13 Trailing commas
 
-Lists, maps, argument lists, parameter lists, enum constants — all
-accept an optional trailing comma. Use `commaSep1` + `optional(',')`
-in every list rule.
+Lists, maps, argument lists and enum constants accept an optional
+trailing comma. Parameter lists do not, as in Apache's
+`formalParameterList`: `def m(a, b,) { }` is an error. Each list rule
+spells the comma handling out; there is no shared helper.
 
 ### 5.14 Method reference `::`
 
@@ -982,7 +983,8 @@ After a `"` or `"""` is consumed in the grammar:
     - matching `"` (or `"""`) → emit BODY (possibly empty), return
     - `\\` followed by any char → consumed as escape
     - `$` followed by `{` → emit BODY, return (caller matches `${`)
-    - `$` followed by `[A-Za-z_]` → emit BODY, return
+    - `$` followed by an identifier start (§5.2, without `$`) → emit
+      BODY, return
     - `\n` is allowed in triple-quoted variants; not in single
       double-quoted (emit ERROR, let grammar handle).
 ```
@@ -1270,6 +1272,12 @@ character after `!in`. With a `[` or `(` inside the operator,
 
 ## 7. Tree-sitter conflict declarations
 
+This list was written before the grammar and is kept as a record of
+the design. None of its entries was needed. The conflicts the grammar
+declares are the `conflicts` array in `grammar.js`, where each entry
+has a comment; `docs/divergences-from-spec.md` §1 says why the two
+differ.
+
 The expected `conflicts` list, in order of root cause:
 
 ```js
@@ -1454,9 +1462,9 @@ Other per-operator corpus files mandated:
   paired with `def y = (Set) list` to keep cast vs. coercion distinct)
 - `operators-method-pointer.txt` (.&)
 - `operators-direct-field.txt` (.@)
-- `operators-safe-index.txt` (?[])
+- `operators-subscript.txt` ([], ?[])
 - `operators-method-reference.txt` (::)
-- `operators-elvis-assign.txt` (?=)
+- `operators-assignment.txt` (=, the augmented forms, ?=)
 - `operators-implication.txt` (==>)
 - `operators-power.txt` (** including `2 ** 3 ** 2` right-assoc test)
 - `operators-safe-chain-dot.txt` (??.) — Groovy 4+; v2 addition
@@ -1773,11 +1781,11 @@ generate` and committed; the C scanner is hand-authored.
   upstream `tree-sitter` types (fixes murtaza64 #38).
 - `bindings/python/`: `pyproject.toml` + `setup.py` for
   `tree-sitter-groovy` PyPI package.
-- `bindings/rust/`: a `lib.rs` exposing `language()` and a
-  `tree-sitter-groovy` crate published on crates.io. Cargo features:
-  default builds with cc; `prebuilt` feature for binary distribution.
+- `bindings/rust/`: a `lib.rs` exposing the `LANGUAGE` constant, in
+  the `dekobon-tree-sitter-groovy` crate published on crates.io. It
+  builds with `cc` and has no Cargo features.
   **This is the integration target for `dekobon/big-code-analysis`.**
-- `bindings/go/`: a Go module exposing `GetLanguage()`.
+- `bindings/go/`: a Go module exposing `Language()`.
 - `bindings/swift/`: `Package.swift` for SwiftPM consumers.
 
 `tree-sitter.json` declares grammar metadata for editor integration
@@ -1796,10 +1804,10 @@ per the tree-sitter CLI's expected schema (file types `.groovy`,
 - v0.2.0 — Groovy 4 record/sealed support (already in §4; promoted
   to GA when Groovy 4's spec stabilises for both).
 
-semver: tree-sitter grammars are still finding their semver
-conventions; we follow `tree-sitter-java`'s: MINOR for grammar shape
-changes (different S-expressions for existing source), PATCH for
-additive node-types and bug fixes that don't change existing trees.
+semver: the rules are in `AGENTS.md` ("Semantic Versioning") and are
+not repeated here. In short, a change to the tree of input that parsed
+is breaking, a new rule, field or capture is additive, and a fix that
+changes no existing tree is a patch.
 
 The `dekobon/big-code-analysis` pin (currently
 `tree-sitter-groovy = "=0.1.2"` from amaanq) will be moved to this

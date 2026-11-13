@@ -1,19 +1,24 @@
 /**
  * @file Apache Groovy grammar for tree-sitter
  * @author Elijah Zupancic <elijah@zupancic.name>
- * @license MIT
+ * @license Apache-2.0 OR MIT
  *
  * The authoritative design document for this grammar is
  * SPECIFICATION.md at the repository root. Every rule below maps to
  * a section there. Read the spec before making non-trivial changes.
  *
- * The external scanner (src/scanner.c) handles three context-sensitive
+ * The external scanner (src/scanner.c) handles the context-sensitive
  * lexing situations that pure grammar rules cannot disambiguate:
  *   - Slashy-string-start vs. division
  *   - Line / block / Groovydoc comment single-token emit
  *   - The contextual `record` keyword, emitted only before a record
  *     header so the word stays an identifier everywhere else
- * See SPECIFICATION.md §6.
+ *   - Three decisions that depend on what shares a line: the key of
+ *     a named argument in a parenthesis-free call, a subscript `[`,
+ *     and the `)` of a cast
+ *   - The `!in` operator, which depends on the character after it
+ * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
+ * the `externals` list below.
  */
 
 /// <reference types="tree-sitter-cli/dsl" />
@@ -187,8 +192,10 @@ function parameter($) {
 module.exports = grammar({
   name: 'groovy',
 
-  // Placeholder for the real implementation. SPECIFICATION.md §3-§7
-  // is the contract this rule set will fulfil.
+  // Keywords are extracted from this token. A keyword is lexed as
+  // such only in a state where it has a parse action, or where it is
+  // reserved (`reserved` below); anywhere else the same text is an
+  // `identifier`. Several comments in this file depend on that.
   word: $ => $.identifier,
 
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
@@ -267,7 +274,8 @@ module.exports = grammar({
   conflicts: $ => [
     // `final def x` / `final x = 1` in a block vs. a modified member at top level.
     [$._modifier, $.local_variable_declaration],
-    // See SPECIFICATION.md §7. Populated as rules accumulate.
+    // This array is the authoritative list; SPECIFICATION.md §7 is
+    // the list predicted before the grammar existed.
     // (list_literal vs map_literal — tree-sitter resolves without
     //  an explicit conflict because `:` after the first element
     //  always disambiguates within one token of lookahead.)
@@ -470,8 +478,8 @@ module.exports = grammar({
     // `identifier`; the `:` decides. A scanner-token form
     // (`_label_colon`) was attempted but interacted with
     // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
-    // which now lex their key through `_command_named_key` instead;
-    // see divergence #5.
+    // which now have their key decided by `_command_named_key`
+    // instead; see the §6.5 row in `docs/divergences-from-spec.md`.
     labeled_statement: $ => prec(1, seq(
       field('label', $.identifier),
       ':',
@@ -597,8 +605,7 @@ module.exports = grammar({
     // §4 — try / catch / finally. At least one of catch/finally is
     // required per Java/Groovy semantics; the grammar relaxes that
     // to allow a bare `try { … }` and lets downstream tooling
-    // surface the error if needed. Try-with-resources lands later
-    // with local variable declarations.
+    // surface the error if needed.
     try_statement: $ => seq(
       'try',
       optional(field('resources', $.resource_specification)),
@@ -748,9 +755,10 @@ module.exports = grammar({
       repeat(seq(',', $._type)),
     ),
 
-    // §4 — Java-style modifiers. Each one is a hard reserved
-    // keyword (§5.2) so the `word: $.identifier` directive keeps
-    // them from accidentally being treated as identifiers.
+    // §4 — Java-style modifiers. Each one is a hard reserved keyword
+    // in Groovy (§5.2). Here it is a keyword only where a modifier can
+    // stand; anywhere else the word lexes as an identifier, and input
+    // such as `foo(private)` parses with no ERROR (#93).
     _modifier: _ => choice(
       'public',
       'private',
@@ -889,12 +897,11 @@ module.exports = grammar({
       )),
     ),
 
-    // §4 — `def name(params) body`. Typed return type (`String foo()
-    // { … }`) lands once we can disambiguate from local variable
-    // declaration. Modifiers and throws clause similarly defer.
-    // prec(1) wins over local_variable_declaration when `(` follows
-    // the name, so `def f() { … }` at script-top-level parses as a
-    // method rather than a `def f` variable followed by `(…) { … }`.
+    // §4 — `def name(params) body`, or a return type in place of
+    // `def`, with modifiers and a throws clause. The static precedence
+    // wins over local_variable_declaration when `(` follows the name,
+    // so `def f() { … }` at script-top-level parses as a method
+    // rather than a `def f` variable followed by `(…) { … }`.
     // Modifiers alone (no `def`, no return type) also introduce a
     // method outside a class body: `final f() { }`. In a class body
     // that shape stays a constructor_declaration.
@@ -1746,7 +1753,7 @@ module.exports = grammar({
     // §3.2 / §5.11 — argument list. Positional args are `_expression`;
     // named args (Groovy's `k: v` in call position) are `map_entry`
     // aliased to `named_argument` so downstream tools can tell them
-    // apart from positional values. Spread (`*expr`) lands later.
+    // apart from positional values.
     argument_list: $ => seq(
       '(',
       optional(seq(
@@ -1944,7 +1951,7 @@ module.exports = grammar({
         ['%',   PREC.MULTIPLICATIVE],
         // SHIFT — §3.1 level 6. Ranges (`..`, `..<`, etc.) share
         // this precedence level but use distinct node kinds, so
-        // they live in their own rule (lands later).
+        // they live in their own rule.
         ['<<',  PREC.SHIFT_OR_RANGE],
         ['>>',  PREC.SHIFT_OR_RANGE],
         ['>>>', PREC.SHIFT_OR_RANGE],
@@ -2007,9 +2014,9 @@ module.exports = grammar({
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.
     // Empty list is `[]`; the empty map literal is the distinct `[:]`
-    // form (see map_literal). Tree-sitter splits the parse between
-    // list_literal and map_literal until a `:` or `]` disambiguates;
-    // the conflict declaration above keeps both alternatives alive.
+    // form (see map_literal). After the first element, a `:` or its
+    // absence tells a list from a map within one token of lookahead,
+    // so no conflict entry is needed.
     // Either `[` token opens a literal, so a same-line `[` resolves as
     // it did with one token: `if (a) { } [1].each { }` is still a block
     // followed by a list, not a subscripted closure.

@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled. |
+| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with `def` (the form without it is an `ERROR`, #94) / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -24,12 +24,12 @@ reasoning here.
 | §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported. String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). |
 | §5.6 Optional parentheses | **Done** | command_chain at statement level. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
-| §5.8 Closure params / it | **Done** | typed and untyped, no synthetic `it`. |
-| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`), and after annotations alone a local declaration takes only the name `_`. |
+| §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
+| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`. |
 | §5.10 Statement terminators | **Equivalent** | newline-as-terminator via `repeat($._statement)` rather than a scanner token (see #3 below). |
 | §5.11 Spread (three positions) | **Done** | `spread_arguments`, `spread_dot_expression`, `spread_map_entry`. |
 | §5.12 `def` positions | **Mostly done** | typed-bare `Type x` (no init) deferred (see #6 below). |
-| §5.13 Trailing commas | **Done** | accepted in list / map / arg / param / enum-constant lists. |
+| §5.13 Trailing commas | **Done** | accepted in list / map / argument / enum-constant lists. A parameter list takes none, as in Apache's `formalParameterList`. |
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
@@ -43,7 +43,7 @@ reasoning here.
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §6.11 CAST_CLOSE | **Done** | the `)` of a cast, emitted only when something follows it on its line (spaces, tabs and line escapes skipped; a line comment ends the line). `x = (a)` followed by `foo()` is two statements, as in Groovy. A parenthesized expression closes with this token or a plain `)`. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
-| §7 Conflicts | **Done** | actual conflicts list smaller than spec predicted (see #1). |
+| §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
 | §9.2 injections.scm | **Done** | groovydoc → javadoc; slashy + dollar-slashy → regex; named-call DSL → sql. |
@@ -74,21 +74,20 @@ fully met. A v2 refactor to true scanner tokens is optional polish.
 [$.trait_declaration, $.class_declaration]
 ```
 
-**Actual `grammar.js` conflicts:**
-
-```
-[$._expression, $._type]
-[$.for_in_statement, $._expression]
-[$.variable_declarator, $._property_name]
-```
+**Actual `grammar.js` conflicts:** the `conflicts` array in
+`grammar.js` is the only list. Each entry has a comment that says which
+two readings it keeps alive and which token decides. This file does not
+repeat it, because a copy here went out of date: it listed three
+entries when the grammar had nine, and fourteen after #83.
 
 The spec's list was an educated guess written before any rule was
 implemented; once the grammar landed, none of the predicted
 conflicts actually fired. Two reasons:
 
-- Several entries (`command_chain`, `_type_arguments`) belong to
-  features that haven't landed yet — generics and juxt-function
-  calls. They will appear with those features.
+- Several entries (`command_chain`, `_type_arguments`) were avoided
+  by how those features were built: a command chain is limited to
+  statement position, and a generic type always carries explicit
+  angle brackets.
 - Other entries (`closure` vs `map_literal`, `trait_declaration` vs
   `class_declaration`, `label` vs `identifier`, `method_reference`
   vs `ternary`) were avoided by using `prec` and structural
@@ -99,22 +98,13 @@ conflicts actually fired. Two reasons:
   position because map-entries live inside `[…]` so cannot
   collide there.
 
-The actual three conflicts are forced by features the spec did
-not have direct prediction-rules for:
+The conflicts that exist come from positions the spec had no rule
+for: a name in parentheses that may be a type or an expression, a
+name after `def` that may be a variable or a method, the first tokens
+of a closure that may be parameters or a statement.
 
-- `[$._expression, $._type]` — `(Foo)` inside parens could be the
-  head of a `parenthesized_type_cast` or a `parenthesized_expression`;
-  resolved by what follows `)`.
-- `[$.for_in_statement, $._expression]` — `for ( identifier …` is
-  either the head of a `for_statement` init expression or the
-  variable of a `for_in_statement`; resolved by `;` vs `in`.
-- `[$.variable_declarator, $._property_name]` — `def identifier` is
-  either a no-init variable or the start of a method name;
-  resolved by `(` (method) vs `=` / `,` / end (variable).
-
-**Action**: keep the spec text as historical record; rely on this
-file plus `grammar.js` comments for the authoritative conflict
-list.
+**Action**: keep the spec text as historical record; the
+authoritative list is `grammar.js`.
 
 ---
 
@@ -212,18 +202,15 @@ positions: generics (`List<String>`), array dimensions
 **Current implementation**:
 - Unqualified identifier types ✓
 - `array_type` (`int[]`, `String[][]`) ✓ (iter 45)
-- `qualified_type` (`java.util.List`) — works in **most** type
-  positions (`new`, `parenthesized_type_cast`, formal parameters)
-  but NOT in `cast_expression` (`x as java.util.Map`) or
+- `qualified_type` (`java.util.List`) — works in every type
+  position, including `cast_expression` (`x as java.util.Map`) and
   `instanceof_expression` (`x instanceof java.lang.Number`). In
-  those slots, tree-sitter's LR(1) chooses `field_access` for the
-  trailing `.Map` over extending the qualified_type, producing
-  `(field_access (cast x as java.util) Map)` rather than
-  `(cast x as java.util.Map)`. The structural ambiguity is real:
-  qualified_type and field_access have identical token sequences
-  and only context distinguishes them, and `cast_expression` at
-  `PREC.RELATIONAL` is looser than `field_access` at
-  `PREC.ACCESS`.
+  those two slots the token sequence is the same as a
+  `field_access` chain, and `PREC.RELATIONAL` is looser than
+  `PREC.ACCESS`, so a plain `_type` there read
+  `(field_access (cast x as java.util) Map)`. They take `_cast_type`
+  instead, whose dotted form (`_dotted_type`, spec §3.2.2) shifts
+  each dot at a precedence tighter than `field_access`.
 - Generics (`List<String>`) ✓ via `generic_type`, with bounded
   wildcards (`? extends Foo`, `? super Bar`), nested arguments
   (`Map<String, List<Integer>>`), qualified bases
@@ -676,7 +663,7 @@ method.
 
 **Action**: accept every member and an initializer after the comma,
 and prefer the constant only when it parses. That needs a GLR
-conflict limited to this position. Tracked in #TBD-enum-comma.
+conflict limited to this position. Tracked in #97.
 
 ---
 
@@ -706,4 +693,4 @@ share the helper `parameter()` in `grammar.js`: annotations, then
 **Action**: accept the modifiers in any order and `...` with no type.
 A closure body can open with the same words, so each added form has to
 be checked against the forks listed in §5.8 of the spec. Tracked in
-#TBD-param-shape.
+#98.

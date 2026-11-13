@@ -7,6 +7,8 @@
 mis = "mis"
 # "juxt" = juxtaposition; used as a grammar term (juxt_function_call)
 juxt = "juxt"
+# "Nd" = the Unicode general category for decimal digits (`\p{Nd}`)
+Nd = "Nd"
 
 [files]
 extend-exclude = [
@@ -16,5 +18,6 @@ extend-exclude = [
   "src/tree_sitter/**",
   "test/corpus/**",
   "test/highlight/**",
+  "test/tags/**",
   "test/stress/**",
 ]
