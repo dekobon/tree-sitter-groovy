@@ -402,8 +402,8 @@ fix relative to *both* parent grammars.
 | `switch` with `case … :` | port | |
 | `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). |
 | `try` / `catch` / `finally` | port | |
-| Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. |
-| Try-with-resources | **new** | `try (Foo f = …) { … }`. |
+| Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. A catch parameter takes `final` and `def`, `var` or a type. |
+| Try-with-resources | **new** | `try (Foo f = …) { … }`; a resource takes `final` and `def`, `var` or a type. |
 | `return`, `break`, `continue`, `yield` | port | break/continue accept an optional label. |
 | `throw` | port | |
 | `assert e` and `assert e : msg` | port from murtaza64 | power-assertion shape. |
@@ -719,17 +719,26 @@ Escape rules:
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
 binds `it`. A parameter has the shape of a method parameter, as in
-Apache's grammar (`formalParameterList`): annotations, `final`, `def`
-or a type (varargs included), the name, and a default
-(`{ String sep = ',', def xs -> … }`). Until the `->`, the parameter
-list and a body that opens with a declaration or an assignment
-(`{ a = 1 }`) parse side by side. The grammar rule:
+Apache's grammar (`formalParameterList`): annotations, `final`, then
+`def`, `var` or a type (varargs included), the name, and a default
+(`{ String sep = ',', def xs -> … }`). `grammar.js` builds
+`formal_parameter` and `closure_parameter` from one helper,
+`parameter()`. `def` and `var` are keywords there, so such a parameter
+has no `type`. Apache's `variableModifiersOpt` allows more than this
+order; `docs/divergences-from-spec.md` §14 lists what is not accepted.
+Until the `->`, the parameter list and a body that opens with a
+declaration or an assignment (`{ a = 1 }`) parse side by side. The
+grammar rule:
 
 ```js
 closure: $ => seq('{',
-  optional(seq($._closure_parameters, '->')),
-  repeat($.statement),
-  '}')
+  optional($.closure_parameters),
+  repeat(choice($._statement, ';')),
+  '}'),
+
+closure_parameters: $ => seq(
+  optional(seq($.closure_parameter, repeat(seq(',', $.closure_parameter)))),
+  '->'),
 ```
 
 We do **not** emit a synthetic `it` parameter. Downstream tools that
@@ -819,8 +828,11 @@ alternative for `seq('*', $.expression)` inside `argument_list`.
 `def` can prefix:
 
 - a local variable declaration (`def x = …`),
+- a field (`def x` in a class or enum body),
 - a method definition (`def f() { … }`),
-- a closure parameter (`{ def x -> … }`),
+- a method or closure parameter (`def f(def x)`, `{ def x -> … }`),
+- a `for`-in variable, a `catch` parameter and a `try` resource
+  (`for (def x in xs)`, `catch (def e)`, `try (def r = open())`),
 - a multi-assignment (`def (a, b) = …`).
 
 The grammar uses `def` as a token in each rule rather than as a

@@ -130,6 +130,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   followed by `b = 1` on the next line was the parenthesized
   expression `(int)` and a declaration `c b = 1`; it is now a cast
   and an assignment.
+- **BREAKING:** `def` and `var` on a method or constructor parameter,
+  a `catch` parameter and a `try` resource are keywords instead of a
+  type name, which changes trees for input that parsed without an
+  `ERROR` at v0.5.0. `def f(def a)`, `catch (def e)` and
+  `try (def r = open())` no longer have a `type` (a `type_identifier`
+  with the text `def`); the node has only a `name`. An untyped `final`
+  on a `catch` parameter or a resource (`catch (final e)`,
+  `try (final r = open())`) was read as a type too and is now a
+  modifier. Closure parameters changed the same way in #79.
 
 ### Fixed
 
@@ -275,6 +284,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   before, so the result depended on the surrounding code, and
   `a = (int) y` at the start of a closure lost the cast when the next
   line began with a literal.
+- `final` before a type is accepted on a `catch` parameter and on a
+  `try` resource (`catch (final Exception e)`,
+  `try (final Foo r = open())`); both were an `ERROR`. A closure
+  parameter takes `var` (`{ var x -> x }`), which was an `ERROR` too.
+  Method and closure parameters now share one definition.
 
 ## [0.5.0] - 2026-11-10
 

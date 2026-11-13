@@ -266,3 +266,102 @@ try (Foo f = open()) { use(f) } catch (E e) { handle(e) }
           (method_invocation
             function: (identifier)
             arguments: (argument_list (identifier))))))))
+
+==================
+Catch parameter with def, var and final
+==================
+
+try { } catch (def e) { }
+try { } catch (var e) { }
+try { } catch (final Exception e) { }
+
+---
+
+(source_file
+  (try_statement
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        name: (identifier))
+      body: (block)))
+  (try_statement
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        name: (identifier))
+      body: (block)))
+  (try_statement
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block))))
+
+==================
+Resources with def, var and final
+==================
+
+try (def r = open()) { }
+try (var r = open(); final Foo s = open()) { }
+try (final r = open()) { }
+
+---
+
+(source_file
+  (try_statement
+    resources: (resource_specification
+      (resource
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block))
+  (try_statement
+    resources: (resource_specification
+      (resource
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block))
+  (try_statement
+    resources: (resource_specification
+      (resource
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block)))
+
+==================
+Final before a type on a catch parameter and on a resource
+==================
+
+try (final Foo r = open()) { } catch (final IOException | RuntimeException e) { }
+
+---
+
+(source_file
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (multi_type
+          (type_identifier)
+          (type_identifier))
+        name: (identifier))
+      body: (block))))

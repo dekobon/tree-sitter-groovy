@@ -158,6 +158,29 @@ function constructorDeclaration($, modifiers) {
   ));
 }
 
+/**
+ * A method parameter or a closure parameter. Apache's `closure` takes
+ * the `formalParameterList` of a method, so the two have one shape:
+ * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
+ * included), the name, and a default value.
+ *
+ * Apache's `variableModifiersOpt` is wider: annotations and modifiers
+ * in any order, `def` or `var` together with a type, and `...` with no
+ * type. Those are not accepted (divergence 14).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} The parameter rule body.
+ */
+function parameter($) {
+  return seq(
+    repeat($.annotation),
+    optional('final'),
+    optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
+    field('name', $.identifier),
+    optional(seq('=', field('default', $._expression))),
+  );
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -584,7 +607,8 @@ module.exports = grammar({
     ),
 
     resource: $ => seq(
-      optional(field('type', $._type)),
+      optional('final'),
+      optional(choice('def', 'var', field('type', $._type))),
       field('name', $.identifier),
       '=',
       field('value', $._expression),
@@ -603,7 +627,8 @@ module.exports = grammar({
     // murtaza64 #39. The type itself is optional — Groovy allows a
     // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
-      optional(field('type', choice($._type, $.multi_type))),
+      optional('final'),
+      optional(choice('def', 'var', field('type', choice($._type, $.multi_type)))),
       field('name', $.identifier),
     ),
 
@@ -919,15 +944,11 @@ module.exports = grammar({
     // `@PathVariable`, `@RequestBody`, JPA's `@Param`, … — ubiquitous
     // on framework-facing methods), optional type, optional varargs
     // marker (`Type... name`), and optional default value
-    // (`name = expr`).
-    // `final` is the only modifier accepted here.
-    formal_parameter: $ => seq(
-      repeat($.annotation),
-      optional('final'),
-      optional(field('type', choice($._type, $.varargs_type))),
-      field('name', $.identifier),
-      optional(seq('=', field('default', $._expression))),
-    ),
+    // (`name = expr`). `final` is the only modifier accepted here.
+    // `def` and `var` stand in place of the type and are keywords, so
+    // `def f(def a)` has no `type`. The shape is `parameter()`, shared
+    // with `closure_parameter`.
+    formal_parameter: $ => parameter($),
 
     varargs_type: $ => seq($._type, '...'),
 
@@ -1899,9 +1920,10 @@ module.exports = grammar({
     // has no `->` and an implicit `it` parameter (we do NOT emit a
     // synthetic `it` per §5.8). A parameter takes what a method
     // parameter does (Apache's closure uses `formalParameterList`):
-    // annotations, `final`, `def` or a type (varargs included), and a
-    // default. The body may open with the same words, so the `->`
-    // decides between the two readings.
+    // annotations, `final`, then `def`, `var` or a type (varargs
+    // included), and a default; both rules are `parameter()`. The
+    // body may open with the same words, so the `->` decides between
+    // the two readings.
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
@@ -1917,13 +1939,7 @@ module.exports = grammar({
       '->',
     ),
 
-    closure_parameter: $ => seq(
-      repeat($.annotation),
-      optional('final'),
-      optional(choice('def', field('type', choice($._type, $.varargs_type)))),
-      field('name', $.identifier),
-      optional(seq('=', field('default', $._expression))),
-    ),
+    closure_parameter: $ => parameter($),
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.
     // Empty list is `[]`; the empty map literal is the distinct `[:]`

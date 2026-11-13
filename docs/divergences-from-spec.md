@@ -676,3 +676,33 @@ method.
 **Action**: accept every member and an initializer after the comma,
 and prefer the constant only when it parses. That needs a GLR
 conflict limited to this position. Tracked in #TBD-enum-comma.
+
+---
+
+## 14. Parameter modifiers in a fixed order
+
+**Apache `GroovyParser.g4`** gives a method parameter and a closure
+parameter one rule, `formalParameter`:
+`variableModifiersOpt type? ELLIPSIS? variableDeclaratorId (ASSIGN expression)?`.
+`variableModifier` is an annotation, `final`, `def` or `var`, in any
+number and order.
+
+**Current implementation**: `formal_parameter` and `closure_parameter`
+share the helper `parameter()` in `grammar.js`: annotations, then
+`final`, then `def`, `var` or a type, the name, and a default.
+
+| Parameter | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `@A final String x = 1`, `def x`, `var x`, `final def x`, `String... xs` | accepted | accepted |
+| `def String x` | accepted | `ERROR` |
+| `final @A x` | accepted | `ERROR` |
+| `... xs`, `def ... xs` | accepted | `ERROR` |
+
+`def` and `var` are keywords in a parameter, so `def f(def x)` has no
+`type`. `catch` parameters and `try` resources take `final` and `def`,
+`var` or a type, with no annotations.
+
+**Action**: accept the modifiers in any order and `...` with no type.
+A closure body can open with the same words, so each added form has to
+be checked against the forks listed in §5.8 of the spec. Tracked in
+#TBD-param-shape.
