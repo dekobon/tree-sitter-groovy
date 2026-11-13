@@ -323,16 +323,35 @@ module.exports = grammar({
     // §4 — after an enum's trailing comma, `private` may open a
     // constructor (`private E() { }`) or any other member.
     [$._modifier, $._modified_constructor_declaration],
-    // `{ final x -> }` vs. a closure body opening with a modified
-    // declaration; the `->` decides.
+    // §5.8 — a closure's parameter list and a closure body that opens
+    // with a declaration share their first tokens, and so does a
+    // block, whose `{` may also open a closure. The `->` decides, or
+    // the first token that only one reading accepts.
+    //
+    // `{ final x -> }` vs. a body opening with a modified declaration.
     [$._modifier, $.closure_parameter],
     // `{ final def x` is also a final local (#56), so all three stay
     // alive there.
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
-    // `{ a = 1 -> }` (a default) vs. `{ a = 1 }` (an assignment).
-    [$._expression, $.closure_parameter],
+    // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
+    // `{ def a, b -> }` vs. `{ def a, b }`. These two fork at every
+    // `,` of a declaration that opens a closure or block, and both
+    // stacks run to the end of the list: 15% to 60% more work for a
+    // list of two to eight names, about twice for a long one. A list
+    // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
+    // An untyped default, `{ a = 1 -> }` vs. `{ a = 1 }`, needs no
+    // entry: see `expression_statement`.
+    //
+    // Two things keep these forks from changing a valid parse, and a
+    // new rule must keep both. `closure_parameter` carries no dynamic
+    // precedence, so a reading that survives to the `->` wins by being
+    // the only one left. And `->` appears nowhere at the top level of
+    // a closure body: only in `closure_parameters` and in the arrow
+    // forms of `switch`. On invalid input the parameter reading can
+    // win, because a missing `->` is a cheaper repair than an ERROR:
+    // `{ x = 1, y }` recovers as two parameters.
   ],
 
   rules: {
@@ -1265,7 +1284,29 @@ module.exports = grammar({
       field('body', choice($.block, $._statement)),
     ),
 
-    expression_statement: $ => $._expression,
+    // A statement that is `name = value` keeps the name unreduced.
+    // A closure can open with the same tokens as a parameter with a
+    // default (`{ a = 1 -> a }`), and so can an `if` / `while` / `for`
+    // block, because its `{` may also open a closure. With `name`
+    // already reduced to an expression, the two readings needed a
+    // fork that ran to the end of the value: 14% to 32% more work for
+    // `ext { version = '1.0' }` or `if (c) { a = 1 }`, and twice the
+    // work for a long value. Here both readings shift the `=` and one
+    // stack parses the value; the token after it decides.
+    //
+    // The form is limited to the start of a statement. Inside an
+    // expression it would take `b = 1` out of `a + b = 1`, which the
+    // operator precedence reads as `(a + b) = 1`.
+    expression_statement: $ => choice(
+      $._expression,
+      alias($._statement_assignment, $.assignment_expression),
+    ),
+
+    _statement_assignment: $ => prec.right(PREC.ASSIGN, seq(
+      field('left', $.identifier),
+      field('operator', '='),
+      field('right', $._expression),
+    )),
 
     // §3.2 PRIMARY — minimal alternative set for now. Every primary
     // expression form from §3.2 / §5 will land in this choice over

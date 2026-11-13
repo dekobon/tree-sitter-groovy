@@ -604,3 +604,26 @@ xs.each { var a = 1 }
           (variable_declarator
             name: (identifier)
             value: (number_literal)))))))
+
+==================
+Closure with a comma after an assignment recovers as a parameter list
+==================
+
+list.each { x = 1, y }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            name: (identifier))
+          (MISSING "->"))))))

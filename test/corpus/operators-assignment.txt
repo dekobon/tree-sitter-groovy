@@ -240,3 +240,64 @@ a + b
     (binary_expression
       left: (identifier)
       right: (identifier))))
+
+==================
+Assignment after a binary operator takes the whole left side
+==================
+
+a + b = 1
+x = y = 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (assignment_expression
+        left: (identifier)
+        right: (number_literal)))))
+
+==================
+Assignment as the first statement of a closure and of a block
+==================
+
+xs.each { a = 1 }
+if (c) { a = 1 }
+while (c) { a = b = 1 }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (assignment_expression
+            left: (identifier)
+            right: (number_literal)))))))
