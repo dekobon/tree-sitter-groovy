@@ -330,8 +330,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the grammar. A new external scanner token, `_cast_close`, is the `)`
   that has something after it on its line; a line escape continues
   the line and a line comment ends it. A cast that closes with a plain
-  `)` loses to any other reading, and is still a cast where there is
-  none, inside `(…)` and `[…]`. On one line the cast now wins
+  `)` loses to any other reading and is still a cast where there is
+  none, as in `foo((String)` followed by `x)`. Inside `(…)` and `[…]`
+  Groovy reads a cast on every later line; here `foo((a)` followed by
+  `- b)` is a subtraction (#99). On one line the cast now wins
   whenever it parses (`(a) + b`, `(a) [0]`, `(a) (b)`), as in
   Apache's grammar. The two readings were unranked
   before, so the result depended on the surrounding code, and

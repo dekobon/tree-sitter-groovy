@@ -1598,10 +1598,13 @@ module.exports = grammar({
     // complete reading. Apache's rule has no `nls` between the two
     // parts, so where a line break can end a statement, `x = (a)`
     // followed by `foo()` is two statements. Inside `(…)` and `[…]`
-    // Groovy ignores line breaks, and there the cast is the only
-    // reading that parses, so `foo((String)` followed by `x)` is
-    // still a cast. Rejecting the cast outright would lose that case:
-    // the scanner cannot tell which brackets enclose it.
+    // Groovy ignores line breaks and reads a cast. Rejecting the cast
+    // outright would lose every such case: the scanner cannot tell
+    // which brackets enclose it. Ranking it last keeps the ones where
+    // nothing else parses, `foo((String)` followed by `x)`. It loses
+    // the ones where the later line can also continue the expression:
+    // `foo((a)` followed by `- b)` is a subtraction here and a cast
+    // in Groovy (divergence 15, #99).
     //
     // Without the weights nothing ranked the two readings and the
     // stack order decided. Inside a closure or block, `a = (int) y`

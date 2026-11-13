@@ -901,9 +901,11 @@ Two rules settle it, both from Apache's
   followed by `foo()` on the next line is two statements. The second
   alternative carries this: a cast whose operand is on a later line
   has a negative dynamic precedence and loses to any other complete
-  reading. Inside `(…)` and `[…]` Groovy ignores line breaks, no
-  other reading parses there, and `foo((String)` followed by `x)` is a
-  cast.
+  reading. Inside `(…)` and `[…]` Groovy ignores line breaks and reads
+  a cast. Here the cast stands there when no other reading parses
+  (`foo((String)` followed by `x)`), and loses when the later line can
+  also continue the expression (`foo((a)` followed by `- b)` is a
+  subtraction); see `docs/divergences-from-spec.md` §15.
 
 Without the two weights the readings were unranked and the result
 depended on the surrounding code.
@@ -1248,11 +1250,13 @@ the operand of a possible cast is on the line of its `)`.
 
 ```text
 Emit CAST_CLOSE for a `)` when, after it:
-  - any spaces, tabs and line escapes (§5.10) are skipped, and
+  - any spaces, tabs, line escapes (§5.10) and block comments that
+    close on the same line are skipped, and
   - the next character is not a line break, not the end of the input,
     and not the `//` of a line comment.
-A `/*` counts as something on the line. The comment is not read, so an
-unterminated one is not scanned to the end of the input.
+A block comment that runs past the end of the line counts as something
+on the line: Groovy's lexer drops the comment with its line breaks, and
+reading on would scan an unterminated comment to the end of the input.
 On any other input return false; the in-grammar lexer then reads `)`.
 ```
 

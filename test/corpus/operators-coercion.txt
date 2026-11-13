@@ -339,3 +339,52 @@ def y = ((String)
         (parenthesized_type_cast
           type: (type_identifier)
           value: (identifier))))))
+
+==================
+A block comment that closes on the line does not carry a cast to the next line
+==================
+
+x = (a) /* c */
+foo()
+y = (int) /* c
+  c */ z
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (block_comment)
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        (block_comment)
+        value: (identifier)))))
+
+==================
+A sign on the line after a parenthesized name inside brackets is a binary operator (divergence 15)
+==================
+
+foo((a)
+  - b)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (parenthesized_expression
+            (identifier))
+          right: (identifier))))))

@@ -41,7 +41,7 @@ reasoning here.
 | §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
 | §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
-| §6.11 CAST_CLOSE | **Done** | a `)` with something after it on its line (spaces, tabs and line escapes skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. |
+| §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -694,3 +694,37 @@ share the helper `parameter()` in `grammar.js`: annotations, then
 A closure body can open with the same words, so each added form has to
 be checked against the forks listed in §5.8 of the spec. Tracked in
 #98.
+
+---
+
+## 15. A cast whose operand is on a later line
+
+**Apache `GroovyParser.g4`**: `castParExpression castOperandExpression`
+has no `nls` between its parts. Where a line break is a token, a `)`
+at the end of a line ends the expression. Inside `(…)` and `[…]` the
+lexer drops line breaks, so a cast may continue on the next line
+there.
+
+**Current implementation**: a newline is `extras` whitespace and the
+scanner has no state, so it cannot know which brackets enclose a
+cast. It reports only whether something follows the `)` on its line
+(`_cast_close`, spec §6.11), and `parenthesized_type_cast` is ranked
+by that: above a parenthesized expression when the operand is on the
+line, below every other complete reading when it is not.
+
+| Input | Groovy 4.0.32 | This grammar |
+|---|---|---|
+| `x = (a)` then `foo()` | two statements | two statements |
+| `x = (a) /* c */` then `foo()` | two statements | two statements |
+| `x = (int) \` then `y` (a line escape) | cast | cast |
+| `foo((String)` then `x)` | cast | cast: nothing else parses |
+| `foo((a)` then `- b)`, or `+ b)` | cast of `-b` | subtraction `(a) - b` |
+| `foo((a)` then `(b))` | cast of `(b)` | call `(a)(b)`, as at v0.5.0 |
+| `x = (a)` then `(b) y` | `x = a`, then the cast `(b) y` | one assignment, `(a)` cast of `(b) y`, as at v0.5.0 |
+
+At v0.5.0 the two readings were unranked and the stack order decided:
+`x = (a)` followed by `foo()` was a cast of the call.
+
+**Action**: a scanner that tracks bracket depth, which would also give
+the grammar a statement terminator where a line break is significant
+(#90, #96). Tracked in #99.

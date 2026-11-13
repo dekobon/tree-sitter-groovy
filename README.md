@@ -199,8 +199,10 @@ These are documented in detail in
   to the grammar. Most code is unaffected, because the next token
   cannot continue the statement. Known cases that read wrongly with no
   `ERROR`: a bare name followed by a literal on the next line is one
-  parenthesis-free call (#90), and a field with a modifier and no type
-  followed by a typed method is a typed field and a constructor (#96).
+  parenthesis-free call (#90); a field with a modifier and no type
+  followed by a typed method is a typed field and a constructor (#96);
+  and inside brackets, `(a)` followed by a line that starts with `-`,
+  `+` or `(` is not the cast Groovy reads (#99).
 - **A method with modifiers and no return type is a constructor** --
   `static f() { }` in a class body is a `constructor_declaration`,
   and `abstract m()` is an `ERROR` (#91).

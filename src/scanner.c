@@ -250,23 +250,48 @@ static bool scan_record_header(TSLexer *lexer) {
 // `x = (a)` followed by `foo()` on the next line is two statements.
 // The grammar ranks a cast by this answer; it does not forbid one,
 // because inside `(…)` and `[…]` a line break ends nothing. Spaces,
-// tabs and line escapes may come first. A line comment ends the line.
-// A block comment counts as something on the line; it is not read,
-// so that an unterminated one is not scanned to the end of the input
-// here.
+// tabs, line escapes and block comments that close on the line may
+// come first. A line comment ends the line.
 static bool cast_operand_follows(TSLexer *lexer) {
     lexer->mark_end(lexer);
-    if (!skip_same_line_space(lexer, false)) {
-        return true;
-    }
-    if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-        return false;
-    }
-    if (lexer->lookahead == '/') {
+    for (;;) {
+        if (!skip_same_line_space(lexer, false)) {
+            return true;
+        }
+        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+            return false;
+        }
+        if (lexer->lookahead != '/') {
+            return true;
+        }
         advance(lexer);
-        return lexer->lookahead != '/';
+        if (lexer->lookahead == '/') {
+            return false;
+        }
+        if (lexer->lookahead != '*') {
+            return true;
+        }
+        // A block comment that closes on this line is skipped, and the
+        // answer depends on what follows it. One that runs past the
+        // end of the line counts as something on the line: Groovy's
+        // lexer drops the comment with its line breaks, and reading
+        // on would scan an unterminated comment to the end of input.
+        advance(lexer);
+        for (;;) {
+            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                return true;
+            }
+            if (lexer->lookahead == '*') {
+                advance(lexer);
+                if (lexer->lookahead == '/') {
+                    advance(lexer);
+                    break;
+                }
+            } else {
+                advance(lexer);
+            }
+        }
     }
-    return true;
 }
 
 void *tree_sitter_groovy_external_scanner_create(void) {
