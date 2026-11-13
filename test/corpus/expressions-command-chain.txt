@@ -689,3 +689,77 @@ String key in a command chain is unsupported
 foo 'a': 1
 
 ---
+
+==================
+Named arguments with non-ASCII keys
+==================
+
+foo 名前: 1, 属性: 2
+bar €uro: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Named key whose code points end in the bytes of case
+==================
+
+foo ţase: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+A statement followed by a non-ASCII label on the next line stays two statements
+==================
+
+result
+名前: x
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (identifier))))
+
+==================
+A no-break space is not part of a named key
+:error
+==================
+
+foo a : 1
+
+---
+
+==================
+A character outside the identifier class is not a named key
+:error
+==================
+
+foo 😀: 1
+
+---

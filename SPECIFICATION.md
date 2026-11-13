@@ -907,7 +907,7 @@ enum TokenType {
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
-  COMMAND_NAMED_KEY,      // §5.5 — `name` of `name:` in a parenthesis-free call
+  COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
@@ -1039,9 +1039,9 @@ Emit RECORD_KEYWORD when, from the current position:
     comments — but no line break and no line comment, because
     `classDeclaration` in GroovyParser.g4 has no `nls` between RECORD
     and the name; then
-  - an identifier (the grammar's own class, §5.2, with every
-    non-ASCII code point counted as an identifier character); then
-    either
+  - a name (§5.2, but with every non-ASCII code point counted as an
+    identifier character; the in-grammar lexer reads the real name
+    afterwards, see §6.8); then either
   - `<` immediately (type parameters; the grammar's `type_parameters`
     opener is `token.immediate` as well), or
   - any mix of spaces, tabs, line escapes, line breaks, block and
@@ -1080,16 +1080,34 @@ Known residuals:
 ### 6.8 COMMAND_NAMED_KEY — implementation contract
 
 Emitted only where a command chain argument may start, and never during
-error recovery (`ERROR_SENTINEL` valid). Skips spaces, tabs and line
-escapes (§5.10) but not newlines, consumes an identifier, marks the
-token end, then looks ahead past the same whitespace for a single `:`
-(a following second `:` means a method reference, so no emit). `case` and `default` are rejected so a
-switch label after a statement on the same line stays a label.
+error recovery (`ERROR_SENTINEL` valid). The token is empty: it says
+that a key starts here, and the in-grammar lexer then reads the key as
+an ordinary `identifier`. The scanner skips spaces, tabs and line
+escapes (§5.10) but not newlines, marks the token end, then looks ahead
+over a name and the same whitespace for a single `:` (a following
+second `:` means a method reference, so no emit). `case` and `default`
+are rejected so a switch label after a statement on the same line stays
+a label.
 
-Keeping the key scanner-side gives the parser a distinct lookahead token,
-so `Type name = …` stays a declaration without a precedence change, and a
-bare statement followed by a label on the next line (Spock's `where:`)
-stays two statements.
+The scanner has no Unicode tables, so its look-ahead counts every
+non-ASCII code point as part of the name. That is wider than §5.2, and
+it is safe because the scanner does not emit the name. On valid input
+the two agree, since outside strings and comments a non-ASCII character
+can only be part of a name. On other input (`foo a` + U+00A0 + `: 1`)
+the lexer reads a shorter name and the parse fails there. The scanner
+used to emit the key itself, with an ASCII-only class. Once #82 made
+non-ASCII names identifiers, `foo 名前: 1` parsed with no `ERROR` as a
+statement and a label.
+
+Keeping the decision scanner-side gives the parser a distinct lookahead
+token, so `Type name = …` stays a declaration without a precedence
+change, and a bare statement followed by a label on the next line
+(Spock's `where:`) stays two statements. A keyword is a valid key:
+after the empty token it has no parse action, so it lexes as an
+identifier, and the key position reserves no word, which covers `new`.
+An empty external token is ignored by the tree-sitter runtime directly
+after a parse error, so a key there is not recognized until the parser
+has shifted another token.
 
 After a comma the statement cannot end, so a key on a continuation line
 (`sh script: 'make',` then `returnStdout: true`) is matched in the grammar

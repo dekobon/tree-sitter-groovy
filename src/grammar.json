@@ -255,16 +255,19 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "SYMBOL",
+          "name": "_command_named_key"
+        },
+        {
           "type": "FIELD",
           "name": "key",
           "content": {
-            "type": "ALIAS",
+            "type": "RESERVED",
             "content": {
               "type": "SYMBOL",
-              "name": "_command_named_key"
+              "name": "identifier"
             },
-            "named": true,
-            "value": "identifier"
+            "context_name": "property"
           }
         },
         {

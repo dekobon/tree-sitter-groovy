@@ -239,8 +239,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   same characters, so `"値は$名前です"` now interpolates `名前です`
   where it was literal text with a `$` before; that is the only tree
   change for input that already parsed. The contextual `record`
-  keyword accepts a non-ASCII record name. No symbol is added.
-  (#78, #82)
+  keyword accepts a non-ASCII record name, and a named argument in a
+  parenthesis-free call takes a non-ASCII key (`foo 名前: 1`): the
+  scanner token `_command_named_key` is now empty and the in-grammar
+  lexer reads the key. No symbol is added. (#78, #82)
 - Closure parameters take what a method parameter takes: `def`
   (`{ def b -> }`), `final`, annotations, varargs
   (`{ String... args -> }`) and a default (`{ a = 1 -> }`,

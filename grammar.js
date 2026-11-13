@@ -211,9 +211,10 @@ module.exports = grammar({
     $.block_comment,
     $.groovydoc_comment,
     $._record_keyword,
-    // §5.5 — `name:` key of a named argument in a parenthesis-free call.
-    // Scanner-side so the newline before a Spock label (`result` then
-    // `where:`) is not swallowed, and so `Type name =` stays a declaration.
+    // §5.5 — empty token before the `name:` key of a named argument in
+    // a parenthesis-free call. Scanner-side so the newline before a Spock
+    // label (`result` then `where:`) is not swallowed, and so
+    // `Type name =` stays a declaration.
     $._command_named_key,
     // §5.10 — `[` on the same line as the token before it (spaces, tabs and
     // line escapes allowed). A `[` after a newline isn't one and can only
@@ -382,12 +383,17 @@ module.exports = grammar({
 
     // §5.5 item 3 — named arguments in a parenthesis-free call:
     // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
-    // GORM's `name blank: false, size: 1..100`. The key is an identifier
-    // lexed by the external scanner only when `:` follows on the same
-    // line, so `Type name = …` and a bare statement followed by a Spock
-    // label on the next line are unaffected.
+    // GORM's `name blank: false, size: 1..100`. `_command_named_key`
+    // is an empty token that the external scanner emits before a name
+    // only when `:` follows it on the same line, so `Type name = …` and
+    // a bare statement followed by a Spock label on the next line are
+    // unaffected. The name itself is an ordinary `identifier`. A
+    // keyword is a valid key (Apache `namedArgLabel`): it has no
+    // action after the empty token, so it lexes as an identifier, and
+    // the empty `property` set does the same for the reserved `new`.
     _command_named_argument: $ => seq(
-      field('key', alias($._command_named_key, $.identifier)),
+      $._command_named_key,
+      field('key', reserved('property', $.identifier)),
       ':',
       field('value', $._expression),
     ),
