@@ -324,6 +324,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   name was. `locals.scm`: a typed local (`String s = 'a'`), a blank
   final and a `try` resource are definitions, and an enum body, a
   record and a `try` statement are scopes.
+- The Python source distribution builds. It held `src/parser.c` and
+  `src/scanner.c` without `src/tree_sitter/*.h`, so installing from
+  the sdist failed with `tree_sitter/parser.h: No such file or
+  directory`, and it held no queries. A `MANIFEST.in` adds both.
+  Wheels are built from a checkout, which has both.
 
 ## [0.5.0] - 2026-11-10
 
