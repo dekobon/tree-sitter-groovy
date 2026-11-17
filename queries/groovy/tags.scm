@@ -49,12 +49,37 @@
 
 ; --- References -----------------------------------------------------
 
+; A call is tagged by the name of the method it calls: the callee
+; itself, or the last name of a member access (`obj.m(x)`, `obj?.m(x)`,
+; `obj??.m(x)`, `list*.m(x)`). Calling a method pointer calls the
+; method it names, so `obj.&m(x)` is a call of `m`. A call through `.@`
+; is not tagged: `obj.@f(x)` calls the closure held in the field `f`,
+; not a method named `f`.
 (method_invocation
   function: (identifier) @name) @reference.call
 
 (method_invocation
-  function: (field_access
-    field: (identifier) @name)) @reference.call
+  function: [
+    (field_access field: (identifier) @name)
+    (safe_navigation_expression property: (identifier) @name)
+    (safe_chain_dot_expression property: (identifier) @name)
+    (spread_dot_expression property: (identifier) @name)
+    (method_pointer_expression method: (identifier) @name)
+  ]) @reference.call
+
+; A parenthesis-free call (`sh 'make'`, `def out = sh script: 'make'`,
+; `obj?.m 'x'`) follows the same rules as `method_invocation`.
+(command_chain
+  receiver: (identifier) @name) @reference.call
+
+(command_chain
+  receiver: [
+    (field_access field: (identifier) @name)
+    (safe_navigation_expression property: (identifier) @name)
+    (safe_chain_dot_expression property: (identifier) @name)
+    (spread_dot_expression property: (identifier) @name)
+    (method_pointer_expression method: (identifier) @name)
+  ]) @reference.call
 
 (object_creation_expression
   type: (type_identifier) @name) @reference.class
@@ -62,6 +87,11 @@
 (object_creation_expression
   type: (generic_type
     base: (type_identifier) @name)) @reference.class
+
+; `array_creation_expression` is not tagged, as in tree-sitter-java:
+; `new Foo[3]` calls no constructor of `Foo`, so it is a use of the type
+; like `Foo x` or `(Foo) x`, which are not tagged either. An element
+; that is created, as in `new Foo[] { new Foo() }`, is tagged above.
 
 (superclass (type_identifier) @name) @reference.class
 

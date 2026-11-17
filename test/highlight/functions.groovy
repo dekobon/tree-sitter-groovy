@@ -26,6 +26,42 @@ def v = a.b.method 1
 //          ^ function.call
 //        ^ property
 
+obj?.method(x)
+//   ^ function.call
+
+obj??.method(x)
+//    ^ function.call
+
+list*.method(x)
+//    ^ function.call
+
+obj?.method 'x'
+//   ^ function.call
+
+obj??.method 'x'
+//    ^ function.call
+
+list*.method 'x'
+//    ^ function.call
+
+obj?.prop
+//   ^ property
+
+obj??.prop
+//    ^ property
+
+list*.prop
+//    ^ property
+
+obj.&method(x)
+//   ^ function
+
+obj.@field(x)
+//   ^ property
+
+obj.@field 'x'
+//   ^ property
+
 String::length
 //      ^ function
 

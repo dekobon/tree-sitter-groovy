@@ -221,19 +221,31 @@
 
 ; -- Layer 7: call sites (after layer 5 so method-named fields win) -
 
+; A call through `.`, `?.`, `??.` or `*.` names its method in the
+; access's last name, which layer 5 made a @property. A call through
+; `.&` keeps @function, as the name is a method pointer; a call through
+; `.@` keeps @property, as it calls the value of the field.
 (method_invocation
   function: (identifier) @function.call)
 
 (method_invocation
-  function: (field_access
-              field: (identifier) @function.call))
+  function: [
+    (field_access field: (identifier) @function.call)
+    (safe_navigation_expression property: (identifier) @function.call)
+    (safe_chain_dot_expression property: (identifier) @function.call)
+    (spread_dot_expression property: (identifier) @function.call)
+  ])
 
 (command_chain
   receiver: (identifier) @function.call)
 
 (command_chain
-  receiver: (field_access
-              field: (identifier) @function.call))
+  receiver: [
+    (field_access field: (identifier) @function.call)
+    (safe_navigation_expression property: (identifier) @function.call)
+    (safe_chain_dot_expression property: (identifier) @function.call)
+    (spread_dot_expression property: (identifier) @function.call)
+  ])
 
 ; -- Layer 8: types (after @variable so aliased identifier wins) ---
 
