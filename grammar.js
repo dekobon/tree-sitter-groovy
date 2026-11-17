@@ -73,6 +73,21 @@ const MODIFIER_ONLY_FIELD_WEIGHT = -1;
 const COMPACT_CONSTRUCTOR_WEIGHT = TYPED_FIELD_WEIGHT - MODIFIER_ONLY_FIELD_WEIGHT + 1;
 
 /*
+ * The fork between a field's name and a type (the
+ * `[variable_declarator, _type]` conflict) also splits a type nested
+ * after a typed field with modifiers. In a record,
+ * `private String y` followed by `class C extends B implements I { }`
+ * is also the fields `String`, `y class`, `C extends` and
+ * `B implements` and a compact constructor `I`: where a keyword has no
+ * action it is an identifier. A type header splits into at most two
+ * such fields after the one named by its keyword (`C extends`,
+ * `B implements`), so a nested type in a record must outweigh a
+ * modifier-only field, two typed fields and a compact constructor.
+ */
+const RECORD_TYPE_MEMBER_WEIGHT =
+  MODIFIER_ONLY_FIELD_WEIGHT + 2 * TYPED_FIELD_WEIGHT + COMPACT_CONSTRUCTOR_WEIGHT + 1;
+
+/*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
  * `JavaLetterOrDigit`: Java's `Character.isJavaIdentifierStart` and
  * `isJavaIdentifierPart` without the identifier-ignorable characters.
@@ -133,8 +148,9 @@ function gstringPart($, textRule) {
 /**
  * The members of a type body, listed once. `enum_body` repeats the
  * list for the member directly after a trailing comma, where a plain
- * constructor is not allowed (see `enum_declaration`), and the two
- * lists must not drift apart.
+ * constructor is not allowed (see `enum_declaration`), and a record
+ * body weights its nested types (`_record_type_member`); the lists
+ * must not drift apart.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral | null} constructor The constructor rule for
@@ -142,11 +158,33 @@ function gstringPart($, textRule) {
  * @returns {RuleOrLiteral[]} The member rules, in a fixed order.
  */
 function classMembers($, constructor) {
+  return [...memberDeclarations($, constructor), ...typeDeclarations($)];
+}
+
+/**
+ * The members of a type body other than nested types.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral | null} constructor See `classMembers`.
+ * @returns {RuleOrLiteral[]} The member rules, in a fixed order.
+ */
+function memberDeclarations($, constructor) {
   return [
     $.method_declaration,
     $.field_declaration,
     ...(constructor ? [constructor] : []),
     $.static_initializer,
+  ];
+}
+
+/**
+ * The type declarations that may be nested in a type body.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral[]} The declaration rules, in a fixed order.
+ */
+function typeDeclarations($) {
+  return [
     $.enum_declaration,
     $.class_declaration,
     $.interface_declaration,
@@ -1274,13 +1312,23 @@ module.exports = grammar({
     _record_body: $ => seq(
       '{',
       repeat(choice(
-        $._class_member,
+        ...memberDeclarations($, $.constructor_declaration),
+        $._record_type_member,
         $.compact_constructor_declaration,
         $.block,
         ';',
       )),
       '}',
     ),
+
+    // A type nested in a record, weighted above the split of its header
+    // into fields and a compact constructor (RECORD_TYPE_MEMBER_WEIGHT).
+    // Each type is aliased to itself because the generator drops the
+    // reduction of a hidden rule with one unaliased child, and the
+    // weight with it.
+    _record_type_member: $ => prec.dynamic(RECORD_TYPE_MEMBER_WEIGHT, choice(
+      ...typeDeclarations($).map(type => alias(type, type)),
+    )),
 
     // §4 — a record's compact canonical constructor, Apache's
     // `modifiersOpt compactConstructorDeclaration` (`methodName nls

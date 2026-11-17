@@ -3398,7 +3398,23 @@
             "members": [
               {
                 "type": "SYMBOL",
-                "name": "_class_member"
+                "name": "method_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "field_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "constructor_declaration"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "static_initializer"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_record_type_member"
               },
               {
                 "type": "SYMBOL",
@@ -3420,6 +3436,69 @@
           "value": "}"
         }
       ]
+    },
+    "_record_type_member": {
+      "type": "PREC_DYNAMIC",
+      "value": 14,
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "enum_declaration"
+            },
+            "named": true,
+            "value": "enum_declaration"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "class_declaration"
+            },
+            "named": true,
+            "value": "class_declaration"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "interface_declaration"
+            },
+            "named": true,
+            "value": "interface_declaration"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "trait_declaration"
+            },
+            "named": true,
+            "value": "trait_declaration"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "record_declaration"
+            },
+            "named": true,
+            "value": "record_declaration"
+          },
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "annotation_type_declaration"
+            },
+            "named": true,
+            "value": "annotation_type_declaration"
+          }
+        ]
+      }
     },
     "compact_constructor_declaration": {
       "type": "PREC_DYNAMIC",

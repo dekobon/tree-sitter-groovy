@@ -314,10 +314,23 @@ compact constructor's weight is one more than the typed field's less
 the modifier-only field's, so the first reading wins (§17);
 `grammar.js` computes it from the other two.
 
+The same fork splits a type nested in a record after a typed field
+with modifiers. A keyword is an identifier wherever it has no action,
+so `private String y` followed by `class C extends B implements I { }`
+is also the fields `String`, `y class`, `C extends` and `B implements`
+and a compact constructor `I`. A type header splits into at most two
+fields after the one its keyword names, so a nested type in a record
+carries the weight of a modifier-only field, two typed fields and a
+compact constructor, plus one. `grammar.js` computes it from those.
+Before the compact constructor the split died at `I {`. With it, the
+split won whenever the header had `extends` or `implements`, and once
+the constructor had its weight, with neither (§17).
+
 The dynamic precedences of class members:
 
 | Member | Weight |
 |---|---|
+| type declaration nested in a record body | 14 (a nested record 15) |
 | `compact_constructor_declaration` (record body only) | 6 |
 | typed `field_declaration` (`def` or a type) | 4 |
 | constructor after an enum's trailing comma | 4 |
@@ -853,6 +866,14 @@ wins. That is Groovy's reading when the line break follows the first
 name (`static count`, then `Name { … }`). With no line break between
 the names Groovy rejects either reading.
 
+The fork also reaches a type nested after a typed field with
+modifiers. Where a field name is expected the type keyword is an
+identifier, so `private String y` followed by `class C { }` is also
+the field `String`, a field `class` of type `y` and a compact
+constructor `C`, and `extends` and `implements` in the header split
+the same way. A type nested in a record carries a dynamic precedence
+above any such split (§6), so it keeps the reading it has elsewhere.
+
 The Groovy column is read off `GroovyParser.g4` and `AstBuilder.java`
 on the 4.0.x branch, not run. Where two alternatives of a rule parse
 the whole input, ANTLR takes the first, here `fieldDeclaration`.
@@ -868,6 +889,7 @@ the whole input, ANTLR takes the first, here `fieldDeclaration`.
 | `static String NAME` then `Name { … }` on the next line | field `NAME`, compact constructor | field `NAME`, `compact_constructor_declaration` |
 | `static Foo bar { … }`, or `static Foo bar` then `{ … }` on the next line | rejected | field `Foo`, `compact_constructor_declaration` named `bar` |
 | `String bar { … }` | rejected | `field_declaration` and `block` |
+| `private String y` then `class C extends B { }`, or another nested type, on the next line | field, nested type | `field_declaration`, then the type's declaration |
 | `'Name' { … }` | compact constructor | `ERROR` |
 
 In a class, interface, trait, enum or `@interface` body nothing

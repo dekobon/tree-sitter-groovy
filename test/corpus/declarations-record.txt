@@ -1567,6 +1567,310 @@ record R(int x) {
         body: (block)))))
 
 ==================
+Nested types after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    class C { }
+}
+record B(int x) {
+    private static final String NAME
+    enum E { A }
+}
+record D(int x) {
+    private static int count
+    interface I { }
+}
+record F(int x) {
+    private final String y
+    trait V { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Nested types with a superclass or interfaces after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    class C extends B { }
+    private final String z
+    class D implements I { }
+    private final String w
+    class E<T> extends B implements I { }
+}
+record G(int x) {
+    private static int count
+    interface I extends J permits K { }
+    private static int total
+    enum E implements I { A }
+    private static int rest
+    trait V extends W implements X { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (super_interfaces
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        type_parameters: (type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        (superclass
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (interface_declaration
+        name: (identifier)
+        (extends_interfaces
+          (type_identifier))
+        (permits_clause
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        (super_interfaces
+          (type_identifier))
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (trait_declaration
+        name: (identifier)
+        (extends_interfaces
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body)))))
+
+==================
+Nested types with modifiers or annotations after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    sealed class S permits T { }
+    private final String z
+    static class C { }
+    private final String w
+    @Deprecated abstract class D { }
+    private final String v
+    record N(int z) { }
+    private final String u
+    @interface Tag { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (permits_clause
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Nested type after a typed field in a record nested in a class
+==================
+
+class K {
+    record R(int a) {
+        private String y
+        class C extends B { }
+    }
+    private String z
+    class D extends B { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (class_declaration
+            name: (identifier)
+            (superclass
+              (type_identifier))
+            body: (class_body))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        body: (class_body)))))
+
+==================
 Modifier, name and block in other type bodies stay a field and an initializer
 ==================
 
