@@ -405,6 +405,21 @@ function arrayInitializer(element) {
   );
 }
 
+/**
+ * The parentheses of a call or an annotation around `argument`s separated
+ * by commas, with a trailing comma allowed after the last one.
+ *
+ * @param {RuleOrLiteral} argument An argument of the list.
+ * @returns {SeqRule} The argument list rule body.
+ */
+function argumentList(argument) {
+  return seq(
+    '(',
+    optional(seq(argument, repeat(seq(',', argument)), optional(','))),
+    ')',
+  );
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -1116,23 +1131,7 @@ module.exports = grammar({
     _annotation_type_element: $ => seq(
       ...methodHead($),
       'default',
-      field('default', choice(
-        $._expression,
-        $.annotation,
-        alias($._annotation_list, $.list_literal),
-      )),
-    ),
-
-    // Apache's `elementValueArrayInitializer` with annotations in it,
-    // `[@A(1), @A(2)]`. A list of expressions is a `list_literal`
-    // already; an `@` cannot start an expression, so the two never
-    // compete for a token.
-    _annotation_list: $ => seq(
-      choice('[', alias($._subscript_open, '[')),
-      $.annotation,
-      repeat(seq(',', $.annotation)),
-      optional(','),
-      ']',
+      field('default', $._element_value),
     ),
 
     // §4 — member list shared by class / interface / trait bodies and
@@ -1656,7 +1655,56 @@ module.exports = grammar({
     annotation: $ => seq(
       '@',
       field('name', $.qualified_name),
-      optional(field('arguments', $.argument_list)),
+      optional(field('arguments', alias($._annotation_arguments, $.argument_list))),
+    ),
+
+    // Apache's `elementValues` is one element value or a list of pairs.
+    // This takes whatever a call takes as well (`@Foo(1, 2)`,
+    // `@Foo(x: 1)`), so that an annotation's arguments parse as before,
+    // and adds element values that are not expressions.
+    _annotation_arguments: $ => argumentList(choice(
+      $._element_value,
+      alias($._element_value_pair, $.assignment_expression),
+      alias($.map_entry, $.named_argument),
+      $.spread_arguments,
+    )),
+
+    // `name = value`, with the node, fields and command chain that
+    // `assignment_expression` has in a call. The name stays unreduced,
+    // as in `_statement_assignment`: reducing it to an expression on
+    // `=` would conflict with this rule, and the precedence shifts the
+    // `=` here instead.
+    _element_value_pair: $ => prec.right(PREC.ASSIGN, seq(
+      field('left', $.identifier),
+      field('operator', '='),
+      field('right', choice(
+        $._element_value,
+        alias($._value_command_chain, $.command_chain),
+      )),
+    )),
+
+    // Apache's `elementValue`: an argument or pair value of an
+    // annotation, or an `@interface` element's `default`. It is not an
+    // expression, so `foo(@A)` and `[@A]` elsewhere stay errors.
+    _element_value: $ => choice(
+      $._expression,
+      $.annotation,
+      alias($._annotation_list, $.list_literal),
+    ),
+
+    // Apache's `elementValueArrayInitializer` with annotations in it,
+    // `[@A(1), @A(2)]`. A list of expressions is a `list_literal`
+    // already; an `@` cannot start an expression, so the two never
+    // compete for a token. Apache also takes a mix (`[@A, 1]`) and a
+    // nested list (`[[@A]]`), which Groovy rejects when it checks the
+    // annotation. A mix would share `[1,` with `list_literal` up to the
+    // first `@`, a conflict that every list in an annotation would pay.
+    _annotation_list: $ => seq(
+      choice('[', alias($._subscript_open, '[')),
+      $.annotation,
+      repeat(seq(',', $.annotation)),
+      optional(','),
+      ']',
     ),
 
     // §4 — `for (x in xs)`, plus the Java-compatible enhanced-for
@@ -2200,15 +2248,7 @@ module.exports = grammar({
     // named args (Groovy's `k: v` in call position) are `map_entry`
     // aliased to `named_argument` so downstream tools can tell them
     // apart from positional values.
-    argument_list: $ => seq(
-      '(',
-      optional(seq(
-        $._argument,
-        repeat(seq(',', $._argument)),
-        optional(','),
-      )),
-      ')',
-    ),
+    argument_list: $ => argumentList($._argument),
 
     _argument: $ => choice(
       $._expression,
