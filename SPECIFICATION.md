@@ -2117,9 +2117,12 @@ Standard tree-sitter highlighting captures:
 
 - Slashy-string and dollar-slashy bodies inject as `regex`. Solves
   the "slashy is a regex" expectation in Jenkins users' editors.
-- Triple-quoted strings inside `sql"""…"""` or `xml"""…"""` named-call
-  positions could inject the respective language; we don't ship those
-  by default but the query file is extensible.
+- A call on the bare name `sql` or `Sql` whose first argument is a
+  `"…"` or `"""…"""` string injects that string as `sql`, with or
+  without parentheses (`sql.execute """…"""`, `sql.rows("…")`). Later
+  string arguments are bind parameters and are not injected. No other
+  embedded language is shipped.
+- Groovydoc comments inject as `javadoc`.
 
 ### 9.3 locals.scm
 
