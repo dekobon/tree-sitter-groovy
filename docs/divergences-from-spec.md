@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with `def` (the form without it is an `ERROR`, #94) / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -170,7 +170,33 @@ AUTOMATIC_SEMICOLON is a v2 improvement.
 The other is a `{` that opens the next line: it joins the previous
 expression where the §6.4 contract as written would end the
 statement. After a call that is Apache's reading too; after
-`new T(...)` it is not (see #11).
+`new T(...)` it is not (see §11 below).
+
+A `(` that opens the next line joins the previous expression as a
+call's arguments. Apache's `arguments` has no `nls` before it, so
+outside brackets Groovy ends the statement. The multi-assignment
+without `def` (#94) is the form this hits, with no `ERROR`:
+
+- Two on consecutive lines, `(a, b) = [1, 2]` then
+  `(c, d) = [3, 4]`, are one statement here,
+  `(a, b) = ([1, 2](c, d) = [3, 4])`. Before #94 that input had an
+  `ERROR`.
+- After a statement that ends in an expression, the `(` calls that
+  expression and the call is assigned, as before #94: `foo()` then
+  `(a, b) = [1, 2]` assigns `foo()(a, b)`, and the swap `def b = 2`
+  then `(a, b) = [b, a]` assigns `2(a, b)`.
+
+Groovy reads two statements in each case (observed on Groovy 3). A
+`;` at the end of the previous statement avoids it.
+
+The opposite also happens, one line read as two statements. After
+`def f`, a `(` may open a parameter list or the next statement, and
+the parser keeps both readings so that `def f` followed by
+`(a, b) = list` on the next line is two statements. A line break is
+whitespace here, so nothing requires one between those statements:
+`def f(a, b) = [1, 2]`, on one line or with the `=` on the next, and
+`@A def f(a, b) = …` parse with no `ERROR` as a declaration of `f`
+followed by a multi-assignment. Groovy rejects them.
 
 ---
 

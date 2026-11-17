@@ -1388,10 +1388,8 @@ module.exports = grammar({
       optional(seq('=', field('value', $._expression))),
     ),
 
-    // §4 — `def (a, b) = expr`. Closes murtaza64 #22. v1 requires
-    // the leading `def`; the no-`def` form `(a, b) = expr` lands
-    // later (it shares a prefix with parenthesized_expression and
-    // needs a conflict declaration).
+    // §4 — `def (a, b) = expr`. Closes murtaza64 #22. The form without
+    // `def` is `multi_assignment_expression`.
     multi_assignment_declaration: $ => seq(
       'def',
       '(',
@@ -1488,6 +1486,7 @@ module.exports = grammar({
       $.elvis_expression,
       $.logical_implication_expression,
       $.assignment_expression,
+      $.multi_assignment_expression,
       $.power_expression,
       $.subscript_expression,
       $.safe_subscript_expression,
@@ -2053,6 +2052,33 @@ module.exports = grammar({
         field('right', $._expression),
       ))));
     },
+
+    // §4 — `(a, b) = expr`, Apache `#multipleAssignmentExprAlt`: two or
+    // more names and `=` alone. Apache lists it in `expression`, so it
+    // nests (`x = (a, b) = list`). The names are identifiers, not
+    // `variable_declarator`s: nothing is declared, and locals.scm reads
+    // every declarator's name as a definition.
+    //
+    // A parenthesized expression or a cast has no `,` at its top level, so
+    // the `,` after `( identifier` decides with no declared conflict. With
+    // one name, `(a) = 1` stays an `assignment_expression`, as in Apache.
+    //
+    // After `def f` or `final f` where a statement can start, a declared
+    // conflict keeps a reading in which the `(` opens the next statement.
+    // For `def f(a, b) { }` that reading now lives from the `(` to the
+    // `{`, so it costs more with each untyped parameter and nothing more
+    // with a longer body. A typed parameter ends it, and a class body has
+    // no statements. It parses `def f` followed by `(a, b) = list` on the
+    // next line, and it also accepts `def f(a, b) = list`, which Groovy
+    // rejects (divergence 3).
+    multi_assignment_expression: $ => prec.right(PREC.ASSIGN, seq(
+      '(',
+      field('name', $.identifier),
+      repeat1(seq(',', field('name', $.identifier))),
+      ')',
+      '=',
+      field('value', $._expression),
+    )),
 
     // §3.1 level 14 / §3.2 — ternary and Elvis share the CONDITIONAL
     // precedence level and are both right-associative. Apache groups

@@ -123,6 +123,399 @@ def (a, b, c) = source
     value: (identifier)))
 
 ==================
+Multi-assignment without def (#94)
+==================
+
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Multi-assignment without def, three names from a method call
+==================
+
+(a, b, c) = f()
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+Multi-assignment without def from a range
+==================
+
+(a, b) = 1..2
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (range_expression
+        start: (number_literal)
+        end: (number_literal)))))
+
+==================
+Multi-assignment without def from a closure call, with a placeholder name
+==================
+
+(_, b) = { [1, 2] }()
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (method_invocation
+        function: (closure
+          (expression_statement
+            (list_literal
+              (number_literal)
+              (number_literal))))
+        arguments: (argument_list)))))
+
+==================
+Multi-assignment without def across line breaks
+==================
+
+(a,
+ b)
+    =
+    [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Multi-assignment without def in a method, a closure and an if branch
+==================
+
+def m() {
+    (a, b) = [1, 2]
+}
+def c = { (a, b) = it }
+if (x) (a, b) = [1, 2]
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (list_literal
+            (number_literal)
+            (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (multi_assignment_expression
+            name: (identifier)
+            name: (identifier)
+            value: (identifier))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (multi_assignment_expression
+        name: (identifier)
+        name: (identifier)
+        value: (list_literal
+          (number_literal)
+          (number_literal))))))
+
+==================
+Multi-assignment without def nested in other expressions
+==================
+
+x = (a, b) = [1, 2]
+foo((a, b) = list)
+for ((a, b) = [0, 5]; a < b; a++) { }
+def m() { return (a, b) = [1, 2] }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (multi_assignment_expression
+        name: (identifier)
+        name: (identifier)
+        value: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (identifier)))))
+  (for_statement
+    init: (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (list_literal
+            (number_literal)
+            (number_literal)))))))
+
+==================
+Multi-assignment without def after a def with no initializer
+==================
+
+def f
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Script method with untyped parameters is not a multi-assignment
+==================
+
+def add(a, b) { a + b }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+Assignment to one parenthesized name is not a multi-assignment
+==================
+
+(a) = 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (parenthesized_expression
+        (identifier))
+      right: (number_literal))))
+
+==================
+Cast to a generic type with two arguments is not a multi-assignment
+==================
+
+(Map<K, V>) m
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (type_identifier)))
+      value: (identifier))))
+
+==================
+Call with a space before its arguments, then an equals sign, is not a multi-assignment
+==================
+
+foo (a, b) = c
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)
+          (identifier)))
+      right: (identifier))))
+
+==================
+Parenthesized names on the line after a call are its arguments (divergence 3)
+==================
+
+foo()
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (method_invocation
+        function: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))
+        arguments: (argument_list
+          (identifier)
+          (identifier)))
+      right: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Two multi-assignments without def on consecutive lines read as one statement (divergence 3)
+==================
+
+(a, b) = [1, 2]
+(c, d) = [3, 4]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (assignment_expression
+        left: (method_invocation
+          function: (list_literal
+            (number_literal)
+            (number_literal))
+          arguments: (argument_list
+            (identifier)
+            (identifier)))
+        right: (list_literal
+          (number_literal)
+          (number_literal))))))
+
+==================
+Method head followed by an equals sign reads as a declaration and a multi-assignment (divergence 3)
+==================
+
+def f(a, b) = [1, 2]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Multi-assignment without def after a call ended by a semicolon
+==================
+
+foo();
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Parenthesized names with no equals sign are not accepted
+:error
+==================
+
+(a, b)
+
+---
+
+==================
+Multi-assignment with a compound operator is not accepted
+:error
+==================
+
+(a, b) += x
+
+---
+
+==================
 Typed local variable declaration
 ==================
 
