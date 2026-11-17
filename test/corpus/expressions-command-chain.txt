@@ -2754,3 +2754,25 @@ String key in a command chain with a dotted receiver is unsupported
 obj.m 'a': 1
 
 ---
+
+==================
+Capitalized last name before a string with no parenthesis is a command chain
+==================
+
+Foo.Bar 'x'
+Foo.Bar 'x', 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)
+    argument: (number_literal)))

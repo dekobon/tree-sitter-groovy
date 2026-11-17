@@ -637,8 +637,8 @@ The resolution we adopt:
    obj.m` followed by `'x'`, as before #52; Groovy rejects the first and
    reads the second as a `return` and a call.
    A capitalized last name before a quoted name and `(` is the return
-   type of a method, as in Groovy: `java.util.List 'foo'() { }` declares
-   `foo`, while `obj.m 'a'() { }` passes `'a'({ })` to `m`. Groovy
+   type of a method, as in Groovy at script and class level:
+   `java.util.List 'foo'() { }` declares `foo`, while `obj.m 'a'() { }` passes `'a'({ })` to `m`. Groovy
    decides the first by trying the parameter list, so
    `java.util.List 'foo'(1)`, a call there, is the expression followed
    by `'foo'(1)` here.
