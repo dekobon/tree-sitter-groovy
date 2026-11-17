@@ -143,3 +143,98 @@ private static g(a) { a }
     body: (block
       (expression_statement
         (identifier)))))
+
+==================
+Annotated methods with no return type at script top level
+==================
+
+@Memoized fib(n) { n }
+
+@Memoized private cached(x) { x }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Modifier-only generic method at script top level
+==================
+
+private <T> first(List<T> xs) { xs }
+
+---
+
+(source_file
+  (method_declaration
+    type_parameters: (method_type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Call with a trailing closure is not a method declaration
+==================
+
+foo(x) { x }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))
+      closure: (closure
+        (expression_statement
+          (identifier))))))
+
+==================
+An annotated loop is not a method named after its keyword
+==================
+
+@Test1 while (true) { break }
+
+---
+
+(source_file
+  (ERROR
+    (annotation
+      name: (qualified_name
+        (identifier))))
+  (while_statement
+    condition: (boolean_literal)
+    body: (block
+      (break_statement))))

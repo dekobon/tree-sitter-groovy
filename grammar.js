@@ -231,6 +231,11 @@ module.exports = grammar({
   reserved: {
     global: _ => ['new'],
     property: _ => [],
+    untyped_method_name: _ => [
+      'new', 'if', 'else', 'for', 'while', 'do', 'switch', 'try', 'catch',
+      'finally', 'synchronized', 'return', 'throw', 'assert', 'break',
+      'continue',
+    ],
   },
 
   extras: $ => [
@@ -941,8 +946,12 @@ module.exports = grammar({
     // wins over local_variable_declaration when `(` follows the name,
     // so `def f() { … }` at script-top-level parses as a method
     // rather than a `def f` variable followed by `(…) { … }`.
-    // Modifiers alone (no `def`, no return type) also introduce a
-    // method outside a class body: `final f() { }`. In a class body
+    // Modifiers or annotations alone (no `def`, no return type) also
+    // introduce a method outside a class body: `final f() { }`,
+    // `@Memoized fib(n) { }`, `private <T> first(xs) { }`. Apache's
+    // AstBuilder requires one of them ("Modifiers or return type is
+    // required"), counting an annotation as a modifier, which keeps
+    // `foo(x) { }` a call with a trailing closure. In a class body
     // that shape stays a constructor_declaration.
     //
     // A method with a body carries a dynamic precedence because its
@@ -962,16 +971,23 @@ module.exports = grammar({
     // interface methods are unaffected.
     method_declaration: $ => {
       const signature = seq(
-        repeat($.annotation),
         choice(
           seq(
+            repeat($.annotation),
             repeat($._modifier),
             optional(field('type_parameters', $.method_type_parameters)),
             choice('def', field('return_type', $._type)),
+            field('name', $._property_name),
           ),
-          repeat1($._modifier),
+          seq(
+            choice(
+              seq(repeat1($.annotation), repeat($._modifier)),
+              repeat1($._modifier),
+            ),
+            optional(field('type_parameters', $.method_type_parameters)),
+            field('name', $._untyped_method_name),
+          ),
         ),
-        field('name', $._property_name),
         field('parameters', $.formal_parameters),
         optional($.throws_clause),
       );
@@ -1750,6 +1766,15 @@ module.exports = grammar({
     // `def "abstract"() { … }` both rely on this.
     _property_name: $ => choice(
       reserved('property', $.identifier),
+      alias($.string_literal, $.quoted_identifier),
+    ),
+
+    // The name of a method with no `def` and no return type. A
+    // statement keyword is reserved here: with nothing else in that
+    // position it would lex as an identifier, and `@A while (x) { }`
+    // would be a method named `while` with no ERROR.
+    _untyped_method_name: $ => choice(
+      reserved('untyped_method_name', $.identifier),
       alias($.string_literal, $.quoted_identifier),
     ),
 

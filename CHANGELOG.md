@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** outside a class body, a method declared with
+  annotations only and no return type (`@Memoized fib(n) { }`), or
+  with modifiers and type parameters
+  (`private <T> first(List<T> xs) { }`), now has its name as `name`,
+  as the modifier-only form has had since #56. Previously
+  these parsed with no `ERROR`, the name as `return_type` and a
+  zero-width `name`. `foo(x) { }`, with neither, is still a call with
+  a trailing closure. A statement keyword is reserved as that name, so
+  an annotated loop, `@A while (x) { }`, is an `ERROR` over the
+  annotation followed by the `while_statement`, and no longer a method
+  named `while` with a missing name. (#106)
+
 ## [0.6.0] - 2026-11-12
 
 ### Added
