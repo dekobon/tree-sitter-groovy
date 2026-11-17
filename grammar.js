@@ -14,9 +14,9 @@
  *   - The contextual `record`, `trait` and `sealed` keywords, emitted
  *     only before a declaration so each word stays an identifier
  *     everywhere else
- *   - Three decisions that depend on what shares a line: the key of
- *     a named argument in a parenthesis-free call, a subscript `[`,
- *     and the `)` of a cast
+ *   - Four decisions that depend on what shares a line: the key of
+ *     a named argument in a parenthesis-free call, the start of such
+ *     a call that is a value, a subscript `[`, and the `)` of a cast
  *   - The `!in` operator, which depends on the character after it
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
@@ -303,6 +303,34 @@ function parameter($) {
 }
 
 /**
+ * The arguments of a parenthesis-free call after its first: after each
+ * comma a named argument or any expression, Apache's
+ * `argumentListElement` without spread arguments.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RepeatRule} The repeated comma and argument.
+ */
+function commandArgumentsAfterFirst($) {
+  return repeat(seq(',', field('argument', choice(
+    alias($._command_named_argument, $.named_argument),
+    alias($._command_continued_named_argument, $.named_argument),
+    $._expression,
+  ))));
+}
+
+/**
+ * The value of a declarator or an assignment: an expression or a
+ * parenthesis-free call (Apache `variableInitializer`, and the right
+ * side of `#assignmentExprAlt` and `#multipleAssignmentExprAlt`).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The value rule.
+ */
+function assignedValue($) {
+  return choice($._expression, alias($._value_command_chain, $.command_chain));
+}
+
+/**
  * The braces of an array initializer around `element`s separated by
  * commas, with a trailing comma allowed after the last one (Apache
  * `variableInitializers`).
@@ -387,6 +415,11 @@ module.exports = grammar({
     // label (`result` then `where:`) is not swallowed, and so
     // `Type name =` stays a declaration.
     $._command_named_key,
+    // §6.14 — empty token before the receiver of a parenthesis-free call
+    // that is a value (`def x = foo 1`), emitted only when the first
+    // argument starts on the receiver's line. `def x = foo` followed by
+    // `1` on the next line stays two statements.
+    $._command_value_start,
     // §5.10 — `[` on the same line as the token before it (spaces, tabs and
     // line escapes allowed). A `[` after a newline isn't one and can only
     // start a list or map literal: a statement, not a subscript of the line
@@ -577,11 +610,29 @@ module.exports = grammar({
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
       field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
-      repeat(seq(',', field('argument', choice(
-        alias($._command_named_argument, $.named_argument),
-        alias($._command_continued_named_argument, $.named_argument),
+      commandArgumentsAfterFirst($),
+    )),
+
+    // §5.5 — a parenthesis-free call as the value of a declarator or an
+    // assignment (`def out = sh script: 'make', returnStdout: true`),
+    // aliased to `command_chain`. A newline is whitespace, so the call
+    // opens with `_command_value_start`, which the scanner emits only
+    // when a literal or a `name:` follows the receiver on its line.
+    // Without it `def x = foo` followed by `1` on the next line would be
+    // one call. A positional first argument is a whole expression, as in
+    // Apache (`def x = foo 'a' + b`); the token makes it start with a
+    // literal. A closure is not a first argument here: `def c = foo { }`
+    // stays a `method_invocation`, as Apache reads it. `prec.right` lets
+    // a `,` continue the call, as in Groovy: `def x = foo 1, y = 2`
+    // passes `y = 2` to `foo`.
+    _value_command_chain: $ => prec.right(seq(
+      $._command_value_start,
+      field('receiver', $.identifier),
+      field('argument', choice(
         $._expression,
-      )))),
+        alias($._command_named_argument, $.named_argument),
+      )),
+      commandArgumentsAfterFirst($),
     )),
 
     // §5.5 item 3 — named arguments in a parenthesis-free call:
@@ -606,11 +657,17 @@ module.exports = grammar({
     // needs no scanner token. Same-line keys normally come from the
     // scanner; `case` and `default`, which the scanner rejects, reach
     // this rule on the same line too (`foo 'a', default: 1`).
-    _command_continued_named_argument: $ => seq(
+    //
+    // A call that is a value can sit inside a list or an argument list,
+    // where a name and `:` after its comma may also be the next map
+    // entry or named argument: `[x = foo a: 1, b: 2]`. The precedence
+    // gives it to the call, as Apache's greedy argument list does, and
+    // `right` keeps `b: c = 1` one argument.
+    _command_continued_named_argument: $ => prec.right(1, seq(
       field('key', $.identifier),
       ':',
       field('value', $._expression),
-    ),
+    )),
 
     _command_argument: $ => choice(
       $.string_literal,
@@ -1479,12 +1536,12 @@ module.exports = grammar({
     _initialized_declarator: $ => seq(
       field('name', $.identifier),
       '=',
-      field('value', $._expression),
+      field('value', assignedValue($)),
     ),
 
     variable_declarator: $ => seq(
       field('name', $.identifier),
-      optional(seq('=', field('value', $._expression))),
+      optional(seq('=', field('value', assignedValue($)))),
     ),
 
     // §4 — `def (a, b) = expr`. Closes murtaza64 #22. The form without
@@ -1496,7 +1553,7 @@ module.exports = grammar({
       repeat(seq(',', $.variable_declarator)),
       ')',
       '=',
-      field('value', $._expression),
+      field('value', assignedValue($)),
     ),
 
     // §4 / §10 row #37 — Jenkins-style `pipeline { … }` block.
@@ -1558,7 +1615,7 @@ module.exports = grammar({
     _statement_assignment: $ => prec.right(PREC.ASSIGN, seq(
       field('left', $.identifier),
       field('operator', '='),
-      field('right', $._expression),
+      field('right', assignedValue($)),
     )),
 
     // §3.2 PRIMARY — minimal alternative set for now. Every primary
@@ -2148,7 +2205,7 @@ module.exports = grammar({
       return choice(...ops.map(op => prec.right(PREC.ASSIGN, seq(
         field('left', $._expression),
         field('operator', op),
-        field('right', $._expression),
+        field('right', assignedValue($)),
       ))));
     },
 
@@ -2176,7 +2233,7 @@ module.exports = grammar({
       repeat1(seq(',', field('name', $.identifier))),
       ')',
       '=',
-      field('value', $._expression),
+      field('value', assignedValue($)),
     )),
 
     // §3.1 level 14 / §3.2 — ternary and Elvis share the CONDITIONAL

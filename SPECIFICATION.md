@@ -395,7 +395,7 @@ fix relative to *both* parent grammars.
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
-| Multi-assignment | **new** | `def (a, b) = expr` is a `multi_assignment_declaration` (murtaza64 #22). `(a, b) = expr` is a `multi_assignment_expression` (#94), after Apache `#multipleAssignmentExprAlt`: two or more plain names, then `=` and no other operator, with line breaks allowed around the `=`. It is an expression, so it nests: `x = (a, b) = list`, `foo((a, b) = list)`, a `for` init, after `return`. Its names are `identifier`s rather than `variable_declarator`s, as nothing is declared. With one name, `(a) = x` is an `assignment_expression` of a parenthesized expression, as in Apache. A `(` that opens a line continues an expression that ends the line before as a call, where Groovy ends the statement (`docs/divergences-from-spec.md` §3), with no `ERROR`: two multi-assignments on consecutive lines, `(a, b) = [1, 2]` then `(c, d) = [3, 4]`, are one statement, `(a, b) = ([1, 2](c, d) = [3, 4])`, and in the swap `def b = 2` then `(a, b) = [b, a]` the call `2(a, b)` is assigned. A `;` after the previous statement avoids it. The reverse also holds: `def f(a, b) = [1, 2]`, which Groovy rejects, is a declaration of `f` followed by a multi-assignment. The value is an expression, so a parenthesis-free call is not one: `(a, b) = f 3` is `(a, b) = f` followed by `3` (#95). The declaration form takes neither types nor modifiers: `def (int a, String b) = …`, `final (a, b) = …`, `final def (a, b) = …` and `var (a, b) = …` are an `ERROR`. |
+| Multi-assignment | **new** | `def (a, b) = expr` is a `multi_assignment_declaration` (murtaza64 #22). `(a, b) = expr` is a `multi_assignment_expression` (#94), after Apache `#multipleAssignmentExprAlt`: two or more plain names, then `=` and no other operator, with line breaks allowed around the `=`. It is an expression, so it nests: `x = (a, b) = list`, `foo((a, b) = list)`, a `for` init, after `return`. Its names are `identifier`s rather than `variable_declarator`s, as nothing is declared. With one name, `(a) = x` is an `assignment_expression` of a parenthesized expression, as in Apache. A `(` that opens a line continues an expression that ends the line before as a call, where Groovy ends the statement (`docs/divergences-from-spec.md` §3), with no `ERROR`: two multi-assignments on consecutive lines, `(a, b) = [1, 2]` then `(c, d) = [3, 4]`, are one statement, `(a, b) = ([1, 2](c, d) = [3, 4])`, and in the swap `def b = 2` then `(a, b) = [b, a]` the call `2(a, b)` is assigned. A `;` after the previous statement avoids it. The reverse also holds: `def f(a, b) = [1, 2]`, which Groovy rejects, is a declaration of `f` followed by a multi-assignment. The value of either form may be a parenthesis-free call, as Apache's `statementExpression` and `variableInitializer` allow: `(a, b) = f 3` and `def (a, b) = f 3` (§5.5, #95). The declaration form takes neither types nor modifiers: `def (int a, String b) = …`, `final (a, b) = …`, `final def (a, b) = …` and `var (a, b) = …` are an `ERROR`. |
 | Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. |
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
@@ -574,14 +574,43 @@ The murtaza64 grammar's `juxt_function_call` has open issue #5 —
 optional parentheses produce ambiguities with ternaries and map items.
 The resolution we adopt:
 
-1. **Command chains are statement-level only.** Per the Groovy spec
-   and the Apache grammar, `a b c d` is a `commandExpression`, which
-   in `GroovyParser.g4` appears under `statement → expressionStatement
-   → commandExpression`. It is **not** a general expression. This
-   removes most of murtaza64's nested-juxt-call conflicts.
-2. **First token is an identifier or property-access chain**, not
-   any expression — so `(x + y) z` is a syntax error, not a juxt-call
-   on a parenthesised expression.
+1. **Command chains are statements and values, not general
+   expressions.** In `GroovyParser.g4` (4.0.x) `a b c d` is a
+   `commandExpression`, the only form of `statementExpression`. A
+   `statement` takes one (`#expressionStmtAlt`), and so do
+   `variableInitializer` (through `enhancedStatementExpression`), the
+   right side of `#assignmentExprAlt` and of
+   `#multipleAssignmentExprAlt`, `expressionInPar` and `lambdaBody`.
+   An operand and the value of `return`, `throw`, `assert` or `yield`
+   take an `expression`, so `return foo 1` is rejected by Groovy and is
+   `return foo` followed by `1` here. The
+   grammar accepts a command chain as a statement, and as the value of
+   a declarator (a local variable, a field, `def (a, b) = …`) or of an
+   assignment with any operator (`x = foo 1`, `x.y += foo 1`,
+   `(a, b) = f 3`). That covers Jenkins' `def out = sh script: 'make',
+   returnStdout: true`. An assignment is an expression, so the value
+   form nests where an assignment does: `println(x = foo 1)`,
+   `"${x = foo 1}"`. The value form is the same `command_chain` node
+   with the same fields. Not accepted here, and taken by Groovy
+   (observed with Groovy 3): a chain in parentheses (`(foo 1)`,
+   `if (foo 1)`); a chain as the only argument of a call (`bar(foo 1)`,
+   `println(sh script: 'x', returnStdout: true)`, and `bar(foo 1, 2)`,
+   which is `bar(foo(1, 2))`), though Groovy rejects one among several
+   arguments (`bar(a, foo 1)`); and a chain in an interpolation
+   (`"${foo 1}"`). Each is an `ERROR`. Nor is a lambda body, which the
+   grammar does not have. Apache's array initializer
+   (`variableInitializers`) takes the rule too, and `AstBuilder` then
+   rejects a command there. A newline is whitespace (§5.10), so a value
+   form needs its first argument on the receiver's line: `def x = foo`
+   followed by `1` on the next line stays two statements, as in Groovy.
+   The scanner makes that decision before the receiver (§6.14).
+   Keeping the chain out of general expressions removes most of
+   murtaza64's nested-juxt-call conflicts.
+2. **The receiver is an identifier**, not any expression: `(x + y) z`
+   is two expression statements, not a juxt-call on a parenthesised
+   expression. A dotted receiver, which Groovy takes (`obj.method 1`
+   calls `method`, observed with Groovy 3), is not implemented yet: it
+   parses as `obj.method` followed by `1`.
 3. **Argument forms allowed**: the first argument is a literal, a
    closure, or a named arg (`k: v`). After a comma an argument is a
    named arg or any expression (`assertEquals 'v', a + b`,
@@ -590,20 +619,34 @@ The resolution we adopt:
    are an `ERROR`.
    A named-arg key is an identifier; Apache also accepts string keys
    (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
-   nested command chains, and an identifier or other non-literal
+   nested command chains, other than as the value of an assignment
+   (`bar 1, x = foo 2`, item 1), and an identifier or other non-literal
    expression as the first positional argument: `foo bar` is also how
    a typed declaration starts (`Type name = …`), and the parser cannot
    tell the two apart before the `=`. A bare `foo bar` parses as two
    expression statements.
+   In a value (item 1) the first positional argument is any expression
+   that starts with a literal, as in Apache's `argumentList`:
+   `def x = foo 'a' + b` passes `'a' + b`. A value takes no closure as
+   the first argument: `def c = foo { }` stays a `method_invocation`,
+   which is how Apache reads a closure after a name. Nor does it take a
+   name, although no declaration can start there: `def x = foo bar` is
+   `def x = foo` followed by `bar`, as in statement position. After a
+   value's arguments a `,` continues the call, as Apache's greedy
+   argument list does: `def x = foo 1, y = 2` passes `y = 2` to `foo`
+   rather than declaring `y`, and in `[x = foo a: 1, b: 2]` the `b: 2`
+   is the call's named argument, not a map entry.
 4. **Chain continuation**: after the first call, subsequent `name`
    tokens become property/method dispatches. The Apache grammar uses
    `commandArgument: pathElement+ argumentList?` for the chain
-   continuation — we mirror that with a `command_chain_segment` rule.
+   continuation. It is not implemented: `foo 1 b 2` parses as the two
+   chains `foo 1` and `b 2`, in a value as well.
 5. **Conflicts** with `binary_expression` (where `a - b` could be
    "call `a` with `-b`") are resolved by giving `binary_expression`
-   higher precedence: command chains *only* match when there is a
-   space and the next token is an identifier or a literal that is
-   not a binary operator.
+   higher precedence: a command chain *only* matches when the token
+   after the receiver can start a first argument (item 3), with or
+   without a space before it (`foo'a'`). `foo -1` is the subtraction
+   `foo - 1` and `foo [1]` a subscript, as in Groovy.
 
 This is meaningfully more conservative than murtaza64's rule, which
 attempts to allow command chains in argument lists. We trade DSL
@@ -615,8 +658,9 @@ the 95% case than ambitious parses on the 5%.
 
 Groovy lets you write `println foo` for `println(foo)`. That **is** a
 juxt-function call (§5.5) and is the dominant form. Method calls
-*nested in expressions* always require parentheses
-(`return f(x)` not `return f x`). The grammar does not need a
+*nested in expressions* require parentheses (`return f(x)` not
+`return f x`), except as the whole value of a declaration or an
+assignment (`def x = f 1`, §5.5 item 1). The grammar does not need a
 separate rule.
 
 ### 5.7 GString interpolation
@@ -923,7 +967,8 @@ grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 (§6.7), `trait` and `sealed` (§6.13) keywords, the named-argument key of a parenthesis-free call
-(§6.8), the same-line subscript opener (§6.9), the `)` of a cast
+(§6.8), the start of such a call that is a value (§6.14), the
+same-line subscript opener (§6.9), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), `STRING_BODY` (§6.10),
 which is never emitted and only marks a string body, and
@@ -950,6 +995,7 @@ enum TokenType {
   TRAIT_KEYWORD,          // §6.13 — `trait` only at the start of a trait header
   SEALED_KEYWORD,         // §6.13 — `sealed` only before `class`, `interface` or `trait`
   COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
+  COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
@@ -1253,7 +1299,8 @@ Known limitations:
   subscripts (§6.9), so `foo 1, 2` followed by `[a].each { }` is two
   statements. A chain whose one argument is positional (`foo 'a'` then
   `(a)`) is not affected either, because that argument is not a full
-  expression. The value of a named argument is one, so it joins even as
+  expression; in a value it is one, and joins (§6.14). The value of a
+  named argument is one, so it joins even as
   the only argument: `foo a: 1` followed by `(b)` has the value `1(b)`.
   Expressions outside command chains already behave this way:
   `def x = 'b'` followed by `(a)` is a call on `'b'`.
@@ -1448,6 +1495,66 @@ not a trait header, so `trait T(int x) { }` is a method `T` with
 return type `trait` and no `ERROR`, at statement level and in a member
 list; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`. It
 is the counterpart of the `record foo() { … }` residual of §6.7.
+
+### 6.14 COMMAND_VALUE_START — implementation contract
+
+A parenthesis-free call may be the value of a declarator or an
+assignment (§5.5 item 1). A newline is whitespace, so with only the
+grammar `def x = foo` followed by `1` on the next line would be one
+call; Groovy ends the statement at the line break (observed with
+Groovy 3). The value form therefore opens with an empty token, which
+the scanner emits only when the first argument starts on the
+receiver's line.
+
+```text
+Emit COMMAND_VALUE_START, empty, where a value may start, when:
+  - after whitespace, line breaks and line escapes (a value may start
+    on the line after its `=`), a name starts, read as in §6.8; and
+  - the name is not `new`, `switch`, `true`, `false` or `null`, which
+    start a value as keywords; and
+  - after spaces, tabs and line escapes, but no line break and no
+    comment, comes a digit, `'`, `"`, the word `true`, `false` or
+    `null`, or a key: a name followed on the same line by `:` and not
+    `::`, other than `case` and `default` (§6.8).
+The token ends before the name; the in-grammar lexer reads the name
+and the argument. On any other input return false. Not emitted during
+error recovery.
+```
+
+The decision is taken at the receiver and not after it. Comments are
+`extras`, so after a comment the parser is where it was and the
+scanner is called again, past the line break it can no longer see. A
+token placed after the receiver would read `def x = foo` followed by
+`/* c */ 1` on the next line as one call. Decided at the receiver,
+every form with a line break after the receiver parses as it did
+before the value form existed.
+
+A slashy string is not a first argument, as in Groovy, which reads `/`
+after a name as division. Known differences from Groovy:
+
+- A comment between the receiver and its first argument on one line,
+  `def x = foo /* c */ 1`, is not a call: the look-ahead reads no
+  comment, so it never scans an unterminated one to the end of the
+  input. The tree is the one from before the value form, `def x = foo`,
+  the comment and `1`. Groovy reads a call (observed with Groovy 3),
+  also when the comment spans lines.
+- A name as the first argument (`def x = foo bar`) is not taken
+  (§5.5 item 3).
+- Two literals Groovy takes as a first argument do not start with a
+  digit or a quote, so the token is not emitted (observed with
+  Groovy 3). `def x = foo $/a/$`, which Groovy reads as `foo('a')`, is
+  `def x = foo` followed by the dollar-slashy string, with no `ERROR`.
+  `def x = foo .5`, Groovy's `foo(0.5)`, is an `ERROR`: `.5` is not a
+  number in this grammar at all. Both read the same before the value
+  form.
+- The first positional argument is an expression, and like every
+  expression it continues onto a next line that can continue it:
+  `def x = foo 1` followed by `(c)` passes `1(c)`, where Groovy ends
+  the statement before the `(` (observed). That is the general reading
+  of a `(` at the start of a line (`docs/divergences-from-spec.md`
+  §3), and an argument after a comma does the same in statement
+  position (§6.8). Before the value form the same input was
+  `def x = foo` followed by `1(c)`.
 
 ---
 
@@ -1942,7 +2049,7 @@ How each filed bug closes against this spec.
 | dekobon/big-code-analysis **#246** (Elvis short-circuit) | §3.2 — `elvis_expression` as a distinct named node. §8.1 — pinned corpus test reproducing the issue's `def pick(a, b, c) { … }` snippet with the expected S-expression. The downstream `get_op_type()` impl can now `matches!(id.into(), AMPAMP \| PIPEPIPE \| ELVIS_EXPRESSION)`. No `MISSING` child anywhere. |
 | dekobon/big-code-analysis **#247** umbrella (all operator gaps) | §3.2 row-by-row: every symbol in the issue's three tables maps to a distinct node kind. The "critical" rows (`?:`, `?.`, `as`, `trait`, `..<`) all have dedicated nodes. The "important" rows (`=~`, `==~`, slashy, `===`, `!==`, `<=>`, `!instanceof`, `!in`) likewise. The "niche" rows (`?=`, `?[]`, `.&`, `.@`, `$/…/$`, `==>`) likewise. §8 anchors each with a pinned test. §3.2.1 explicitly handles the subscript-yielding-callable composition (`arr[i](args)`). §3.2.2 documents the lexer trailing-context rule for `!instanceof` / `!in` to avoid mis-tokenisation when followed by an identifier character. |
 | amaanq #2 / #3 (maintenance / license) | The prior grammar is treated as inspiration only — no code is incorporated. This grammar is an independent project, dual-licensed under `Apache-2.0 OR MIT`, with no dependency on the upstream project's release cadence. |
-| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statement-level only, first token must be identifier-or-property-access, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
+| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements and to the values of declarations and assignments, the receiver an identifier, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
 | murtaza64 **#16** (empty block comments) | §6.6 — block comments and groovydoc comments are external-scanner tokens that consume the entire `/* … */` or `/** … */` regardless of content. §8.2 — pinned test with `/**/`, `/***/`, `/* */`. |
 | murtaza64 **#22** (multiple assignment) | §4 — `multi_assignment_declaration` rule. §8.2 — pinned test on `def (a, b) = [1, 2]`. |
 | murtaza64 **#27** (publish to npm) | Out of grammar scope. The package layout in §2.1 includes `package.json` and `bindings/node/`; npm publishing is part of release tooling, not the grammar. |

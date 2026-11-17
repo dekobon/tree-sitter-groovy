@@ -8,7 +8,9 @@
 // cannot express: each word is a keyword only when the declaration it
 // opens follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
-// argument in a parenthesis-free call; §6.9 SUBSCRIPT_OPEN, a `[` on
+// argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
+// empty token before the receiver of such a call that is a value;
+// §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
 // something after it on its line; and §6.12 NOT_IN, the `!in`
 // operator. UNTERMINATED_COMMENT (§6.6) is an empty token at the
@@ -16,8 +18,8 @@
 // STRING_BODY (§6.10) is never emitted; it is valid only
 // inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
-// SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the STRING_BODY check are
-// suppressed.
+// COMMAND_VALUE_START, SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the
+// STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
 // else is kept between calls.
@@ -36,6 +38,7 @@ enum TokenType {
     TRAIT_KEYWORD,
     SEALED_KEYWORD,
     COMMAND_NAMED_KEY,
+    COMMAND_VALUE_START,
     SUBSCRIPT_OPEN,
     CAST_CLOSE,
     NOT_IN,
@@ -137,6 +140,43 @@ static bool word_is(const char *word, unsigned len, const char *keyword) {
     return len == strlen(keyword) && memcmp(word, keyword, len) == 0;
 }
 
+// Whether a word that `read_word` returned is the literal `true`,
+// `false` or `null`.
+static bool is_literal_word(const char *word, unsigned len) {
+    return word_is(word, len, "true") || word_is(word, len, "false")
+        || word_is(word, len, "null");
+}
+
+// Whether the name that `read_word` just consumed is the key of a named
+// argument: `:` follows on the same line, and not `::`, which makes a
+// method reference. `case:` and `default:` are switch labels, not keys.
+// Apache's `namedArgLabel` accepts both keywords, so `foo default: 1`
+// diverges on purpose: the one-liner
+// `switch (x) { case 1: foo default: bar }` in statements-switch.txt
+// depends on the rejection.
+static bool key_colon_follows(TSLexer *lexer, const char *word, unsigned len) {
+    if (word_is(word, len, "case") || word_is(word, len, "default")) {
+        return false;
+    }
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead != ':') {
+        return false;
+    }
+    lexer->advance(lexer, false);
+    return lexer->lookahead != ':';
+}
+
+// Consumes a name and what follows it on its line, and returns whether
+// the name is the key of a named argument.
+static bool read_named_key(TSLexer *lexer) {
+    // Keeps enough characters to tell `default` from a longer word.
+    char word[sizeof "default"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    return key_colon_follows(lexer, word, len);
+}
+
 // SPECIFICATION.md §6.8 — decides that the key of a named argument
 // in a parenthesis-free call (`exclude group: 'a'`) starts here: a
 // name on the current line, followed by `:` and not `::`. The token is
@@ -150,27 +190,50 @@ static bool word_is(const char *word, unsigned len, const char *keyword) {
 // start.
 static bool scan_command_named_key(TSLexer *lexer) {
     lexer->mark_end(lexer);
-    // Keep the first few chars to reject `case:` / `default:`, which
-    // are switch labels, not keys. Apache's `namedArgLabel` accepts both
-    // keywords, so `foo default: 1` diverges on purpose: the one-liner
-    // `switch (x) { case 1: foo default: bar }` in statements-switch.txt
-    // depends on the rejection.
-    char word[sizeof "default"];
+    if (!read_named_key(lexer)) {
+        return false;
+    }
+    lexer->result_symbol = COMMAND_NAMED_KEY;
+    return true;
+}
+
+// SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
+// here as the value of a declarator or an assignment
+// (`def out = sh script: 'make'`): a name, then on its line a number, a
+// string, `true`, `false`, `null` or the key of a named argument. The
+// token is empty and sits before the name, which the in-grammar lexer
+// reads, as it reads the argument. Taking the decision at the name, not
+// after it, keeps a line break hidden by a comment from joining two
+// statements: in `def x = foo` followed by `/* c */ 1` on the next line,
+// the token after the comment would no longer see the line break.
+//
+// The caller has skipped whitespace and seen an identifier start.
+static bool scan_command_value_start(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    char word[sizeof "switch"];
     unsigned len = read_word(lexer, word, sizeof word);
-    if (word_is(word, len, "case") || word_is(word, len, "default")) {
+    // The words that start a value as keywords keep that reading.
+    if (word_is(word, len, "new") || word_is(word, len, "switch")
+        || is_literal_word(word, len)) {
         return false;
     }
     if (!skip_same_line_space(lexer, false)) {
         return false;
     }
-    if (lexer->lookahead != ':') {
+    int32_t c = lexer->lookahead;
+    // A slashy string is not an argument here: after a name Groovy reads
+    // `/` as division.
+    bool starts_argument = (c >= '0' && c <= '9') || c == '\'' || c == '"';
+    if (!starts_argument && is_identifier_start(c)) {
+        char argument[sizeof "default"];
+        unsigned argument_len = read_word(lexer, argument, sizeof argument);
+        starts_argument = is_literal_word(argument, argument_len)
+            || key_colon_follows(lexer, argument, argument_len);
+    }
+    if (!starts_argument) {
         return false;
     }
-    lexer->advance(lexer, false);
-    if (lexer->lookahead == ':') {
-        return false;
-    }
-    lexer->result_symbol = COMMAND_NAMED_KEY;
+    lexer->result_symbol = COMMAND_VALUE_START;
     return true;
 }
 
@@ -555,9 +618,11 @@ bool tree_sitter_groovy_external_scanner_scan(
     // in-grammar `\s` SKIP rule — without this, tree-sitter's lexer
     // eats `\n`, does NOT re-invoke the external scanner, then
     // fails on the following `/` and consumes it through error
-    // recovery. The contextual keywords (§6.7, §6.13) share the
-    // whitespace skip and are dispatched on their first letter before
-    // the `/` branches.
+    // recovery. The contextual keywords (§6.7, §6.13) and the receiver
+    // of a call that is a value (§6.14) share the whitespace skip and
+    // are dispatched on their first letter before the `/` branches. A
+    // value may start on the line after its `=`, so that receiver is
+    // looked for past line breaks too.
     bool wants_comment = valid_symbols[LINE_COMMENT]
         || valid_symbols[BLOCK_COMMENT]
         || valid_symbols[GROOVYDOC_COMMENT];
@@ -565,12 +630,15 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_record = valid_symbols[RECORD_KEYWORD];
     bool wants_trait = valid_symbols[TRAIT_KEYWORD];
     bool wants_sealed = valid_symbols[SEALED_KEYWORD];
+    bool wants_value_start = valid_symbols[COMMAND_VALUE_START]
+        && !valid_symbols[ERROR_SENTINEL];
     bool wants_cast_close = valid_symbols[CAST_CLOSE]
         && !valid_symbols[ERROR_SENTINEL];
     bool wants_not_in = valid_symbols[NOT_IN]
         && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
-        && !wants_sealed && !wants_cast_close && !wants_not_in) {
+        && !wants_sealed && !wants_value_start && !wants_cast_close
+        && !wants_not_in) {
         return false;
     }
 
@@ -613,6 +681,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         lexer->result_symbol = SEALED_KEYWORD;
         return true;
+    }
+    if (wants_value_start && is_identifier_start(lexer->lookahead)) {
+        return scan_command_value_start(lexer);
     }
     if (lexer->lookahead == '!' && wants_not_in) {
         // SPECIFICATION.md §6.12 — `!in` is an operator only before

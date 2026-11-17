@@ -13,6 +13,12 @@ doIt(a, b)
 obj.method()
 //  ^ function.call
 
+def out = sh script: 'make'
+//        ^ function.call
+
+x = foo 1
+//  ^ function.call
+
 String::length
 //      ^ function
 

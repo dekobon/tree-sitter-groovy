@@ -66,3 +66,67 @@ x \
     (subscript_expression
       object: (identifier)
       index: (identifier))))
+
+==================
+Declaration followed by a literal on the next line stays two statements (CRLF)
+==================
+
+def x = foo
+1
+y = foo
+'a'
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (string_literal)))
+
+==================
+Command chain value with named arguments continued on the next line (CRLF)
+==================
+
+def out = sh script: 'make',
+   returnStdout: true
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (string_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (boolean_literal))))))
+
+==================
+Line escape between the receiver of a command chain value and its argument (CRLF)
+==================
+
+def x = foo \
+  1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))

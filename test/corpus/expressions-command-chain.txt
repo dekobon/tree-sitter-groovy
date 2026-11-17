@@ -763,3 +763,788 @@ A character outside the identifier class is not a named key
 foo 😀: 1
 
 ---
+
+==================
+Command chain as a declaration value with named arguments (#95)
+==================
+
+def out = sh script: 'make', returnStdout: true
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (string_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (boolean_literal))))))
+
+==================
+Command chain as a declaration value with positional arguments
+==================
+
+def a = foo 1, 2
+def b = foo 'b'
+def c = foo "c"
+def d = foo 1.5
+def e = foo true
+def f = foo null
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)
+        argument: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal
+          (string_fragment)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (boolean_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (null_literal)))))
+
+==================
+First argument of a command chain value is a whole expression
+==================
+
+def x = foo 'a' + b
+def y = foo true ? 1 : 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (binary_expression
+          left: (string_literal)
+          right: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (ternary_expression
+          condition: (boolean_literal)
+          consequence: (number_literal)
+          alternative: (number_literal))))))
+
+==================
+Command chain as the value of every declaration form
+==================
+
+final a = foo 1
+int b = foo 1
+var c = foo 1
+@Field def d = foo 1
+def (e, f) = foo 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (command_chain
+      receiver: (identifier)
+      argument: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (command_chain
+      receiver: (identifier)
+      argument: (number_literal))))
+
+==================
+Command chain as the value of an assignment
+==================
+
+(a, b) = f 3
+x = foo 1
+x += foo 1
+x.y = foo 1
+x = y = foo 1
+env.OUT = sh script: 'make', returnStdout: true
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (assignment_expression
+        left: (identifier)
+        right: (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (string_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (boolean_literal))))))
+
+==================
+Command chain as the value of a field
+==================
+
+class C {
+  static x = foo 1
+  private String s = sh script: 'make'
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (command_chain
+            receiver: (identifier)
+            argument: (number_literal))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (identifier)
+              value: (string_literal))))))))
+
+==================
+Command chain values in a method body, a closure and an interpolation
+==================
+
+def f() { def x = foo 1 }
+list.each { x = foo 'a' }
+"${x = foo 1}"
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (command_chain
+            receiver: (identifier)
+            argument: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (string_literal)))))))
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)))))))
+
+==================
+A named argument after a command chain value in a list belongs to the call
+==================
+
+def l = [x = foo a: 1, b: 2]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (identifier)
+              value: (number_literal))
+            argument: (named_argument
+              key: (identifier)
+              value: (number_literal))))))))
+
+==================
+A comma after a command chain value continues the call
+==================
+
+def x = foo 1, y = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)
+        argument: (assignment_expression
+          left: (identifier)
+          right: (number_literal))))))
+
+==================
+Command chain value with arguments continued on the next line
+==================
+
+def x = foo a: 1,
+    b: 2
+def y = foo 1,
+    2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)
+        argument: (number_literal)))))
+
+==================
+Command chain value starting on the line after the equals sign
+==================
+
+def x =
+  foo 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
+Line escape between the receiver of a command chain value and its argument
+==================
+
+def x = foo \
+  1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
+Declaration followed by a literal on the next line stays two statements
+==================
+
+def a = foo
+1
+def b = foo
+'b'
+def c = foo
+"c"
+def d = foo
+true
+def e = foo
+null
+String s = foo
+1
+final f = foo
+'f'
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (string_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (boolean_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (null_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (identifier))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (string_literal)))
+
+==================
+Assignment followed by a literal on the next line stays two statements
+==================
+
+x = foo
+1
+x.y = foo
+'a'
+x += foo
+true
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (boolean_literal)))
+
+==================
+Declaration followed by a label on the next line stays two statements
+==================
+
+def x = foo
+where: 1
+y = foo
+then: 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Declaration followed by a comment and a literal on the next line stays two statements
+==================
+
+def x = foo
+/* c */ 1
+def y = foo
+/* c */ where: 1
+z = foo
+// c
+2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (block_comment)
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (block_comment)
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (line_comment)
+  (expression_statement
+    (number_literal)))
+
+==================
+Declaration followed by other statements on the next line stays two statements
+==================
+
+def a = foo
+bar
+def b = foo
+bar()
+def c = foo
+[1, 2]
+def d = foo
+def e = 1
+def g = foo
+return 1
+def h = foo
+if (a) { }
+def i = foo
+bar 'a'
+def j = foo
+x = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (list_literal
+      (number_literal)
+      (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (return_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (if_statement
+    condition: (identifier)
+    consequence: (block))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A brace or a parenthesis on the line after a declaration continues its value as before
+==================
+
+def a = foo
+{ }
+def b = foo
+(c)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        closure: (closure))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
+A parenthesis on the line after a command chain value joins its last argument
+==================
+
+def x = foo 1
+(c)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (method_invocation
+          function: (number_literal)
+          arguments: (argument_list
+            (identifier)))))))
+
+==================
+A closure after the receiver of a declaration value stays a method invocation
+==================
+
+def c = foo { it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        closure: (closure
+          (expression_statement
+            (identifier)))))))
+
+==================
+A comment between the receiver and the first argument of a value is not a command chain (known divergence)
+==================
+
+def x = foo /* c */ 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (block_comment)
+  (expression_statement
+    (number_literal)))
+
+==================
+An identifier as the first argument of a value is not a command chain
+==================
+
+def x = foo bar
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier)))
+
+==================
+A receiver inside a binary expression is not a command chain value
+==================
+
+def s = 'a' + foo 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (string_literal)
+        right: (identifier))))
+  (expression_statement
+    (number_literal)))
+
+==================
+Return of a parenthesis-free call is two statements
+==================
+
+return foo 1
+
+---
+
+(source_file
+  (return_statement
+    (identifier))
+  (expression_statement
+    (number_literal)))
+
+==================
+Spread argument in a command chain value is unsupported
+:error
+==================
+
+def x = foo 'a', *args
+
+---

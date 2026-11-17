@@ -21,8 +21,8 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported. String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). |
-| §5.6 Optional parentheses | **Done** | command_chain at statement level. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement and as the value of a declaration or an assignment (#95). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). Not accepted where Groovy takes one: in parentheses (`(foo 1)`), as the only argument of a call (`bar(foo 1)`), in an interpolation (`"${foo 1}"`), with a name as the first argument, with a dotted receiver (#52); see #18 below. |
+| §5.6 Optional parentheses | **Done** | command_chain as a statement and as the value of a declaration or an assignment. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
 | §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`. An `@interface` element takes a `default` (#101), which may be an annotation or a list of annotations; an annotation's own arguments may not (`@Foo(@Bar)` is an `ERROR`). Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
@@ -43,6 +43,7 @@ reasoning here.
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
+| §6.14 COMMAND_VALUE_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal or a key follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. A comment between the receiver and the argument on one line is not read past (see #18 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -86,8 +87,9 @@ conflicts actually fired. Two reasons:
 
 - Several entries (`command_chain`, `_type_arguments`) were avoided
   by how those features were built: a command chain is limited to
-  statement position, and a generic type always carries explicit
-  angle brackets.
+  statement position and to the value of a declaration or an
+  assignment, where a scanner token starts it, and a generic type
+  always carries explicit angle brackets.
 - Other entries (`closure` vs `map_literal`, `trait_declaration` vs
   `class_declaration`, `label` vs `identifier`, `method_reference`
   vs `ternary`) were avoided by using `prec` and structural
@@ -904,3 +906,51 @@ keyword is an identifier where it has no action.
 
 **Action**: none planned. A string name can join the rule if real
 code uses it.
+
+---
+
+## 18. A parenthesis-free call as a value
+
+**Apache `GroovyParser.g4`** (4.0.x branch): `variableInitializer` is
+`enhancedStatementExpression`, and the right side of
+`#assignmentExprAlt` and of `#multipleAssignmentExprAlt` is a
+`statementExpression`, which is `commandExpression`. So
+`def out = sh script: 'make', returnStdout: true` declares `out` as the
+result of a call, and so do `x = foo 1` and `(a, b) = f 3`.
+`expressionInPar` takes one as well; `return`, `throw`, `assert` and
+`yield` take an `expression`.
+
+**Current implementation** (#95): `command_chain` is also the value of
+a declarator (a local variable, a field, `def (a, b) = …`) and of an
+assignment with any operator. A newline is whitespace, so the value
+form opens with `_command_value_start`, an empty token that the scanner
+emits only when a literal or a key follows the receiver on its line
+(spec §6.14). Before #95 the forms below were a declaration of `foo`
+followed by a statement, or an `ERROR` once a comma followed.
+
+The Groovy column was observed by running Groovy 3.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `def out = sh script: 'make', returnStdout: true`, `def x = foo 1, 2`, `x += foo 'a'`, `(a, b) = f 3`, `static x = foo 1` in a class body | a call | `command_chain` value |
+| `def x = foo` then `1`, `'a'` or `where: 1` on the next line, also with a comment opening that line | two statements | two statements, as before |
+| `def x = foo 'a' + b`, `def x = foo 1 as int` | the expression is the argument | the same |
+| `def x = foo 1, y = 2` | `y = 2` is the second argument | the same |
+| `true ? x = foo 1, b : 3` | the chain takes `b`, the ternary the `: 3` | `ERROR`: `b : 3` reads as a named argument |
+| `def x = c ? y = foo a : 2` | `c ? (y = foo(a)) : 2` | `ERROR` over the whole ternary: the scanner takes `a :` as a key, so the call takes the ternary's `: 2`; before, a local `ERROR` at `a` |
+| `def x = foo /* c */ 1` | a call | `def x = foo`, the comment and `1`, as before |
+| `def x = foo 1` then `(c)` on the next line | two statements | the argument is `1(c)` (§3); before, `def x = foo` then `1(c)` |
+| `def x = foo bar` | `foo(bar)` | `def x = foo` then `bar`, as before and as in statement position |
+| `def x = foo $/a/$`, `def x = foo .5` | `foo('a')`, `foo(0.5)` | as before: `def x = foo` then the string; an `ERROR` (spec §6.14) |
+| `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
+| `def r = obj.method 1` | a call | `def r = obj.method` then `1`, as before (#52) |
+| `def x = (foo 1)`, `if (foo 1) { }`, `bar(foo 1)`, `"${foo 1}"` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | `ERROR`, as before |
+| `def x = foo 1 b 2` | `foo(1).b(2)` | the chains `foo 1` and `b 2`, as in statement position |
+| `def c = foo { }` | a call with a closure | `method_invocation`, as before |
+| `return foo 1`, `throw foo 1`, `assert foo 1`, `def s = 'a' + foo 1` | rejected | two statements, as before |
+| `def f(a = foo 1) { }` at script or block level | rejected | no `ERROR`: after `def f` a `(` may open the next statement (§3), so this is the declaration `def f`, then a call on `(a = foo 1)` with a trailing closure; before, a `method_declaration` with a local `ERROR` in its parameters. In a class body it is an `ERROR`, as before |
+
+**Action**: a chain in parentheses or as a call's only argument, and a
+dotted receiver (#52), are the forms real code is likely to need. A comment between the receiver and
+the argument needs the look-ahead to read comments without scanning an
+unterminated one twice.
