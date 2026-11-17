@@ -212,6 +212,22 @@ function parameter($) {
   );
 }
 
+/**
+ * The braces of an array initializer around `element`s separated by
+ * commas, with a trailing comma allowed after the last one (Apache
+ * `variableInitializers`).
+ *
+ * @param {RuleOrLiteral} element An element of the initializer.
+ * @returns {SeqRule} The initializer rule body.
+ */
+function arrayInitializer(element) {
+  return seq(
+    '{',
+    optional(seq(element, repeat(seq(',', element)), optional(','))),
+    '}',
+  );
+}
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -380,6 +396,11 @@ module.exports = grammar({
     // `{ @A _ x -> }`, a parameter of type `_`, vs. `{ @A _` as the
     // declaration of the placeholder followed by a statement `x`.
     [$._placeholder_declarator, $.closure_parameter],
+    // §3.2 — `new T[][] { {a, b} }` vs. `new T[][] { {a, b -> a} }`: in
+    // a nesting array initializer a `{` opens an initializer or a closure,
+    // and a name before a `,` is an element or a parameter. The `->`
+    // decides; an initializer holds none.
+    [$._expression, $.closure_parameter],
     // An untyped default, `{ a = 1 -> }` vs. `{ a = 1 }`, needs no
     // entry: see `expression_statement`.
     //
@@ -1418,6 +1439,7 @@ module.exports = grammar({
       $.direct_field_access_expression,
       $.method_reference_expression,
       $.object_creation_expression,
+      $.array_creation_expression,
       $.parenthesized_type_cast,
       $.cast_expression,
       $.membership_expression,
@@ -1547,8 +1569,8 @@ module.exports = grammar({
     },
 
     // §3.2 — `new Foo(args)` and the anonymous inner class
-    // `new Foo(args) { members }`. Array creation `new Foo[10]` and
-    // array initialisers land later. PREC.PRIMARY only labels the
+    // `new Foo(args) { members }`. Array creation is
+    // `array_creation_expression` below. PREC.PRIMARY only labels the
     // §3.1 tier. The number decides nothing: the rule's one conflict
     // (below) is against itself, where it cancels out, and
     // `new Foo().bar` composes without any precedence.
@@ -1571,10 +1593,19 @@ module.exports = grammar({
     // that #68 reported.
     object_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
       'new',
-      field('type', choice($._type, alias($._diamond_type, $.generic_type))),
+      field('type', choice($._created_type, alias($._diamond_type, $.generic_type))),
       field('arguments', $.argument_list),
       optional(field('body', $.class_body)),
     )),
+
+    // Apache `createdName`: a `_type` without array dimensions, which
+    // belong to the array creation. With `array_type` here, the `[`
+    // after `new int` could open the type `int[]` or a dimension.
+    _created_type: $ => choice(
+      alias($.identifier, $.type_identifier),
+      $.qualified_type,
+      $.generic_type,
+    ),
 
     // §3.2 — Apache's createdName permits diamond, but ordinary types
     // (including nested type arguments) do not. Keep the public shape.
@@ -1587,6 +1618,58 @@ module.exports = grammar({
     )),
 
     _diamond_type_arguments: _ => seq(token.immediate('<'), '>'),
+
+    // §3.2 — `new int[n][m]`, `new int[n][]` and `new int[] { … }`,
+    // after Apache `creator`: sized dimensions and then empty ones, or
+    // empty dimensions and an initializer. Right associativity makes a
+    // same-line `[` after a dimension another dimension rather than a
+    // subscript, so `new int[2][3]` is two-dimensional, as Apache's
+    // greedy loops read it. A `[` on the next line is a list literal
+    // (§6.9).
+    //
+    // The number of `[]` picks the initializer. In Groovy 3 and 4 an
+    // element is an expression, so a `{` among the elements is a
+    // closure: `new Closure[] { { it * 2 } }`. Groovy 5 (GROOVY-8551)
+    // nests initializers. They are taken only after two or more `[]`,
+    // where the Groovy 4 reading puts a closure in an element that must
+    // itself be an array.
+    array_creation_expression: $ => prec.right(PREC.PRIMARY, seq(
+      'new',
+      field('type', $._created_type),
+      choice(
+        seq(
+          repeat1(field('dimensions', $.dimensions_expr)),
+          optional(field('dimensions', $.dimensions)),
+        ),
+        seq(
+          field('dimensions', alias($._one_dimension, $.dimensions)),
+          field('value', alias($._flat_array_initializer, $.array_initializer)),
+        ),
+        seq(
+          field('dimensions', alias($._many_dimensions, $.dimensions)),
+          field('value', $.array_initializer),
+        ),
+      ),
+    )),
+
+    dimensions_expr: $ => seq(alias($._subscript_open, '['), $._expression, ']'),
+
+    dimensions: $ => prec.right(repeat1(seq(alias($._subscript_open, '['), ']'))),
+
+    _one_dimension: $ => seq(alias($._subscript_open, '['), ']'),
+
+    _many_dimensions: $ => seq($._one_dimension, repeat1($._one_dimension)),
+
+    // Groovy 3 and 4 `arrayInitializer`. Groovy 2 read these braces as
+    // a closure.
+    _flat_array_initializer: $ => arrayInitializer($._expression),
+
+    // Groovy 5 `arrayInitializer`. A nested `{}` or `{ x }` could also
+    // be a closure; `prec(1)` makes it an initializer, the alternative
+    // Groovy 5 tries first.
+    array_initializer: $ => prec(1, arrayInitializer(
+      choice($._expression, $.array_initializer),
+    )),
 
     // §5.15 — C-style cast `(Foo) x`. Distinct from
     // `parenthesized_expression` followed by something (resolved

@@ -306,6 +306,7 @@ issue #246's "Suggested fix" path 1.
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
 | unary `+` `-` `!` `~` | `unary_expression` | `operator`, `operand` | |
 | `new` | `object_creation_expression` | `type`, `arguments`, `body` | Constructor-only diamond (`new List<>()`) uses `generic_type` with empty `type_arguments`; ordinary types and nested type arguments require at least one argument. The optional `body` is the `class_body` of an anonymous inner class (`new Runnable() { … }`); a `{` after the arguments is always that body, never a trailing closure (#68). That is wider than Groovy, which calls a closure on the new object when the `{` starts a later line or cannot be a class body (`docs/divergences-from-spec.md` §11). Qualified creation (`outer.new Inner(...)`) has no production. |
+| `new T[n]`, `new T[] { … }` | `array_creation_expression` | `type`, `dimensions`, `value` | After Apache `creator`: sized dimensions (a `dimensions_expr` per `[n]`) and then empty ones (one `dimensions` node for all the `[]`), or empty dimensions and an `array_initializer` in `value`, with a trailing comma allowed after the last element. `type` has no dimensions, here and in `object_creation_expression`, so `new int[]()` is an `ERROR`. A `[` on the line of the previous dimension is another dimension, so `new int[2][3]` is two-dimensional; a `[` on the next line is a list (§6.9). After one `[]` the elements are expressions, as in Groovy 3 and 4, so a `{` among them is a closure (`new Closure[] { { it * 2 } }`). After two or more `[]` an element may also be a nested initializer (`new int[][] {{1, 2}, {3}}`), which only Groovy 5 accepts (GROOVY-8551); there a `{` is an initializer unless it can only be a closure (`{ -> 1 }`, `{ a, b -> a }`), as Groovy 5 tries `arrayInitializer` first, and `{ x = 1 }` is the exception and reads as a closure. Also wider than Groovy 4: `new int[3] { it }` and `new int[2][3] {1}` are a call with a closure, as is a `{` on the next line (divergence §11). Groovy 3 reads the same-line braces as an initializer after sized dimensions and rejects it ("dimension should be empty"); the 4.x `creator` allows `nls` before an initializer, so it reads the next-line ones the same way. Narrower than Groovy 5: `new int[2][][0]` is an `ERROR`, as Groovy 3 and 4 reject it ("dimension cannot be empty"), where Groovy 5's grammar reads a subscript. Annotations on the type or a dimension (`new @A int[3]`, `new int @A [3]`) have no production. |
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 
@@ -1198,13 +1199,14 @@ Known limitations:
 
 Emitted wherever a `[` may follow, and never during error recovery
 (`ERROR_SENTINEL` valid). Skips spaces, tabs and line escapes (§5.10)
-but not newlines; if the next character is `[`, consumes it. Subscripts and array types
-accept only this token. List and map literals accept it and the
-in-grammar `[`, so a `[` on the same line resolves as it did with a
-single token. At a newline it emits nothing, so the in-grammar `[`
-lexes instead and starts a list or map literal: Groovy ends a statement
-at a newline, which is what lets a Grails controller action return
-`[model: value]` on its own line.
+but not newlines; if the next character is `[`, consumes it.
+Subscripts, array types and the dimensions of an array creation accept
+only this token. List and map literals accept it and the in-grammar
+`[`, so a `[` on the same line resolves as it did with a single token.
+At a newline it emits nothing, so the in-grammar `[` lexes instead and
+starts a list or map literal: Groovy ends a statement at a newline,
+which is what lets a Grails controller action return `[model: value]`
+on its own line.
 
 Two known differences from Groovy are accepted. The scanner is
 stateless, so a newline before `[` ends the expression everywhere,
