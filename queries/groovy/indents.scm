@@ -16,6 +16,7 @@
   (closure)
   (list_literal)
   (map_literal)
+  (array_initializer)
   (argument_list)
   (formal_parameters)
   (record_components)

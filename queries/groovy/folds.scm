@@ -12,6 +12,7 @@
 (closure) @fold
 (list_literal) @fold
 (map_literal) @fold
+(array_initializer) @fold
 (argument_list) @fold
 
 (groovydoc_comment) @fold
