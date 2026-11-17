@@ -2111,6 +2111,10 @@
           "named": true
         },
         {
+          "type": "compact_constructor_declaration",
+          "named": true
+        },
+        {
           "type": "constructor_declaration",
           "named": true
         },
@@ -2755,6 +2759,42 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "compact_constructor_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        }
+      ]
     }
   },
   {

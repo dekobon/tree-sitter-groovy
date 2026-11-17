@@ -37,6 +37,9 @@
 (constructor_declaration
   name: (identifier) @name) @definition.constructor
 
+(compact_constructor_declaration
+  name: (identifier) @name) @definition.constructor
+
 (field_declaration
   (variable_declarator
     name: (identifier) @name)) @definition.field

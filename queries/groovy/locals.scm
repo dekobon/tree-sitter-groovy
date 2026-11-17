@@ -14,6 +14,7 @@
   (closure)
   (method_declaration)
   (constructor_declaration)
+  (compact_constructor_declaration)
   (static_initializer)
   (for_statement)
   (for_in_statement)

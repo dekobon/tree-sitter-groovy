@@ -207,6 +207,7 @@
 (enum_constant name: (identifier) @constant)
 (method_declaration name: [(identifier) (quoted_identifier)] @function)
 (constructor_declaration name: (identifier) @constructor)
+(compact_constructor_declaration name: (identifier) @constructor)
 (formal_parameter name: (identifier) @variable.parameter)
 (closure_parameter name: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)

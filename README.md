@@ -174,11 +174,13 @@ These are documented in detail in
   `new ArrayList().call { ... }` to keep the call.
 - **A `{ ... }` straight after a field with no initializer is an
   instance initializer block** -- `int x { ... }` parses with no
-  `ERROR`. A record's compact constructor (`public Name { ... }`),
-  which is unsupported, takes the same reading. After a field *with*
-  an initializer a next-line `{` is that expression's trailing
-  closure, as in Groovy: end the field with `;` to get an
-  initializer block.
+  `ERROR`. In a record body a name with only modifiers or `def` before
+  it is a compact constructor instead (`public Name { ... }`), with the
+  `{` on the same line or the next, so `static count` followed by a
+  block is a constructor named `count`, and `static Foo bar { ... }` is
+  a field `Foo` and a constructor `bar`. After a field *with* an
+  initializer a next-line `{` is that expression's trailing closure,
+  as in Groovy: end the field with `;` to get an initializer block.
 - **`sealed` and `trait` are keywords where a class member can
   start** -- a field named `sealed` or `trait` is an `ERROR` when it
   follows a modifier (`private boolean sealed`) or opens the member

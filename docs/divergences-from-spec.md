@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -307,6 +307,25 @@ modifier (`private String w`, `public A() { }`, `static { }`) was
 `private final int`, a field of type `v` named after that modifier,
 and the rest: a keyword is an identifier wherever it has no action.
 
+In a record body, `static count` followed by `R { }` is a
+modifier-only field and a compact constructor, and also the typed
+field `static count R` followed by an instance initializer. The
+compact constructor's weight is one more than the typed field's less
+the modifier-only field's, so the first reading wins (§17);
+`grammar.js` computes it from the other two.
+
+The dynamic precedences of class members:
+
+| Member | Weight |
+|---|---|
+| `compact_constructor_declaration` (record body only) | 6 |
+| typed `field_declaration` (`def` or a type) | 4 |
+| constructor after an enum's trailing comma | 4 |
+| `method_declaration` with a body | 3 |
+| `record_declaration` | 1 |
+| modifier-only `field_declaration` | −1 |
+| `method_declaration` without a body | −1 |
+
 A method declaration without a body carries a negative dynamic
 precedence, so `x` followed by `foo()` on the next line is two
 statements, as is `println foo()` on one line. Outside a class body a
@@ -510,9 +529,8 @@ Two places in a member list do differ from Apache:
   an instance initializer here too, so `int x { … }` and
   `void run { … }` (parentheses forgotten) parse without an `ERROR`;
   Apache's `classBody` wants a `sep` between members. In a record
-  body this hides an unsupported construct: the compact canonical
-  constructor `public Name { … }` parses as a modifier-only field
-  `Name` followed by an initializer block.
+  body a modifier-only field followed by a block is a compact
+  constructor instead, on either line (§17).
 - **An enum constant.** `enum_body` takes the initializer wherever
   its member list repeats — after `;`, after a first member, or
   with no constants — but not directly after a constant. With the
@@ -795,3 +813,71 @@ make the runtime lex the marker again.
 
 **Action**: none planned. A marker with a width would need a token the
 grammar accepts wherever `/` can appear.
+
+---
+
+## 17. A record's compact constructor
+
+**Apache `GroovyParser.g4`** (4.0.x branch): `memberDeclaration` has
+`modifiersOpt (classDeclaration | compactConstructorDeclaration)`, and
+`compactConstructorDeclaration` is `methodName nls methodBody`, so a
+line break may come before the `{`. The parser takes it in every class
+body. `AstBuilder` then rejects it outside a record, and when its name
+is not the record's. `methodName` may also be a string literal, and
+`modifiersOpt` includes `def`. `AstBuilder` also rejects any instance
+initializer in a record, and any instance field.
+
+**Current implementation** (#72): `compact_constructor_declaration`
+(annotations, modifiers, `def`, `name`, `body`) is a member of a record
+body and of no other. `def` comes after the modifiers, as on a field or
+a method. The body node is still `class_body`: the rule is a hidden
+`_record_body` aliased to it. A type nested in a record has its own
+body rule, so the member does not reach it, and a record nested in any
+body brings it. The name is not compared with the record's, so any
+`Name { … }` in a record body is a compact constructor.
+
+After modifiers or `def` and a name, the same tokens are a field
+followed by an instance initializer. A static precedence on
+`compact_constructor_declaration` settles it at the `{`, with no GLR
+fork. A line break is whitespace here, so a `{` on the next line reads
+the same. Groovy's other reading is never valid in a record, as it
+ends in an instance initializer.
+
+After modifiers and two names, the fork between a field's name and a
+type (§6) keeps two readings to the end of the block: a typed field
+followed by an initializer, and a modifier-only field followed by a
+compact constructor. The constructor's dynamic precedence is one more
+than the typed field's less the modifier-only field's, so the second
+wins. That is Groovy's reading when the line break follows the first
+name (`static count`, then `Name { … }`). With no line break between
+the names Groovy rejects either reading.
+
+The Groovy column is read off `GroovyParser.g4` and `AstBuilder.java`
+on the 4.0.x branch, not run. Where two alternatives of a rule parse
+the whole input, ANTLR takes the first, here `fieldDeclaration`.
+
+| In a record body | Groovy 4 | This grammar |
+|---|---|---|
+| `public Name { … }`, `Name { … }`, `@A Name { … }`, `def Name { … }` | compact constructor | `compact_constructor_declaration` |
+| `Name` then `{ … }` on the next line | compact constructor | `compact_constructor_declaration` |
+| `public Name` or `def Name` then `{ … }` on the next line | field and initializer, rejected | `compact_constructor_declaration` |
+| `static count` then `{ … }` on the next line | field and initializer, rejected | `compact_constructor_declaration` named `count` |
+| `public Name;` then `{ … }` | field and initializer, rejected | `field_declaration` and `block` |
+| `static count` then `Name { … }` on the next line | field `count`, compact constructor | field `count`, `compact_constructor_declaration` |
+| `static String NAME` then `Name { … }` on the next line | field `NAME`, compact constructor | field `NAME`, `compact_constructor_declaration` |
+| `static Foo bar { … }`, or `static Foo bar` then `{ … }` on the next line | rejected | field `Foo`, `compact_constructor_declaration` named `bar` |
+| `String bar { … }` | rejected | `field_declaration` and `block` |
+| `'Name' { … }` | compact constructor | `ERROR` |
+
+In a class, interface, trait, enum or `@interface` body nothing
+changes: `public Name { … }` is a field and an initializer, which
+Groovy rejects, and `Name { … }` is an `ERROR`.
+
+The words that Apache's `modifier` takes and `_modifier` does not
+(`var`, `default`, `sealed`, `non-sealed`) do not start a compact
+constructor, nor does `def` before a modifier: `def public Name { … }`
+is a field named `public` and a compact constructor `Name`, as a
+keyword is an identifier where it has no action.
+
+**Action**: none planned. A string name can join the rule if real
+code uses it.

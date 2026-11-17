@@ -60,6 +60,18 @@ const PREC = {
 /* eslint-enable no-multi-spaces */
 
 /*
+ * Dynamic precedences of class members that are tied to each other
+ * (docs/divergences-from-spec.md §6). In a record, `static count`
+ * followed by `R { }` is a modifier-only field and a compact
+ * constructor, and also the typed field `static count R` followed by
+ * an instance initializer. The first pair must outweigh the typed
+ * field alone; equal sums would leave the choice to tree shape.
+ */
+const TYPED_FIELD_WEIGHT = 4;
+const MODIFIER_ONLY_FIELD_WEIGHT = -1;
+const COMPACT_CONSTRUCTOR_WEIGHT = TYPED_FIELD_WEIGHT - MODIFIER_ONLY_FIELD_WEIGHT + 1;
+
+/*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
  * `JavaLetterOrDigit`: Java's `Character.isJavaIdentifierStart` and
  * `isJavaIdentifierPart` without the identifier-ignorable characters.
@@ -926,10 +938,10 @@ module.exports = grammar({
       ']',
     ),
 
-    // §4 — member list shared by class / interface / trait / record
-    // bodies and the anonymous inner class body of
-    // `object_creation_expression`. An `@interface` body extends it
-    // (`_annotation_type_body`) and is aliased to it.
+    // §4 — member list shared by class / interface / trait bodies and
+    // the anonymous inner class body of `object_creation_expression`.
+    // An `@interface` body and a record body extend it
+    // (`_annotation_type_body`, `_record_body`) and are aliased to it.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
@@ -937,8 +949,8 @@ module.exports = grammar({
     //
     // A bare `block` is an instance initializer. It sits in the member
     // repeat — here, in the four identical repeats of `enum_body` and in
-    // the one of `_annotation_type_body` — rather than in
-    // `_class_member`, because `enum_body` also places
+    // the ones of `_annotation_type_body` and `_record_body` — rather
+    // than in `_class_member`, because `enum_body` also places
     // a lone `_class_member` directly after its constants. A block in
     // that slot is an LR conflict on `A() {` (constructor, or constant
     // plus initializer) and, once that is resolved, silently accepts
@@ -1012,7 +1024,7 @@ module.exports = grammar({
       // splitting `private final int v\n C() {}` after `int`. The
       // weight is above a method body's: the split reading holds a
       // method (`v C() {}`), which would otherwise tie.
-      prec.dynamic(4, seq(
+      prec.dynamic(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
         repeat($._modifier),
         choice('def', field('type', $._type)),
@@ -1025,7 +1037,7 @@ module.exports = grammar({
       // `A() { }`: a keyword is an identifier wherever it has no
       // action. Both readings hold one typed field, so they tied, and
       // a comment between the two members made the split win.
-      prec.dynamic(-1, seq(
+      prec.dynamic(MODIFIER_ONLY_FIELD_WEIGHT, seq(
         repeat($.annotation),
         repeat1($._modifier),
         $.variable_declarator,
@@ -1253,7 +1265,46 @@ module.exports = grammar({
       optional(field('type_parameters', $.type_parameters)),
       field('components', $.record_components),
       optional($.super_interfaces),
-      optional(field('body', $.class_body)),
+      optional(field('body', alias($._record_body, $.class_body))),
+    ))),
+
+    // The member list of `class_body` plus a compact constructor, which
+    // no other body takes. A type nested in a record keeps its own body
+    // rule, and a record nested in a class brings this one.
+    _record_body: $ => seq(
+      '{',
+      repeat(choice(
+        $._class_member,
+        $.compact_constructor_declaration,
+        $.block,
+        ';',
+      )),
+      '}',
+    ),
+
+    // §4 — a record's compact canonical constructor, Apache's
+    // `modifiersOpt compactConstructorDeclaration` (`methodName nls
+    // methodBody`): `public Warning { … }`. Apache's parser takes it in
+    // any class body and rejects it outside a record afterwards, as it
+    // does a name that differs from the record's; the name is not
+    // compared here. Apache's modifiers include `def`, which this
+    // grammar places after the others, as on a field or a method.
+    //
+    // The static precedence makes the `{` after modifiers or `def` and
+    // a name open this body rather than end a field before an instance
+    // initializer. A line break is whitespace, so the `{` on the next
+    // line reads the same. Groovy rejects an instance initializer in a
+    // record, so only this reading can be valid.
+    //
+    // The dynamic precedence decides where the `[variable_declarator,
+    // _type]` conflict keeps two readings alive, as in `static count`
+    // then `R { }`; see COMPACT_CONSTRUCTOR_WEIGHT for its value.
+    compact_constructor_declaration: $ => prec.dynamic(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
+      repeat($.annotation),
+      repeat($._modifier),
+      optional('def'),
+      field('name', $.identifier),
+      field('body', $.block),
     ))),
 
     record_components: $ => seq(

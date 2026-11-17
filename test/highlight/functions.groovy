@@ -25,3 +25,10 @@ def r = new Runnable() {
     void run() { }
     //   ^ function
 }
+
+record Warning(String message) {
+    public Warning {
+    //     ^ constructor
+        assert message
+    }
+}
