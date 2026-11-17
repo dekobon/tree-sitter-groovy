@@ -36,10 +36,10 @@ reasoning here.
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
-| §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. |
+| §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. A `/*` with no `*/` is not a comment; the first one emits an empty hidden `_unterminated_comment` extra that carries the scanner's one bit of state, so later ones do not read to the end of input again (#75). Error recovery near that first `/*` can differ from v0.6.0, for worse as well as better, and one reparse differs from a parse from scratch; see #16 below. |
 | §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
 | §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
-| §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (stateless scanner; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
+| §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (the scanner tracks no brackets; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
@@ -706,7 +706,7 @@ lexer drops line breaks, so a cast may continue on the next line
 there.
 
 **Current implementation**: a newline is `extras` whitespace and the
-scanner has no state, so it cannot know which brackets enclose a
+scanner tracks no brackets, so it cannot know which brackets enclose a
 cast. It reports only whether something follows the `)` on its line
 (`_cast_close`, spec §6.11), and `parenthesized_type_cast` is ranked
 by that: above a parenthesized expression when the operand is on the
@@ -728,3 +728,44 @@ At v0.5.0 the two readings were unranked and the stack order decided:
 **Action**: a scanner that tracks bracket depth, which would also give
 the grammar a statement terminator where a line break is significant
 (#90, #96). Tracked in #99.
+
+## 16. The marker of an unterminated block comment
+
+**Spec §6.6**: a `/*` with no `*/` is not a comment, and the first one
+emits an empty hidden extra token, `_unterminated_comment`, that
+carries the scanner's one bit of state (#75). Valid input never sees
+it. Two effects on other input are accepted.
+
+**Error recovery**: the marker is one more node on the parse stack, so
+recovery near the first unterminated `/*` can choose a different
+repair than it did at v0.6.0, worse as well as better. Over 13_245
+single `/*` insertions into the corpus inputs, 233 trees (1.8%)
+changed: 86 with more bytes inside `ERROR`, 59 with fewer, 88 with the
+same. No input that parsed without an `ERROR` is affected.
+
+**Incremental reparse**: because the marker is empty, one reparse is
+not the parse from scratch.
+
+| Step | Text | Tree |
+|---|---|---|
+| Before the edit | `x = (a)/* n` then `c` | `x = (a)` with `ERROR`s after it |
+| Insert `*/` before `c`, reparse with the old tree | `x = (a)/* n` then `*/c` | `x = (a)` as `parenthesized_expression`, `block_comment`, `c` as a second statement |
+| The same text parsed from scratch | | one statement, `parenthesized_type_cast` over `c` |
+
+At `/*` a cast and a parenthesized expression are both possible. The
+parse path of the cast shifts the marker, fails on `/` and is dropped
+before the other path reduces, so `(a)` is reduced with one path
+alive, is not marked as the outcome of a conflict, and is reused. The
+reparse has no error and the next edit to that node corrects it. In
+1_000_000 random chained edits this happened 4 times; 3 reparses
+differed at v0.6.0 from other causes. The same happens with
+`foo((String)/* why` then `arg)` when `*/` is inserted before `arg`.
+`bindings/rust/tests/incremental_reparse.rs` pins the first case and
+fails if the two parses start to agree.
+
+A change of included ranges with no edit is a third case, shared with
+every other token: a range added later that contains `*/` does not
+make the runtime lex the marker again.
+
+**Action**: none planned. A marker with a width would need a token the
+grammar accepts wherever `/` can appear.

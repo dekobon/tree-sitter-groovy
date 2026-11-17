@@ -282,17 +282,22 @@ module.exports = grammar({
     $.line_comment,
     $.block_comment,
     $.groovydoc_comment,
+    // §6.6 — an empty, hidden token at the first `/*` that has no `*/`.
+    // It adds no syntax: the scanner needs a token to carry that fact
+    // forward, and only an extra is valid wherever a comment may start.
+    $._unterminated_comment,
   ],
 
   // Externals listed here must have a matching branch in
   // `src/scanner.c` AND be referenced by at least one rule below
-  // (`_command_named_key` and `_subscript_open` included). There are
-  // two exceptions. No rule references `_error_sentinel`: it exists so
-  // the scanner can detect error recovery, when tree-sitter marks
-  // every external valid. It is kept last here and in the scanner's
-  // `TokenType` enum, and the two orders must match. The scanner never
-  // emits `_string_body`: a string body references it so that the
-  // scanner can tell it is inside one.
+  // (`_command_named_key` and `_subscript_open` included) or by
+  // `extras`. There are two exceptions. No rule references
+  // `_error_sentinel`: it exists so the scanner can detect error
+  // recovery, when tree-sitter marks every external valid. It is kept
+  // last here and in the scanner's `TokenType` enum, and the two
+  // orders must match. The scanner never emits `_string_body`: a
+  // string body references it so that the scanner can tell it is
+  // inside one.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -326,6 +331,8 @@ module.exports = grammar({
     // §6.12 — the `!in` operator, which needs whitespace or an opening
     // bracket after it. The scanner reads that character and leaves it.
     $._not_in,
+    // §6.6 — see `extras`.
+    $._unterminated_comment,
     // §6.10 — never emitted: valid only between the quotes of a string
     // whose body is lexed in pieces. Comments are extras, so the parser
     // offers them there too; the scanner must emit nothing, or `//` and

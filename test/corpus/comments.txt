@@ -122,3 +122,39 @@ bar
   (block_comment)
   (groovydoc_comment)
   (expression_statement (identifier)))
+
+==================
+Several unterminated block comments, issue 75
+==================
+
+/* closed */
+foo a /* x
+record b /* y
+bar c /** z
+
+---
+
+(source_file
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      (ERROR)
+      right: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      (ERROR)
+      right: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (power_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (MISSING identifier))
+      right: (identifier))))

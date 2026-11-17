@@ -46,7 +46,9 @@ The default branch is **`main`**.
   expression before it (§6.9), a `)` with something after it on its
   line, which ranks a cast (§6.11), and the `!in` operator, which
   needs whitespace or a bracket after it (§6.12). Inside a string body
-  it emits nothing (§6.10). GString interpolation, automatic semicolons and label
+  it emits nothing (§6.10). Its only state is one bit, "no `*/` from
+  here on", carried by an empty hidden token at the first unterminated
+  `/*` (§6.6). GString interpolation, automatic semicolons and label
   colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does

@@ -8851,6 +8851,10 @@
     {
       "type": "SYMBOL",
       "name": "groovydoc_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_unterminated_comment"
     }
   ],
   "conflicts": [
@@ -8954,6 +8958,10 @@
     {
       "type": "SYMBOL",
       "name": "_not_in"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_unterminated_comment"
     },
     {
       "type": "SYMBOL",

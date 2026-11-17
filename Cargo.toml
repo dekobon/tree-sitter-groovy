@@ -27,6 +27,14 @@ path = "bindings/rust/lib.rs"
 name = "parse_stress"
 path = "bindings/rust/tests/parse_stress.rs"
 
+[[test]]
+name = "incremental_reparse"
+path = "bindings/rust/tests/incremental_reparse.rs"
+
+[[test]]
+name = "unterminated_comment_cost"
+path = "bindings/rust/tests/unterminated_comment_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 

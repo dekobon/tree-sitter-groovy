@@ -10,16 +10,18 @@
 // argument in a parenthesis-free call; §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
 // something after it on its line; and §6.12 NOT_IN, the `!in`
-// operator. STRING_BODY (§6.10) is never emitted; it is valid only
+// operator. UNTERMINATED_COMMENT (§6.6) is an empty token at the
+// first `/*` that has no `*/`, and carries the scanner's state.
+// STRING_BODY (§6.10) is never emitted; it is valid only
 // inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
 // SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the STRING_BODY check are
 // suppressed.
 //
-// Stateless — `create` returns NULL and the runtime calls
-// `destroy` / `serialize` / `deserialize` as no-ops. When a future
-// branch needs persistent state, introduce a struct then.
+// One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
+// else is kept between calls.
 
+#include "tree_sitter/alloc.h"
 #include "tree_sitter/parser.h"
 
 #include <string.h>
@@ -34,9 +36,34 @@ enum TokenType {
     SUBSCRIPT_OPEN,
     CAST_CLOSE,
     NOT_IN,
+    UNTERMINATED_COMMENT,
     STRING_BODY,
     ERROR_SENTINEL,
 };
+
+// SPECIFICATION.md §6.6 — a `/*` with no `*/` after it is not a
+// comment, and finding that out means reading to the end of input.
+// Without a memory, a file with N of them was read N times.
+//
+// The fact is about the input alone: no `*/` at or after one position
+// means none after any later one. But a scan that fails leaves no
+// token, and the runtime restores the state from the last external
+// token before every call, so the scan that learns it emits the empty
+// UNTERMINATED_COMMENT token to hold it. That token read to the end of
+// input, so any edit after it makes the runtime lex it again, and a
+// node lexed in this state is reused only where the new parse is in
+// the same state.
+// §6.6 records the one reparse this does not cover: being empty, the
+// token lets a node before it be reused after the comment is closed.
+typedef struct {
+    bool no_comment_close_ahead;
+} Scanner;
+
+// A failed allocation leaves the scanner without its memory, which
+// costs time and nothing else.
+static inline bool no_comment_close_ahead(const Scanner *scanner) {
+    return scanner != NULL && scanner->no_comment_close_ahead;
+}
 
 // Wider than the grammar's `identifier` token (SPECIFICATION.md
 // §5.2): every non-ASCII code point counts as an identifier
@@ -150,8 +177,16 @@ static inline bool is_line_break(int32_t c) {
 // line comments when `newlines` is set. Returns false on a `/` that
 // opens neither comment kind (a slashy string or division cannot be
 // part of a header), on a `\` that is not a line escape, and on an
-// unterminated block comment.
-static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
+// unterminated block comment. `no_close_ahead` says that every block
+// comment from here on is unterminated. Finding that out here cannot
+// be remembered: the token would have to start before `record`, which
+// is before the position the fact holds from. The comment branch of
+// the scan function reaches the same `/*` next and remembers it.
+static bool skip_header_trivia(
+    TSLexer *lexer,
+    bool newlines,
+    bool no_close_ahead
+) {
     for (;;) {
         for (;;) {
             if (!skip_same_line_space(lexer, false)) {
@@ -167,6 +202,9 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
         }
         advance(lexer);
         if (lexer->lookahead == '*') {
+            if (no_close_ahead) {
+                return false;
+            }
             advance(lexer);
             // EOF-bounded: an unterminated comment ends the scan here.
             for (;;) {
@@ -214,7 +252,7 @@ static bool skip_header_trivia(TSLexer *lexer, bool newlines) {
 // `(` the rule has `nls`, so line breaks and line comments are
 // skipped there too. A command-style call `record Point(1, 2)`
 // matches the pattern and misfires; §6.7 lists the residuals.
-static bool scan_record_header(TSLexer *lexer) {
+static bool scan_record_header(TSLexer *lexer, bool no_close_ahead) {
     if (is_identifier_char(lexer->lookahead)) {
         return false;
     }
@@ -223,7 +261,7 @@ static bool scan_record_header(TSLexer *lexer) {
         && lexer->lookahead != '\\') {
         return false;
     }
-    if (!skip_header_trivia(lexer, false)) {
+    if (!skip_header_trivia(lexer, false, no_close_ahead)) {
         return false;
     }
     if (!is_identifier_start(lexer->lookahead)) {
@@ -237,7 +275,7 @@ static bool scan_record_header(TSLexer *lexer) {
     if (lexer->lookahead == '<') {
         return true;
     }
-    if (!skip_header_trivia(lexer, true)) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead)) {
         return false;
     }
     return lexer->lookahead == '(';
@@ -295,20 +333,33 @@ static bool cast_operand_follows(TSLexer *lexer) {
 }
 
 void *tree_sitter_groovy_external_scanner_create(void) {
-    return NULL;
+    return ts_calloc(1, sizeof(Scanner));
 }
 
 void tree_sitter_groovy_external_scanner_destroy(void *payload) {
-    (void)payload;
+    ts_free(payload);
 }
+
+// Length of the serialized state while the flag is unset. It must
+// stay 0: the runtime passes that length before the first external
+// token.
+static const unsigned UNSET_STATE_LENGTH = 0;
+
+// Length of the serialized state once the flag is set: one byte.
+static const unsigned SET_STATE_LENGTH = 1;
+
+// The value of that byte. Any other is read as unset.
+static const char SET_STATE_BYTE = 1;
 
 unsigned tree_sitter_groovy_external_scanner_serialize(
     void *payload,
     char *buffer
 ) {
-    (void)payload;
-    (void)buffer;
-    return 0;
+    if (!no_comment_close_ahead(payload)) {
+        return UNSET_STATE_LENGTH;
+    }
+    buffer[0] = SET_STATE_BYTE;
+    return SET_STATE_LENGTH;
 }
 
 void tree_sitter_groovy_external_scanner_deserialize(
@@ -316,9 +367,11 @@ void tree_sitter_groovy_external_scanner_deserialize(
     const char *buffer,
     unsigned length
 ) {
-    (void)payload;
-    (void)buffer;
-    (void)length;
+    Scanner *scanner = payload;
+    if (scanner != NULL) {
+        scanner->no_comment_close_ahead =
+            length == SET_STATE_LENGTH && buffer[0] == SET_STATE_BYTE;
+    }
 }
 
 bool tree_sitter_groovy_external_scanner_scan(
@@ -326,7 +379,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     TSLexer *lexer,
     const bool *valid_symbols
 ) {
-    (void)payload;
+    Scanner *scanner = payload;
 
     // SPECIFICATION.md §6.10 — STRING_BODY is valid only between the
     // quotes of a string whose body is lexed in pieces. Comments are
@@ -422,7 +475,7 @@ bool tree_sitter_groovy_external_scanner_scan(
             }
             advance(lexer);
         }
-        if (!scan_record_header(lexer)) {
+        if (!scan_record_header(lexer, no_comment_close_ahead(scanner))) {
             return false;
         }
         lexer->result_symbol = RECORD_KEYWORD;
@@ -463,6 +516,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         return false;
     }
 
+    // UNTERMINATED_COMMENT is empty and ends here. Every other token
+    // of this branch moves the end again.
+    lexer->mark_end(lexer);
     advance(lexer);
     // Dispatch on the char after `/`:
     //   `/`  → line comment
@@ -482,11 +538,12 @@ bool tree_sitter_groovy_external_scanner_scan(
         while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
             advance(lexer);
         }
+        lexer->mark_end(lexer);
         lexer->result_symbol = LINE_COMMENT;
         return true;
     }
     if (next == '*') {
-        if (!wants_comment) {
+        if (!wants_comment || no_comment_close_ahead(scanner)) {
             return false;
         }
         advance(lexer);
@@ -499,6 +556,7 @@ bool tree_sitter_groovy_external_scanner_scan(
                 if (!valid_symbols[GROOVYDOC_COMMENT]) {
                     return false;
                 }
+                lexer->mark_end(lexer);
                 lexer->result_symbol = GROOVYDOC_COMMENT;
                 return true;
             }
@@ -510,6 +568,7 @@ bool tree_sitter_groovy_external_scanner_scan(
                 advance(lexer);
                 if (lexer->lookahead == '/') {
                     advance(lexer);
+                    lexer->mark_end(lexer);
                     if (is_groovydoc) {
                         if (!valid_symbols[GROOVYDOC_COMMENT]) {
                             return false;
@@ -527,7 +586,15 @@ bool tree_sitter_groovy_external_scanner_scan(
                 advance(lexer);
             }
         }
-        return false;
+        // The runtime drops an empty extra token unless the state
+        // changed with it. This one sets the flag, and the check above
+        // keeps a second one from being emitted in the same state.
+        if (scanner == NULL || !valid_symbols[UNTERMINATED_COMMENT]) {
+            return false;
+        }
+        scanner->no_comment_close_ahead = true;
+        lexer->result_symbol = UNTERMINATED_COMMENT;
+        return true;
     }
     if (next == '=') {
         // `/=` is the augmented-assign operator. The in-grammar

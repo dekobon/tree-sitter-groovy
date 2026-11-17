@@ -923,7 +923,8 @@ emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 keyword (§6.7), the named-argument key of a parenthesis-free call
 (§6.8), the same-line subscript opener (§6.9), the `)` of a cast
-(§6.11), the `!in` operator (§6.12), `STRING_BODY` (§6.10),
+(§6.11), the `!in` operator (§6.12), the empty marker of an
+unterminated block comment (§6.6), `STRING_BODY` (§6.10),
 which is never emitted and only marks a string body, and
 `ERROR_SENTINEL`, which no rule references and which only signals
 error recovery; the other tokens listed here are met in-grammar, see
@@ -949,6 +950,7 @@ enum TokenType {
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
+  UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
@@ -1058,6 +1060,65 @@ in murtaza64's grammar requires at least one whitespace character
 after `/**`, so `/**/` (empty groovydoc) and `/***/` (immediate `*/`)
 both fail. A scanner-driven token simply consumes from the opener to
 the matching `*/` regardless of intermediate content.
+
+A `/*` with no `*/` after it is not a comment: the scanner emits no
+comment token, and the in-grammar lexer reads `/` and `*` as
+operators, as ANTLR's lexer does. Learning that there is no `*/`
+means reading to the end of input, so a file with N such openers was
+read N times (#75). The scanner now keeps one bit of state, "there is
+no `*/` from here on", which is the only state it has. The bit is a
+property of the input and stays true at every later position, so
+later `/*` openers, and the block comments the `record` look-ahead
+(§6.7) skips, fail at once while it is set.
+
+tree-sitter stores scanner state only in a token the scanner emits,
+and restores it from the last such token before every call, so a
+failed scan cannot leave the bit behind. The scan that reaches the end
+of input therefore emits `UNTERMINATED_COMMENT`: an empty, hidden
+token, listed in `extras` because a comment may start anywhere. The
+runtime accepts an empty extra token only when the state changed with
+it, which holds exactly once per parse path. The state is empty while
+the bit is unset and one byte once it is set.
+
+An edit does not leave the bit stale. The marker read to the end of
+input, so after any edit behind it the runtime lexes it again, and a
+node lexed with the bit set is reused only where the new parse has
+the bit set too. A change of included ranges is not an edit: a range
+added later that contains `*/` leaves the marker in place, because
+the runtime checks only a node's own look-ahead, as it does for every
+other token.
+
+One reparse differs from a parse from scratch because the marker is
+empty. In `x = (a)/* n` followed by `c` on the next line, a cast and
+a parenthesized expression are both possible when the parser reaches
+`/*`. The parse path of the cast shifts the marker, fails on `/` and
+is dropped before the other path reduces, so `(a)` is reduced with
+one path alive and is not marked as the outcome of a conflict.
+Inserting `*/` before `c` makes the text valid, and the reparse
+reuses that `parenthesized_expression`: `x = (a)`, a comment, and `c`
+as a second statement, where a parse from scratch gives one statement
+with a `parenthesized_type_cast` over `c`. The reparse has no error,
+and the next edit to that node corrects it. This is accepted. It was
+4 in 1_000_000 random chained edits, where 3 differed before the
+marker existed, from other causes.
+`bindings/rust/tests/incremental_reparse.rs` checks reparses against
+parses from scratch and pins this case.
+
+Input that parsed without an error has no unterminated comment, never
+sees the marker and is unaffected. On malformed input the marker is
+one more node on the parse stack, so error recovery near the first
+unterminated `/*` can choose a different repair than it did without
+the marker, and it can be worse as well as better. Over 13_245 single
+`/*` insertions into the corpus inputs, 233 trees (1.8%) changed: 86
+with more bytes inside `ERROR`, 59 with fewer, 88 with the same. In
+`ResponseEntity get(/*@PathVariable("id") Long id, @RequestBody Map
+body) { }` the method declaration with a 2-byte `ERROR` became two
+expression statements, a 54-byte `ERROR` and a closure.
+
+The look-ahead of the `record` header cannot set the bit, because its
+token would start at `record`, before the position the fact holds
+from; the comment branch reaches the same `/*` next and sets it, so
+that costs one extra read of the input, once.
 
 ### 6.7 RECORD_KEYWORD — implementation contract
 
@@ -1209,8 +1270,8 @@ starts a list or map literal: Groovy ends a statement at a newline,
 which is what lets a Grails controller action return `[model: value]`
 on its own line.
 
-Two known differences from Groovy are accepted. The scanner is
-stateless, so a newline before `[` ends the expression everywhere,
+Two known differences from Groovy are accepted. The scanner tracks
+no brackets, so a newline before `[` ends the expression everywhere,
 including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a`
 followed by `[0])` on the next line. Groovy's lexer ignores newlines
 inside `(…)`, `[…]` and `?[…]`, so `foo(a` followed by `[0])` on the
