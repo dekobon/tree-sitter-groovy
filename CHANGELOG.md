@@ -7,6 +7,154 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Added
+
+- `array_creation_expression` for `new T[n][m]`, `new T[n][]` and
+  `new T[] { … }`, after Apache `creator`, with `type`, `dimensions`
+  (a `dimensions_expr` per `[n]`, one `dimensions` node for the `[]`s)
+  and `value` (an `array_initializer`). After one `[]` a `{` among the
+  elements is a closure, as in Groovy 3 and 4; after two or more a
+  nested `{ … }` is an initializer, as in Groovy 5. Each form was an
+  `ERROR` that swallowed its declaration. Folds and indents cover the
+  initializer. (#102)
+- `multi_assignment_expression` for `(a, b) = expr` without `def`,
+  with a `name` field per identifier and a `value` field; it nests
+  (`x = (a, b) = list`). It was an `ERROR`. A `(` that opens a line
+  still calls the expression ending the line before, so two on
+  consecutive lines are one statement with no `ERROR` (end the first
+  with `;`), and `def f(a, b) = list`, which Groovy rejects, parses;
+  see `docs/divergences-from-spec.md` §3. (#94)
+- `compact_constructor_declaration` for a record's compact canonical
+  constructor (`public Warning { … }`; annotations, modifiers, `def`
+  or none), with `name` and `body`, in a record body only. The name is
+  not compared with the record's. Highlights, tags and locals treat it
+  as `constructor_declaration`. (#72)
+- An `@interface` element takes a default: `String value() default
+  'x'` is a `method_declaration` with an optional `default` field
+  holding an expression, an annotation or a `list_literal` of
+  annotations; that `default` is `@keyword`. Most such elements were
+  an `ERROR`. (#101)
+- A parenthesis-free call as the value of a declarator (local, field,
+  `def (a, b) = …`) or of an assignment with any operator:
+  `def out = sh script: 'make', returnStdout: true`, `x = foo 1, 2`,
+  `(a, b) = f 3`. The value is a `command_chain` with the fields of
+  the statement form. The first argument must start on the receiver's
+  line with a number, a string, `true`, `false`, `null` or a `name:`
+  key, so `def x = foo` followed by `1` on the next line stays two
+  statements. Not yet accepted, though Groovy takes them: a chain in
+  parentheses, as a call's only argument, or in an interpolation.
+  (#95)
+- A parenthesis-free call whose receiver is a name followed by member
+  accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`) written without spaces,
+  as a statement and as a value: `obj.method 1, 2`, `log.info "x"`,
+  `def r = obj?.find id: 1`. `command_chain.receiver` adds those six
+  node kinds; the method name of a `field_access` receiver is
+  `@function.call`. The first argument must start on the receiver's
+  line, so `result.size` followed by `2` on the next line stays two
+  statements. Receivers that end in a call or a subscript
+  (`foo().bar 1`) are not handled. (#52)
+
+### Changed
+
+- **BREAKING:** a dotted name followed on its line by a literal or a
+  `name:` key is a `command_chain` (see Added), which changes trees for
+  input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,
+  `sql.execute "…"` and `task.dependsOn 'a'` were the expression and a
+  separate statement holding the literal; `obj.method x: 1` was the
+  expression and a `labeled_statement`. After another statement on the
+  same line (`foo 1 a.b 'c'`) the dotted call is a second statement,
+  where Groovy continues the first. `obj.m 'a'() { }` and
+  `a.B "x$y"() { }` were a `method_declaration` and are now a call, as
+  in Groovy; `java.util.List 'foo'() { }` is still a method. (#52)
+- **BREAKING:** the value of a declarator or an assignment takes a
+  parenthesis-free call (see Added), which changes trees for input that
+  parsed without an `ERROR` at v0.6.0. `def x = foo 1`, `x = foo 'a'`,
+  `x += foo 1` and `a.b = foo 1` had the value `foo` and then a
+  statement; `x = foo a: 1` was an assignment and a
+  `labeled_statement`. The argument is the whole expression
+  (`def x = foo 1 ?: 2`, `foo 1 as int`, `foo 1 { }`). A line escape
+  between receiver and argument now joins them, and in
+  `bar 1, x = foo 2` the assignment takes `foo 2`. `def (a, b) = foo 1`
+  followed by `(c, d) = bar 2` stays one statement, now
+  `foo(1(c, d) = bar 2)`. (#95)
+- **BREAKING:** in a record body, a name after modifiers, annotations
+  or `def` and followed by a block is a `compact_constructor_declaration`
+  (see Added), which changes trees for input that parsed without an
+  `ERROR` at v0.6.0: `public Warning { … }` and `def Warning { … }`
+  were a modifier-only field and an initializer `block`. A field with
+  no type, or a typed field with modifiers, followed by a block on the
+  next line is now a field and a compact constructor named after its
+  last word (`private static String NAME` then `{ … }`: field `String`,
+  constructor `NAME`); Groovy rejects an initializer in a record, and
+  a `;` after the field keeps the block. Class, interface, trait, enum
+  and `@interface` bodies are unchanged. (#72)
+- **BREAKING:** `trait` and `sealed` are keywords only before the
+  declaration each opens (see Fixed), which changes trees for input
+  that parsed without an `ERROR` at v0.6.0. `trait` at the end of a
+  line before its name (`trait` then `T { }`) is the name `trait` and
+  a call at statement level, as in Groovy, and a field `T` of type
+  `trait` and a block in a member list; both were a
+  `trait_declaration`. `modifiers Type trait` at the end of a line is a
+  field named `trait`, where v0.6.0 read a field `Type` and a
+  `trait_declaration` that took the next member. In a class body a
+  modifier-only field followed by a method named `sealed` or `trait`
+  (`static count` then `void sealed() { }`) is now a typed field and a
+  constructor, the misreading of #96 that the keyword hid. (#73)
+- **BREAKING:** an `@interface` element whose default is a bare name
+  (`Class value() default Object`) is a `method_declaration` with a
+  `default` field; v0.6.0 parsed it with no `ERROR` as the element and
+  a field of type `default`. (#101)
+- **BREAKING:** `object_creation_expression`'s `type` field no longer
+  includes `array_type` in `node-types.json`. `new int[]()` and
+  `new String[]() { }`, an object creation of an array type at v0.6.0,
+  are now an `ERROR`, as Groovy rejects them. (#102)
+- **BREAKING:** the npm package's `engines.node` floor is now `>=22`
+  (was `>=20`); Node 20 is end of life. npm warns and still installs.
+  The CI lint job runs Node 24. (#62)
+- Five external scanner tokens are added: `_trait_keyword` and
+  `_sealed_keyword` (#73), `_command_value_start` (#95),
+  `_command_path_start` (#52) and `_unterminated_comment` (#75), an
+  empty hidden extra; the anonymous `trait` and `sealed` nodes keep
+  their kinds. The scanner now carries one bit of serialized state
+  (#75). Six named nodes and one field (`dimensions`) are added;
+  `SYMBOL_COUNT` goes from 321 to 363 and `FIELD_COUNT` from 45 to 46,
+  so most symbol ids and the field ids after `dimensions` change. In
+  `node-types.json` every expression position adds
+  `array_creation_expression` and `multi_assignment_expression`;
+  `variable_declarator.value`, `local_variable_declaration.value`,
+  `multi_assignment_declaration.value`,
+  `multi_assignment_expression.value` and
+  `assignment_expression.right` add `command_chain`; `class_body` adds
+  `compact_constructor_declaration`; `list_literal` adds `annotation`;
+  `method_declaration` gains `default`. (#52, #72, #73, #75, #94, #95,
+  #101, #102)
+- A script-level method head with untyped parameters
+  (`def f(a, b) { }`) parses slower: about 1.2x with two parameters and
+  1.4x with four, growing linearly. Lines that start with a dotted name
+  are about 3% slower and real files about 1%. The compiled parser is
+  about 29% larger. (#52, #94, #95)
+
+### Fixed
+
+- `trait` and `sealed` are names wherever they do not open a
+  declaration, as in Groovy: `private String trait`,
+  `private boolean sealed = true`, `static trait = 1`, `return trait`,
+  `trait = x` and `sealed()` parse. Each was an `ERROR`, or opened a
+  `trait_declaration` that swallowed the following members. Like
+  `record`, both keywords now come from the external scanner
+  (`SPECIFICATION.md` §6.13). `sealed` before another modifier
+  (`sealed abstract class S { }`) is still an `ERROR`; other residuals
+  are in `docs/divergences-from-spec.md` §12. (#73)
+- A file with many unterminated `/*` is no longer read once per `/*`:
+  the scanner, and the `record` header look-ahead, read to the end of
+  input each time, so parse time grew with the square of the count.
+  Input that parsed without an `ERROR` parses as before. On malformed
+  input, error recovery near the first unterminated `/*` can differ and
+  can be worse as well as better, and in one rare case an incremental
+  reparse after closing such a comment keeps a parenthesized expression
+  where a parse from scratch reads a cast (`SPECIFICATION.md` §6.6).
+  (#75)
+
 ## [0.6.0] - 2026-11-12
 
 ### Added

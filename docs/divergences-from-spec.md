@@ -43,6 +43,7 @@ reasoning here.
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
+| §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal or a key follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A comment between the receiver and the argument on one line is not read past (see #18 and #19 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -649,6 +650,7 @@ declaration that took the following members as its name and body.
 | Input | v0.6.0 | Now |
 |---|---|---|
 | `boolean sealed`, `String trait`, `def sealed = 1`, `void sealed() { }` in a class body | field, method | the same |
+| `static count` then `void sealed() { }` (or `void trait() { }`) on the next line, in a class body | field `count`, method | a typed field `count void` and a constructor `sealed`, with no `ERROR`: the split of a modifier-only field and a typed method (#96), which the keyword hid at v0.6.0. Groovy reads a field and a method |
 | `private boolean sealed`, `private String trait = "x"`, `public static final int sealed = 1` in a class body | `ERROR`; after `trait` the next members inside a `trait_declaration` | field |
 | `private String trait() { }` | `ERROR` | method |
 | `static trait = 1`, `private sealed`, `sealed() { }` | `ERROR` | field, field, constructor |
@@ -892,6 +894,7 @@ the whole input, ANTLR takes the first, here `fieldDeclaration`.
 | `static Foo bar { … }`, or `static Foo bar` then `{ … }` on the next line | rejected | field `Foo`, `compact_constructor_declaration` named `bar` |
 | `String bar { … }` | rejected | `field_declaration` and `block` |
 | `private String y` then `class C extends B { }`, or another nested type, on the next line | field, nested type | `field_declaration`, then the type's declaration |
+| `static count`, then `Foo y`, then `class C extends B { }`, each on its own line | an instance field in a record, which Groovy rejects | fields `count Foo`, `y class` and `C extends`, then a compact constructor `B`, with no `ERROR`; v0.6.0 read two fields and the class. The nested type's weight covers one field before it, not a modifier-only field followed by a typed field without modifiers |
 | `'Name' { … }` | compact constructor | `ERROR` |
 
 In a class, interface, trait, enum or `@interface` body nothing
