@@ -39,8 +39,9 @@ The default branch is **`main`**.
 - `src/scanner.c` — hand-written external scanner. Handles the
   context-sensitive lexing situations from `SPECIFICATION.md` §6 that
   the grammar cannot: slashy-vs-division, the line / block / Groovydoc
-  comment single-token emit, the contextual `record` keyword, which
-  is emitted only before a record header (§6.7), the key of a named
+  comment single-token emit, the contextual `record`, `trait` and
+  `sealed` keywords, each emitted only before the declaration it
+  opens (§6.7, §6.13), the key of a named
   argument in a parenthesis-free call, which needs `:` on the same
   line (§6.8), a subscript `[` on the same line as the
   expression before it (§6.9), a `)` with something after it on its

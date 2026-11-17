@@ -764,7 +764,7 @@ trait T {
         body: (class_body)))))
 
 ==================
-Nested record recovers after a rejected field named sealed
+Nested record after a field named sealed (#73)
 ==================
 
 class C {
@@ -780,9 +780,9 @@ class C {
     name: (identifier)
     body: (class_body
       (field_declaration
+        type: (type_identifier)
         (variable_declarator
           name: (identifier)))
-      (ERROR)
       (record_declaration
         name: (identifier)
         components: (record_components
@@ -1738,3 +1738,30 @@ def r = new Runnable() {
 }
 
 ---
+
+==================
+Field named trait at the end of a line before a compact constructor (#73)
+==================
+
+record R(int x) {
+    private static String trait
+    R { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))

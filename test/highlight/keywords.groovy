@@ -83,6 +83,21 @@ class Holder {
     // <- keyword
 }
 
+class Hero {
+    private String trait
+    //             ^ property
+    private boolean sealed = true
+    //              ^ property
+    trait Skill { }
+    // <- keyword
+    sealed class Rank { }
+    // <- keyword
+}
+
+trait = sealed
+// <- variable
+//      ^ variable
+
 synchronized (lock) { }
 // <- keyword
 

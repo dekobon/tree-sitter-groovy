@@ -11,8 +11,9 @@
  * lexing situations that pure grammar rules cannot disambiguate:
  *   - Slashy-string-start vs. division
  *   - Line / block / Groovydoc comment single-token emit
- *   - The contextual `record` keyword, emitted only before a record
- *     header so the word stays an identifier everywhere else
+ *   - The contextual `record`, `trait` and `sealed` keywords, emitted
+ *     only before a declaration so each word stays an identifier
+ *     everywhere else
  *   - Three decisions that depend on what shares a line: the key of
  *     a named argument in a parenthesis-free call, a subscript `[`,
  *     and the `)` of a cast
@@ -153,6 +154,20 @@ function classMembers($, constructor) {
     $.record_declaration,
     $.annotation_type_declaration,
   ];
+}
+
+/**
+ * The optional Groovy 4 `sealed` or `non-sealed` before `class`,
+ * `interface` or `trait`. `sealed` comes from the scanner, which emits
+ * it only when one of those words follows (SPECIFICATION.md §6.13).
+ * `non-sealed` is a single token so that its dash is not lexed as
+ * subtraction.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The optional modifier.
+ */
+function sealedModifier($) {
+  return optional(choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')));
 }
 
 /**
@@ -325,6 +340,10 @@ module.exports = grammar({
     $.block_comment,
     $.groovydoc_comment,
     $._record_keyword,
+    // §6.13 — `trait` before a trait header, `sealed` before `class`,
+    // `interface` or `trait`. Anywhere else each word is an identifier.
+    $._trait_keyword,
+    $._sealed_keyword,
     // §5.5 — empty token before the `name:` key of a named argument in
     // a parenthesis-free call. Scanner-side so the newline before a Spock
     // label (`result` then `where:`) is not swallowed, and so
@@ -781,13 +800,11 @@ module.exports = grammar({
     // modifiers, and sealed / permits clauses land in later
     // iterations. trait closes the dekobon #247 trait row.
     // §4 — class declaration with optional Groovy 4 sealed modifier
-    // and `permits` clause. The `non-sealed` form is a single
-    // anonymous token (token('non-sealed')) so the dash doesn't
-    // get lexed as subtraction.
+    // and `permits` clause.
     class_declaration: $ => seq(
       repeat($.annotation),
       repeat($._modifier),
-      optional(choice('sealed', token('non-sealed'))),
+      sealedModifier($),
       'class',
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
@@ -797,11 +814,13 @@ module.exports = grammar({
       field('body', $.class_body),
     ),
 
+    // §6.13 — the keyword comes from the scanner, which emits it only
+    // when a trait header follows, so `private String trait` is a field.
     trait_declaration: $ => seq(
       repeat($.annotation),
       repeat($._modifier),
-      optional(choice('sealed', token('non-sealed'))),
-      'trait',
+      sealedModifier($),
+      alias($._trait_keyword, 'trait'),
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
       optional($.extends_interfaces),
@@ -813,7 +832,7 @@ module.exports = grammar({
     interface_declaration: $ => seq(
       repeat($.annotation),
       repeat($._modifier),
-      optional(choice('sealed', token('non-sealed'))),
+      sealedModifier($),
       'interface',
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
@@ -968,17 +987,10 @@ module.exports = grammar({
     // so `class Inner { … }` would silently parse as a field `Inner`
     // of type `class` followed by an instance initializer block, and
     // a nested `record R(int x) { }` as a method `R` returning
-    // `record`. The record keyword comes from the scanner (§6.7), so
-    // listing it here does not reserve `record` as a member name.
-    //
-    // The price: `trait` and `sealed` are keywords wherever a member
-    // can start, as they already are where a statement can. A member
-    // cannot open with one of them as a plain identifier, with or
-    // without modifiers (`static trait = 1`, `sealed() { }`), nor use
-    // one as the name after `modifier(s) Type`, because `private Foo`
-    // is already a complete field (`private boolean sealed` is an
-    // ERROR; `boolean sealed` is not). See divergence 12. No
-    // `conflicts` entry is needed.
+    // `record`. The `record`, `trait` and `sealed` keywords come from
+    // the scanner (§6.7, §6.13), so listing their declarations here
+    // does not reserve the words as member names. No `conflicts` entry
+    // is needed.
     _class_member: $ => choice(...classMembers($, $.constructor_declaration)),
 
     // §4 — constructors share the method_declaration shape but have
@@ -1214,23 +1226,11 @@ module.exports = grammar({
     // share the prefix with an annotated member; the same precedence
     // decides after them, so `@Foo A\n int x` is a constant and a
     // field.
-    enum_constant: $ => choice(
-      prec(1, seq(
-        repeat($.annotation),
-        field('name', $.identifier),
-        optional(field('arguments', $.argument_list)),
-      )),
-      // `sealed` and `trait` are keywords wherever a member can start
-      // (divergence 12): at the first constant and, since #89, after
-      // every `,`. A constant may still have either name, so the
-      // keyword is accepted as one. The negative precedence gives way
-      // to a declaration when one follows: `sealed class`, `trait T {`.
-      prec(-1, seq(
-        repeat($.annotation),
-        field('name', alias(choice('sealed', 'trait'), $.identifier)),
-        optional(field('arguments', $.argument_list)),
-      )),
-    ),
+    enum_constant: $ => prec(1, seq(
+      repeat($.annotation),
+      field('name', $.identifier),
+      optional(field('arguments', $.argument_list)),
+    )),
 
     // §4 — record (Groovy 4+), after Apache's `classDeclaration`:
     // `[modifiers] record Name[<T>](Type a, Type b) [implements I] [{ body }]`.

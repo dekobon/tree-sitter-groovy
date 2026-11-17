@@ -181,15 +181,15 @@ These are documented in detail in
   a field `Foo` and a constructor `bar`. After a field *with* an
   initializer a next-line `{` is that expression's trailing closure,
   as in Groovy: end the field with `;` to get an initializer block.
-- **`sealed` and `trait` are keywords where a class member can
-  start** -- a field named `sealed` or `trait` is an `ERROR` when it
-  follows a modifier (`private boolean sealed`) or opens the member
-  (`static trait = 1`). `boolean sealed` and `String trait`, with no
-  modifier, parse, and so does an enum constant with either name
-  (`enum E { trait, sealed }`).
-  `record` is not affected: it is a keyword only directly before a
-  record header (`record Name(`), so `private Record record` and
-  `record.key()` parse.
+- **A name `sealed` at the end of a line before a nested type is
+  the modifier** -- `record`, `trait` and `sealed` are keywords only
+  before the declaration each opens, so `private Record record`,
+  `private String trait` and `return sealed` parse as names. A line
+  break is whitespace, though, so `private boolean sealed` followed by
+  `class Inner { }` on the next line is a field `boolean` and a sealed
+  class, where Groovy reads a field `sealed` and a class. `sealed`
+  must come directly before `class`, `interface` or `trait`:
+  `sealed abstract class S { }` is an `ERROR`.
 - **A member after an enum's trailing comma must start with a
   modifier, `def` or a keyword** -- Groovy up to 4.x takes any member
   there. `A,` followed by `String x` or by `E() { }` is an `ERROR`

@@ -17,8 +17,9 @@ const LINES: usize = 2_000;
 const CHUNK_BYTES: usize = 1_024;
 
 /// Most bytes the parser may ask for, per byte of input. Measured: 4.9
-/// for the plain series and 5.9 for the `record` one. One scan to the
-/// end of input per line gives about 1000 and more.
+/// for the plain series, 5.9 for the `record` one, 5.0 for `trait` and
+/// 4.0 for `sealed`. One scan to the end of input per line gives about
+/// 1000 and more.
 const MAX_BYTES_SERVED_PER_INPUT_BYTE: usize = 20;
 
 /// Parses `LINES` copies of `line` and returns the bytes served to the
@@ -60,6 +61,24 @@ fn unterminated_comments_are_scanned_once() {
 #[test]
 fn unterminated_comments_in_record_headers_are_scanned_once() {
     let ratio = bytes_served_per_input_byte("record a /* x\n");
+    assert!(
+        ratio < MAX_BYTES_SERVED_PER_INPUT_BYTE,
+        "parser read the input {ratio} times over",
+    );
+}
+
+#[test]
+fn unterminated_comments_in_trait_headers_are_scanned_once() {
+    let ratio = bytes_served_per_input_byte("trait a /* x\n");
+    assert!(
+        ratio < MAX_BYTES_SERVED_PER_INPUT_BYTE,
+        "parser read the input {ratio} times over",
+    );
+}
+
+#[test]
+fn unterminated_comments_after_sealed_are_scanned_once() {
+    let ratio = bytes_served_per_input_byte("sealed /* x\n");
     assert!(
         ratio < MAX_BYTES_SERVED_PER_INPUT_BYTE,
         "parser read the input {ratio} times over",

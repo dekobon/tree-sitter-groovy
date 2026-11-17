@@ -18,7 +18,7 @@ reasoning here.
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
 | §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
-| §5.2 Contextual keywords | **Mostly done** | `var`, `sealed`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record` is a scanner token emitted only before a record header (§6.7), so it is an identifier everywhere else. Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
+| §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
 | §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported. String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). |
@@ -601,7 +601,7 @@ argument the form is an `ERROR`. This predates #68.
 
 ---
 
-## 12. `sealed` and `trait` are keywords where a member can start
+## 12. `sealed` and `trait`: keyword or name
 
 **Apache `GroovyParser.g4`** lets both words name things: its
 `identifier` rule lists `SEALED` and `TRAIT` next to `Identifier`,
@@ -609,65 +609,66 @@ so `private boolean sealed` and `String trait` are ordinary fields.
 **Spec §5.2** asks for the same through an
 `identifier_or_contextual` fallback.
 
-**Current implementation**: the declaration rules spell the words
-as literals, and with `word: $.identifier` the lexer hands back the
-keyword wherever the parser could accept it, with no fallback to
-`identifier`. That was already so where a statement can start:
-`boolean sealed = true` in a method body, and a statement that
-opens with a variable named `trait`, are errors at v0.4.0 too
-(`def sealed = 1` is not).
+**Current implementation** (#73): as for `record`, the keywords come
+from the external scanner, which emits each only before the
+declaration it opens (spec §6.13): `trait` when a name follows on the
+same line and then `{`, `<`, `extends`, `implements` or `permits`;
+`sealed` when `class`, `interface` or `trait` follows, or, on the same
+line, another modifier, an annotation, `record` or `enum`. Everywhere
+else the word is an `identifier`.
 
-Nested type declarations (#60, #68) extend it to member lists. A
-nested `class`, `interface`, `trait`, `record` or `@interface` has
-to be a member, because otherwise its keyword lexes as an identifier
-and `class Inner { … }` parses, with no `ERROR`, as a field `Inner`
-of type `class` followed by an instance initializer block. With the
-productions in place `sealed` and `trait` are keywords wherever a
-member can start:
+Groovy takes the class modifiers in any order. The grammar accepts no
+modifier after `sealed`, so `sealed abstract class S { }`,
+`sealed @A class S { }` and `sealed static class C { }` in a class body
+are an `ERROR` at `sealed`, as at v0.6.0, until modifiers are accepted
+in any order. `sealed record` and `sealed enum`, which Groovy rejects
+too, stay an `ERROR` as well.
 
-| Input in a class body | Result |
-|---|---|
-| `boolean sealed`, `String trait`, `def sealed = 1` | field, as before |
-| `int x, trait`, `List<String> sealed`, `@Lazy List sealed` | field, as before |
-| `void sealed() { }`, parameters and property accesses named `sealed` / `trait` | as before |
-| `private boolean sealed`, `private String trait = "x"` | `ERROR` (a field at v0.4.0) |
-| `public static final int sealed = 1` | `ERROR` (a field at v0.4.0) |
-| `static trait = 1`, `private trait`, `sealed() { }` | `ERROR` (parsed at v0.4.0) |
-| `enum E { trait, B }`, `enum E { sealed }`, `enum E { A, sealed }` | constants (the first two an `ERROR` at v0.5.0) |
+v0.5.0 and v0.6.0 spelled both words as grammar literals. With
+`word: $.identifier` the lexer returns a keyword wherever the parser
+has an action for it, and the nested type declarations of #60 and #68
+gave them one at every member start. After `private String`, which is
+already a complete field named `String`, `trait` then opened a trait
+declaration that took the following members as its name and body.
 
-The rows that fail share one shape. A field needs no type after a
-modifier, so `private boolean` is already a complete field named
-`boolean`, a new member may start right after it, and the lexer
-prefers the keyword. Without a modifier the type cannot stand
-alone, the next word can only be the name, and it stays an
-identifier.
+| Input | v0.6.0 | Now |
+|---|---|---|
+| `boolean sealed`, `String trait`, `def sealed = 1`, `void sealed() { }` in a class body | field, method | the same |
+| `private boolean sealed`, `private String trait = "x"`, `public static final int sealed = 1` in a class body | `ERROR`; after `trait` the next members inside a `trait_declaration` | field |
+| `private String trait() { }` | `ERROR` | method |
+| `static trait = 1`, `private sealed`, `sealed() { }` | `ERROR` | field, field, constructor |
+| `return trait`, `trait = x`, `String sealed = 'x'` in a method body | `ERROR` | statement, local variable |
+| an enum constant `trait`, then `int f() { }` on the next line | `ERROR` | constant and method |
+| `trait T { }`, `sealed class C permits A { }`, `static count` then `trait T { }` on the next line | declaration | the same |
 
-An enum constant sits where a member could start too: the first one,
-and since #89 every one after a `,`. `enum_constant` therefore takes
-the two keywords as a name, aliased to `identifier`, at a lower
-precedence than the declarations, so `sealed class` and `trait T {`
-are still declarations there. One shape stays an `ERROR`, as at
-v0.5.0: a constant named `trait` followed, with no `;` or `,`, by a
-member that starts with a name (`trait` then `int f() { }` on the
-next line), which reads as a trait declaration.
+A line break is whitespace to the grammar. The scanner sees the line
+breaks after the word, in its look-ahead, but not the ones before it,
+so where Groovy relies on those the readings differ:
 
-`record` escapes the table because its keyword is not a grammar
-literal: the external scanner emits it only when a name follows on
-the same line and `(` after that (spec §6.7), so `private Record record`,
-`public void record() { }` and `enum E { record, B }` all parse and
-a nested `record R(int x) { }` is a `record_declaration`.
+| Input | Groovy | This grammar |
+|---|---|---|
+| `trait` then `T { }` on the next line, at statement level | name `trait`, then the call `T { }` (observed, Groovy 3) | the same; a `trait_declaration` at v0.6.0 |
+| the same in a member list | rejected (observed, Groovy 3) | field `T` of type `trait` and an instance initializer; a `trait_declaration` at v0.6.0 |
+| `private String trait` then `T { }` on the next line, in a record body | field `trait` and a compact constructor (read off the 4.0.x grammar) | the same; a field `String` and a `trait_declaration` at v0.6.0 |
+| `private boolean sealed` then `class Inner { }` on the next line | field `sealed` and a class (read off the 4.0.x grammar) | field `boolean` and a sealed class, as at v0.6.0 |
+| `trait T` then `{ }` on the next line, in a member list | field `T` of type `trait` and an initializer, which then fails to resolve (observed, Groovy 3) | `trait_declaration` |
+| `sealed` then `public class C { }` on the next line | sealed class (read off the 4.0.x grammar) | name `sealed` and a class at statement level; field of type `sealed` named `public` and a class in a member list; `ERROR` at v0.6.0 |
+| `private boolean sealed` then `static class D { }` on the next line | field `sealed` and a class (read off the 4.0.x grammar) | the same; `ERROR` at v0.6.0 |
 
-**Action**: give `sealed` and `trait` the same treatment — a scanner
-token emitted only when the word opens a declaration (`sealed class`,
-`sealed interface`, `trait Name {`), so the literal disappears from
-the lexer and the word is an identifier elsewhere. The alternative,
-accepting the words as names through an aliased keyword
-(`alias('sealed', $.identifier)`), is in place for enum constants,
-where it needs no declared conflict. In the declarator position it
-was tried for `record` and rejected: after
-`private boolean` it is a genuine LR(1) conflict that needs a
-declared conflict, and it still leaves `public void record() { }` an
-error because the method name position wants `_property_name`.
+A modifier after `sealed` is an `ERROR` while the modifier order is
+fixed, so across a line break the scanner leaves the word a name and
+the last row keeps its field. Once modifiers are accepted in any order,
+looking past them to `class`, `interface` or `trait` would read the
+`sealed` then `public class` row correctly as well.
+
+`trait T(int x) { }` is a method `T` with return type `trait` and no
+`ERROR`; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`.
+It is the counterpart of the `record foo() { … }` residual of spec
+§6.7.
+
+**Action**: none planned. The `private boolean sealed` then
+`class Inner { }` row needs what precedes the word on its line, which
+the scanner cannot see.
 
 ---
 

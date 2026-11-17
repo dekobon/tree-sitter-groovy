@@ -1082,3 +1082,44 @@ Annotation on a name other than the placeholder is not accepted
 @Field x
 
 ---
+
+==================
+Variables and parameters named trait and sealed (#73)
+==================
+
+def trait = 'brave'
+String sealed = 'no'
+void level(String trait, sealed) {
+    def c = { trait -> trait }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier))))))))

@@ -1,11 +1,12 @@
 // Hand-written external scanner for tree-sitter-groovy.
 //
 // Handles §6.2 slashy-string-start, §6.6 line/block/groovydoc
-// comments, and the §6.7 contextual `record` keyword. The first two
-// start with `/`; combining their dispatch keeps the in-grammar lexer
-// from partially consuming the leading `/`. The third is a look-ahead
-// decision the grammar cannot express: `record` is a keyword only
-// when a record header follows it. Also handles §6.8
+// comments, and the contextual `record` (§6.7), `trait` and `sealed`
+// (§6.13) keywords. The first two start with `/`; combining their
+// dispatch keeps the in-grammar lexer from partially consuming the
+// leading `/`. The keywords are look-ahead decisions the grammar
+// cannot express: each word is a keyword only when the declaration it
+// opens follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
@@ -32,6 +33,8 @@ enum TokenType {
     BLOCK_COMMENT,
     GROOVYDOC_COMMENT,
     RECORD_KEYWORD,
+    TRAIT_KEYWORD,
+    SEALED_KEYWORD,
     COMMAND_NAMED_KEY,
     SUBSCRIPT_OPEN,
     CAST_CLOSE,
@@ -68,12 +71,13 @@ static inline bool no_comment_close_ahead(const Scanner *scanner) {
 // Wider than the grammar's `identifier` token (SPECIFICATION.md
 // §5.2): every non-ASCII code point counts as an identifier
 // character, because the scanner has no Unicode tables. That is safe
-// because the scanner never emits a name. It only looks ahead, for
-// the name of a record header and for the key of a named argument,
-// and the in-grammar lexer then reads the name with the real class.
-// On valid input the two agree: outside strings and comments, a
-// non-ASCII character can only be part of a name. On other input the
-// name the lexer reads is shorter, and the parse fails there.
+// because the scanner never emits a name. It only looks ahead: past the
+// name in a declaration header, at the key of a named argument, and at
+// words it compares with ASCII keywords. The in-grammar lexer then
+// reads any name with the real class. On valid input the two agree:
+// outside strings and comments, a non-ASCII character can only be part
+// of a name. On other input the name the lexer reads is shorter, and
+// the parse fails there.
 static inline bool is_identifier_start(int32_t c) {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
         || c == '_' || c == '$' || c > 0x7F;
@@ -110,6 +114,29 @@ static bool skip_same_line_space(TSLexer *lexer, bool skip) {
     }
 }
 
+// Consumes a name and keeps its first `size` characters in `word`, to
+// compare with a keyword. A non-ASCII character is stored as 0, which
+// matches no keyword; cut to a `char` it could. Returns the full length.
+static unsigned read_word(TSLexer *lexer, char *word, unsigned size) {
+    unsigned len = 0;
+    // EOF-bounded: lookahead is 0 at end of input, which fails the
+    // predicate.
+    while (is_identifier_char(lexer->lookahead)) {
+        if (len < size) {
+            word[len] = lexer->lookahead <= 0x7F ? (char)lexer->lookahead : 0;
+        }
+        len++;
+        lexer->advance(lexer, false);
+    }
+    return len;
+}
+
+// Whether a word that `read_word` returned is `keyword`. A word longer
+// than the buffer differs in length from every keyword compared.
+static bool word_is(const char *word, unsigned len, const char *keyword) {
+    return len == strlen(keyword) && memcmp(word, keyword, len) == 0;
+}
+
 // SPECIFICATION.md §6.8 — decides that the key of a named argument
 // in a parenthesis-free call (`exclude group: 'a'`) starts here: a
 // name on the current line, followed by `:` and not `::`. The token is
@@ -127,19 +154,10 @@ static bool scan_command_named_key(TSLexer *lexer) {
     // are switch labels, not keys. Apache's `namedArgLabel` accepts both
     // keywords, so `foo default: 1` diverges on purpose: the one-liner
     // `switch (x) { case 1: foo default: bar }` in statements-switch.txt
-    // depends on the rejection. A non-ASCII character is stored as 0,
-    // which matches neither word; cut to a `char` it could.
-    char word[8];
-    unsigned len = 0;
-    while (is_identifier_char(lexer->lookahead)) {
-        if (len < sizeof(word)) {
-            word[len] = lexer->lookahead <= 0x7F ? (char)lexer->lookahead : 0;
-        }
-        len++;
-        lexer->advance(lexer, false);
-    }
-    if ((len == 4 && memcmp(word, "case", 4) == 0)
-        || (len == 7 && memcmp(word, "default", 7) == 0)) {
+    // depends on the rejection.
+    char word[sizeof "default"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "case") || word_is(word, len, "default")) {
         return false;
     }
     if (!skip_same_line_space(lexer, false)) {
@@ -172,20 +190,22 @@ static inline bool is_line_break(int32_t c) {
     return c == '\n' || c == '\r';
 }
 
-// Skips the trivia Groovy's lexer hides inside a record header:
+// Skips the trivia Groovy's lexer hides inside a declaration header:
 // spaces, tabs, line escapes and block comments, plus line breaks and
 // line comments when `newlines` is set. Returns false on a `/` that
 // opens neither comment kind (a slashy string or division cannot be
 // part of a header), on a `\` that is not a line escape, and on an
 // unterminated block comment. `no_close_ahead` says that every block
 // comment from here on is unterminated. Finding that out here cannot
-// be remembered: the token would have to start before `record`, which
+// be remembered: the token would have to start at the keyword, which
 // is before the position the fact holds from. The comment branch of
 // the scan function reaches the same `/*` next and remembers it.
+// `crossed_line`, when not NULL, is set once a line break is skipped.
 static bool skip_header_trivia(
     TSLexer *lexer,
     bool newlines,
-    bool no_close_ahead
+    bool no_close_ahead,
+    bool *crossed_line
 ) {
     for (;;) {
         for (;;) {
@@ -194,6 +214,9 @@ static bool skip_header_trivia(
             }
             if (!newlines || !is_line_break(lexer->lookahead)) {
                 break;
+            }
+            if (crossed_line != NULL) {
+                *crossed_line = true;
             }
             advance(lexer);
         }
@@ -231,6 +254,47 @@ static bool skip_header_trivia(
     }
 }
 
+// Consumes `keyword` and returns whether the input spells it as a whole
+// word, with no identifier character after it. On false, input has been
+// consumed, so the caller returns false and the runtime rewinds.
+static bool consume_keyword(TSLexer *lexer, const char *keyword) {
+    for (const char *c = keyword; *c != '\0'; c++) {
+        if (lexer->lookahead != *c) {
+            return false;
+        }
+        advance(lexer);
+    }
+    return !is_identifier_char(lexer->lookahead);
+}
+
+// The name of a declaration header, after its keyword. `mark_end` fixes
+// the token at the keyword; what is read from here on is look-ahead and
+// is not kept. Between the keyword and the name only spaces, tabs, line
+// escapes and block comments may appear: `classDeclaration` in
+// GroovyParser.g4 has no `nls` there, so the keyword at the end of a
+// line is never one. `private Record record` followed by a constructor
+// on the next line, and `private String trait` followed by any member,
+// stay a field and that member.
+static bool scan_header_name(TSLexer *lexer, bool no_close_ahead) {
+    lexer->mark_end(lexer);
+    if (!is_inline_space(lexer->lookahead) && lexer->lookahead != '/'
+        && lexer->lookahead != '\\') {
+        return false;
+    }
+    if (!skip_header_trivia(lexer, false, no_close_ahead, NULL)) {
+        return false;
+    }
+    if (!is_identifier_start(lexer->lookahead)) {
+        return false;
+    }
+    // EOF-bounded: lookahead is 0 at end of input, which fails the
+    // predicate.
+    while (is_identifier_char(lexer->lookahead)) {
+        advance(lexer);
+    }
+    return true;
+}
+
 // SPECIFICATION.md §6.7 — `record` is a keyword only at the start of
 // a record header: `record`, a name on the same line, then `(` with
 // Groovy's lexer trivia allowed in between, or `<` straight after the
@@ -243,42 +307,97 @@ static bool skip_header_trivia(
 // record_declaration is a class member that is every member start.
 //
 // The scanner has already consumed `record` when this is called.
-// `mark_end` fixes the token there; the look-ahead that follows is
-// read but not kept. Between `record` and the name only spaces, tabs
-// and block comments may appear: `classDeclaration` in
-// GroovyParser.g4 has no `nls` there, so `record` at the end of a line
-// is never a keyword, which keeps `private Record record` followed by
-// a constructor on the next line a field and a constructor. Before
-// `(` the rule has `nls`, so line breaks and line comments are
+// Before `(` the rule has `nls`, so line breaks and line comments are
 // skipped there too. A command-style call `record Point(1, 2)`
 // matches the pattern and misfires; §6.7 lists the residuals.
 static bool scan_record_header(TSLexer *lexer, bool no_close_ahead) {
-    if (is_identifier_char(lexer->lookahead)) {
+    if (!scan_header_name(lexer, no_close_ahead)) {
         return false;
-    }
-    lexer->mark_end(lexer);
-    if (!is_inline_space(lexer->lookahead) && lexer->lookahead != '/'
-        && lexer->lookahead != '\\') {
-        return false;
-    }
-    if (!skip_header_trivia(lexer, false, no_close_ahead)) {
-        return false;
-    }
-    if (!is_identifier_start(lexer->lookahead)) {
-        return false;
-    }
-    // EOF-bounded: lookahead is 0 at end of input, which fails the
-    // predicate.
-    while (is_identifier_char(lexer->lookahead)) {
-        advance(lexer);
     }
     if (lexer->lookahead == '<') {
         return true;
     }
-    if (!skip_header_trivia(lexer, true, no_close_ahead)) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)) {
         return false;
     }
     return lexer->lookahead == '(';
+}
+
+// SPECIFICATION.md §6.13 — `trait` is a keyword only at the start of a
+// trait header: as for `record`, a name on the same line, then, with
+// line breaks and comments allowed (the rule has `nls` before each
+// clause and the body), `<`, `{` or one of `extends`, `implements` and
+// `permits`. Everywhere else the word is an identifier, as Apache's
+// `identifier` rule allows. A `<` after a space opens type parameters
+// in Groovy but not in the grammar, whose opener is `token.immediate`;
+// taking the keyword keeps that an `ERROR` rather than a comparison.
+// The scanner has already consumed `trait` when this is called.
+static bool scan_trait_header(TSLexer *lexer, bool no_close_ahead) {
+    if (!scan_header_name(lexer, no_close_ahead)) {
+        return false;
+    }
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)) {
+        return false;
+    }
+    if (lexer->lookahead == '{' || lexer->lookahead == '<') {
+        return true;
+    }
+    char word[sizeof "implements"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    return word_is(word, len, "extends") || word_is(word, len, "implements")
+        || word_is(word, len, "permits");
+}
+
+// The words of `_modifier` in grammar.js, and `default`, which Apache's
+// class modifiers add. Apache's member modifiers take all of them, in
+// any order, before a nested type declaration.
+static bool is_modifier_word(const char *word, unsigned len) {
+    return word_is(word, len, "public") || word_is(word, len, "protected")
+        || word_is(word, len, "private") || word_is(word, len, "static")
+        || word_is(word, len, "abstract") || word_is(word, len, "final")
+        || word_is(word, len, "strictfp") || word_is(word, len, "default")
+        || word_is(word, len, "synchronized") || word_is(word, len, "native")
+        || word_is(word, len, "transient") || word_is(word, len, "volatile");
+}
+
+// SPECIFICATION.md §6.13 — `sealed` is a keyword only before `class`,
+// `interface` or `trait`, the words the grammar accepts after it.
+// Apache's modifiers end in `nls`, so line breaks and comments may come
+// between. Everywhere else the word is an identifier. The scanner has
+// already consumed `sealed` when this is called.
+//
+// Groovy's parser also takes `sealed` before another modifier, an
+// annotation, `record` or `enum`. The grammar accepts none of them
+// after it, so the keyword there only keeps the `ERROR` at the word.
+// Read as a name, the word gave a tree with no `ERROR` that dropped the
+// modifier, or lost the declaration to an `ERROR` that began at `sealed`.
+// The keyword is taken only on the same line: across a line break the
+// same words also start the member after a field named `sealed`, which
+// the keyword would turn into an `ERROR`.
+static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
+    lexer->mark_end(lexer);
+    bool crossed_line = false;
+    if (!skip_header_trivia(lexer, true, no_close_ahead, &crossed_line)) {
+        return false;
+    }
+    if (lexer->lookahead == '@') {
+        return !crossed_line;
+    }
+    char word[sizeof "synchronized"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "class") || word_is(word, len, "interface")
+        || word_is(word, len, "trait")) {
+        return true;
+    }
+    if (crossed_line) {
+        return false;
+    }
+    if (word_is(word, len, "non") && lexer->lookahead == '-') {
+        advance(lexer);
+        return consume_keyword(lexer, "sealed");
+    }
+    return is_modifier_word(word, len) || word_is(word, len, "record")
+        || word_is(word, len, "enum");
 }
 
 // SPECIFICATION.md §6.11 — whether something follows a `)` on its
@@ -418,11 +537,11 @@ bool tree_sitter_groovy_external_scanner_scan(
         // here. Falling through after the scan advanced past `b` in
         // `foo a, b` and a newline made the comment branch emit `b` as a
         // line_comment, since mark_end had already been called.
-        // RECORD_KEYWORD can be valid here too, after a statement-start
-        // identifier (`foo` then `record R(…)`). The key wins on the same
-        // line: `foo record: 1` is a named argument, while a record header
-        // there is not valid Groovy. A `record` on the next line is not
-        // reached here, since a newline is not skipped.
+        // The keywords of §6.7 and §6.13 can be valid here too, after a
+        // statement-start identifier (`foo` then `record R(…)`). The key
+        // wins on the same line: `foo record: 1` is a named argument,
+        // while a declaration there is not valid Groovy. A keyword on the
+        // next line is not reached here, since a newline is not skipped.
         if (wants_named_key && is_identifier_start(lexer->lookahead)) {
             return scan_command_named_key(lexer);
         }
@@ -436,24 +555,27 @@ bool tree_sitter_groovy_external_scanner_scan(
     // in-grammar `\s` SKIP rule — without this, tree-sitter's lexer
     // eats `\n`, does NOT re-invoke the external scanner, then
     // fails on the following `/` and consumes it through error
-    // recovery. §6.7 `record` shares the whitespace skip and is
-    // dispatched on `r` before the `/` branches.
+    // recovery. The contextual keywords (§6.7, §6.13) share the
+    // whitespace skip and are dispatched on their first letter before
+    // the `/` branches.
     bool wants_comment = valid_symbols[LINE_COMMENT]
         || valid_symbols[BLOCK_COMMENT]
         || valid_symbols[GROOVYDOC_COMMENT];
     bool wants_slashy = valid_symbols[SLASHY_STRING_START];
     bool wants_record = valid_symbols[RECORD_KEYWORD];
+    bool wants_trait = valid_symbols[TRAIT_KEYWORD];
+    bool wants_sealed = valid_symbols[SEALED_KEYWORD];
     bool wants_cast_close = valid_symbols[CAST_CLOSE]
         && !valid_symbols[ERROR_SENTINEL];
     bool wants_not_in = valid_symbols[NOT_IN]
         && !valid_symbols[ERROR_SENTINEL];
-    if (!wants_comment && !wants_slashy && !wants_record
-        && !wants_cast_close && !wants_not_in) {
+    if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
+        && !wants_sealed && !wants_cast_close && !wants_not_in) {
         return false;
     }
 
     // A line escape is whitespace too, so a comment, a slashy string or
-    // `record` may follow one.
+    // a keyword may follow one.
     while (is_whitespace(lexer->lookahead) || lexer->lookahead == '\\') {
         if (lexer->lookahead == '\\') {
             if (!skip_same_line_space(lexer, true)) {
@@ -463,22 +585,33 @@ bool tree_sitter_groovy_external_scanner_scan(
             lexer->advance(lexer, true);
         }
     }
+    // A letter can never open a comment or a slashy string, so every
+    // path out of the keyword branches returns. On `false` the runtime
+    // rewinds to the token start and the in-grammar lexer reads the
+    // word as an identifier.
+    bool no_close_ahead = no_comment_close_ahead(scanner);
     if (lexer->lookahead == 'r' && wants_record) {
-        // An `r` can never open a comment or a slashy string, so
-        // every path out of this branch returns. On `false` the
-        // runtime rewinds to the token start and the in-grammar
-        // lexer reads the word as an identifier.
-        static const char keyword[] = "record";
-        for (const char *c = keyword; *c != '\0'; c++) {
-            if (lexer->lookahead != *c) {
-                return false;
-            }
-            advance(lexer);
-        }
-        if (!scan_record_header(lexer, no_comment_close_ahead(scanner))) {
+        if (!consume_keyword(lexer, "record")
+            || !scan_record_header(lexer, no_close_ahead)) {
             return false;
         }
         lexer->result_symbol = RECORD_KEYWORD;
+        return true;
+    }
+    if (lexer->lookahead == 't' && wants_trait) {
+        if (!consume_keyword(lexer, "trait")
+            || !scan_trait_header(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = TRAIT_KEYWORD;
+        return true;
+    }
+    if (lexer->lookahead == 's' && wants_sealed) {
+        if (!consume_keyword(lexer, "sealed")
+            || !scan_sealed_target(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = SEALED_KEYWORD;
         return true;
     }
     if (lexer->lookahead == '!' && wants_not_in) {

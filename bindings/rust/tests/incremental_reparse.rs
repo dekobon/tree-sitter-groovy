@@ -12,14 +12,16 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
 /// Texts with zero, one or several unterminated block comments, in
 /// the positions the scanner treats differently: after an expression,
-/// at a statement start, inside a record header, and after a comment
-/// that does close.
+/// at a statement start, inside a record or trait header, after
+/// `sealed`, and after a comment that does close.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
     "foo a /* x\nfoo b /* y\nfoo c /* z\n",
     "/* a */ x\n/* b\ny /* c\nz\n",
     "record A /* x\nrecord B(int n) { }\n/** doc\nrecord C /* y\n",
+    "trait A /* x\ntrait B { }\nclass C {\n  private String trait\n  trait D /* y\n}\n",
+    "sealed /* x\nsealed class S { }\nclass C {\n  private boolean sealed\n  sealed /* y\n}\n",
     "class C {\n  /* one */\n  int a /* two\n  int b /* three\n}\n",
     "def s = \"/* in a string\"\nfoo /* x\ndef t = /a*/\n",
     "x /* a\r\ny /* b\r\n",

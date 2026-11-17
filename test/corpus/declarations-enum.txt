@@ -1321,3 +1321,26 @@ Enum with type parameters is an error
 enum E<T> { A }
 
 ---
+
+==================
+Enum constant named trait before a member on the next line (#73)
+==================
+
+enum E {
+    trait
+    int f() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

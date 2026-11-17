@@ -388,7 +388,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D`. Annotations may come first (`@Grab('g:a:1') import a.B`), on `package` too. |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). An `@interface` element may take a default, as in Apache's `methodDeclaration` (`DEFAULT elementValue`): `String value() default 'x'` is a `method_declaration` whose `default` field holds an expression, an annotation, or a `list_literal` of annotations (#101). `default` is a keyword after the `()` only in an `@interface` body: in an interface, Groovy reads `void a()` followed by `default void b() { }` on the next line as two methods, telling them apart by the line break, which is whitespace here. The `default` modifier of an interface method is not supported, and it gives a wrong tree with no `ERROR`: `default void b() { }` parses as a field of type `default` named `void`, then a constructor `b`. |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). `record`, `trait` and `sealed` stay usable names next to the nested declarations because their keywords come from the scanner (§6.7, §6.13; `docs/divergences-from-spec.md` §12). An `@interface` element may take a default, as in Apache's `methodDeclaration` (`DEFAULT elementValue`): `String value() default 'x'` is a `method_declaration` whose `default` field holds an expression, an annotation, or a `list_literal` of annotations (#101). `default` is a keyword after the `()` only in an `@interface` body: in an interface, Groovy reads `void a()` followed by `default void b() { }` on the next line as two methods, telling them apart by the line break, which is whitespace here. The `default` modifier of an interface method is not supported, and it gives a wrong tree with no `ERROR`: `default void b() { }` parses as a field of type `default` named `void`, then a constructor `b`. |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | optional `implements` clause (`super_interfaces`, as on classes); constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55). A member may also follow a trailing `,` directly, which Groovy accepts up to 4.x and Groovy 5 rejects (#88). This grammar takes a narrower set than Groovy there: a member that starts with a modifier, `def` or a declaration keyword, with annotations before it allowed; a constructor needs an access modifier. A member that starts with a bare name is not accepted: `A,` then `String x` or `E() { }` is an `ERROR`, the second because it reads as a constant with an anonymous class body (`docs/divergences-from-spec.md` §13). Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. The body takes the members of a class body plus a compact canonical constructor, Apache's `compactConstructorDeclaration`: `public Name { … }`, with annotations, modifiers, `def` after the modifiers, or none of them, and the `{` on the same line or the next, is a `compact_constructor_declaration` with `name` and `body` (#72). The body node is still `class_body`. Only a record body takes it; Apache's parser takes it in any class body and rejects it afterwards outside a record. Its name is not compared with the record's, so any `Name { … }` there is one. A modifier-only field followed by a block (`static count`, then `{ … }` on the next line) reads as a compact constructor too, and a `;` after the field keeps the field and the block. `static count` followed by `Name { … }` is that field and a compact constructor, by a dynamic precedence, so `static Foo bar { … }` is a field `Foo` and a constructor `bar`. A string-literal name is not supported (`docs/divergences-from-spec.md` §17). |
@@ -471,12 +471,11 @@ identifiers): `abstract`, `assert`, `boolean`, `break`, `byte`,
 `protected`, `public`, `return`, `short`, `static`, `strictfp`,
 `super`, `switch`, `synchronized`, `this`, `throw`, `throws`,
 `transient`, `try`, `void`, `volatile`, `while`. Also the
-Groovy-specific hard keywords `def`, `trait`, `module`,
-`threadsafe`.
+Groovy-specific hard keywords `def`, `module`, `threadsafe`.
 
 **Contextual keywords** (keywords only in specific syntactic
 positions, identifiers elsewhere): `as`, `in`, `var`, `record`,
-`sealed`, `non-sealed`, `permits`, `yield`, `async`, `await`,
+`trait`, `sealed`, `non-sealed`, `permits`, `yield`, `async`, `await`,
 `defer`, `val` (the last four added in v2 of this spec from the
 Apache lexer; `val` is `'val' {isValEnabled()}?` — conditionally
 enabled). Each appears in only one position-specific rule:
@@ -484,8 +483,8 @@ enabled). Each appears in only one position-specific rule:
 - `as` — RHS operator of `cast_expression`; also `import X as Y`.
 - `in` — RHS operator of `membership_expression`; also `for (x in xs)`.
 - `var` — replaces `def` as a declaration type token.
-- `record`, `sealed`, `non-sealed`, `permits` — class-declaration
-  prefixes/clauses.
+- `record`, `trait`, `sealed`, `non-sealed`, `permits` —
+  class-declaration keywords, prefixes and clauses.
 - `yield` — switch-expression branch.
 - `async` — closure/lambda prefix (`async closureOrLambdaExpression`).
 - `await` — unary prefix on an expression or expression list.
@@ -505,11 +504,12 @@ identifier_or_contextual: $ => choice($.identifier, 'var', 'record',
 otherwise hide a usable identifier behind a keyword (variable names,
 property accesses, named arguments).
 
-The implementation takes a different route for `record`: the keyword
-is an external-scanner token emitted only before a record header
-(§6.7), so the word lexes as a plain `identifier` in every other
-position and no fallback choice is needed. The same technique is
-available to the other contextual words.
+The implementation takes a different route for `record`, `trait` and
+`sealed`: each keyword is an external-scanner token emitted only
+before the declaration it opens (§6.7, §6.13), so the word lexes as a
+plain `identifier` in every other position and no fallback choice is
+needed. The same technique is available to the other contextual
+words.
 
 Quoted identifiers (`map."key with spaces"`, `def "test name"() { … }`)
 are supported by allowing a string-literal in identifier position
@@ -922,7 +922,7 @@ handle the context-sensitive lexing situations that pure tree-sitter
 grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
-keyword (§6.7), the named-argument key of a parenthesis-free call
+(§6.7), `trait` and `sealed` (§6.13) keywords, the named-argument key of a parenthesis-free call
 (§6.8), the same-line subscript opener (§6.9), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), `STRING_BODY` (§6.10),
@@ -947,6 +947,8 @@ enum TokenType {
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
   RECORD_KEYWORD,         // §6.7 — `record` only at the start of a record header
+  TRAIT_KEYWORD,          // §6.13 — `trait` only at the start of a trait header
+  SEALED_KEYWORD,         // §6.13 — `sealed` only before `class`, `interface` or `trait`
   COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
@@ -1069,8 +1071,8 @@ means reading to the end of input, so a file with N such openers was
 read N times (#75). The scanner now keeps one bit of state, "there is
 no `*/` from here on", which is the only state it has. The bit is a
 property of the input and stays true at every later position, so
-later `/*` openers, and the block comments the `record` look-ahead
-(§6.7) skips, fail at once while it is set.
+later `/*` openers, and the block comments the keyword look-aheads
+(§6.7, §6.13) skip, fail at once while it is set.
 
 tree-sitter stores scanner state only in a token the scanner emits,
 and restores it from the last such token before every call, so a
@@ -1116,10 +1118,10 @@ with more bytes inside `ERROR`, 59 with fewer, 88 with the same. In
 body) { }` the method declaration with a 2-byte `ERROR` became two
 expression statements, a 54-byte `ERROR` and a closure.
 
-The look-ahead of the `record` header cannot set the bit, because its
-token would start at `record`, before the position the fact holds
-from; the comment branch reaches the same `/*` next and sets it, so
-that costs one extra read of the input, once.
+The look-ahead after `record`, `trait` or `sealed` cannot set the bit,
+because its token would start at the keyword, before the position the
+fact holds from; the comment branch reaches the same `/*` next and
+sets it, so that costs one extra read of the input, once.
 
 ### 6.7 RECORD_KEYWORD — implementation contract
 
@@ -1168,6 +1170,8 @@ Known residuals:
 - A method with no modifier whose return type is spelled `record`
   (`record foo() { … }`) reads as a record declaration, as it did at
   v0.4.0 at statement start; in a class body it was a method there.
+  The reverse holds for `trait`: `trait T(int x) { }` is a method,
+  where Groovy reports an error (§6.13).
 - A line break or a line comment anywhere between `record` and the
   name (after a block comment too), with the name and `(` on the
   next line, is not a header: the word is an identifier and the rest
@@ -1354,6 +1358,96 @@ The in-grammar form of this token was a regex that had to include the
 character after `!in`. With a `[` or `(` inside the operator,
 `a !in[1, 2]` and `a !in(b)` were an `ERROR`. The token is aliased to
 `!in`. It is not emitted during error recovery.
+
+### 6.13 TRAIT_KEYWORD and SEALED_KEYWORD — implementation contract
+
+Apache's `identifier` rule lists `TRAIT` and `SEALED`, so both words
+name fields, methods, variables and parameters (`private String trait`,
+`return trait`). They are keywords for the reason `record` is (§6.7):
+`trait_declaration` and the sealed class, interface and trait start
+wherever a statement or a member can, and a literal there is the
+keyword at every such start. After `private String`, which is already a
+complete field named `String`, `trait` read as the keyword and opened
+a trait declaration that took the following members (#73).
+
+```text
+Emit TRAIT_KEYWORD when, from the current position:
+  - the next five characters are `trait`, not followed by an
+    identifier character; then
+  - a name on the same line, as for RECORD_KEYWORD (§6.7):
+    `classDeclaration` has no `nls` between TRAIT and the name; then
+  - any mix of spaces, tabs, line escapes, line breaks, block and line
+    comments, and then `{`, `<`, or the word `extends`, `implements`
+    or `permits`.
+Emit SEALED_KEYWORD when, from the current position:
+  - the next six characters are `sealed`, not followed by an
+    identifier character; then
+  - any mix of the trivia above, line breaks included (Apache's
+    modifiers end in `nls`); then
+  - the word `class`, `interface` or `trait`, the words the grammar
+    accepts after the modifier; or, when no line break was crossed,
+    `@`, `non-sealed`, `record`, `enum`, `default` or a word of
+    `_modifier`.
+Each token is the keyword alone; the look-ahead is not kept. On any
+other input return false; the in-grammar lexer then reads the word as
+`identifier`.
+```
+
+The grammar binds the tokens as `alias($._trait_keyword, 'trait')` and
+`alias($._sealed_keyword, 'sealed')`, so the anonymous nodes,
+`node-types.json` and the `@keyword` captures are those of the
+literals. `non-sealed` is not an identifier in Apache's grammar and
+stays an in-grammar token.
+
+Groovy's parser takes `sealed` among the other class modifiers in any
+order, and before an annotation. The grammar accepts no modifier after
+`sealed`, nor `sealed record` or `sealed enum` (which Groovy rejects
+later), so `sealed abstract class S { }`, `sealed @A class S { }` and
+`class O { sealed static class C { } }` are an `ERROR` at `sealed`
+until modifiers are accepted in any order. The keyword is still
+emitted there, so that the `ERROR` stays at the word and the
+declaration keeps its node: read as a name, the word gave trees with
+no `ERROR`, such as a field of type `sealed` named `static`, or lost
+the class to the `ERROR`. That is done only on the same line. Across a
+line break the same words also start the member after a field named
+`sealed` (`private boolean sealed`, then `static class D { }` or
+`public int size`), which the keyword would turn into an `ERROR`; a
+modifier after `sealed` can only be an `ERROR` while the order is
+fixed, so the field keeps its reading.
+
+A line break is whitespace to the grammar, so the scanner's look-ahead
+is what tells a declaration from a name. Groovy also sees the line
+breaks before the word, and the scanner does not, so these readings
+differ:
+
+- `trait` at the end of a line is never the keyword. In a member list
+  `trait` followed by `T { }` on the next line is then a field `T` of
+  type `trait` and an instance initializer; Groovy rejects that input
+  (observed with Groovy 3). At statement level it is the name `trait`
+  followed by the call `T { }`, as in Groovy (observed). At v0.6.0
+  both were trait declarations.
+- `sealed` at the end of a line before a nested `class`, `interface`
+  or `trait` is the keyword. `private boolean sealed` followed by
+  `class Inner { }` on the next line is a field named `boolean` and a
+  sealed class; Groovy reads a field `sealed` and a class (read off
+  `GroovyParser.g4`, not run).
+- In a class body Groovy's parser reads `trait T` followed by `{` on
+  the next line as a field of type `trait` and an instance
+  initializer (observed with Groovy 3; its member alternatives try a
+  field first), which fails to resolve later. Here it is a trait
+  declaration.
+- `sealed` alone at the end of a line before another modifier is a
+  name. `sealed` followed by `public class C { }` on the next line is
+  the name `sealed` and a class at statement level, and a field of
+  type `sealed` named `public` and a class in a member list; Groovy 4
+  reads a sealed class (read off `GroovyParser.g4`). At v0.6.0 both
+  were an `ERROR`.
+
+One residual does not involve a line break. A name followed by `(` is
+not a trait header, so `trait T(int x) { }` is a method `T` with
+return type `trait` and no `ERROR`, at statement level and in a member
+list; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`. It
+is the counterpart of the `record foo() { … }` residual of §6.7.
 
 ---
 
