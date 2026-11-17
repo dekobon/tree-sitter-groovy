@@ -15,3 +15,8 @@ record R()
 
 @interface Marker { }
 //         ^ type.definition
+
+@Foo(x = @Bar(1))
+// <- attribute
+//       ^ attribute
+class Baz { }

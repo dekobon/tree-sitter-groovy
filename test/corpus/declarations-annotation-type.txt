@@ -205,6 +205,56 @@ Annotation element with a list of annotations default
               (number_literal))))))))
 
 ==================
+Annotation element with a nested annotation default
+==================
+
+@interface Outer {
+    Inner first() default @Inner(@Leaf)
+    Inner[] all() default [@Inner(x = @Leaf), @Inner([@Leaf])]
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (annotation
+              name: (qualified_name
+                (identifier))))))
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (annotation
+                  name: (qualified_name
+                    (identifier))))))
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (list_literal
+                (annotation
+                  name: (qualified_name
+                    (identifier)))))))))))
+
+==================
 Annotation element with a negative number default
 ==================
 

@@ -841,6 +841,14 @@ care can match `closure` nodes with no parameter list.
 syntax) is a separate class-declaration form (§4), whose elements may
 take a `default` value.
 
+An argument, the value of a `k=v` pair, and an element's `default` are
+Apache's `elementValue`: an expression, an annotation, or a
+`list_literal` of annotations, so `@Foo(@Bar)`, `@Foo(k = @Bar(1))`
+and `@Foo([@Bar, @Baz])` nest to any depth. The argument list is an
+`argument_list`; a pair is an `assignment_expression` whose `left` is
+an `identifier`, the shape `k=v` has in a call. An annotation is a
+value only there: `foo(@Bar)` and `[@Bar]` elsewhere are errors.
+
 ### 5.10 Statement terminators
 
 Groovy treats both newline and `;` as statement terminators *most of
