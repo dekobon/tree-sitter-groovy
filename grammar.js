@@ -164,6 +164,31 @@ function constructorDeclaration($, modifiers) {
 }
 
 /**
+ * A method declaration up to its parameter list: annotations,
+ * modifiers, type parameters, `def` or a return type, the name and the
+ * parameters. `method_declaration` and an annotation type element with
+ * a default (`_annotation_type_element`) share it.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral[]} The rules of the head, in order.
+ */
+function methodHead($) {
+  return [
+    repeat($.annotation),
+    choice(
+      seq(
+        repeat($._modifier),
+        optional(field('type_parameters', $.method_type_parameters)),
+        choice('def', field('return_type', $._type)),
+      ),
+      repeat1($._modifier),
+    ),
+    field('name', $._property_name),
+    field('parameters', $.formal_parameters),
+  ];
+}
+
+/**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
  * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
@@ -849,20 +874,64 @@ module.exports = grammar({
       '@',
       'interface',
       field('name', $.identifier),
-      field('body', $.class_body),
+      field('body', alias($._annotation_type_body, $.class_body)),
     ),
 
-    // §4 — member list shared by class / interface / trait / record /
-    // `@interface` bodies and the anonymous inner class body of
-    // `object_creation_expression`.
+    // The member list of `class_body` plus an element with a default.
+    // Groovy accepts `default` after the `()` of any abstract method,
+    // but only an annotation type element uses it, and only here is it
+    // a keyword: in an interface, `void a()` then `default void b() { }`
+    // on the next line is two methods, which Groovy tells apart by the
+    // line break, whitespace here.
+    _annotation_type_body: $ => seq(
+      '{',
+      repeat(choice(
+        $._class_member,
+        alias($._annotation_type_element, $.method_declaration),
+        $.block,
+        ';',
+      )),
+      '}',
+    ),
+
+    // §4 — `String value() default 'x'`, Apache's `methodDeclaration`
+    // with `DEFAULT elementValue`, which excludes a throws clause. An
+    // element with no default is an ordinary `method_declaration`.
+    _annotation_type_element: $ => seq(
+      ...methodHead($),
+      'default',
+      field('default', choice(
+        $._expression,
+        $.annotation,
+        alias($._annotation_list, $.list_literal),
+      )),
+    ),
+
+    // Apache's `elementValueArrayInitializer` with annotations in it,
+    // `[@A(1), @A(2)]`. A list of expressions is a `list_literal`
+    // already; an `@` cannot start an expression, so the two never
+    // compete for a token.
+    _annotation_list: $ => seq(
+      choice('[', alias($._subscript_open, '[')),
+      $.annotation,
+      repeat(seq(',', $.annotation)),
+      optional(','),
+      ']',
+    ),
+
+    // §4 — member list shared by class / interface / trait / record
+    // bodies and the anonymous inner class body of
+    // `object_creation_expression`. An `@interface` body extends it
+    // (`_annotation_type_body`) and is aliased to it.
     // The body accepts `;` as an empty member / terminator the same
     // way statement lists do (§5.10): a field or abstract method is
     // commonly written `int x = 1;` / `void f();`, and a stray `;` is
     // a no-op member. `;` is anonymous, so it never appears in the AST.
     //
     // A bare `block` is an instance initializer. It sits in the member
-    // repeat — here and in the four identical repeats of `enum_body` —
-    // rather than in `_class_member`, because `enum_body` also places
+    // repeat — here, in the four identical repeats of `enum_body` and in
+    // the one of `_annotation_type_body` — rather than in
+    // `_class_member`, because `enum_body` also places
     // a lone `_class_member` directly after its constants. A block in
     // that slot is an LR conflict on `A() {` (constructor, or constant
     // plus initializer) and, once that is resolved, silently accepts
@@ -982,20 +1051,7 @@ module.exports = grammar({
     // body. In a class body nothing competes, so abstract and
     // interface methods are unaffected.
     method_declaration: $ => {
-      const signature = seq(
-        repeat($.annotation),
-        choice(
-          seq(
-            repeat($._modifier),
-            optional(field('type_parameters', $.method_type_parameters)),
-            choice('def', field('return_type', $._type)),
-          ),
-          repeat1($._modifier),
-        ),
-        field('name', $._property_name),
-        field('parameters', $.formal_parameters),
-        optional($.throws_clause),
-      );
+      const signature = seq(...methodHead($), optional($.throws_clause));
       return prec.right(2, choice(
         prec.dynamic(-1, signature),
         prec.dynamic(3, seq(signature, field('body', $.block))),

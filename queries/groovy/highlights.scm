@@ -178,6 +178,10 @@
 ; everywhere else.
 (synchronized_statement "synchronized" @keyword)
 
+; `String value() default 'x'` gives an annotation element its default;
+; the word is a branch label only in a `switch`.
+(method_declaration "default" @keyword)
+
 (shebang) @keyword.directive
 
 ; -- Layer 5: dot-family property captures -------------------------

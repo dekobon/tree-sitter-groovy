@@ -387,7 +387,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D`. Annotations may come first (`@Grab('g:a:1') import a.B`), on `package` too. |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). Nesting makes `sealed` and `trait` keywords at member start (`docs/divergences-from-spec.md` §12); `record` stays a usable name because its keyword comes from the scanner (§6.7). An `@interface` element may take a default, as in Apache's `methodDeclaration` (`DEFAULT elementValue`): `String value() default 'x'` is a `method_declaration` whose `default` field holds an expression, an annotation, or a `list_literal` of annotations (#101). `default` is a keyword after the `()` only in an `@interface` body: in an interface, Groovy reads `void a()` followed by `default void b() { }` on the next line as two methods, telling them apart by the line break, which is whitespace here. The `default` modifier of an interface method is not supported, and it gives a wrong tree with no `ERROR`: `default void b() { }` parses as a field of type `default` named `void`, then a constructor `b`. |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | optional `implements` clause (`super_interfaces`, as on classes); constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55). A member may also follow a trailing `,` directly, which Groovy accepts up to 4.x and Groovy 5 rejects (#88). This grammar takes a narrower set than Groovy there: a member that starts with a modifier, `def` or a declaration keyword, with annotations before it allowed; a constructor needs an access modifier. A member that starts with a bare name is not accepted: `A,` then `String x` or `E() { }` is an `ERROR`, the second because it reads as a constant with an anonymous class body (`docs/divergences-from-spec.md` §13). Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. |
@@ -758,7 +758,8 @@ care can match `closure` nodes with no parameter list.
 
 `@Foo`, `@Foo(arg)`, `@Foo(k1=v1, k2=v2)`, `@a.b.Foo(…)`, `@Foo @Bar`
 (stacked). Annotation `@interface` declaration (Java annotation type
-syntax) is a separate class-declaration form (§4).
+syntax) is a separate class-declaration form (§4), whose elements may
+take a `default` value.
 
 ### 5.10 Statement terminators
 

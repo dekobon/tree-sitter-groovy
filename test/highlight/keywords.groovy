@@ -58,6 +58,12 @@ try { x }
 switch (x) { case 1 -> y }
 // <- keyword.control
 
+switch (x) { default -> y }
+//           ^ keyword.control
+
+@interface Tag { String value() default 'x' }
+//                              ^ keyword
+
 yield 42
 // <- keyword.control
 
