@@ -21,7 +21,7 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement and as the value of a declaration or an assignment (#95). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). Not accepted where Groovy takes one: in parentheses (`(foo 1)`), as the only argument of a call (`bar(foo 1)`), in an interpolation (`"${foo 1}"`), with a name as the first argument, with a dotted receiver (#52); see #18 below. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement and as the value of a declaration or an assignment (#95). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). Not accepted where Groovy takes one: in parentheses (`(foo 1)`), as the only argument of a call (`bar(foo 1)`), in an interpolation (`"${foo 1}"`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18 and #19 below. |
 | §5.6 Optional parentheses | **Done** | command_chain as a statement and as the value of a declaration or an assignment. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
@@ -43,7 +43,7 @@ reasoning here.
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
-| §6.14 COMMAND_VALUE_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal or a key follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. A comment between the receiver and the argument on one line is not read past (see #18 below). |
+| §6.14 COMMAND_VALUE_START, COMMAND_PATH_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal or a key follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A comment between the receiver and the argument on one line is not read past (see #18 and #19 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -943,14 +943,68 @@ The Groovy column was observed by running Groovy 3.
 | `def x = foo bar` | `foo(bar)` | `def x = foo` then `bar`, as before and as in statement position |
 | `def x = foo $/a/$`, `def x = foo .5` | `foo('a')`, `foo(0.5)` | as before: `def x = foo` then the string; an `ERROR` (spec §6.14) |
 | `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
-| `def r = obj.method 1` | a call | `def r = obj.method` then `1`, as before (#52) |
+| `def r = obj.method 1` | a call | `command_chain` value whose receiver is a `field_access` (#52; see #19) |
 | `def x = (foo 1)`, `if (foo 1) { }`, `bar(foo 1)`, `"${foo 1}"` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | `ERROR`, as before |
 | `def x = foo 1 b 2` | `foo(1).b(2)` | the chains `foo 1` and `b 2`, as in statement position |
 | `def c = foo { }` | a call with a closure | `method_invocation`, as before |
 | `return foo 1`, `throw foo 1`, `assert foo 1`, `def s = 'a' + foo 1` | rejected | two statements, as before |
 | `def f(a = foo 1) { }` at script or block level | rejected | no `ERROR`: after `def f` a `(` may open the next statement (§3), so this is the declaration `def f`, then a call on `(a = foo 1)` with a trailing closure; before, a `method_declaration` with a local `ERROR` in its parameters. In a class body it is an `ERROR`, as before |
 
-**Action**: a chain in parentheses or as a call's only argument, and a
-dotted receiver (#52), are the forms real code is likely to need. A comment between the receiver and
+**Action**: a chain in parentheses or as a call's only argument are
+the forms real code is likely to need. A comment between the receiver and
 the argument needs the look-ahead to read comments without scanning an
 unterminated one twice.
+
+---
+
+## 19. A parenthesis-free call with a dotted receiver
+
+**Apache `GroovyParser.g4`** (4.0.x branch): `commandExpression` is
+`expression (argumentList)? commandArgument*`, and the expression may
+be any path, so `obj.method 1`, `a?.b.c 'x'`, `foo().bar 1` and
+`foo.bar[0] 1` are calls. `SemanticPredicates.isInvalidLocalVariableDeclaration`
+reads `a.b c` as a call unless the last name of the path starts with
+an upper-case letter or `c` is followed by `=`: `a.b.C x` and
+`a.b c = 1` are declarations.
+
+**Current implementation** (#52): the receiver of `command_chain` may be
+a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`)
+written without spaces, built of the same nodes as in an expression. A
+statement with such a receiver holds `_command_path_start`, an empty
+token between the first name and the first access that the scanner
+emits only when a literal or a key follows the receiver on its line
+(spec §6.14); the value form's `_command_value_start` reads the same
+receivers before them. The arguments are
+those of the value form: the first is a whole expression that starts
+with a literal, or a named argument. Before #52 each form below with a
+call in the Groovy column was the expression followed by the argument
+as a separate statement, or an `ERROR` once a comma followed.
+
+The Groovy column was observed by running Groovy 3.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `obj.method 1`, `obj?.m 'a', 2`, `a.b.c x: 1`, `this.foo 1`, `System.out.println 'x'`, `def r = obj.m 1` | a call | `command_chain`, the receiver a `field_access` or the node of its operator |
+| `log.info 'x: ' + y`, `obj.m 1 as int` | the expression is the argument | the same |
+| `result.size` then `2`, `'a'` or `where: 1` on the next line, also with a comment or a blank line between | two statements | two statements, as before |
+| `x.y \` then `1` on the next line (a line escape) | a call | a call |
+| `x.y /* c */ 1` | a call | `x.y`, the comment and `1`, as before |
+| `x.y` then `/* c */ a.b 'c'` on the next line | two statements, the second a call | the same |
+| `obj . m 1`, `obj` then `.m 1` on the next line | a call | the expression and `1`, as before |
+| `foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`, `(obj).m 1`, `obj.'name' 1`, `obj::m 1` | a call | the expression and `1`, as before |
+| `a.b c` | `a.b(c)` | `a.b` then `c`, as before (a name is not a first argument, spec §5.5 item 3) |
+| `a.b.C x = 1`, `a.b c = 1` | a declaration | a declaration, as before |
+| `obj.m { }`, `obj.m -1`, `obj.m [1]`, `obj.m (1)` | a call with a closure; a subtraction; a subscript; a call | the same, as before |
+| `obj.m 'a' other 'b'` | `obj.m('a').other('b')` | the chains `obj.m 'a'` and `other 'b'` (spec §5.5 item 4) |
+| `x.y a.b 'c'`, `foo a.b 'x'`, `foo 1 a.b 'c'`, `foo 'a' obj.m 'b'`, `x() a.b 'c'` | a chain continuation (`x.y(a.b).c`) | the first statement and the call `a.b 'c'`; before, the first statement, `a.b` and `'c'` |
+| `return obj.m 'x'` | rejected | `return obj.m` and `'x'`, as before |
+| `return` then `obj.m 'x'` on the next line | `return`, then a call | `return obj.m` and `'x'`, as before |
+| `java.util.List 'foo'() { }`, `java.util.List '''foo''' () { }` | a method | a method, as before |
+| `obj.m 'a'() { }`, `obj.m 'a'(b)`, `java.util.list 'a'() { }`, `java.util.List "$x"() { }` | a call with the argument `'a'(…)` | the same; before, a method declaration, or `obj.m` and `'a'(b)` |
+| `java.util.List 'foo'(1)` | a call | `java.util.List` and `'foo'(1)`, as before |
+| `x.y 1` then `-1` on the next line | two statements | one call with the argument `1 - 1`; before, `x.y` and `1 - 1` |
+| `obj.m 1, *xs`, `obj.m 'a': 1` | a call | `ERROR` |
+
+**Action**: none planned for the spaced and multi-line receivers. A
+receiver that ends in a call or a subscript needs the scanner to read
+balanced brackets.

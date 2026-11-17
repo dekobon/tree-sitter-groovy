@@ -2758,7 +2758,31 @@
         "required": true,
         "types": [
           {
+            "type": "direct_field_access_expression",
+            "named": true
+          },
+          {
+            "type": "field_access",
+            "named": true
+          },
+          {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "method_pointer_expression",
+            "named": true
+          },
+          {
+            "type": "safe_chain_dot_expression",
+            "named": true
+          },
+          {
+            "type": "safe_navigation_expression",
+            "named": true
+          },
+          {
+            "type": "spread_dot_expression",
             "named": true
           }
         ]

@@ -231,6 +231,10 @@
 (command_chain
   receiver: (identifier) @function.call)
 
+(command_chain
+  receiver: (field_access
+              field: (identifier) @function.call))
+
 ; -- Layer 8: types (after @variable so aliased identifier wins) ---
 
 (type_identifier) @type

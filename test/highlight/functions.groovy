@@ -19,6 +19,13 @@ def out = sh script: 'make'
 x = foo 1
 //  ^ function.call
 
+obj.method 'x'
+//  ^ function.call
+
+def v = a.b.method 1
+//          ^ function.call
+//        ^ property
+
 String::length
 //      ^ function
 

@@ -1548,3 +1548,1209 @@ Spread argument in a command chain value is unsupported
 def x = foo 'a', *args
 
 ---
+
+==================
+Command chain with a dotted receiver (#52)
+==================
+
+someFun 1, 2
+someObj.memberFn 1
+someObj.memberFn 1, 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal)
+    argument: (number_literal)))
+
+==================
+Command chain receivers with each member access
+==================
+
+a.b.c 1
+obj?.m 'a'
+obj??.m 'a'
+obj*.m 'a'
+obj.&m 'a'
+obj.@f 'a'
+this.foo 1
+super.foo 1
+System.out.println 'x'
+record.add 'x'
+trait.add 'x'
+sealed.add 'x'
+obj.class 'x'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (safe_navigation_expression
+      object: (identifier)
+      property: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (safe_chain_dot_expression
+      object: (identifier)
+      property: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (spread_dot_expression
+      object: (identifier)
+      property: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (method_pointer_expression
+      object: (identifier)
+      method: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (direct_field_access_expression
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+First arguments of a command chain with a dotted receiver
+==================
+
+obj.m "a${b}"
+obj.m 1.5
+obj.m true
+obj.m null
+obj.m a: 1, b: 2
+obj.m in: 1
+obj.m 'a' + b
+obj.m 1 as int
+obj.m 'a'.trim()
+obj.m 'a', x + y
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal
+      (string_fragment)
+      (gstring_brace_interpolation
+        value: (identifier))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (boolean_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (null_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (binary_expression
+      left: (string_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (cast_expression
+      value: (number_literal)
+      type: (type_identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (method_invocation
+      function: (field_access
+        object: (string_literal)
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)
+    argument: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+Command chain with a dotted receiver in statement positions
+==================
+
+if (c) obj.m 'a' else obj.n 'b'
+list.each { obj.m 'a', it }
+then: obj.m 1
+switch (x) { case 1: obj.m 'a'; break }
+switch (x) { case 1 -> obj.m 'a' }
+x.y; a.b 'c'
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (command_chain
+      receiver: (field_access
+        object: (identifier)
+        field: (identifier))
+      argument: (string_literal))
+    alternative: (command_chain
+      receiver: (field_access
+        object: (identifier)
+        field: (identifier))
+      argument: (string_literal)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (field_access
+            object: (identifier)
+            field: (identifier))
+          argument: (string_literal)
+          argument: (identifier)))))
+  (labeled_statement
+    label: (identifier)
+    statement: (command_chain
+      receiver: (field_access
+        object: (identifier)
+        field: (identifier))
+      argument: (number_literal)))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (string_literal))
+          (break_statement)))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (string_literal))))))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+Command chain value with a dotted receiver
+==================
+
+def r = obj.method 1
+r = obj?.m 'a', 2
+x.y = a.b 'c'
+def (p, q) = obj.m 1
+x += obj.m a: 1
+def w =
+  obj.m 1
+obj.m 1, z = a.b 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (safe_navigation_expression
+          object: (identifier)
+          property: (identifier))
+        argument: (string_literal)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (string_literal))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (command_chain
+      receiver: (field_access
+        object: (identifier)
+        field: (identifier))
+      argument: (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal)
+    argument: (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal)))))
+
+==================
+Command chain field value with a dotted receiver
+==================
+
+class A {
+  static y = a?.b 'c'
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (command_chain
+            receiver: (safe_navigation_expression
+              object: (identifier)
+              property: (identifier))
+            argument: (string_literal)))))))
+
+==================
+Dotted expressions that are not command chains
+==================
+
+a.b c
+a.b instanceof C
+a.b as C
+a.b in c
+a.b ? x : y
+a.b ?: c
+x = (A) a.b
+obj.m -1
+obj.m [1]
+obj.m (1)
+obj.m { }
+obj.prop = 1
+obj.m /x/
+def x = a.b c
+a..b 'x'
+a*b 'x'
+x.y?b:c
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (instanceof_expression
+      value: (field_access
+        object: (identifier)
+        field: (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (cast_expression
+      value: (field_access
+        object: (identifier)
+        field: (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (membership_expression
+      element: (field_access
+        object: (identifier)
+        field: (identifier))
+      collection: (identifier)))
+  (expression_statement
+    (ternary_expression
+      condition: (field_access
+        object: (identifier)
+        field: (identifier))
+      consequence: (identifier)
+      alternative: (identifier)))
+  (expression_statement
+    (elvis_expression
+      value: (field_access
+        object: (identifier)
+        field: (identifier))
+      default: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (field_access
+          object: (identifier)
+          field: (identifier)))))
+  (expression_statement
+    (binary_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (number_literal)))
+  (expression_statement
+    (subscript_expression
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      index: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure)))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (number_literal)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (range_expression
+      start: (identifier)
+      end: (identifier)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (ternary_expression
+      condition: (field_access
+        object: (identifier)
+        field: (identifier))
+      consequence: (identifier)
+      alternative: (identifier))))
+
+==================
+Qualified type declarations are not command chains
+==================
+
+a.b.C x = 1
+a.b c = 1
+java.util.List list = []
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier))
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier)
+    value: (list_literal)))
+
+==================
+Dotted expression followed by a literal on the next line stays two statements
+==================
+
+x.y
+1
+a.b.c
+'a'
+x?.y
+"b"
+result.size
+2
+ext.foo
+'bar'
+x.y
+true
+x.y
+null
+println x.y
+1
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (safe_navigation_expression
+      object: (identifier)
+      property: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (boolean_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (null_literal))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
+Dotted expression followed by a label on the next line stays two statements
+==================
+
+x.y
+a: 1
+result.size
+where: 1
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Dotted expression followed by a comment or a blank line and a literal stays two statements
+==================
+
+x.y
+/* c */ 1
+x.y // c
+'a'
+x.y /* c */
+2
+
+x.y
+
+'b'
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (block_comment)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (line_comment)
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (block_comment)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (string_literal)))
+
+==================
+Dotted declaration value followed by a literal on the next line stays two statements
+==================
+
+def v = x.y
+1
+v = a.b.c
+'a'
+def w = x?.y
+a: 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (field_access
+        object: (field_access
+          object: (identifier)
+          field: (identifier))
+        field: (identifier))))
+  (expression_statement
+    (string_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (safe_navigation_expression
+        object: (identifier)
+        property: (identifier))))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Line escape between a dotted receiver and its argument
+==================
+
+x.y \
+  1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal)))
+
+==================
+A dotted call after a statement on the same line is a command chain
+==================
+
+x.y a.b 'c'
+foo a.b 'x'
+foo 1 a.b 'c'
+foo { } a.b 'c'
+x() a.b 'c'
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+A dotted call on the line after an expression is a command chain
+==================
+
+x.y
+a.b 'c'
+foo
+obj.m 1
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal)))
+
+==================
+A dotted call after a call with an identifier receiver on the same line is a second command chain
+==================
+
+foo 'a' obj.m 'b'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+Return followed by a dotted call on the same line returns the receiver
+==================
+
+def f() {
+  return obj.m 'x'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (field_access
+          object: (identifier)
+          field: (identifier)))
+      (expression_statement
+        (string_literal)))))
+
+==================
+Return followed by a dotted call on the next line returns the receiver (known divergence)
+==================
+
+def f() {
+  return
+  obj.m 'x'
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (field_access
+          object: (identifier)
+          field: (identifier)))
+      (expression_statement
+        (string_literal)))))
+
+==================
+A dotted call after a comment on the line after a statement is a command chain
+==================
+
+x.y
+/* c */ a.b 'c'
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (block_comment)
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+A quoted name after a capitalized dotted type declares a method
+==================
+
+java.util.List 'foo'() { }
+java.lang.String "bar"() { 1 }
+java.util.List '''baz''' () { }
+java.util.List 'it\'s'() { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (number_literal))))
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+A quoted name and a parenthesis after a dotted receiver is an argument of a call
+==================
+
+obj.m 'a'() { }
+obj.m 'a'(b)
+java.util.list 'c'() { }
+java.util.List "$x"() { }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (method_invocation
+      function: (string_literal)
+      arguments: (argument_list)
+      closure: (closure)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (method_invocation
+      function: (string_literal)
+      arguments: (argument_list
+        (identifier))))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (method_invocation
+      function: (string_literal)
+      arguments: (argument_list)
+      closure: (closure)))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (method_invocation
+      function: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier)))
+      arguments: (argument_list)
+      closure: (closure))))
+
+==================
+A line after a dotted call that can continue its first argument joins it
+==================
+
+x.y 1
+-1
+x.y 2
+++i
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (update_expression
+      operand: (number_literal)))
+  (expression_statement
+    (identifier)))
+
+==================
+A literal followed by a member access is not the receiver of a command chain
+==================
+
+true.x 1
+null.x 2
+def a = true.x 3
+def b = null.x 4
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (boolean_literal)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (null_literal)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (boolean_literal)
+        field: (identifier))))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (null_literal)
+        field: (identifier))))
+  (expression_statement
+    (number_literal)))
+
+==================
+Dotted receivers Groovy takes that are not command chains here
+==================
+
+obj . m 1
+obj
+.m 2
+x.y /* c */ 3
+foo().bar 4
+foo[0].bar 5
+'str'.m 6
+obj.'quoted name' 7
+obj::m 8
+obj.m $/x/$
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (block_comment)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (subscript_expression
+        object: (identifier)
+        index: (number_literal))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (string_literal)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (quoted_identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier)))
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+Spread argument in a command chain with a dotted receiver is unsupported
+:error
+==================
+
+obj.m 1, *xs
+
+---
+
+==================
+String key in a command chain with a dotted receiver is unsupported
+:error
+==================
+
+obj.m 'a': 1
+
+---

@@ -319,6 +319,65 @@ function commandArgumentsAfterFirst($) {
 }
 
 /**
+ * The arguments of a parenthesis-free call that opens with a scanner
+ * token (§6.14): the first a named argument or any expression, as in
+ * Apache's `argumentList`, then the arguments after it.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} The argument list rule.
+ */
+function commandArguments($) {
+  return seq(
+    field('argument', choice(
+      $._expression,
+      alias($._command_named_argument, $.named_argument),
+    )),
+    commandArgumentsAfterFirst($),
+  );
+}
+
+/**
+ * The member accesses that may join the names of a parenthesis-free
+ * call's receiver (§5.5 item 2): the node each one is in an expression,
+ * its operator, and the field of the name after the operator.
+ */
+const COMMAND_PATH_ACCESSES = [
+  ['field_access', '.', 'field'],
+  ['safe_navigation_expression', '?.', 'property'],
+  ['safe_chain_dot_expression', '??.', 'property'],
+  ['spread_dot_expression', '*.', 'property'],
+  ['method_pointer_expression', '.&', 'method'],
+  ['direct_field_access_expression', '.@', 'field'],
+];
+
+/**
+ * The rules of a receiver that is a name followed by member accesses: a
+ * hidden rule `path` choosing among one hidden rule per access, each
+ * aliased to the expression node of its operator, so the receiver has
+ * the nodes and fields of the same text anywhere else. An access joins
+ * the receiver's first name, as `first` builds it, or another access.
+ *
+ * @param {string} path The name of the hidden choice rule.
+ * @param {(function(GrammarSymbols<string>): RuleOrLiteral)} first The
+ *   object of the innermost access.
+ * @returns {{[name: string]: RuleBuilder<string>}} The rules, by name.
+ */
+function commandPathRules(path, first) {
+  const rules = {
+    [path]: $ => choice(...COMMAND_PATH_ACCESSES.map(([kind]) =>
+      alias($[`${path}_${kind}`], $[kind]))),
+  };
+  for (const [kind, operator, nameField] of COMMAND_PATH_ACCESSES) {
+    rules[`${path}_${kind}`] = $ => seq(
+      choice(first($), field('object', $[path])),
+      operator,
+      field(nameField, reserved('property', $.identifier)),
+    );
+  }
+  return rules;
+}
+
+/**
  * The value of a declarator or an assignment: an expression or a
  * parenthesis-free call (Apache `variableInitializer`, and the right
  * side of `#assignmentExprAlt` and `#multipleAssignmentExprAlt`).
@@ -420,6 +479,10 @@ module.exports = grammar({
     // argument starts on the receiver's line. `def x = foo` followed by
     // `1` on the next line stays two statements.
     $._command_value_start,
+    // §6.14 — empty token between the first name of a statement and a
+    // member access after it (`obj` and `.method 1`), emitted only when
+    // the first argument follows on the line.
+    $._command_path_start,
     // §5.10 — `[` on the same line as the token before it (spaces, tabs and
     // line escapes allowed). A `[` after a newline isn't one and can only
     // start a list or map literal: a statement, not a subscript of the line
@@ -595,6 +658,7 @@ module.exports = grammar({
       $.method_declaration,
       $.labeled_statement,
       $.command_chain,
+      alias($._path_command_chain, $.command_chain),
     ),
 
     // §5.5 — command_chain is the parenthesis-free method-call
@@ -624,15 +688,34 @@ module.exports = grammar({
     // literal. A closure is not a first argument here: `def c = foo { }`
     // stays a `method_invocation`, as Apache reads it. `prec.right` lets
     // a `,` continue the call, as in Groovy: `def x = foo 1, y = 2`
-    // passes `y = 2` to `foo`.
+    // passes `y = 2` to `foo`. The receiver may have member accesses
+    // (`def r = obj.method 1`), which the scanner reads with the name.
     _value_command_chain: $ => prec.right(seq(
       $._command_value_start,
-      field('receiver', $.identifier),
-      field('argument', choice(
-        $._expression,
-        alias($._command_named_argument, $.named_argument),
-      )),
-      commandArgumentsAfterFirst($),
+      field('receiver', choice($.identifier, $._command_path)),
+      commandArguments($),
+    )),
+
+    // §5.5 item 2 — a statement whose receiver has a member access
+    // (`obj.method 1`, `a?.b.c x: 1`). Unlike the identifier form above it
+    // holds a scanner token between the receiver's first name and its
+    // first access, emitted only when a literal or a `name:` follows the
+    // receiver on its line, so `result.size` followed by `2` on the next
+    // line stays two statements. The arguments are those of the value
+    // form. A value with such a receiver is `_value_command_chain`: a
+    // name in a value is an `_expression` otherwise, and referencing it
+    // here as well would cost every value a reduction.
+    _path_command_chain: $ => seq(
+      field('receiver', $._statement_command_path),
+      commandArguments($),
+    ),
+
+    // The receivers with member accesses of a value and of a statement.
+    // The scanner reads them (§6.14), so they are built of names only.
+    ...commandPathRules('_command_path', $ => field('object', $.identifier)),
+    ...commandPathRules('_statement_command_path', $ => seq(
+      field('object', $.identifier),
+      $._command_path_start,
     )),
 
     // §5.5 item 3 — named arguments in a parenthesis-free call:

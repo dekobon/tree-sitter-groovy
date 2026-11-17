@@ -130,3 +130,74 @@ def x = foo \
       value: (command_chain
         receiver: (identifier)
         argument: (number_literal)))))
+
+==================
+Dotted expression followed by a literal or a label on the next line stays two statements (CRLF)
+==================
+
+x.y
+1
+def v = a.b
+'a'
+x.y
+a: 1
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal))))
+
+==================
+Command chain with a dotted receiver before a literal on the next line (CRLF)
+==================
+
+obj.m 'a'
+2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (expression_statement
+    (number_literal)))
+
+==================
+Line escape between a dotted receiver and its argument (CRLF)
+==================
+
+x.y \
+  1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (number_literal)))

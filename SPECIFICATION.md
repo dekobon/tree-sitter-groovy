@@ -606,11 +606,42 @@ The resolution we adopt:
    The scanner makes that decision before the receiver (§6.14).
    Keeping the chain out of general expressions removes most of
    murtaza64's nested-juxt-call conflicts.
-2. **The receiver is an identifier**, not any expression: `(x + y) z`
-   is two expression statements, not a juxt-call on a parenthesised
-   expression. A dotted receiver, which Groovy takes (`obj.method 1`
-   calls `method`, observed with Groovy 3), is not implemented yet: it
-   parses as `obj.method` followed by `1`.
+2. **The receiver is a name, or a name followed by member accesses**,
+   not any expression: `(x + y) z` is two expression statements, not a
+   juxt-call on a parenthesised expression. The accesses are `.`, `?.`,
+   `??.`, `*.`, `.&` and `.@`, each followed by a name, written without
+   spaces (`obj.method 1`, `a?.b.c 'x'`, `System.out.println 'x'`), and
+   each is the node it is in any other expression: the receiver of
+   `obj.method 1` is a `field_access`. Groovy calls the last name in
+   every one of these (observed with Groovy 3). A dotted receiver holds
+   a scanner token: in a value it is the one before the receiver (item
+   1), in a statement an empty token between the first name and the
+   first access (§6.14). Either is emitted only when the first argument
+   starts on the receiver's line, so `result.size` followed by `2` on
+   the next line, or by `where:`, stays two statements. A statement
+   whose receiver is a single name is matched in the grammar instead,
+   and keeps its next-line reading (#90). Not accepted, though Groovy
+   takes each as a call (observed): spaces or a line break inside the
+   receiver (`obj . m 1`, `obj` followed by `.m 1` on the next line), a
+   receiver not made of names (`foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`,
+   `(obj).m 1`), a quoted name (`obj.'name' 1`), `::` (`obj::m 1`), and
+   a value whose first name is `new`, `switch`, `true`, `false` or
+   `null` (`def x = true.x 1`). Each parses as before, as the
+   expression followed by the argument.
+   A dotted receiver that starts a statement is a call also after
+   another statement on the same line: `x.y a.b 'c'`, `foo a.b 'x'` and
+   `foo 1 a.b 'c'` are the first statement followed by the call
+   `a.b 'c'`. Groovy continues the first statement there instead
+   (`x.y(a.b).c`, item 4). After `return`, on its line or the next one,
+   the name is the returned value, so `return obj.m 'x'` is `return
+   obj.m` followed by `'x'`, as before #52; Groovy rejects the first and
+   reads the second as a `return` and a call.
+   A capitalized last name before a quoted name and `(` is the return
+   type of a method, as in Groovy: `java.util.List 'foo'() { }` declares
+   `foo`, while `obj.m 'a'() { }` passes `'a'({ })` to `m`. Groovy
+   decides the first by trying the parameter list, so
+   `java.util.List 'foo'(1)`, a call there, is the expression followed
+   by `'foo'(1)` here.
 3. **Argument forms allowed**: the first argument is a literal, a
    closure, or a named arg (`k: v`). After a comma an argument is a
    named arg or any expression (`assertEquals 'v', a + b`,
@@ -625,13 +656,16 @@ The resolution we adopt:
    a typed declaration starts (`Type name = …`), and the parser cannot
    tell the two apart before the `=`. A bare `foo bar` parses as two
    expression statements.
-   In a value (item 1) the first positional argument is any expression
-   that starts with a literal, as in Apache's `argumentList`:
-   `def x = foo 'a' + b` passes `'a' + b`. A value takes no closure as
-   the first argument: `def c = foo { }` stays a `method_invocation`,
-   which is how Apache reads a closure after a name. Nor does it take a
-   name, although no declaration can start there: `def x = foo bar` is
-   `def x = foo` followed by `bar`, as in statement position. After a
+   In a value (item 1), and after a dotted receiver (item 2), the first
+   positional argument is any expression that starts with a literal, as
+   in Apache's `argumentList`: `def x = foo 'a' + b` and
+   `log.info 'x: ' + y` pass the sum. Neither takes a closure as the
+   first argument: `def c = foo { }` and `list.each { }` stay a
+   `method_invocation`, which is how Apache reads a closure after a
+   name. Nor does either take a name, although no declaration can start
+   there: `def x = foo bar` is `def x = foo` followed by `bar`, as in
+   statement position, and `a.b c` is `a.b` followed by `c` (Groovy
+   calls `a.b(c)`; `a.b.C x = 1` declares `x`). After a
    value's arguments a `,` continues the call, as Apache's greedy
    argument list does: `def x = foo 1, y = 2` passes `y = 2` to `foo`
    rather than declaring `y`, and in `[x = foo a: 1, b: 2]` the `b: 2`
@@ -640,7 +674,8 @@ The resolution we adopt:
    tokens become property/method dispatches. The Apache grammar uses
    `commandArgument: pathElement+ argumentList?` for the chain
    continuation. It is not implemented: `foo 1 b 2` parses as the two
-   chains `foo 1` and `b 2`, in a value as well.
+   chains `foo 1` and `b 2`, in a value as well, and `foo 'a' obj.m 'b'`
+   as `foo 'a'` and `obj.m 'b'`.
 5. **Conflicts** with `binary_expression` (where `a - b` could be
    "call `a` with `-b`") are resolved by giving `binary_expression`
    higher precedence: a command chain *only* matches when the token
@@ -967,7 +1002,8 @@ grammar rules cannot disambiguate. Each token below has a single
 emit/no-emit decision per call. The implementation exports the
 slashy opener, the three comment tokens, the contextual `record`
 (§6.7), `trait` and `sealed` (§6.13) keywords, the named-argument key of a parenthesis-free call
-(§6.8), the start of such a call that is a value (§6.14), the
+(§6.8), the start of such a call that is a value or a statement
+with a dotted receiver (§6.14), the
 same-line subscript opener (§6.9), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), `STRING_BODY` (§6.10),
@@ -996,6 +1032,7 @@ enum TokenType {
   SEALED_KEYWORD,         // §6.13 — `sealed` only before `class`, `interface` or `trait`
   COMMAND_NAMED_KEY,      // §5.5 — empty; before the `name` of `name:` in a parenthesis-free call
   COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
+  COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
@@ -1496,15 +1533,16 @@ return type `trait` and no `ERROR`, at statement level and in a member
 list; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`. It
 is the counterpart of the `record foo() { … }` residual of §6.7.
 
-### 6.14 COMMAND_VALUE_START — implementation contract
+### 6.14 COMMAND_VALUE_START and COMMAND_PATH_START — implementation contract
 
 A parenthesis-free call may be the value of a declarator or an
-assignment (§5.5 item 1). A newline is whitespace, so with only the
-grammar `def x = foo` followed by `1` on the next line would be one
-call; Groovy ends the statement at the line break (observed with
-Groovy 3). The value form therefore opens with an empty token, which
-the scanner emits only when the first argument starts on the
-receiver's line.
+assignment (§5.5 item 1), and its receiver may have member accesses
+(§5.5 item 2). A newline is whitespace, so with only the grammar
+`def x = foo` followed by `1` on the next line would be one call, and
+so would `result.size` followed by `2`; Groovy ends the statement at
+the line break (observed with Groovy 3). Both forms therefore hold an
+empty token, which the scanner emits only when the first argument
+starts on the receiver's line.
 
 ```text
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
@@ -1512,30 +1550,70 @@ Emit COMMAND_VALUE_START, empty, where a value may start, when:
     on the line after its `=`), a name starts, read as in §6.8; and
   - the name is not `new`, `switch`, `true`, `false` or `null`, which
     start a value as keywords; and
-  - after spaces, tabs and line escapes, but no line break and no
-    comment, comes a digit, `'`, `"`, the word `true`, `false` or
-    `null`, or a key: a name followed on the same line by `:` and not
-    `::`, other than `case` and `default` (§6.8).
-The token ends before the name; the in-grammar lexer reads the name
-and the argument. On any other input return false. Not emitted during
-error recovery.
+  - any member accesses follow it, as below; and
+  - the first argument follows, as below.
+The token ends before the name.
+
+Emit COMMAND_PATH_START, empty, directly after the first name of a
+statement, when:
+  - a member access starts there, with nothing before it; and
+  - one or more member accesses follow, as below; and
+  - the first argument follows, as below; and
+  - not: the last name of the receiver starts with `A` to `Z`, the
+    argument is a string that closes on the line with no `$` in it,
+    and `(` follows it on the line.
+The token ends after the name.
+
+Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
+a name, with no space anywhere.
+The first argument: after spaces, tabs and line escapes, but no line
+break and no comment, a digit, `'`, `"`, the word `true`, `false` or
+`null`, or a key: a name followed on the same line by `:` and not
+`::`, other than `case` and `default` (§6.8).
+The in-grammar lexer reads the receiver and the argument. On any other
+input return false. Neither token is emitted during error recovery.
 ```
 
-The decision is taken at the receiver and not after it. Comments are
-`extras`, so after a comment the parser is where it was and the
-scanner is called again, past the line break it can no longer see. A
-token placed after the receiver would read `def x = foo` followed by
-`/* c */ 1` on the next line as one call. Decided at the receiver,
-every form with a line break after the receiver parses as it did
-before the value form existed.
+The two tokens are decided where nothing hides a line break from the
+scanner. Comments are `extras`, so after a comment the parser is where
+it was and the scanner is called again, past the line break it can no
+longer see. A token placed after the receiver would read `def x = foo`
+followed by `/* c */ 1` on the next line as one call.
+COMMAND_VALUE_START is decided before the receiver, and
+COMMAND_PATH_START between its first name and the operator after it,
+where no whitespace, comment or line break may come. Every form with a
+line break after the receiver parses as it did before.
+
+The scanner reads on after a statement's first name only when a member
+access follows it directly, so it reads nothing more on other
+statements. Those that start with a dotted name are read once more. A
+value's receiver is read before it, as for a single name, and its
+accesses are read once more as well. Measured against the grammar
+before #52, code made only of such lines (`a.b.c()`, `x.y = 1`,
+`def x = a.b`) parses about 3% to 4% slower, other short lines up to
+about 2% slower (the parse table grew), and real Groovy and Gradle
+files about 1% slower. The two places differ because the parser can
+tell a statement's first name from the start of an expression only by
+the token after it, while in a value the name is an expression, and a
+rule that took the name itself would cost every value a reduction. A
+statement whose receiver is a single name is matched in the grammar
+(§5.5 item 3). `record`, `trait` and `sealed` followed by a member
+access are names (§6.7, §6.13), so `record.add 'x'` is a call.
+
+A string after a receiver whose last name is capitalized, followed by
+`(`, is the name of a method: Groovy declares `foo` in
+`java.util.List 'foo'() { }` and `java.util.List '''foo''' () { }`, and
+calls in `obj.m 'a'() { }`, `java.util.list 'a'() { }` and
+`java.util.List "$x"() { }` (observed). The scanner reads the string,
+triple-quoted or not, to its close on the line.
 
 A slashy string is not a first argument, as in Groovy, which reads `/`
 after a name as division. Known differences from Groovy:
 
 - A comment between the receiver and its first argument on one line,
-  `def x = foo /* c */ 1`, is not a call: the look-ahead reads no
-  comment, so it never scans an unterminated one to the end of the
-  input. The tree is the one from before the value form, `def x = foo`,
+  `def x = foo /* c */ 1` or `x.y /* c */ 1`, is not a call: the
+  look-ahead reads no comment, so it never scans an unterminated one to
+  the end of the input. The tree is the one from before, the receiver,
   the comment and `1`. Groovy reads a call (observed with Groovy 3),
   also when the comment spans lines.
 - A name as the first argument (`def x = foo bar`) is not taken
@@ -1548,13 +1626,21 @@ after a name as division. Known differences from Groovy:
   number in this grammar at all. Both read the same before the value
   form.
 - The first positional argument is an expression, and like every
-  expression it continues onto a next line that can continue it:
-  `def x = foo 1` followed by `(c)` passes `1(c)`, where Groovy ends
-  the statement before the `(` (observed). That is the general reading
-  of a `(` at the start of a line (`docs/divergences-from-spec.md`
-  §3), and an argument after a comma does the same in statement
-  position (§6.8). Before the value form the same input was
-  `def x = foo` followed by `1(c)`.
+  expression it continues onto a next line that can continue it. A
+  next line that starts with `(` makes a call: `def x = foo 1` followed
+  by `(c)` passes `1(c)`. One that starts with `-`, `+`, `++` or `--`
+  makes a binary or postfix expression: `x.y 1` followed by `-1`
+  passes `1 - 1`, and `x.y 2` followed by `++i` passes `2++` and leaves
+  `i`. Groovy ends the statement at the line break in each case
+  (observed). That is the general reading of such a line
+  (`docs/divergences-from-spec.md` §3), and an argument after a comma
+  does the same in statement position (§6.8). Before, the receiver was
+  followed by the same expression as a statement of its own, `1(c)` or
+  `1 - 1`: only where that expression is attached changed.
+- The receiver is read without spaces, comments or line breaks inside
+  it, so `obj . m 1` and `obj` followed by `.m 1` on the next line are
+  not calls; Groovy reads both as `obj.m(1)` (observed). Both read as
+  they did before #52.
 
 ---
 
@@ -2049,7 +2135,7 @@ How each filed bug closes against this spec.
 | dekobon/big-code-analysis **#246** (Elvis short-circuit) | §3.2 — `elvis_expression` as a distinct named node. §8.1 — pinned corpus test reproducing the issue's `def pick(a, b, c) { … }` snippet with the expected S-expression. The downstream `get_op_type()` impl can now `matches!(id.into(), AMPAMP \| PIPEPIPE \| ELVIS_EXPRESSION)`. No `MISSING` child anywhere. |
 | dekobon/big-code-analysis **#247** umbrella (all operator gaps) | §3.2 row-by-row: every symbol in the issue's three tables maps to a distinct node kind. The "critical" rows (`?:`, `?.`, `as`, `trait`, `..<`) all have dedicated nodes. The "important" rows (`=~`, `==~`, slashy, `===`, `!==`, `<=>`, `!instanceof`, `!in`) likewise. The "niche" rows (`?=`, `?[]`, `.&`, `.@`, `$/…/$`, `==>`) likewise. §8 anchors each with a pinned test. §3.2.1 explicitly handles the subscript-yielding-callable composition (`arr[i](args)`). §3.2.2 documents the lexer trailing-context rule for `!instanceof` / `!in` to avoid mis-tokenisation when followed by an identifier character. |
 | amaanq #2 / #3 (maintenance / license) | The prior grammar is treated as inspiration only — no code is incorporated. This grammar is an independent project, dual-licensed under `Apache-2.0 OR MIT`, with no dependency on the upstream project's release cadence. |
-| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements and to the values of declarations and assignments, the receiver an identifier, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
+| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements and to the values of declarations and assignments, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
 | murtaza64 **#16** (empty block comments) | §6.6 — block comments and groovydoc comments are external-scanner tokens that consume the entire `/* … */` or `/** … */` regardless of content. §8.2 — pinned test with `/**/`, `/***/`, `/* */`. |
 | murtaza64 **#22** (multiple assignment) | §4 — `multi_assignment_declaration` rule. §8.2 — pinned test on `def (a, b) = [1, 2]`. |
 | murtaza64 **#27** (publish to npm) | Out of grammar scope. The package layout in §2.1 includes `package.json` and `bindings/node/`; npm publishing is part of release tooling, not the grammar. |

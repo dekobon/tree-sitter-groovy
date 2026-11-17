@@ -9,7 +9,9 @@
 // opens follows it. Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
-// empty token before the receiver of such a call that is a value;
+// empty token before the receiver of such a call that is a value, and
+// COMMAND_PATH_START, one between the first name of a dotted receiver
+// and its first member access;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
 // something after it on its line; and §6.12 NOT_IN, the `!in`
@@ -18,8 +20,8 @@
 // STRING_BODY (§6.10) is never emitted; it is valid only
 // inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
 // valid only during error recovery, where COMMAND_NAMED_KEY,
-// COMMAND_VALUE_START, SUBSCRIPT_OPEN, CAST_CLOSE, NOT_IN and the
-// STRING_BODY check are suppressed.
+// COMMAND_VALUE_START, COMMAND_PATH_START, SUBSCRIPT_OPEN, CAST_CLOSE,
+// NOT_IN and the STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
 // else is kept between calls.
@@ -39,6 +41,7 @@ enum TokenType {
     SEALED_KEYWORD,
     COMMAND_NAMED_KEY,
     COMMAND_VALUE_START,
+    COMMAND_PATH_START,
     SUBSCRIPT_OPEN,
     CAST_CLOSE,
     NOT_IN,
@@ -197,9 +200,84 @@ static bool scan_command_named_key(TSLexer *lexer) {
     return true;
 }
 
+// Whether a member access may start here: the first character of every
+// operator `read_member_access` reads.
+static inline bool is_member_access_start(int32_t c) {
+    return c == '.' || c == '?' || c == '*';
+}
+
+// Consumes one of the operators that join the names of a
+// parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&` and
+// `.@`. Returns false, with input consumed, on anything else.
+static bool read_member_access(TSLexer *lexer) {
+    switch (lexer->lookahead) {
+        case '.':
+            lexer->advance(lexer, false);
+            if (lexer->lookahead == '&' || lexer->lookahead == '@') {
+                lexer->advance(lexer, false);
+            }
+            return true;
+        case '?':
+            lexer->advance(lexer, false);
+            if (lexer->lookahead == '?') {
+                lexer->advance(lexer, false);
+            }
+            break;
+        case '*':
+            lexer->advance(lexer, false);
+            break;
+        default:
+            return false;
+    }
+    if (lexer->lookahead != '.') {
+        return false;
+    }
+    lexer->advance(lexer, false);
+    return true;
+}
+
+// Consumes member accesses, each an operator and a name, for as long as
+// one starts here, and sets `last_name` to the first character of the last
+// name read. Returns false, with input consumed, at an operator that is not
+// one of them or that no name follows.
+static bool read_member_accesses(TSLexer *lexer, int32_t *last_name) {
+    while (is_member_access_start(lexer->lookahead)) {
+        if (!read_member_access(lexer)
+            || !is_identifier_start(lexer->lookahead)) {
+            return false;
+        }
+        *last_name = lexer->lookahead;
+        read_word(lexer, NULL, 0);
+    }
+    return true;
+}
+
+// Whether the first argument of a parenthesis-free call starts here, on
+// the line: after spaces, tabs and line escapes, a number, a string,
+// `true`, `false`, `null` or the key of a named argument. A quote is
+// left unread. A slashy string is not an argument here: after a name
+// Groovy reads `/` as division.
+static bool first_argument_follows(TSLexer *lexer) {
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    int32_t c = lexer->lookahead;
+    if ((c >= '0' && c <= '9') || c == '\'' || c == '"') {
+        return true;
+    }
+    if (!is_identifier_start(c)) {
+        return false;
+    }
+    char argument[sizeof "default"];
+    unsigned argument_len = read_word(lexer, argument, sizeof argument);
+    return is_literal_word(argument, argument_len)
+        || key_colon_follows(lexer, argument, argument_len);
+}
+
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
 // here as the value of a declarator or an assignment
-// (`def out = sh script: 'make'`): a name, then on its line a number, a
+// (`def out = sh script: 'make'`, `def r = obj.method 1`): a name and any
+// member accesses written without spaces, then on its line a number, a
 // string, `true`, `false`, `null` or the key of a named argument. The
 // token is empty and sits before the name, which the in-grammar lexer
 // reads, as it reads the argument. Taking the decision at the name, not
@@ -217,20 +295,9 @@ static bool scan_command_value_start(TSLexer *lexer) {
         || is_literal_word(word, len)) {
         return false;
     }
-    if (!skip_same_line_space(lexer, false)) {
-        return false;
-    }
-    int32_t c = lexer->lookahead;
-    // A slashy string is not an argument here: after a name Groovy reads
-    // `/` as division.
-    bool starts_argument = (c >= '0' && c <= '9') || c == '\'' || c == '"';
-    if (!starts_argument && is_identifier_start(c)) {
-        char argument[sizeof "default"];
-        unsigned argument_len = read_word(lexer, argument, sizeof argument);
-        starts_argument = is_literal_word(argument, argument_len)
-            || key_colon_follows(lexer, argument, argument_len);
-    }
-    if (!starts_argument) {
+    int32_t last_name = 0;
+    if (!read_member_accesses(lexer, &last_name)
+        || !first_argument_follows(lexer)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
@@ -251,6 +318,69 @@ static inline bool is_inline_space(int32_t c) {
 
 static inline bool is_line_break(int32_t c) {
     return c == '\n' || c == '\r';
+}
+
+// Whether the string that starts here is the name of a method declared
+// with a qualified return type (`java.util.List 'foo'() { }`): it closes
+// on this line, has no interpolation, and `(` follows it on the line.
+// Groovy reads an interpolated name before `(` as a dynamic call.
+static bool method_name_follows(TSLexer *lexer) {
+    int32_t quote = lexer->lookahead;
+    lexer->advance(lexer, false);
+    unsigned closing_quotes = 1;
+    if (lexer->lookahead == quote) {
+        lexer->advance(lexer, false);
+        if (lexer->lookahead == quote) {
+            lexer->advance(lexer, false);
+            closing_quotes = 3;
+        } else {
+            closing_quotes = 0;
+        }
+    }
+    // Bounded by the line: a line break or the end of input stops it.
+    unsigned quotes_seen = 0;
+    while (quotes_seen < closing_quotes) {
+        int32_t c = lexer->lookahead;
+        if (lexer->eof(lexer) || is_line_break(c) || (quote == '"' && c == '$')) {
+            return false;
+        }
+        lexer->advance(lexer, false);
+        if (c == '\\') {
+            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                return false;
+            }
+            lexer->advance(lexer, false);
+        }
+        quotes_seen = c == quote ? quotes_seen + 1 : 0;
+    }
+    return skip_same_line_space(lexer, false) && lexer->lookahead == '(';
+}
+
+// SPECIFICATION.md §6.14 — decides that a statement is a
+// parenthesis-free call whose receiver has member accesses
+// (`obj.method 1`, `a?.b.c x: 1`). The token is empty and sits between
+// the receiver's first name, already read, and its first access. Nothing
+// can come between the two, so no line break or comment is in play
+// there; the accesses must follow each other without spaces, and the
+// first argument must start on their line. The caller has seen a member
+// access start.
+static bool scan_command_path_start(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    int32_t last_name = 0;
+    if (!read_member_accesses(lexer, &last_name)
+        || !first_argument_follows(lexer)) {
+        return false;
+    }
+    // Groovy declares a method when the last name is capitalized
+    // (`java.util.List 'foo'() { }`) and calls one otherwise
+    // (`obj.m 'a'() { }` is `obj.m('a'({ }))`).
+    bool capitalized = last_name >= 'A' && last_name <= 'Z';
+    if (capitalized && (lexer->lookahead == '\'' || lexer->lookahead == '"')
+        && method_name_follows(lexer)) {
+        return false;
+    }
+    lexer->result_symbol = COMMAND_PATH_START;
+    return true;
 }
 
 // Skips the trivia Groovy's lexer hides inside a declaration header:
@@ -572,6 +702,14 @@ bool tree_sitter_groovy_external_scanner_scan(
     // belongs to the in-grammar lexer.
     if (valid_symbols[STRING_BODY] && !valid_symbols[ERROR_SENTINEL]) {
         return false;
+    }
+
+    // SPECIFICATION.md §6.14 — a member access directly after the first
+    // name of a statement. No other token starts with one of its
+    // characters.
+    if (valid_symbols[COMMAND_PATH_START] && !valid_symbols[ERROR_SENTINEL]
+        && is_member_access_start(lexer->lookahead)) {
+        return scan_command_path_start(lexer);
     }
 
     // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY

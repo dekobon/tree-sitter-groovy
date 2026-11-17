@@ -13,10 +13,10 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// Texts with zero, one or several unterminated block comments, in
 /// the positions the scanner treats differently: after an expression,
 /// at a statement start, inside a record or trait header, after
-/// `sealed`, and after a comment that does close. The last two hold
-/// parenthesis-free calls as values (§6.14), whose start token depends
-/// on what follows the receiver on its line, so an edit there must
-/// lex it again.
+/// `sealed`, and after a comment that does close. The last five hold
+/// parenthesis-free calls (§6.14), as values and as statements with a
+/// dotted receiver, whose start token depends on the receiver and on
+/// what follows it on its line, so an edit there must lex it again.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -30,10 +30,13 @@ const TEXTS: &[&str] = &[
     "x /* a\r\ny /* b\r\n",
     "def x = foo 1\ny = bar 'a', 2\nz.w = baz a: 1\n",
     "def x = foo\n1\nx = foo /* c */ true\n",
+    "obj.m 1\nx.y\n'a'\nrecord.add a: 1, 2\n",
+    "def r = a?.b 'c'\nx.y a.b 'c'\nfoo\nobj.m /* c */ 1\n",
+    "java.util.List 'f'() { }\nobj.m 'a'(b)\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
-const INSERTIONS: &[&str] = &["", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x"];
+const INSERTIONS: &[&str] = &["", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x", "."];
 
 /// Byte lengths an edit removes.
 const REMOVED_LENGTHS: &[usize] = &[0, 1, 2, 3];
