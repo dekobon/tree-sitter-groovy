@@ -64,6 +64,31 @@ switch (x) { default -> y }
 @interface Tag { String value() default 'x' }
 //                              ^ keyword
 
+interface Greeter {
+    default String greet() { 'hi' }
+    // <- keyword.modifier
+    public default int pick(int x) { switch (x) { default -> 0 } }
+    //     ^ keyword.modifier
+    //                                            ^ keyword.control
+}
+
+default class Plain { }
+// <- keyword.modifier
+default interface Face { }
+// <- keyword.modifier
+default trait Mixin { }
+// <- keyword.modifier
+default enum Level { LOW }
+// <- keyword.modifier
+default record Pair(int a) { }
+// <- keyword.modifier
+
+default void script() { }
+// <- keyword.modifier
+
+foo default: 1
+//  ^ label
+
 yield 42
 // <- keyword.control
 

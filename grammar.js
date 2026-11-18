@@ -171,6 +171,7 @@ function classMembers($, constructor) {
 function memberDeclarations($, constructor) {
   return [
     $.method_declaration,
+    alias($._default_method_declaration, $.method_declaration),
     $.field_declaration,
     ...(constructor ? [constructor] : []),
     $.static_initializer,
@@ -232,25 +233,46 @@ function constructorDeclaration($, modifiers) {
  * A method declaration up to its parameter list: annotations,
  * modifiers, type parameters, `def` or a return type, the name and the
  * parameters. `method_declaration` and an annotation type element with
- * a default (`_annotation_type_element`) share it.
+ * a default (`_annotation_type_element`) share it; a method with the
+ * `default` modifier (`_default_method_declaration`) passes its own
+ * modifiers.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} [modifiers] What comes between the annotations
+ *   and the name. By default, modifiers followed by type parameters and
+ *   `def` or a return type, or modifiers alone.
  * @returns {RuleOrLiteral[]} The rules of the head, in order.
  */
-function methodHead($) {
+function methodHead($, modifiers = choice(
+  seq(
+    repeat($._modifier),
+    optional(field('type_parameters', $.method_type_parameters)),
+    choice('def', field('return_type', $._type)),
+  ),
+  repeat1($._modifier),
+)) {
   return [
     repeat($.annotation),
-    choice(
-      seq(
-        repeat($._modifier),
-        optional(field('type_parameters', $.method_type_parameters)),
-        choice('def', field('return_type', $._type)),
-      ),
-      repeat1($._modifier),
-    ),
+    modifiers,
     field('name', $._property_name),
     field('parameters', $.formal_parameters),
   ];
+}
+
+/**
+ * A method declaration from its head: the head and a throws clause,
+ * then a body or nothing. See `method_declaration` for the weights.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral[]} head The rules of the head (`methodHead`).
+ * @returns {PrecRightRule} The declaration rule body.
+ */
+function methodDeclaration($, head) {
+  const signature = seq(...head, optional($.throws_clause));
+  return prec.right(2, choice(
+    prec.dynamic(-1, signature),
+    prec.dynamic(3, seq(signature, field('body', $.block))),
+  ));
 }
 
 /**
@@ -671,6 +693,7 @@ module.exports = grammar({
       $.multi_assignment_declaration,
       $.pipeline_statement,
       $.method_declaration,
+      alias($._default_method_declaration, $.method_declaration),
       $.labeled_statement,
       $.command_chain,
       alias($._path_command_chain, $.command_chain),
@@ -784,11 +807,23 @@ module.exports = grammar({
     // named-argument command chains (`archiveArtifacts artifacts: 'x'`),
     // which now have their key decided by `_command_named_key`
     // instead; see the §6.5 row in `docs/divergences-from-spec.md`.
-    labeled_statement: $ => prec(1, seq(
-      field('label', $.identifier),
-      ':',
-      field('statement', $._statement),
-    )),
+    //
+    // `default` is a keyword at the start of a statement, so it is a
+    // label by its own alternative, and `foo default: 1` stays a
+    // statement and a label (spec §6.8). In a switch body a `default`
+    // after a case ends the case instead (`switch_case`).
+    labeled_statement: $ => choice(
+      prec(1, seq(
+        field('label', $.identifier),
+        ':',
+        field('statement', $._statement),
+      )),
+      seq(
+        field('label', alias('default', $.identifier)),
+        ':',
+        field('statement', $._statement),
+      ),
+    ),
 
     // §4 — block of statements: control-flow, method and constructor
     // bodies, static / instance initializers. Shares `{ ... }` syntax
@@ -996,7 +1031,7 @@ module.exports = grammar({
     // and `permits` clause.
     class_declaration: $ => seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._type_modifiers),
       sealedModifier($),
       'class',
       field('name', $.identifier),
@@ -1011,7 +1046,7 @@ module.exports = grammar({
     // when a trait header follows, so `private String trait` is a field.
     trait_declaration: $ => seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._type_modifiers),
       sealedModifier($),
       alias($._trait_keyword, 'trait'),
       field('name', $.identifier),
@@ -1024,7 +1059,7 @@ module.exports = grammar({
 
     interface_declaration: $ => seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._type_modifiers),
       sealedModifier($),
       'interface',
       field('name', $.identifier),
@@ -1089,6 +1124,16 @@ module.exports = grammar({
       'strictfp',
     ),
 
+    // The modifiers of a type declaration, `default` among them
+    // (divergence 20). A hidden rule rather than `repeat($._modifier)`
+    // in each declaration: the modifiers reduce to it at the
+    // declaration keyword, so the header after it has one production
+    // whether or not `default` is there.
+    _type_modifiers: $ => choice(
+      repeat1($._modifier),
+      seq(repeat($._modifier), 'default', repeat($._modifier)),
+    ),
+
     permits_clause: $ => seq(
       'permits',
       $._type,
@@ -1110,10 +1155,10 @@ module.exports = grammar({
 
     // The member list of `class_body` plus an element with a default.
     // Groovy accepts `default` after the `()` of any abstract method,
-    // but only an annotation type element uses it, and only here is it
-    // a keyword: in an interface, `void a()` then `default void b() { }`
-    // on the next line is two methods, which Groovy tells apart by the
-    // line break, whitespace here.
+    // but only an annotation type element uses it, and only here may it
+    // follow the `()`: in an interface, `void a()` then
+    // `default void b() { }` on the next line is two methods, which
+    // Groovy tells apart by the line break, whitespace here.
     _annotation_type_body: $ => seq(
       '{',
       repeat(choice(
@@ -1128,11 +1173,17 @@ module.exports = grammar({
     // §4 — `String value() default 'x'`, Apache's `methodDeclaration`
     // with `DEFAULT elementValue`, which excludes a throws clause. An
     // element with no default is an ordinary `method_declaration`.
-    _annotation_type_element: $ => seq(
+    //
+    // A `default` after the `()` could also end the member there and
+    // start the next one, a method with the `default` modifier. The
+    // precedence, equal to the right-associative one of
+    // `method_declaration`, keeps it this element's default, on the
+    // same line or the next.
+    _annotation_type_element: $ => prec(2, seq(
       ...methodHead($),
       'default',
       field('default', $._element_value),
-    ),
+    )),
 
     // §4 — member list shared by class / interface / trait bodies and
     // the anonymous inner class body of `object_creation_expression`.
@@ -1258,13 +1309,32 @@ module.exports = grammar({
     // only that reading is valid Groovy: a script method needs a
     // body. In a class body nothing competes, so abstract and
     // interface methods are unaffected.
-    method_declaration: $ => {
-      const signature = seq(...methodHead($), optional($.throws_clause));
-      return prec.right(2, choice(
-        prec.dynamic(-1, signature),
-        prec.dynamic(3, seq(signature, field('body', $.block))),
-      ));
-    },
+    method_declaration: $ => methodDeclaration($, methodHead($)),
+
+    // §4 — a method with the `default` modifier, aliased to
+    // `method_declaration` (divergence 20). Apache's `modifier` takes
+    // `default` before any declaration; Groovy 3 ignores it except on
+    // an interface method. This rule and `_type_modifiers` make
+    // `default` a keyword wherever a member or a statement can start,
+    // as it is in Groovy, where it is reserved: before them it lexed as
+    // an identifier there, and `default void b() { }` was a field of
+    // type `default` named `void` and a constructor `b`. With no return
+    // type the member is a method, where after other modifiers it is a
+    // constructor: the modifier is meaningless on a constructor.
+    //
+    // The keyword also starts the next member or statement after one
+    // that can end, so a line break before it separates the two, as in
+    // Groovy. Where a fork between a field's name and a type comes
+    // before (`private String y`), the reading that takes `default` as
+    // the name of a field survives; the weights of `method_declaration`
+    // outrank it.
+    _default_method_declaration: $ => methodDeclaration($, methodHead($, seq(
+      repeat($._modifier),
+      'default',
+      repeat($._modifier),
+      optional(field('type_parameters', $.method_type_parameters)),
+      optional(choice('def', field('return_type', $._type))),
+    ))),
 
     // §4 / §5.14 — method-level generic type parameters
     // (`<T> T identity(T x) { x }`). Distinct from `type_parameters`
@@ -1356,7 +1426,7 @@ module.exports = grammar({
     // included — which a patch release must not do.
     enum_declaration: $ => seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._type_modifiers),
       'enum',
       field('name', $.identifier),
       optional($.super_interfaces),
@@ -1436,7 +1506,7 @@ module.exports = grammar({
     // right whenever both parse.
     record_declaration: $ => prec.dynamic(1, prec.right(seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._type_modifiers),
       alias($._record_keyword, 'record'),
       field('name', $.identifier),
       optional(field('type_parameters', $.type_parameters)),
@@ -1819,12 +1889,17 @@ module.exports = grammar({
       '}',
     ),
 
-    switch_case: $ => seq(
+    // `default` after a case's statements could also start a statement
+    // in them, a method with the `default` modifier or the label
+    // `default:`. Left associativity ends the case there, so it is the
+    // next branch, as Groovy reads it: no statement in a switch body
+    // starts with `default`. `switch_default` ends the same way.
+    switch_case: $ => prec.left(seq(
       'case',
       field('value', $._expression),
       ':',
       repeat(choice($._statement, ';')),
-    ),
+    )),
 
     // The arrow body may be terminated by `;` (`case 1 -> foo();`),
     // matching the Java/Groovy `case L -> expr;` arrow form. The `;`
@@ -1838,13 +1913,13 @@ module.exports = grammar({
       optional(';'),
     ),
 
-    switch_default: $ => seq(
+    switch_default: $ => prec.left(seq(
       'default',
       choice(
         seq(':', repeat(choice($._statement, ';'))),
         seq('->', field('body', choice($.block, $._statement)), optional(';')),
       ),
-    ),
+    )),
 
     // §3.2 — `x as Type`. RELATIONAL level (10), left-associative.
     // RHS is `_cast_type`, a `_type`-shaped sibling that swaps in

@@ -158,3 +158,113 @@ switch (c) {
             object: (identifier)
             field: (identifier))
           body: (expression_statement (string_literal)))))))
+
+==================
+Default on the line after a case body is the next branch
+==================
+
+switch (x) {
+    case 1:
+        foo()
+    default:
+        bar()
+}
+switch (x) {
+    case 1: foo()
+    default: bar()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Default after an empty case is the next branch
+==================
+
+switch (x) { case 1: default: c() }
+switch (x) {
+    case 1:
+    default:
+        c()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Default after a statement in a case is the next branch, not a named argument (known divergence)
+==================
+
+switch (x) {
+    case 1:
+        foo default: 1
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (identifier)))
+        (switch_default
+          (expression_statement
+            (number_literal)))))))

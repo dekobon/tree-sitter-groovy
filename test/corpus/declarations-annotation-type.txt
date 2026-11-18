@@ -618,3 +618,83 @@ Default after a class method is not an element default
 class C { String v() default 'x' }
 
 ---
+
+==================
+Annotation element with the default modifier
+==================
+
+@interface Tag {
+    default String value()
+    String other() default 'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Default on the line after an element stays its default
+==================
+
+@interface Tag {
+    String value()
+    default 'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Default modifier and element default on one element is an error (limitation)
+:error
+==================
+
+@interface Tag { default String value() default 'x' }
+
+---
+
+==================
+Default-modifier element on the line after an element default
+==================
+
+@interface Tag {
+    String a() default 'x'
+    default String b()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))

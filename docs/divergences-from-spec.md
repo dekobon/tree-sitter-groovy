@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). Not yet supported, each an `ERROR`: typed names (`def (int a, String b) = …`), `final` (`final (a, b) = …`, `final def (a, b) = …`) and `var (a, b) = …`. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -1011,3 +1011,104 @@ The Groovy column was observed by running Groovy 3.
 **Action**: none planned for the spaced and multi-line receivers. A
 receiver that ends in a call or a subscript needs the scanner to read
 balanced brackets.
+
+---
+
+## 20. The `default` modifier
+
+**Apache `GroovyParser.g4`** (4.0.x branch): `DEFAULT` is a
+`classOrInterfaceModifier` ("interface only"), so `modifier` takes it,
+and with it `modifiersOpt` before a method, a constructor, a nested
+type or a compact constructor, `modifiers` before a field or a local
+variable, and `classOrInterfaceModifiersOpt` before a top-level type.
+`modifiers` allows a line break between modifiers and after the last.
+`default` is a keyword (`keywords`), so it is never a name. Groovy 3
+gives the modifier a meaning only on an interface method, and ignores
+it elsewhere.
+
+**Current implementation**: a method may have `default` among its
+modifiers, in a type body or as a statement. The rule,
+`_default_method_declaration`, is aliased to `method_declaration` and
+has its weights (§6). Other modifiers may come before and after
+`default`, as they come in any order among themselves. After them the
+return type is optional, and a member with none is a method, where
+after other modifiers it is a constructor (`public m() { }`): the
+modifier is meaningless on a constructor. The modifier is an anonymous
+`default` child before the `name`; an `@interface` element's default
+is the `default` field after the parameters, and no method has both.
+A class, interface, trait, enum or record declaration takes `default`
+among its modifiers too, at the top level or nested, through the
+hidden `_type_modifiers`. An `@interface` declaration takes no
+modifiers. Fields, constructors, compact constructors, initializers
+and local variables do not take it, and each is an `ERROR` with it.
+
+`default` is therefore a keyword wherever a member or a statement can
+start, as in Groovy, where it is reserved, and after anything that can
+end before one, such as `return`, `break` or an expression. Before,
+it was a keyword only in a switch body and after the `()` of an
+`@interface` element, and an identifier elsewhere: `default void b()
+{ }` in a type body was a field of type `default` named `void` and a
+constructor `b`. As a name in those positions it is now an `ERROR`.
+Where only an expression or a name can follow it is still an
+identifier (`x = default`, `foo(default)`, `def default = 1`).
+
+At the start of a statement outside a switch body, `default:` is a
+label by its own alternative of `labeled_statement`, an `identifier`
+node as before, so `foo default: 1` is still a statement and a label
+(spec §6.8). In a switch body, `default` after a case's statements
+could also start a statement in them; `switch_case` and
+`switch_default` are left-associative, so it ends the case and is the
+next branch, as before. No statement in a Groovy switch body starts
+with `default`.
+
+A member or a statement that can end before `default` ends there, so a
+line break before it separates the two, as in Groovy. Where a fork
+between a field's name and a type comes before, the reading that takes
+`default` as a name survives. `private String y` followed by
+`default void b() { }` is also `private String`, a field `y default`
+and the method `void b() { }`; the method weights decide it,
+4 + 3 against −1 + 4 + 3. With a modifier-only field between them
+(`private String y`, `static count`, then `default void b() { }`) the
+split `private String`, `y static`, `count default`, `void b() { }`
+weighs 10 against 6 and wins. That is the weakness of modifier-only
+fields that §6 describes: `private String y`, `static count` and
+`void b() { }` on three lines split the same way before this rule, as
+a field `count void` and a constructor `b`.
+
+In an `@interface` body a `default` after the `()` is the element's
+default, by a static precedence on `_annotation_type_element`, so a
+line break before it is accepted, as before (§5.9 row above).
+
+The Groovy column was observed by running Groovy 3, which does not
+parse records; the rows marked `.g4` are read off the grammar.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `default void b() { }` in an interface, trait, class, enum or anonymous class body, with annotations, other modifiers on either side, type parameters, `def` or no return type | a method | `method_declaration`; before, a field of type `default` named after the next word, then the rest |
+| the same in a record body | a method (`.g4`) | `method_declaration` |
+| `default void b() { }` at the start of a statement | a script method | `method_declaration`; before, the expression `default`, then a method |
+| any member or statement, then `default void b() { }` on the next line | two | two |
+| `default` alone on a line, then `void b() { }` | a method | a method |
+| `default C() { }` in `class C` | a constructor | a method `C` |
+| `default class C { }`, and `interface`, `trait`, `enum` and `record` declarations with `default`, at the top level or nested | the type | the type's declaration; before, the expression `default` and the declaration at the top level, and nested an `ERROR`, or for a record a field `record` of type `default` and a constructor |
+| `default String value()` in an `@interface` | an element | `method_declaration` |
+| `default String value() default 'x'` in an `@interface` | an element with a default | `ERROR`, as before |
+| `String value()` then `default 'x'` on the next line, in an `@interface` | rejected | the element's default, as before |
+| `String value()` then `default String b()` on the next line, in an `@interface` | two elements | `value` defaulting to `String`, then an `ERROR`, as before |
+| `String a() default 'x'` then `default String b()` on the next line, in an `@interface` | two elements | two elements; before, an `ERROR` |
+| `void a() default 1`, `Class<?> type() default Object` in an interface | an element default | `ERROR`; before, an `ERROR`, or a field `Object` of type `default` |
+| `default String NAME = 'x'`, `default X = 1`, the compact constructor `default R { }` | a field, a compact constructor (`.g4`) | `ERROR`; before, an `ERROR`, or for `default X = 1` and `default R { }` a field of type `default` |
+| `final default int X = 1`, `default final int X = 1` | a field `X` | `ERROR`; before, a field `default`, or one of type `default`, and the field `X` |
+| `default static { }` | rejected | `ERROR`; before, a field `static` of type `default` and an initializer |
+| `default int x = 1` in a block | a local variable | `ERROR`; before, the expression `default` and a declaration |
+| `default @Override void b() { }` | a method | `ERROR`, as is any annotation after a modifier (#92) |
+| `default = 1`, `default.x()`, `return default`, `break default`, `String default`, `final default = 1`, `void default() { }`, `{ default -> 1 }`, `println default`, `if (x) a() else default`, `static default = 1` and `private default` in a class, `enum E { default }` | rejected: `default` is reserved | `ERROR`; before, `default` was a name |
+| `x = default`, `foo(default)`, `[default]`, `throw default`, `assert default`, `def default = 1`, `def default() { }`, `def f(default) { }`, `for (default in xs) { }`, `void default() { }` in a class | rejected | `default` is a name, as before |
+| `foo.default`, `[default: 1]`, `foo(default: 1)`, `foo 'a', default: 1` | a property, a key | the same, as before |
+| `foo default: 1`, `x = foo default: 1`, `a.b default: 1` | a call with the named argument `default` | the statement, then the label `default:`, as before (spec §6.8) |
+| `switch (x) { case 1: foo()` then `default: bar() }` on the next line, `case 1: default: c()`, and the other switch forms | the switch | the same tree as before |
+| `lbl: default void b() { }`, `if (x) default void b() { }` | rejected | a label or an `if` around a `method_declaration`; before, around the expression `default`, then a method |
+
+**Action**: none planned. Fields, constructors and local variables
+could take the modifier through rules of their own, as methods do;
+Groovy 3 ignores it on all of them.

@@ -143,3 +143,953 @@ private static g(a) { a }
     body: (block
       (expression_statement
         (identifier)))))
+
+==================
+Default method in an interface
+==================
+
+interface I { default void b() { } }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default method after an abstract method on the previous line
+==================
+
+interface I {
+    void a()
+    default void b() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default method with modifiers, annotations and generics
+==================
+
+interface I {
+    public default void a() { }
+    default public void b() { }
+    @Override default String toString() { 'I' }
+    default <T> T id(T t) { t }
+    default def c() { }
+    default void d() throws IOException { }
+    abstract default void e()
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal))))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        (throws_clause
+          (type_identifier))
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+Default method with no return type is a method
+==================
+
+interface I {
+    default greet() { 'hi' }
+    default 'quoted name'() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal))))
+      (method_declaration
+        name: (quoted_identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default modifier on its own line
+==================
+
+interface I {
+    default
+    void b() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Abstract methods then default methods on the next line
+==================
+
+interface I {
+    String name()
+    default String greet() { "hi $name" }
+    List<String> names()
+    default List<String> more() { [] }
+    int[] counts()
+    default int[] none() { null }
+    <T> T pick(T t)
+    default <T> T same(T t) { t }
+    def any()
+    default def all() { }
+    void run() throws IOException
+    default void stop() { }
+    void halt(); default void resume() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal
+              (string_fragment)
+              (gstring_dollar_interpolation
+                value: (identifier))))))
+      (method_declaration
+        return_type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (list_literal))))
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (null_literal))))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier))))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        (throws_clause
+          (type_identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default method followed by abstract methods, constants and nested types
+==================
+
+interface I {
+    default void a() { }
+    void b()
+    String NAME = 'x'
+    default String c() { NAME }
+    interface J { }
+    class K { }
+    default void d() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (identifier))))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default methods in an interface nested in a class, a record and an enum
+==================
+
+class C {
+    interface I { default void a() { } }
+}
+record R(int x) {
+    interface I { default void a() { } }
+}
+enum E {
+    A
+    interface I { default void a() { } }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (interface_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Switch default inside a default method
+==================
+
+interface I {
+    default int f(int x) {
+        switch (x) {
+            case 1: return 1
+            default: return 0
+        }
+    }
+    default String g(int x) {
+        switch (x) {
+            case 1 -> 'one'
+            default -> 'other'
+        }
+    }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (switch_expression
+              value: (identifier)
+              body: (switch_block
+                (switch_case
+                  value: (number_literal)
+                  (return_statement
+                    (number_literal)))
+                (switch_default
+                  (return_statement
+                    (number_literal))))))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (switch_expression
+              value: (identifier)
+              body: (switch_block
+                (switch_arrow_case
+                  value: (number_literal)
+                  body: (expression_statement
+                    (string_literal)))
+                (switch_default
+                  body: (expression_statement
+                    (string_literal)))))))))))
+
+==================
+Default methods in trait, class, enum and record bodies
+==================
+
+trait T { default void a() { } }
+class C { default void a() { } }
+enum E { A; default void a() { } }
+enum F {
+    A, B,
+    default void a() { }
+}
+record R(int x) { default void a() { } }
+
+---
+
+(source_file
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default method after fields on the previous line
+==================
+
+class C {
+    private String y
+    default void a() { }
+    static count
+    default void b() { }
+    int x = 1
+    default void c() { }
+    def m = [default: 1]
+    default void d() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (map_literal
+            (map_entry
+              key: (identifier)
+              value: (number_literal)))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default after a statement stays a label, in a default method too
+==================
+
+foo default: 1
+x = foo default: 1
+def m = [default: foo.default]
+interface I {
+    default void f() { foo default: 1 }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (field_access
+            object: (identifier)
+            field: (identifier))))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (identifier))
+          (labeled_statement
+            label: (identifier)
+            statement: (expression_statement
+              (number_literal))))))))
+
+==================
+Default field is an error (limitation)
+:error
+==================
+
+interface I { default String NAME = 'x' }
+
+---
+
+==================
+Default modifier on type declarations
+==================
+
+default class C { }
+public default abstract class D { }
+default sealed class S permits A { }
+interface I {
+    default class N { }
+    default record Q(int y) { }
+    default interface J { default void m() { } }
+}
+record R(int x) {
+    private default enum E { A }
+}
+@Foo default trait T { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))))
+  (trait_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Default method in an anonymous class body
+==================
+
+def o = new Runnable() {
+    void prepare() { }
+    default void run() { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block)))))))
+
+==================
+Default method after comments between members
+==================
+
+interface I {
+    void a() // a
+    default void b() { }
+    /* c */ default void c() { }
+    String d() /* d */
+    default String e() { 'e' }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (line_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (block_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (block_comment)
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal)))))))
+
+==================
+Default method after enum constants with no separator
+==================
+
+enum E { A, B
+    default void b() { } }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Default method in a script
+==================
+
+default void a() { }
+x = 1
+default void b() { }
+foo
+default void c() { }
+println 'x'
+default String d() { 'd' }
+default
+void e() { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (expression_statement
+    (identifier))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (string_literal))))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+Default as a name at the start of a statement is an error (assignment)
+:error
+==================
+
+default = 1
+
+---
+
+==================
+Default as a name at the start of a statement is an error (call)
+:error
+==================
+
+default.call()
+
+---
+
+==================
+Default as a name after return is an error
+:error
+==================
+
+def f() { return default }
+
+---
+
+==================
+Default as a local variable name is an error
+:error
+==================
+
+String default = 'x'
+
+---
+
+==================
+Default as a script method name after a return type is an error
+:error
+==================
+
+void default() { }
+
+---
+
+==================
+Default as a closure parameter is an error
+:error
+==================
+
+def c = { default -> 1 }
+
+---
+
+==================
+Default as a command argument is an error
+:error
+==================
+
+println default
+
+---
+
+==================
+Default as a field name after a modifier is an error
+:error
+==================
+
+class C { static default = 1 }
+
+---
+
+==================
+Default on a local variable is an error (limitation)
+:error
+==================
+
+def f() { default int x = 1 }
+
+---

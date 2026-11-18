@@ -178,9 +178,19 @@
 ; everywhere else.
 (synchronized_statement "synchronized" @keyword)
 
-; `String value() default 'x'` gives an annotation element its default;
-; the word is a branch label only in a `switch`.
-(method_declaration "default" @keyword)
+; `default` is a branch label in a `switch` and a modifier on a method
+; or a type declaration (`default void run() { }`). On a method that has
+; a `default` field it gives an annotation element its default
+; (`String value() default 'x'`) instead; a method never has both.
+(method_declaration !default "default" @keyword.modifier)
+(method_declaration "default" @keyword default: (_))
+[
+  (class_declaration "default" @keyword.modifier)
+  (interface_declaration "default" @keyword.modifier)
+  (trait_declaration "default" @keyword.modifier)
+  (enum_declaration "default" @keyword.modifier)
+  (record_declaration "default" @keyword.modifier)
+]
 
 (shebang) @keyword.directive
 

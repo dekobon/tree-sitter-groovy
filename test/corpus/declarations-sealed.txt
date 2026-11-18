@@ -306,7 +306,8 @@ public sealed abstract class P permits Q { }
         (variable_declarator
           name: (identifier)))))
   (class_declaration
-    (ERROR)
+    (ERROR
+      (identifier))
     name: (identifier)
     (permits_clause
       (type_identifier))

@@ -13,3 +13,6 @@ class Runner { def run() { }; int count }
 
 enum Mode { ON; int code }
 //          ^ definition.constant
+
+interface Greeter { default String greet() { 'hi' }; int count }
+//                                 ^ definition.method
