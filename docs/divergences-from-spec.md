@@ -1143,6 +1143,12 @@ Groovy column was observed with Groovy 3.
 | `def a = foo[].class` | an index with no arguments on `foo`, or a class if `foo` is one | a `MISSING` index, as before: the name is lowercase |
 | `def q = List<String>[].class` | a class | comparisons and a list, with no `ERROR`, as before |
 | `String[]` then `xs = foo()` on the next line | a class, then an assignment | a declaration of `xs`, as before |
+| `short[].class`, `def m() { short[].class }`, `{ short[]::new }`, `if (x) short[].class` | a class | `array_type`; before, an `ERROR` |
+| `foo String[].class`, `foo int[]::new`, `obj.m String[].class`, `def x = foo String[].class` | a call with the class as its argument | two statements, the name or the access and then the class, with no `ERROR`; before, an `ERROR`. A first argument that is not a literal or a key is not taken, as in `foo bar` (spec §5.5 item 3, #18 above) |
+| `foo String[]`, `obj.m String[]` | a call with the class as its argument | an `ERROR`, as before: the call is not taken, and a bare `String[]` at the start of a statement is not a value |
+| `enum E { A(String[]) }`, `case 1 -> String[]` in a switch | an argument, an arrow body (the second read off the 4.x `.g4`; Groovy 3 has no switch expression) | an `ERROR`, as before: a constructor's parameter and a statement may start there |
+| `String /* c */ [].class` | a class | a `MISSING` index, as before: only spaces, tabs and line escapes may come before the `[` |
+| `_Foo[].class`, `$Foo[].class`, `Été[].class` | a class when the name is one (`_Foo` observed) | a `MISSING` index, as before: the name must start with `A` to `Z` |
 | `String[][0]` | an index on the class | an `ERROR`; before, a `MISSING` index |
 
 **Action**: none planned. Taking a package-qualified name would mean

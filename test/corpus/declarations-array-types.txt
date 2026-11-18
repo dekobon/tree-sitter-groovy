@@ -499,6 +499,164 @@ def w = x instanceof Object[]
           (type_identifier))))))
 
 ==================
+Array values at the start of a statement
+==================
+
+int[][].class
+String[].&new
+short[].class
+if (x) short[].class
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (array_type
+        (array_type
+          (type_identifier)))
+      field: (identifier)))
+  (expression_statement
+    (method_pointer_expression
+      object: (array_type
+        (type_identifier))
+      method: (identifier)))
+  (expression_statement
+    (field_access
+      object: (array_type
+        (type_identifier))
+      field: (identifier)))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (field_access
+        object: (array_type
+          (type_identifier))
+        field: (identifier)))))
+
+==================
+Short array values in a method and a closure body
+==================
+
+def m() { short[].class }
+def f = { short[]::new }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (method_reference_expression
+            target: (array_type
+              (type_identifier))))))))
+
+==================
+Statements that start with short or sealed are unchanged
+==================
+
+short x = 1
+short[] xs = foo()
+sealed class S { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+A name before a bracket on the next line is not an array type
+==================
+
+Foo
+[].each { }
+long
+[].each { }
+MAX
+[].each { }
+def x = Foo
+[].each { }
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal)
+        field: (identifier))
+      closure: (closure)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal)
+        field: (identifier))
+      closure: (closure)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal)
+        field: (identifier))
+      closure: (closure)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal)
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Nested array type after a comma in a command call
+==================
+
+foo 'a', Map.Entry[]
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (array_type
+      (qualified_type
+        (type_identifier)
+        (type_identifier)))))
+
+==================
 Array type continued on a new line inside parentheses is unsupported
 :error
 ==================
@@ -542,5 +700,32 @@ Bare array type where a type may start is unsupported
 ==================
 
 def m() { return String[] }
+
+---
+
+==================
+Array type of a lowercase name in an argument is unsupported
+:error
+==================
+
+foo(bar[].class)
+
+---
+
+==================
+Array type of a lowercase nested name is unsupported
+:error
+==================
+
+def x = Foo.bar[].class
+
+---
+
+==================
+Array type of a lowercase nested name in an argument is unsupported
+:error
+==================
+
+foo(Foo.bar[].class)
 
 ---

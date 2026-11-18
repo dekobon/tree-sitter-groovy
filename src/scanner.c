@@ -1048,7 +1048,22 @@ bool tree_sitter_groovy_external_scanner_scan(
         return true;
     }
     if (lexer->lookahead == 's' && wants_sealed) {
-        if (!consume_keyword(lexer, "sealed")
+        // §6.15 — `short` is the one element type name that shares a
+        // first letter with these keywords, and a statement may start
+        // with `short[].class` where `sealed` may start too. The array
+        // token is empty and ends here; the keyword moves the end again.
+        lexer->mark_end(lexer);
+        advance(lexer);
+        if (lexer->lookahead == 'h') {
+            if (!wants_array || !consume_keyword(lexer, "hort")
+                || !array_dimensions_follow(lexer, type_may_start,
+                                            no_close_ahead)) {
+                return false;
+            }
+            lexer->result_symbol = ARRAY_VALUE_START;
+            return true;
+        }
+        if (!consume_keyword(lexer, "ealed")
             || !scan_sealed_target(lexer, no_close_ahead)) {
             return false;
         }
