@@ -1211,6 +1211,7 @@ and later is read off `GroovyParser.g4`.
 | `{ var -> var }`, `{ yield -> yield }`, `var: foo()`, `yield: foo()` | names, labels | `ERROR` | names, labels |
 | `void var() { }`, `int as(int x) { x }` where a statement starts | methods | `ERROR` | methods |
 | `for (String in : xs)` | a loop over `in` | `ERROR` | a loop over `in` |
+| `for (var x in xs)`, `for (var x : xs)` | loops | `ERROR` | loops |
 | `var (a, b) = l`, and `private var (a, b) = l` in a class body | declarations | `ERROR` | declarations |
 | `var(a, b)`, `var (a, b).foo()` in a method | calls of `var` | `ERROR` | calls |
 | `import a.B` then `as = 1` on the next line | an import and an assignment | `ERROR` | the same as Groovy |

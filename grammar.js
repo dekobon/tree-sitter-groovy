@@ -1903,7 +1903,7 @@ module.exports = grammar({
       'for',
       '(',
       optional('final'),
-      optional(choice('def', field('type', $._type))),
+      optional(choice('def', varKeyword($), field('type', $._type))),
       field('variable', $.identifier),
       choice(alias($._in_keyword, 'in'), ':'),
       field('value', $._expression),

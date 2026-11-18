@@ -403,7 +403,7 @@ fix relative to *both* parent grammars.
 | `while` / `do-while` | port | |
 | `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`), a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators) or a `multi_assignment_declaration` (`def (i, n) = [0, 5]`). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
-| `for (x in xs)` | port | |
+| `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`). |
 | `switch` with `case … :` | port | |
 | `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). |
 | `try` / `catch` / `finally` | port | |
@@ -1874,7 +1874,7 @@ with `def`, in place of the word.
   `var(a, b)`, assigned `l`. It is now two statements, as with
   `final` (§4), and as in Groovy (observed).
 
-Measured against the grammar before: STATE_COUNT 4179 to 4247,
+Measured against the grammar before: STATE_COUNT 4179 to 4249,
 LARGE_STATE_COUNT 1555 to 1565, six external tokens and no conflict
 or precedence added, and the same number of parse steps and of steps
 with more than one stack version on real files. Real Groovy and

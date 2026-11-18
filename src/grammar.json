@@ -5992,6 +5992,15 @@
                   "value": "def"
                 },
                 {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_var_keyword"
+                  },
+                  "named": false,
+                  "value": "var"
+                },
+                {
                   "type": "FIELD",
                   "name": "type",
                   "content": {

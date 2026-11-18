@@ -178,6 +178,8 @@ final var = 1
 
 for (v in vs) { }
 //     ^ keyword.operator
+for (var v in vs) { }
+//   ^ keyword
 
 switch (x) { case 1 -> yield 2 }
 //                     ^ keyword.control

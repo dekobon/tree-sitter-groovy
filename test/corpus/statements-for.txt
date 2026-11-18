@@ -314,3 +314,22 @@ for (String in : xs) { }
     variable: (identifier)
     value: (identifier)
     body: (block)))
+
+==================
+For-in with var
+==================
+
+for (var x in xs) { }
+for (final var x : xs) { }
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
