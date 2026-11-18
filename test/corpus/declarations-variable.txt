@@ -181,12 +181,11 @@ def (String s, n) = foo 1
       argument: (number_literal))))
 
 ==================
-Multi-assignment with final, var and annotations
+Multi-assignment with final, final var and annotations
 ==================
 
 final def (a, b) = list
 final (a, b) = list
-var (a, b) = list
 final var (int a, b) = list
 final(a, b) = list
 @Field def (a, b) = [1, 2]
@@ -195,12 +194,6 @@ final(a, b) = list
 ---
 
 (source_file
-  (multi_assignment_declaration
-    (variable_declarator
-      name: (identifier))
-    (variable_declarator
-      name: (identifier))
-    value: (identifier))
   (multi_assignment_declaration
     (variable_declarator
       name: (identifier))
@@ -257,7 +250,7 @@ def m() {
     foo()
     final (int a, b) = [1, 2]
 }
-xs.each { var (String k, v) = it }
+xs.each { final var (String k, v) = it }
 for (def (int i, n) = [0, 5]; i < n; i++) { }
 
 ---
@@ -351,6 +344,130 @@ class C {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block)))))
+
+==================
+Multi-assignment with a rest binding (Groovy 6)
+==================
+
+def (a, *b) = list
+def (h, List<Integer> *t) = list
+final (*init, last) = list
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment with keyed pairs (Groovy 6)
+==================
+
+def (name: n, age: int a) = person
+final (x: px, y: py) = point
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment reads a keyword before a name as its type
+==================
+
+def (def a, b) = l
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment with var alone is not accepted
+:error
+==================
+
+var (a, b) = l
+
+---
+
+==================
+Multi-assignment with annotations alone is not accepted
+:error
+==================
+
+@A (a, b) = l
+
+---
+
+==================
+Multi-assignment with static where a statement starts is not accepted
+:error
+==================
+
+static def (a, b) = l
+
+---
+
+==================
+Multi-assignment with var in a class body is not accepted
+:error
+==================
+
+class C { var (a, b) = l }
+
+---
+
+==================
+Multi-assignment mixing names and keyed pairs is not accepted
+:error
+==================
+
+def (name: n, b) = m
+
+---
 
 ==================
 Multi-assignment without def (#94)

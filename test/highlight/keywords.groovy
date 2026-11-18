@@ -148,3 +148,9 @@ final var (int a, String b) = pair()
 //             ^ variable
 //                ^ type
 //                       ^ variable
+
+class Pair {
+    static final def (left, right) = [1, 2]
+    //                ^ variable
+    //                      ^ variable
+}

@@ -1719,16 +1719,22 @@ module.exports = grammar({
 
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
     // `typeNamePairs`. Closes murtaza64 #22. The form without `def` is
-    // `multi_assignment_expression`. It takes the introducers of an
-    // untyped local: annotations, `final`, then `def` or `var`, or
-    // `final` alone. Apache takes any modifiers, and annotations alone.
-    // Like a local here it does not take `static` and the rest, and it
-    // does not take annotations alone: in `@A (a, b) = …` the `(` would
-    // open the annotation's arguments or the names, a fork at every
-    // annotation with arguments where a statement starts.
+    // `multi_assignment_expression`. It takes annotations, then `def`,
+    // `final def`, `final var` or `final` alone. Apache takes any
+    // modifiers, and annotations alone. Like a local here it does not
+    // take `static` and the rest, and it does not take annotations
+    // alone: in `@A (a, b) = …` the `(` would open the annotation's
+    // arguments or the names, a fork at every annotation with arguments
+    // where a statement starts.
+    //
+    // Nor does it take `var` alone, which Groovy does. `var` is a
+    // keyword where a statement starts, so `var` used as a name there
+    // (`int var = (x)`, `var = (x)`) is an ERROR, and with a `(` valid
+    // after `var` the recovery from it resumes at that `(` and can turn
+    // the whole method into an ERROR.
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
-      choice(seq(optional('final'), choice('def', 'var')), 'final'),
+      choice(seq(optional('final'), 'def'), seq('final', optional('var'))),
       $._multi_assignment_names,
       '=',
       field('value', assignedValue($)),
@@ -1748,18 +1754,46 @@ module.exports = grammar({
 
     // Apache `typeNamePairs`. A typed name is a `variable_declarator`
     // with a `type` field, so that each name keeps its own type. A
-    // keyword before a name lexes as a type: `def (def a, b)`, which
-    // Groovy 3 rejects, has the type `def`.
+    // keyword before a name lexes as a type: `def (def a, b)` has the
+    // type `def`.
+    //
+    // Groovy 6 adds a rest binding, `def (a, *b) = list`, whose `*` is a
+    // token of its `variable_declarator`, and keyed pairs,
+    // `def (name: n, age: int a) = map`, whose key is a `key` field. A
+    // list holds names or keyed pairs, not both. Groovy accepts one rest
+    // binding per list; that is checked after parsing, here not at all.
     _multi_assignment_names: $ => {
       const declarator = choice(
         $.variable_declarator,
         alias($._typed_multi_assignment_declarator, $.variable_declarator),
+        alias($._rest_multi_assignment_declarator, $.variable_declarator),
       );
-      return seq('(', declarator, repeat(seq(',', declarator)), ')');
+      const keyed = alias($._keyed_multi_assignment_declarator, $.variable_declarator);
+      return seq(
+        '(',
+        choice(
+          seq(declarator, repeat(seq(',', declarator))),
+          seq(keyed, repeat(seq(',', keyed))),
+        ),
+        ')',
+      );
     },
 
     _typed_multi_assignment_declarator: $ => seq(
       field('type', $._type),
+      field('name', $.identifier),
+    ),
+
+    _rest_multi_assignment_declarator: $ => seq(
+      optional(field('type', $._type)),
+      '*',
+      field('name', $.identifier),
+    ),
+
+    _keyed_multi_assignment_declarator: $ => seq(
+      field('key', $.identifier),
+      ':',
+      optional(field('type', $._type)),
       field('name', $.identifier),
     ),
 
