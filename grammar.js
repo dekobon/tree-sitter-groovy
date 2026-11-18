@@ -174,6 +174,7 @@ function memberDeclarations($, constructor) {
     $.method_declaration,
     alias($._default_method_declaration, $.method_declaration),
     $.field_declaration,
+    alias($._multi_assignment_field, $.multi_assignment_declaration),
     ...(constructor ? [constructor] : []),
     $.static_initializer,
   ];
@@ -557,6 +558,11 @@ module.exports = grammar({
   conflicts: $ => [
     // `final def x` / `final x = 1` in a block vs. a modified member at top level.
     [$._modifier, $.local_variable_declaration],
+    // `final def (a, b) = …` takes the same fork at `final`: the
+    // multi-assignment shifts `def` with the local, so the fork is no
+    // wider. The second entry is the same fork at the start of a closure
+    // (see below).
+    [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration],
     // This array is the authoritative list; SPECIFICATION.md §7 is
     // the list predicted before the grammar existed.
     // (list_literal vs map_literal — tree-sitter resolves without
@@ -628,6 +634,8 @@ module.exports = grammar({
     // `{ final x -> }` vs. a body opening with a final local (#56) or
     // with a modified declaration; all three stay alive at `final`.
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
+    // `{ final def (a, b) = … }`: the same fork, no wider.
+    [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration, $.closure_parameter],
     // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
     // `{ def a, b -> }` vs. `{ def a, b }`. These two fork at every
     // `,` of a declaration that opens a closure or block, and both
@@ -887,7 +895,11 @@ module.exports = grammar({
     for_statement: $ => seq(
       'for',
       '(',
-      optional(field('init', choice($._expression, $.local_variable_declaration))),
+      optional(field('init', choice(
+        $._expression,
+        $.local_variable_declaration,
+        $.multi_assignment_declaration,
+      ))),
       ';',
       optional(field('condition', $._expression)),
       ';',
@@ -1705,16 +1717,50 @@ module.exports = grammar({
       optional(seq('=', field('value', assignedValue($)))),
     ),
 
-    // §4 — `def (a, b) = expr`. Closes murtaza64 #22. The form without
-    // `def` is `multi_assignment_expression`.
+    // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
+    // `typeNamePairs`. Closes murtaza64 #22. The form without `def` is
+    // `multi_assignment_expression`. It takes the introducers of an
+    // untyped local: annotations, `final`, then `def` or `var`, or
+    // `final` alone. Apache takes any modifiers, and annotations alone.
+    // Like a local here it does not take `static` and the rest, and it
+    // does not take annotations alone: in `@A (a, b) = …` the `(` would
+    // open the annotation's arguments or the names, a fork at every
+    // annotation with arguments where a statement starts.
     multi_assignment_declaration: $ => seq(
-      'def',
-      '(',
-      $.variable_declarator,
-      repeat(seq(',', $.variable_declarator)),
-      ')',
+      repeat($.annotation),
+      choice(seq(optional('final'), choice('def', 'var')), 'final'),
+      $._multi_assignment_names,
       '=',
       field('value', assignedValue($)),
+    ),
+
+    // The same in a type body, Apache `fieldDeclaration`, with the
+    // modifiers of a field. Groovy parses it and then drops it: it
+    // declares no field. `var` is not a keyword in a body (`var x = 1`
+    // there is a field of type `var`), so it does not start one.
+    _multi_assignment_field: $ => seq(
+      repeat($.annotation),
+      choice(seq(repeat($._modifier), 'def'), repeat1($._modifier)),
+      $._multi_assignment_names,
+      '=',
+      field('value', assignedValue($)),
+    ),
+
+    // Apache `typeNamePairs`. A typed name is a `variable_declarator`
+    // with a `type` field, so that each name keeps its own type. A
+    // keyword before a name lexes as a type: `def (def a, b)`, which
+    // Groovy 3 rejects, has the type `def`.
+    _multi_assignment_names: $ => {
+      const declarator = choice(
+        $.variable_declarator,
+        alias($._typed_multi_assignment_declarator, $.variable_declarator),
+      );
+      return seq('(', declarator, repeat(seq(',', declarator)), ')');
+    },
+
+    _typed_multi_assignment_declarator: $ => seq(
+      field('type', $._type),
+      field('name', $.identifier),
     ),
 
     // §4 / §10 row #37 — Jenkins-style `pipeline { … }` block.

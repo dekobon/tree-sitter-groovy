@@ -140,3 +140,11 @@ def v(String... rest) { }
 def f(def a, var b) { }
 //    ^ keyword
 //           ^ keyword
+
+final var (int a, String b) = pair()
+// <- keyword.modifier
+//    ^ keyword
+//         ^ type.builtin
+//             ^ variable
+//                ^ type
+//                       ^ variable

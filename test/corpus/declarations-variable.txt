@@ -123,6 +123,236 @@ def (a, b, c) = source
     value: (identifier)))
 
 ==================
+Multi-assignment with typed names
+==================
+
+def (int a, String b) = [1, 'x']
+def (int a, b) = list
+def (List<String> xs, Map.Entry e, int[] arr) = f()
+def (String s, n) = foo 1
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (string_literal)))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)))
+      name: (identifier))
+    (variable_declarator
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))
+      name: (identifier))
+    (variable_declarator
+      type: (array_type
+        (type_identifier))
+      name: (identifier))
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (command_chain
+      receiver: (identifier)
+      argument: (number_literal))))
+
+==================
+Multi-assignment with final, var and annotations
+==================
+
+final def (a, b) = list
+final (a, b) = list
+var (a, b) = list
+final var (int a, b) = list
+final(a, b) = list
+@Field def (a, b) = [1, 2]
+@Lazy final (int a, String b) = list
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (number_literal)))
+  (multi_assignment_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Typed and final multi-assignment in a method, a closure and a for init
+==================
+
+def m() {
+    foo()
+    final (int a, b) = [1, 2]
+}
+xs.each { var (String k, v) = it }
+for (def (int i, n) = [0, 5]; i < n; i++) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (multi_assignment_declaration
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (multi_assignment_declaration
+          (variable_declarator
+            type: (type_identifier)
+            name: (identifier))
+          (variable_declarator
+            name: (identifier))
+          value: (identifier)))))
+  (for_statement
+    init: (multi_assignment_declaration
+      (variable_declarator
+        type: (type_identifier)
+        name: (identifier))
+      (variable_declarator
+        name: (identifier))
+      value: (list_literal
+        (number_literal)
+        (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block)))
+
+==================
+Multi-assignment in a class body
+==================
+
+class C {
+    static final def (a, b) = [1, 2]
+    @Lazy private (int x, String y) = load()
+    def m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
 Multi-assignment without def (#94)
 ==================
 

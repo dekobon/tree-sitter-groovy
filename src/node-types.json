@@ -2183,6 +2183,10 @@
           "named": true
         },
         {
+          "type": "multi_assignment_declaration",
+          "named": true
+        },
+        {
           "type": "record_declaration",
           "named": true
         },
@@ -4022,6 +4026,10 @@
           "named": true
         },
         {
+          "type": "multi_assignment_declaration",
+          "named": true
+        },
+        {
           "type": "record_declaration",
           "named": true
         },
@@ -5290,6 +5298,10 @@
           },
           {
             "type": "method_reference_expression",
+            "named": true
+          },
+          {
+            "type": "multi_assignment_declaration",
             "named": true
           },
           {
@@ -9815,6 +9827,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "annotation",
+          "named": true
+        },
         {
           "type": "variable_declarator",
           "named": true
@@ -17918,6 +17934,28 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "generic_type",
+            "named": true
+          },
+          {
+            "type": "qualified_type",
+            "named": true
+          },
+          {
+            "type": "type_identifier",
             "named": true
           }
         ]
