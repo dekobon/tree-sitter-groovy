@@ -44,7 +44,7 @@ reasoning here.
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
-| §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new` or an array type value follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new` or an array type value, so `foo` followed by `new Bar()` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
+| §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new` or an array type value follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new` or an array type value, so `foo` followed by `new Bar()` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A keyword Groovy reserves is no receiver of a value (`def x = return 1`); `super`, `permits`, `pipeline` and `_` are. A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -1367,18 +1367,20 @@ The Groovy column was observed by running Groovy 3.
 | `"${foo 1}"`, `"v: ${sh script: 'x', returnStdout: true}"`, `"""${foo 'a', 2}"""`, `/${log.info 'x'}/` | a call | the `command_chain` is the interpolation's `value`; before, an `ERROR` |
 | `(foo) 1`, `(Foo) 'x'`, `(int) 1`, `(a) - 1`, `(a, b) = foo 1` | casts; a multi-assignment | the same, as before: the name is followed by `)` or `,` |
 | `"${foo} 1"`, `"$foo 1"`, `"${foo}1"` | the name, then the text | the same, as before |
-| `"${a; b}"`, `"${def x = 1}"`, `"${foo 1; 2}"`, `"${if (c) 1 else 2}"`; `"${-> x}"` | a closure, called; a closure | an `ERROR`, as before: an interpolation holds one expression |
+| `"${a; b}"`, `"${def x = 1}"`, `"${foo 1; 2}"`, `"${if (c) 1 else 2}"`, `"${return 1}"`, `"${throw new E()}"`; `"${-> x}"` | a closure, called; a closure | an `ERROR`, as before: an interpolation holds one expression, and statements in it are not parsed |
 | `(int 1)`, `(String 'x')` | calls of the methods `int` and `String` | the same |
 | `(foo` then `1)` on the next line | a call: inside parentheses Groovy's lexer drops line breaks | an `ERROR`, as before (spec §6.9) |
 | `(foo /* c */ 1)` | a call | an `ERROR`, as before (spec §6.14) |
 | `foo` then `(bar 1)` on the next line | `foo`, then the call | an `ERROR`, as before: a `(` on the next line continues the expression (§3) |
 | `(foo 1) 2` | `foo(1).call(2)` | the parenthesis, then `2`: a receiver is a name (spec §5.5 item 2); before, an `ERROR` |
-| `(return 1)`, `if (throw new Foo()) { }` | rejected | a call of a method named `return` (`throw`), as `def x = return 1` was before: the receiver of a value may be any name but `new`, `switch`, `true`, `false` and `null` |
+| `(return 1)`, `if (throw new Foo()) { }` | rejected | an `ERROR`: a keyword Groovy reserves is no receiver of a value (spec §6.14) |
+| `def x = return 1`, `x = class 'a'`, `v.w += if 1` | rejected | the declaration or assignment with the keyword as a name, then the argument as a statement; before, a call of a method named `return` (`class`, `if`). An argument that is no statement makes an `ERROR` (`x = throw 1, 2`) |
+| `def x = super.foo 1`, `def x = static.foo 1`, `def x = permits 'x'`, `e = pipeline 'x'`, `(_ 1)`, `(super 'a')` | calls (`static` before `.` is a name to Groovy) | the same, as before |
 | `def foo(bar 1)`, `def x (foo 1) { }` at script or block level | rejected | no `ERROR`: the declaration of `foo` (`x`), then the parenthesis as the next statement (§3), as `def foo(1)` before; before, a `method_declaration` with an `ERROR` in its parameters. In a class body it is an `ERROR`, as before |
 | `def f(Foo.Bar true)`, `final def g(int null)`, with no body | rejected | the declaration of `f` (`g`), then the parenthesis as the next statement; before, a `method_declaration` whose parameter is named `true` (`null`). With a body it is that `method_declaration`, as before |
 
-The last row is one of the two changes of a tree with no `ERROR`; the
-other is in the table below.
+The `def x = return 1` row and the last row are changes of a tree with
+no `ERROR`; the other is in the table below.
 
 **A first argument in parentheses.** Apache's `commandExpression` is
 `expression argumentList? commandArgument*`, and the first element of
@@ -1420,11 +1422,17 @@ steps with more than one stack version are unchanged.
 | `bar(foo 1) 2`, `void foo(bar 1) { }` | `bar(foo(1)).2`; `void.foo(bar(1, { }))` | the call, then `2` (spec §5.5 item 4); `void`, then the call `foo((bar 1) { })`; before, an `ERROR` |
 | `foo bar(baz true)`, `println this(it null)`, with no body | rejected, or after another name `foo.bar(baz(true))` | the statement `foo` (`println`), then the call; before, a method `bar` (`this`) with return type `foo` (`println`) and a parameter named `true` (`null`) |
 
-The last row is the other change of a tree with no `ERROR`. Of 120,000
-inputs a fuzzer built around parentheses, conditions, interpolations
-and calls with parentheses, and 120,000 it made by changing corpus
-inputs and lines of real files, every tree with no `ERROR` that
-changed is in one of the two rows, and none became an `ERROR`. No tree
-changed for the corpus, the highlight, tag and stress tests, or the
-real Groovy, Gradle and Jenkins files, except by error recovery in two
-corpus inputs and 41 Java files parsed as Groovy.
+The last row is the other change of a tree with no `ERROR`. Of
+120,000 inputs a fuzzer built around parentheses, conditions,
+interpolations and calls with parentheses, and 120,000 it made by
+changing corpus inputs and lines of real files, every tree with no
+`ERROR` that changed is one of the changes named here, and only the
+keyword rule made any an `ERROR`. A second fuzzer put
+each keyword of grammar.js and some names before a first argument, in
+every value position, in 80,000 inputs: every tree with no `ERROR` that
+the rule for keywords changed (10,891, of which 4,989 now hold an
+`ERROR`) has a keyword Groovy reserves as the receiver, and Groovy 3
+rejects each of 600 of them taken at random. No tree changed for the
+corpus, the highlight, tag and stress tests, or the real Groovy, Gradle
+and Jenkins files, except by error recovery in two corpus inputs and 41
+Java files parsed as Groovy.

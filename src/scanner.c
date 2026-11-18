@@ -536,12 +536,8 @@ static bool first_argument_follows(
                                no_close_ahead);
 }
 
-// Whether a word that `read_word` returned starts a value as a keyword,
-// so that it is no receiver there.
-static bool is_value_keyword(const char *word, unsigned len) {
-    return word_is(word, len, "new") || word_is(word, len, "switch")
-        || is_literal_word(word, len);
-}
+// Defined after is_grammar_keyword, which it calls.
+static bool is_value_keyword(const char *word, unsigned len, int32_t next);
 
 // SPECIFICATION.md §6.14 — whether a parenthesis-free call in
 // parentheses starts here, as the first argument of another one:
@@ -563,11 +559,11 @@ static bool parenthesized_command_follows(
         || !is_identifier_start(lexer->lookahead)) {
         return false;
     }
-    char word[sizeof "switch"];
+    char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
     int32_t last_name = 0;
     bool nested = false;
-    return !is_value_keyword(word, len)
+    return !is_value_keyword(word, len, lexer->lookahead)
         && read_member_accesses(lexer, &last_name, &nested)
         && first_argument_follows(lexer, false, no_close_ahead);
 }
@@ -607,9 +603,9 @@ static bool scan_value_start(
         return true;
     }
     bool capitalized = is_capital(lexer->lookahead);
-    char word[sizeof "boolean"];
+    char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
-    if (is_value_keyword(word, len)) {
+    if (is_value_keyword(word, len, lexer->lookahead)) {
         return false;
     }
     bool accesses = is_member_access_start(lexer->lookahead);
@@ -1286,6 +1282,24 @@ static bool is_grammar_keyword(const char *word, unsigned len) {
         default:
             return false;
     }
+}
+
+// Whether a word that `read_word` returned, with `next` the character
+// after it, is a keyword that cannot be the first name of a value's
+// receiver: a keyword of grammar.js that Groovy reserves, among them the
+// words that start a value as keywords (`new`, `switch`, `true`, `false`,
+// `null`). Groovy calls no method named `return` in `def x = return 1`,
+// and reads the braces of an interpolation that holds one as a closure
+// with a statement. It takes `super`, `permits`, `pipeline` and `_` as
+// names, and `static` before a `.` (Apache `pathExpression`), so
+// `def x = super.foo 1` and `def x = static.foo 1` are calls.
+static bool is_value_keyword(const char *word, unsigned len, int32_t next) {
+    if (word_is(word, len, "static")) {
+        return next != '.';
+    }
+    return is_grammar_keyword(word, len) && !word_is(word, len, "super")
+        && !word_is(word, len, "permits") && !word_is(word, len, "pipeline")
+        && !word_is(word, len, "_");
 }
 
 // Whether the first argument of a statement's parenthesis-free call that

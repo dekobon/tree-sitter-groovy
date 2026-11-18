@@ -2147,6 +2147,101 @@ return println(foo 1)
         argument: (number_literal)))))
 
 ==================
+A keyword Groovy reserves is not the receiver of a command chain value
+==================
+
+def a = return 1
+def b = super.foo 1
+def c = static.foo 'x'
+def d = permits 'x'
+e = pipeline 'x'
+f = (super.foo 1)
+g = (_ 1)
+h = "${this.foo 1}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (string_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (field_access
+            object: (identifier)
+            field: (identifier))
+          argument: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (number_literal)))))))
+
+==================
+A return statement in an interpolation is unsupported
+:error
+==================
+
+def a = "${return 1}"
+
+---
+
+==================
+A throw statement in an interpolation is unsupported
+:error
+==================
+
+def a = "${throw new E()}"
+
+---
+
+==================
 Command chain with a dotted receiver (#52)
 ==================
 

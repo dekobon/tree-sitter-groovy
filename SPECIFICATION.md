@@ -627,10 +627,13 @@ The resolution we adopt:
    and taken by Groovy (observed with Groovy 3): a call whose argument
    in parentheses has such an argument itself (`println(bar(foo 1))`),
    as the scanner looks into one parenthesis only (§6.14); and more
-   than one statement, a declaration or a closure's parameters in an
-   interpolation (`"${a; b}"`, `"${def x = 1}"`, `"${-> x}"`). Each is
-   an `ERROR`. Nor is a first argument on the
-   line after the receiver inside parentheses, `(foo` followed by `1)`,
+   than one statement, a declaration, another statement that is no
+   expression or a closure's parameters in an interpolation
+   (`"${a; b}"`, `"${def x = 1}"`, `"${return 1}"`, `"${-> x}"`). Each
+   is an `ERROR`. A keyword Groovy reserves is no receiver of a value
+   (§6.14): `"${return 1}"` is no call of `return`. Nor is a first
+   argument on the line after the receiver inside parentheses, `(foo`
+   followed by `1)`,
    which Groovy reads as a call because its lexer drops line breaks
    inside parentheses: the scanner tracks no brackets (§6.9), so this
    is an `ERROR`, as before. Nor is a lambda body, which the
@@ -1648,8 +1651,7 @@ must already have made `println` the receiver or an expression.
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
   - after whitespace, line breaks and line escapes (a value may start
     on the line after its `=`), a name starts, read as in §6.8; and
-  - the name is not `new`, `switch`, `true`, `false` or `null`, which
-    start a value as keywords; and
+  - the name is not a value keyword, as below; and
   - any member accesses follow it, as below; and
   - the first argument follows, as below.
 The token ends before the name.
@@ -1676,6 +1678,10 @@ when:
     as below.
 The token ends before the name.
 
+A value keyword: a keyword of grammar.js that Groovy reserves, which
+includes `new`, `switch`, `true`, `false` and `null`, the words that
+start a value as keywords. `super`, `permits`, `pipeline` and `_` are
+names to Groovy and are none, and so is `static` before a `.`.
 Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
 a name, with no space anywhere.
 The first argument: after spaces, tabs and line escapes, but no line
@@ -1684,9 +1690,9 @@ break and no comment, a digit, `'`, `"`, the word `true`, `false` or
 the same line by `:` and not `::`, other than `case` and `default`
 (§6.8), or a call in parentheses.
 A call in parentheses: `(`, then Groovy's trivia, then a name that is
-not `new`, `switch`, `true`, `false` or `null`, its member accesses as
-above and a first argument other than a call in parentheses, as
-COMMAND_VALUE_START reads them after the `(`.
+no value keyword, its member accesses as above and a first argument
+other than a call in parentheses, as COMMAND_VALUE_START reads them
+after the `(`.
 A creation: the word `new`, then, after Groovy's trivia (whitespace,
 line breaks, line escapes and comments), a name. The key `new:` is
 not one.
@@ -1740,6 +1746,19 @@ with no `ERROR` changes: a method header with no body whose parameter is
 named `true`, `false` or `null`, which Groovy rejects. `foo bar(baz true)`
 was the method `bar` with return type `foo`, and is now the statement
 `foo` and the call `bar(baz true)`.
+
+A keyword that Groovy reserves is no receiver of a value: with
+`def x = return 1` Groovy calls nothing, and it reads `"${return 1}"`
+and `"${throw new E()}"` as statements, which an interpolation here
+does not hold (§5.5 item 1). The receiver of a value was any name but
+`new`, `switch`, `true`, `false` and `null` before; `def x = return 1`
+was a call of `return` and is now the declaration of `x` with the value
+`return` (a name to the in-grammar lexer, as no keyword is valid there)
+and the statement `1`, and `x = throw 1, 2` is an `ERROR`. Groovy
+rejects each such input (observed with Groovy 3 on 600 of them that a
+fuzzer changed). The names Groovy takes stay receivers:
+`def x = super.foo 1`, `def x = static.foo 1`, `(permits 'x')`,
+`def x = pipeline 'x'`, `(_ 1)`.
 
 COMMAND_PATH_START makes the scanner read on after a statement's first
 name only when a member access follows it directly. Those statements
