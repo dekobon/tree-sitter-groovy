@@ -5593,8 +5593,12 @@
           ]
         },
         {
-          "type": "STRING",
-          "value": "*"
+          "type": "FIELD",
+          "name": "rest",
+          "content": {
+            "type": "STRING",
+            "value": "*"
+          }
         },
         {
           "type": "FIELD",

@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final` and `final var` (`final (int a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body. Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by `var` alone (`var (a, b) = …`, which Groovy accepts; it waits for `var` to be usable as a name, see SPECIFICATION.md §4), by annotations alone (`@A (a, b) = …`), by modifiers other than `final` where a statement starts (`static def (a, b) = …`) or by `var` in a type body. Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final` and `final var` (`final (int a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body. Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by `var` alone (`var (a, b) = …`, which Groovy accepts; it waits for `var` to be usable as a name, see SPECIFICATION.md §4, which also covers the error recovery that `final var (a, b)` still disturbs), by annotations alone (`@A (a, b) = …`), by modifiers other than `final` where a statement starts (`static def (a, b) = …`) or by `var` in a type body. Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -787,6 +787,29 @@ line, below every other complete reading when it is not.
 
 At v0.5.0 the two readings were unranked and the stack order decided:
 `x = (a)` followed by `foo()` was a cast of the call.
+
+A multi-assignment declaration on the next line is a case where only
+one reading used to be complete. After a line that ends in a
+parenthesized name, dotted name or primitive type (`def y = (x)`,
+`x = (b)`, `(b)`, `return (x)`, `assert (x)`, `(Foo.Bar)`, `(int)`),
+with blank lines and comments allowed between, these were read with
+no `ERROR` as the operand of the cast, a call of a method named
+`final`, `def`, `private` and so on, assigned the value
+(`(x) final(a, b) = m`):
+
+- a declaration that starts with `final` (`final (a, b) = m`; in
+  `final def (a, b) = m` the operand was `final` alone);
+- a declaration with a rest binding or keyed pairs
+  (`def (h, *t) = l`, `def (k: v) = m`);
+- in a type body, a multi-assignment member after a field
+  (`def (a, b) = m`, `private (a, b) = m`).
+
+Now that the declaration parses, it is the second statement or member,
+as in Groovy 3 for the forms it knows. `def (a, b) = l` at a statement
+start was already two statements. After a parenthesized generic type
+the cast stays the only reading here: `def y = (List<String>)` then
+`def (a, *b) = l`, or `def (a, b) = l`, is
+`(List<String>) def(a, *b) = l`, where Groovy 3 reads two statements.
 
 **Action**: a scanner that tracks bracket depth, which would also give
 the grammar a statement terminator where a line break is significant

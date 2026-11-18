@@ -380,6 +380,35 @@ final (*init, last) = list
     value: (identifier)))
 
 ==================
+Multi-assignment rest binding keeps its star in the declarator
+:cst
+==================
+
+def (h, List<Integer> *t) = l
+
+---
+
+1:0  - 2:0    source_file
+1:0  - 1:29     multi_assignment_declaration
+1:0  - 1:3        "def"
+1:4  - 1:5        "("
+1:5  - 1:6        variable_declarator
+1:5  - 1:6          name: identifier `h`
+1:6  - 1:7        ","
+1:8  - 1:24       variable_declarator
+1:8  - 1:21         type: generic_type
+1:8  - 1:12           base: type_identifier `List`
+1:12 - 1:21           arguments: type_arguments
+1:12 - 1:13             "<"
+1:13 - 1:20             type_identifier `Integer`
+1:20 - 1:21             ">"
+1:22 - 1:23         "*"
+1:23 - 1:24         name: identifier `t`
+1:24 - 1:25       ")"
+1:26 - 1:27       "="
+1:28 - 1:29       value: identifier `l`
+
+==================
 Multi-assignment with keyed pairs (Groovy 6)
 ==================
 
@@ -406,6 +435,68 @@ final (x: px, y: py) = point
       key: (identifier)
       name: (identifier))
     value: (identifier)))
+
+==================
+Multi-assignment declaration after a parenthesized name at the end of a line
+==================
+
+def y = (x)
+def (h, *t) = l
+x = (b)
+final (a, b) = m
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_expression
+        (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment member after a field ending in a parenthesized name
+==================
+
+class C {
+    def y = (x)
+    private (a, b) = m
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier)))))
 
 ==================
 Multi-assignment reads a keyword before a name as its type

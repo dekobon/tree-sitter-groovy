@@ -1731,7 +1731,9 @@ module.exports = grammar({
     // keyword where a statement starts, so `var` used as a name there
     // (`int var = (x)`, `var = (x)`) is an ERROR, and with a `(` valid
     // after `var` the recovery from it resumes at that `(` and can turn
-    // the whole method into an ERROR.
+    // the whole method into an ERROR. `final var (` is still taken, so
+    // that happens after `final` (`final var = (1)`) until `var` is
+    // accepted as a name.
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
       choice(seq(optional('final'), 'def'), seq('final', optional('var'))),
@@ -1757,8 +1759,8 @@ module.exports = grammar({
     // keyword before a name lexes as a type: `def (def a, b)` has the
     // type `def`.
     //
-    // Groovy 6 adds a rest binding, `def (a, *b) = list`, whose `*` is a
-    // token of its `variable_declarator`, and keyed pairs,
+    // Groovy 6 adds a rest binding, `def (a, *b) = list`, whose `*` is
+    // the `rest` field of its `variable_declarator`, and keyed pairs,
     // `def (name: n, age: int a) = map`, whose key is a `key` field. A
     // list holds names or keyed pairs, not both. Groovy accepts one rest
     // binding per list; that is checked after parsing, here not at all.
@@ -1786,7 +1788,7 @@ module.exports = grammar({
 
     _rest_multi_assignment_declarator: $ => seq(
       optional(field('type', $._type)),
-      '*',
+      field('rest', '*'),
       field('name', $.identifier),
     ),
 
