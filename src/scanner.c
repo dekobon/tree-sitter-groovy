@@ -866,24 +866,45 @@ static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
         || word_is(word, len, "enum");
 }
 
+// SPECIFICATION.md §6.16 — whether `instanceof` and a type follow, read
+// from here: a name's test. Groovy never takes `instanceof` as a name, so
+// `var instanceof T` and `yield instanceof T` test the word before it.
+// Where no type follows (`var instanceof = 1`, which Groovy rejects), the
+// word before it keeps the reading it had when it was always a keyword.
+static bool instanceof_test_follows(TSLexer *lexer, bool no_close_ahead) {
+    return consume_keyword(lexer, "instanceof")
+        && skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        && is_identifier_start(lexer->lookahead);
+}
+
 // SPECIFICATION.md §6.16 — whether an expression starts here, after
 // Groovy's trivia, line breaks and comments included: what `yield` and
 // `in` need after them to be keywords. The characters are those an
-// expression of the grammar can start with. `!`, `+` and `-` start one
-// unless they are `!=`, `+=`, `-=` or `->`. `++` and `--` start one only
-// when an operand follows them, so `in++` and `yield++` update a name;
-// they are read in a loop, not by recursion, which a long run of them
-// would turn into a deep stack. `()` starts none, so `yield()` is a call.
-// A `/` starts a slashy string unless a space or `=` follows it.
+// expression of the grammar can start with, except that `instanceof` or
+// `!instanceof` with a type after it tests the word before it. `!`, `+`
+// and `-` start one unless they are `!=`, `+=`, `-=` or `->`. `++` and
+// `--` start one only when an operand follows them on their line, so
+// `in++` and `yield++` update a name, also when `foo()` follows on the
+// next line, as in Groovy; they are read in a loop, not by recursion,
+// which a long run of them would turn into a deep stack. `()` starts
+// none, so `yield()` is a call. A `/` starts a slashy string unless a
+// space, `=` or a second `/` (a line comment, read on the line of a `++`)
+// follows it.
 static bool expression_follows(TSLexer *lexer, bool no_close_ahead) {
+    bool same_line = false;
     for (;;) {
         bool slash = false;
-        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)) {
+        if (!skip_header_trivia(lexer, !same_line, no_close_ahead, NULL,
+                                &slash)) {
             return false;
         }
         int32_t c = lexer->lookahead;
         if (slash) {
-            return !lexer->eof(lexer) && !is_whitespace(c) && c != '=';
+            return !lexer->eof(lexer) && !is_whitespace(c) && c != '='
+                && c != '/';
+        }
+        if (c == 'i') {
+            return !instanceof_test_follows(lexer, no_close_ahead);
         }
         if (is_identifier_start(c) || (c >= '0' && c <= '9') || c == '\''
             || c == '"' || c == '[' || c == '{' || c == '~') {
@@ -898,12 +919,22 @@ static bool expression_follows(TSLexer *lexer, bool no_close_ahead) {
                 || lexer->lookahead != ')';
         }
         if (c == '!') {
+            // `!instanceof` is one operator only before whitespace, as the
+            // grammar's token is (GroovyLexer.g4 `NOT_INSTANCEOF`).
+            if (lexer->lookahead == 'i') {
+                return !consume_keyword(lexer, "instanceof")
+                    || !is_whitespace(lexer->lookahead)
+                    || !skip_header_trivia(lexer, true, no_close_ahead, NULL,
+                                           NULL)
+                    || !is_identifier_start(lexer->lookahead);
+            }
             return lexer->lookahead != '=';
         }
         if (lexer->lookahead != c) {
             return lexer->lookahead != '=' && lexer->lookahead != '>';
         }
         advance(lexer);
+        same_line = true;
     }
 }
 
@@ -946,10 +977,11 @@ static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
 
 // SPECIFICATION.md §6.16 — `var` declares the name that follows it, on
 // the line or a later one (`var x = 1`, `def f(var x)`), as it did when
-// the word was always a keyword. Before `(` it opens a multi-assignment:
-// where `var` alone may open one (VAR_NAMES_KEYWORD valid), only when
-// the names, `)` and `=` follow; after `final`, always. Anywhere else the
-// word is a name.
+// the word was always a keyword. `var instanceof T` tests `var`, as in
+// Groovy (`instanceof_test_follows`). Before `(` it opens a
+// multi-assignment: where `var` alone may open one (VAR_NAMES_KEYWORD
+// valid), only when the names, `)` and `=` follow; after `final`, always.
+// Anywhere else the word is a name.
 static bool scan_var(
     TSLexer *lexer,
     const bool *valid_symbols,
@@ -959,6 +991,10 @@ static bool scan_var(
         return false;
     }
     if (is_identifier_start(lexer->lookahead)) {
+        if (lexer->lookahead == 'i'
+            && instanceof_test_follows(lexer, no_close_ahead)) {
+            return false;
+        }
         lexer->result_symbol = VAR_KEYWORD;
         return valid_symbols[VAR_KEYWORD];
     }

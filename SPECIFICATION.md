@@ -1760,16 +1760,20 @@ The scanner now makes each choice from what follows the word.
 On the word `var`, `yield`, `in` or `as`, not followed by an
 identifier character, where its token is valid, look past any mix of
 spaces, tabs, line escapes, line breaks, block and line comments:
-  VAR_KEYWORD        a name follows; or `(` follows where VAR_NAMES_KEYWORD
-                     is not valid (after `final`, in a parameter).
+  VAR_KEYWORD        a name follows, other than `instanceof` followed by
+                     a type; or `(` follows where VAR_NAMES_KEYWORD is
+                     not valid (after `final`, in a parameter).
   VAR_NAMES_KEYWORD  `(` follows, then only names, `,`, `*`, `:`, `.`,
                      `<`, `>`, `?`, `[`, `]` and trivia up to `)`, then
                      `=` that is not `==` or `=~`.
-  YIELD_KEYWORD,     an expression starts: a name, a digit, a quote,
-  IN_KEYWORD         `[`, `{` or `~`; `(` unless `)` follows it; `!`
-                     unless `=` follows it; `+` or `-` unless `=` or `>`
-                     follows it, and `++` or `--` only when an
-                     expression starts after it; `/` (a slashy string)
+  YIELD_KEYWORD,     an expression starts: a name other than
+  IN_KEYWORD         `instanceof` followed by a type, a digit, a quote,
+                     `[`, `{` or `~`; `(` unless `)` follows it; `!`
+                     unless `=` or `instanceof`, whitespace and a type
+                     follow it; `+` or `-` unless `=` or `>` follows it,
+                     and `++` or `--` only when an expression starts
+                     after it on its line (spaces, tabs, line escapes
+                     and block comments only); `/` (a slashy string)
                      unless a space or `=` follows it.
   AS_KEYWORD         a name, the start of a type, follows.
 Each token is the word alone; the look-ahead is not kept. On any other
@@ -1811,11 +1815,30 @@ a name:
   `yield_statement`s, as before; Groovy calls, subtracts from or
   indexes a variable named `yield` there (observed with Groovy 3, in
   which `yield` is no keyword).
-- `var` before any name is the keyword, `in`, `as` and `instanceof`
-  included. `var in xs` is the declaration of `in` followed by `xs`;
-  Groovy declares `xs` with the type `in` (observed). `var instanceof T`
-  is a declaration of `instanceof` followed by `T`, where Groovy tests
-  `var` (observed).
+- `var` before any name is the keyword, `in` and `as` included.
+  `var in xs` is the declaration of `in` followed by `xs`; Groovy
+  declares `xs` with the type `in` (observed).
+
+`instanceof` is never a name in Groovy, so `instanceof` or
+`!instanceof` followed by a type makes the word before it a name that
+is tested: `var instanceof T`, `yield instanceof T`,
+`yield !instanceof T`, and `in instanceof T` on the line after an
+expression, as in Groovy (observed with Groovy 3). The type may be on
+the next line, as Groovy allows. Where no type follows, the word keeps
+its reading: `var instanceof = 1`, which Groovy rejects, is still a
+declaration of `instanceof`; taking the word as a name there would
+turn that tree into an `ERROR`.
+
+`in++` and `yield++` update a name. After `++` or `--` the look-ahead
+stays on the line, so the operator is the name's postfix update when
+the line ends after it: `yield++` followed by `foo()` on the next line,
+and `x = 1` then `in++` then `foo()`, are separate statements, as in
+Groovy (observed). With an operand after it on its line the word is
+the keyword: `x in ++y` and `yield ++y` are a membership test and a
+`yield_statement`, the second where Groovy calls `(yield++)` with `y`
+(observed). A line break between the word and `++` is crossed, so
+`a in` followed by `++b` on the next line is `a in ++b`, as in Groovy
+(observed).
 
 In a type body `var` before a name is not a keyword, so `var x = 1`
 there is a field of type `var`, as before; Groovy reads `var` as a
@@ -1851,15 +1874,23 @@ Known residuals, each an `ERROR` as before:
   parses, as `as` before `(` is a name.
 - `final var(x) { }`, a script method named `var` with the modifier
   `final` alone, which Groovy declares (observed).
+- A typed loop variable named `in` or `as` with the `in` form,
+  `for (String in in xs)` and `for (int as in xs)`, which Groovy takes
+  (observed). After `String`, which a classic `for` may also read as
+  an expression, the first `in` is the operator because a name follows
+  it. The `:` form parses.
+- `yield(1, 2)`, which Groovy calls (observed): before `(` the word is
+  the keyword unless `)` follows, so it is a `yield_statement` with an
+  `ERROR` in its parentheses.
 
 `println var` is two statements, as `println x` is: a name is not the
 first argument of a parenthesis-free call (§5.5).
 
-Two kinds of tree change for input that parsed without an `ERROR`,
-both found by fuzzing the grammar before against this one and both
-checked mechanically on every case found: in each, the new tree is
-the one the old grammar gave the same input with an ordinary name, or
-with `def`, in place of the word.
+Four kinds of tree change for input that parsed without an `ERROR`,
+found by fuzzing the grammar before against this one and checked
+mechanically on every case found: in each, the new tree is the one
+the old grammar gave the same input with an ordinary name, or with
+`def`, in place of the word.
 
 - Where two readings fork, one could die at the word because it was a
   keyword there, and the other then won. Now both live and the dynamic
@@ -1873,14 +1904,48 @@ with `def`, in place of the word.
   name, `x = (b)` then `var (a, b) = l`, was the cast `(b)` of the call
   `var(a, b)`, assigned `l`. It is now two statements, as with
   `final` (§4), and as in Groovy (observed).
+- `var instanceof T`, `yield instanceof T`, `yield !instanceof T` and,
+  after an expression, `in instanceof T` and `in !instanceof T` were a
+  declaration of `instanceof`, a `yield_statement` or a membership
+  test, followed by `T`. Each is now the test of the word.
+- `yield++` or `yield--`, and `in++` or `in--` after an expression,
+  at the end of a line before an expression on the next (`yield++`
+  then `foo()`) were a `yield_statement` or a membership test of a
+  prefix update. Each is now the postfix update of the name, and the
+  next line a statement of its own.
+
+The last two kinds can turn a tree without an `ERROR` into one with
+an `ERROR`, the `ERROR` an ordinary name gets in the same place. After
+`yield++` the next line is read as a statement, so a line this grammar
+does not take there is now an `ERROR`: `yield++` followed by
+`private int f` or `static count`, a local with a modifier, which
+Groovy declares, was `yield ++private` and `int f`. And `instanceof`
+followed by a word reads as a test even where Groovy rejects it as
+anything: `@A` followed by `var instanceof T`, `var instanceof new
+Foo()`.
+
+An incremental reparse can differ from a parse from scratch, as in
+§6.6. Whether the word is a keyword depends on what follows it, but a
+finished node that ends before the word is reused when an edit changes
+only those later bytes. `x = a` followed by `in = 1` on the next line
+is an assignment and a second statement; editing the second line to
+`in y = 12` makes the text, parsed from scratch, the assignment
+`x = ((a in y) = 12)`, while a reparse keeps `x = a` and reads the
+declaration `in y = 12`. Both trees have no `ERROR`. In the same way
+`import a.B` followed by `as = C`, edited to `as l= Cx`, keeps the
+import without an alias on reparse. The runtime counts the scanner's
+look-ahead past the word against the word's own token only, so no
+token the scanner emits can mark the node before it; the next edit
+inside that node corrects it.
 
 Measured against the grammar before: STATE_COUNT 4179 to 4249,
 LARGE_STATE_COUNT 1555 to 1565, six external tokens and no conflict
 or precedence added, and the same number of parse steps and of steps
 with more than one stack version on real files. Real Groovy and
-Gradle files and Java files parse about 0.8% slower in wall-clock
-time with 0.2% and 0.1% more instructions, code dense with `as` and
-`in` about 2% slower, and code dense with `var` about 2% faster.
+Gradle files and Java files take about 0.1% to 0.2% more instructions
+(about 0.8% in wall-clock time, near the noise of a second build of
+the same grammar). Code dense with `as`, `in`, `var` or `yield` parses
+within about 2% of before, faster or slower depending on the code.
 
 ---
 

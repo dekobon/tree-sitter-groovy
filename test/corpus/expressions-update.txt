@@ -95,3 +95,41 @@ f(i++)
       arguments: (argument_list
         (update_expression
           operand: (identifier))))))
+
+==================
+yield++ and in++ at the end of a line update the name
+==================
+
+yield++
+foo()
+x = 1
+in++
+foo()
+x in ++y
+
+---
+
+(source_file
+  (expression_statement
+    (update_expression
+      operand: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (update_expression
+      operand: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (unary_update_expression
+        operand: (identifier)))))

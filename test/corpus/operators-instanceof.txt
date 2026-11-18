@@ -107,3 +107,35 @@ x
   (expression_statement
     (unary_expression
       operand: (identifier))))
+
+==================
+instanceof after var, yield and in tests the name
+==================
+
+var instanceof T
+yield instanceof T
+yield !instanceof T
+x
+in instanceof T
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier))))

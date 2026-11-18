@@ -1221,23 +1221,31 @@ and later is read off `GroovyParser.g4`.
 | `return var` then `x = 1` on the next line | `return var`, then an assignment | `return`, then a declaration of `x` | the same as before |
 | `yield x`, `yield (x)`, `yield -1`, `yield [1]` outside a switch expression | a call, a call, a subtraction, an index (Groovy 4 and later: the same, read off the `.g4`) | `yield_statement` | the same as before |
 | `var in xs`, `var as T` | a declaration of `xs` of type `in` (`T` of type `as`) | a declaration of `in` (`as`), then `xs` (`T`) | the same as before |
-| `var instanceof T` | `var instanceof T` | a declaration of `instanceof`, then `T` | the same as before |
+| `var instanceof T`, `yield instanceof T`, `yield !instanceof T`; `x` then `in instanceof T` on the next line | a test of `var`, `yield`, `in` | a declaration of `instanceof`, a `yield_statement`, a membership test, each followed by `T` | a test of the name |
+| `var instanceof = 1` | rejected | a declaration of `instanceof` | the same as before: no type follows `instanceof` |
+| `yield++` then `foo()` on the next line; `x = 1`, then `in++`, then `foo()` | updates of the name, then a call | `yield ++foo()`; `x = 1 in ++foo()` | the update, then the call |
+| `x in ++y`, `a in` then `++b` on the next line | a membership test of `++y`, `++b` | the same | the same |
+| `yield ++y` | `(yield++)` called with `y` | `yield_statement` | the same as before |
+| `for (String in in xs)`, `for (int as in xs)` | loops over `in`, `as` | `ERROR` | `ERROR`: the first `in` is the operator, as a name follows it |
+| `yield(1, 2)` | a call | `ERROR` | `ERROR`: before `(` the word is the keyword |
 | `for (var in xs)` | a loop over `var` | `ERROR` | `ERROR`: `var` before a name is the keyword |
 | `int in(int x) { x }` where a statement starts | a method | `ERROR` | `ERROR`: before `(` the word is the operator, as in `a in (b)` |
 | `final var(x) { }` in a script | a method `var` | `ERROR` | `ERROR`: after `final`, `var (` is the keyword |
 | `x = (b)` then `in` on the next line | two statements | a cast of `in` | two statements |
 | `def y = (x)` then `var (a, b) = l` on the next line | two statements | a cast of the call `var(a, b)`, assigned | two statements |
 
-The last two rows changed trees that had no `ERROR`. Spec §6.16
-describes both kinds: where the old keyword ended one of two
-readings, the new tree is the one an ordinary name gets; and a
-multi-assignment opened by `var` alone reads as the one opened by
-`def`.
+The last two rows, the `instanceof` row and the `++` row changed trees
+that had no `ERROR`. Spec §6.16 describes the kinds: where the old
+keyword ended one of two readings, the new tree is the one an ordinary
+name gets; a multi-assignment opened by `var` alone reads as the one
+opened by `def`; and `instanceof` with a type, or a line break after
+`++` or `--`, makes the word the name it is in Groovy.
 
-**Action**: none planned. `for (var in xs)` needs the scanner to know
-it is in a `for` header, and taking `var` as a name before `in`, `as`
-and `instanceof` everywhere would change the trees of `var in xs`,
-`var as T` and `var instanceof T`, which parse without an `ERROR`. A
+**Action**: none planned. `for (var in xs)` and `for (String in in xs)`
+need the scanner to know it is in a `for` header, and taking `var` as
+a name before `in` and `as` everywhere would change the trees of
+`var in xs` and `var as T`, which parse without an `ERROR` and which
+Groovy declares too. A
 method named `in` with a return type would need the operator to look
 past the parentheses to a body, where `a in (b) { … }` is a membership
 test of a call with a closure in Groovy too.
