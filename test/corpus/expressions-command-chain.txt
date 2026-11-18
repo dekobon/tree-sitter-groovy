@@ -2224,6 +2224,77 @@ h = "${this.foo 1}"
             argument: (number_literal)))))))
 
 ==================
+Keywords Groovy takes as names before a command chain in parentheses
+==================
+
+class A extends B {
+  A() { super(foo 1) }
+  A(int x) { this(foo x: 1) }
+}
+permits(foo 1)
+pipeline(foo 1)
+_(foo 1)
+super new Foo()
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (command_chain
+            receiver: (identifier)
+            argument: (parenthesized_expression
+              (command_chain
+                receiver: (identifier)
+                argument: (number_literal))))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (command_chain
+            receiver: (identifier)
+            argument: (parenthesized_expression
+              (command_chain
+                receiver: (identifier)
+                argument: (named_argument
+                  key: (identifier)
+                  value: (number_literal)))))))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
 A return statement in an interpolation is unsupported
 :error
 ==================

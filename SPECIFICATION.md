@@ -1669,8 +1669,9 @@ The token ends after the name.
 Emit COMMAND_STATEMENT_START, empty, where a statement may start,
 when:
   - after whitespace, line breaks and line escapes, a name starts that
-    is not a keyword of grammar.js, and no member access follows it;
-    and
+    is not a keyword of grammar.js, or is one that is no value keyword
+    and that a call in parentheses follows (`super(foo 1)`), and no
+    member access follows it; and
   - not: the name is `record`, `trait`, `sealed`, `var`, `yield`, `in`
     or `as` and its own token (§6.7, §6.13, §6.16) is valid there; the
     scanner decides that token instead; and
@@ -1758,7 +1759,11 @@ and the statement `1`, and `x = throw 1, 2` is an `ERROR`. Groovy
 rejects each such input (observed with Groovy 3 on 600 of them that a
 fuzzer changed). The names Groovy takes stay receivers:
 `def x = super.foo 1`, `def x = static.foo 1`, `(permits 'x')`,
-`def x = pipeline 'x'`, `(_ 1)`.
+`def x = pipeline 'x'`, `(_ 1)`. At the start of a statement those
+names are receivers only before a call in parentheses, where the
+statement form has no other reading: `super(foo 1)` in a constructor
+is a call, as `this(foo 1)` is, and `super new Foo()` stays `super`
+and the creation (§5.5 item 3).
 
 COMMAND_PATH_START makes the scanner read on after a statement's first
 name only when a member access follows it directly. Those statements
@@ -1791,8 +1796,12 @@ branches decide them where no statement may start. A keyword of
 grammar.js is turned down as soon as it is read, because after the
 token the parser takes only a name, and the in-grammar lexer would read
 `return` in `return new Foo()` as one; a test compares the scanner's
-words with `src/grammar.json`. A statement may also follow a bare
-`return`, `break` or `continue`, and `final Type`, which declares
+words with `src/grammar.json`. The keywords that are names to Groovy,
+`super`, `permits`, `pipeline` and `_`, are read on when a call in
+parentheses follows them: `super(foo 1)` in a constructor is a call,
+while `super new Foo()` stays `super` and the creation, as before. A
+statement may also follow a bare `return`, `break` or `continue`, and
+`final Type`, which declares
 `Type`, so the token is valid after each, and each takes it before its
 operand or name: `return foo new Foo()` returns `foo`, as
 `return foo 1` does, and `final String s new Foo()` declares `s`.

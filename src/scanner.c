@@ -1368,10 +1368,19 @@ static bool scan_statement_start(
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
     }
-    // No keyword is a receiver or the element type of an array type, so
-    // the look-ahead past one would decide nothing.
+    // A keyword is no receiver or element type of an array type, so the
+    // look-ahead past one would decide nothing, except before a call in
+    // parentheses for the keywords Groovy takes as names: `super(foo 1)` in
+    // a constructor calls, as `this(foo 1)` does. Before `new` or an array
+    // type value they stay the name and then the argument.
     if (is_grammar_keyword(word, len)) {
-        return false;
+        if (is_value_keyword(word, len, lexer->lookahead)
+            || !skip_same_line_space(lexer, false) || lexer->lookahead != '('
+            || !parenthesized_command_follows(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = COMMAND_STATEMENT_START;
+        return true;
     }
     if (lexer->lookahead == '.') {
         // A dotted receiver is decided after the first name.
