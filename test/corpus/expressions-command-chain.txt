@@ -2295,6 +2295,26 @@ super new Foo()
       arguments: (argument_list))))
 
 ==================
+Command chain in parentheses inside the parentheses of a call is unsupported (known divergence)
+==================
+
+println(bar(foo 1))
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (ERROR
+              (number_literal))))))))
+
+==================
 A return statement in an interpolation is unsupported
 :error
 ==================

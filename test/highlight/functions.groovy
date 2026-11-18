@@ -52,6 +52,7 @@ println(foo 1)
 
 x.add(foo 'a')
 //^ function.call
+//    ^ function.call
 
 obj?.method(x)
 //   ^ function.call
