@@ -46,11 +46,13 @@ The default branch is **`main`**.
   names, an expression, or a type, and such a word as a named
   argument's key (§6.16), the key of a named
   argument in a parenthesis-free call, which needs `:` on the same
-  line (§6.8), the start of such a call that is the value of a
-  declaration or an assignment, a statement whose receiver has a
-  member access (`obj.method 1`), or a statement whose first argument
-  is a `new` or an array type (`foo new Bar()`), each of which needs
-  its first argument on the receiver's line (§6.14), a subscript `[`
+  line (§6.8), the start of such a call that is a value (of a
+  declaration or an assignment, or in parentheses or an
+  interpolation), a statement whose receiver has a member access
+  (`obj.method 1`), or a statement whose first argument is a `new`, an
+  array type or such a call in parentheses (`foo new Bar()`,
+  `println(foo 1)`), each of which needs its first argument on the
+  receiver's line (§6.14), a subscript `[`
   on the same line as the
   expression before it (§6.9), the start of an array type that is a
   value (`String[].class`), which needs `[]` after the name (§6.15),

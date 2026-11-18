@@ -15,8 +15,8 @@
 // empty token before the receiver of such a call that is a value,
 // COMMAND_PATH_START, one between the first name of a dotted receiver
 // and its first member access, and COMMAND_STATEMENT_START, one before
-// a statement's one-name receiver whose first argument is a `new` or an
-// array type;
+// a statement's one-name receiver whose first argument is a `new`, an
+// array type or such a call in parentheses;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
@@ -481,19 +481,34 @@ static bool array_value_follows(
     return array_dimensions_follow(lexer, true, no_close_ahead);
 }
 
+static bool parenthesized_command_follows(
+    TSLexer *lexer,
+    bool no_close_ahead
+);
+
 // Whether the first argument of a parenthesis-free call starts here, on
 // the line: after spaces, tabs and line escapes, a number, a string,
 // `true`, `false`, `null`, an object or array creation, the key of a
-// named argument or an array type that is a value. A quote is left
-// unread. A slashy string is not an argument here: after a name Groovy
-// reads `/` as division.
-static bool first_argument_follows(TSLexer *lexer, bool no_close_ahead) {
+// named argument or an array type that is a value; or, when
+// `parenthesized` is set, such a call in parentheses
+// (`parenthesized_command_follows`). A quote is left unread. A slashy
+// string is not an argument here: after a name Groovy reads `/` as
+// division.
+static bool first_argument_follows(
+    TSLexer *lexer,
+    bool parenthesized,
+    bool no_close_ahead
+) {
     if (!skip_same_line_space(lexer, false)) {
         return false;
     }
     int32_t c = lexer->lookahead;
     if ((c >= '0' && c <= '9') || c == '\'' || c == '"') {
         return true;
+    }
+    if (c == '(') {
+        return parenthesized
+            && parenthesized_command_follows(lexer, no_close_ahead);
     }
     if (!is_identifier_start(c)) {
         return false;
@@ -521,9 +536,46 @@ static bool first_argument_follows(TSLexer *lexer, bool no_close_ahead) {
                                no_close_ahead);
 }
 
+// Whether a word that `read_word` returned starts a value as a keyword,
+// so that it is no receiver there.
+static bool is_value_keyword(const char *word, unsigned len) {
+    return word_is(word, len, "new") || word_is(word, len, "switch")
+        || is_literal_word(word, len);
+}
+
+// SPECIFICATION.md §6.14 — whether a parenthesis-free call in
+// parentheses starts here, as the first argument of another one:
+// Groovy reads `println(foo 1)` as `println` called with `(foo 1)`
+// (Apache `expressionInPar` as the first element of `argumentList`).
+// After the `(` and Groovy's trivia, which inside parentheses includes
+// line breaks, the receiver and the first argument that
+// COMMAND_VALUE_START reads there. That token opens the inner call, and
+// the scanner decides it again once the parser is past the `(`. The
+// look-ahead goes into one parenthesis only, so that each part of the
+// input is read a bounded number of times: `println(bar(foo 1))` is no
+// call of `println`.
+static bool parenthesized_command_follows(
+    TSLexer *lexer,
+    bool no_close_ahead
+) {
+    lexer->advance(lexer, false);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        || !is_identifier_start(lexer->lookahead)) {
+        return false;
+    }
+    char word[sizeof "switch"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    int32_t last_name = 0;
+    bool nested = false;
+    return !is_value_keyword(word, len)
+        && read_member_accesses(lexer, &last_name, &nested)
+        && first_argument_follows(lexer, false, no_close_ahead);
+}
+
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
-// here as the value of a declarator or an assignment
-// (`def out = sh script: 'make'`, `def r = obj.method 1`): a name and any
+// here as a value: of a declarator or an assignment
+// (`def out = sh script: 'make'`, `def r = obj.method 1`), or in
+// parentheses or an interpolation (`(foo 1)`, `"${foo 1}"`): a name and any
 // member accesses written without spaces, then on its line the first
 // argument (`first_argument_follows`). The
 // token is empty and sits before the name, which the in-grammar lexer
@@ -557,9 +609,7 @@ static bool scan_value_start(
     bool capitalized = is_capital(lexer->lookahead);
     char word[sizeof "boolean"];
     unsigned len = read_word(lexer, word, sizeof word);
-    // The words that start a value as keywords keep that reading.
-    if (word_is(word, len, "new") || word_is(word, len, "switch")
-        || is_literal_word(word, len)) {
+    if (is_value_keyword(word, len)) {
         return false;
     }
     bool accesses = is_member_access_start(lexer->lookahead);
@@ -580,7 +630,7 @@ static bool scan_value_start(
         lexer->result_symbol = ARRAY_VALUE_START;
         return true;
     }
-    if (!first_argument_follows(lexer, no_close_ahead)) {
+    if (!first_argument_follows(lexer, true, no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
@@ -652,15 +702,18 @@ static bool scan_command_path_start(TSLexer *lexer, bool no_close_ahead) {
     int32_t last_name = 0;
     bool nested = false;
     if (!read_member_accesses(lexer, &last_name, &nested)
-        || !first_argument_follows(lexer, no_close_ahead)) {
+        || !skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    bool quoted = lexer->lookahead == '\'' || lexer->lookahead == '"';
+    if (!first_argument_follows(lexer, true, no_close_ahead)) {
         return false;
     }
     // Groovy declares a method when the last name is capitalized
     // (`java.util.List 'foo'() { }`) and calls one otherwise
     // (`obj.m 'a'() { }` is `obj.m('a'({ }))`).
     bool capitalized = last_name >= 'A' && last_name <= 'Z';
-    if (capitalized && (lexer->lookahead == '\'' || lexer->lookahead == '"')
-        && method_name_follows(lexer)) {
+    if (capitalized && quoted && method_name_follows(lexer)) {
         return false;
     }
     lexer->result_symbol = COMMAND_PATH_START;
@@ -1237,11 +1290,15 @@ static bool is_grammar_keyword(const char *word, unsigned len) {
 
 // Whether the first argument of a statement's parenthesis-free call that
 // opens with COMMAND_STATEMENT_START starts here, after the spaces after
-// the receiver: an object or array creation, or an array type that is a
-// value. The key `new` of a named argument (`foo new: 1`) is not one: the
-// grammar's form takes it. A lowercase name is read only while it can
-// still be `new` or a primitive type name.
+// the receiver: an object or array creation, an array type that is a
+// value, or such a call in parentheses (`println(foo 1)`). The key `new`
+// of a named argument (`foo new: 1`) is not one: the grammar's form takes
+// it. A lowercase name is read only while it can still be `new` or a
+// primitive type name.
 static bool statement_argument_follows(TSLexer *lexer, bool no_close_ahead) {
+    if (lexer->lookahead == '(') {
+        return parenthesized_command_follows(lexer, no_close_ahead);
+    }
     if (lexer->lookahead == 'n') {
         return consume_keyword(lexer, "new")
             && creation_follows(lexer, no_close_ahead);

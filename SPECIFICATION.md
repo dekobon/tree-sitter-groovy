@@ -607,15 +607,29 @@ The resolution we adopt:
    does: `println(x = foo 1)`. The value form is the same
    `command_chain` node with the same fields; in parentheses it is the
    child of a `parenthesized_expression`, and in a condition or an
-   interpolation it is the `condition` (`value`, `lock`) itself. Not
-   accepted here, and taken by Groovy (observed with Groovy 3): a chain
-   as the only argument of a call (`bar(foo 1)`,
-   `println(sh script: 'x', returnStdout: true)`, and `bar(foo 1, 2)`,
-   which is `bar(foo(1, 2))`), though Groovy rejects one among several
-   arguments (`bar(a, foo 1)`); and more than one statement, a
-   declaration or a closure's parameters in an interpolation
-   (`"${a; b}"`, `"${def x = 1}"`, `"${-> x}"`). Each is an `ERROR`.
-   Nor is a first argument on the
+   interpolation it is the `condition` (`value`, `lock`) itself.
+   Groovy also reads `println(foo 1)` as a call of `println`, but not
+   as `println` called with the chain: it is a command whose first
+   argument is the parenthesized expression `(foo 1)` (Apache's
+   `argumentList` after the receiver of a `commandExpression`). So that
+   expression is all of the first argument and may go on:
+   `println(foo 1).trim()` is `println((foo 1).trim())`,
+   `bar(foo 1) + 2` is `bar((foo 1) + 2)`, `bar(foo 1, 2)` is
+   `bar(foo(1, 2))` and `println(foo 1), 2` passes `2` to `println`
+   (observed with Groovy 3). The grammar reads each the same way: a
+   `command_chain` whose first argument holds the
+   `parenthesized_expression` (item 3). That call is a command chain
+   itself, so it is accepted where one is (`x.add(foo 'a')`,
+   `def y = bar(foo 1)`, `"${bar(foo 1)}"`), and Groovy rejects it
+   where one is not: `assertEquals(3, foo 1)`, `bar(a, foo 1)`,
+   `a + bar(foo 1)`, `[bar(foo 1)]` and `return bar(foo 1)`. The last is
+   `return bar` followed by `(foo 1)` here (item 2). Not accepted here,
+   and taken by Groovy (observed with Groovy 3): a call whose argument
+   in parentheses has such an argument itself (`println(bar(foo 1))`),
+   as the scanner looks into one parenthesis only (§6.14); and more
+   than one statement, a declaration or a closure's parameters in an
+   interpolation (`"${a; b}"`, `"${def x = 1}"`, `"${-> x}"`). Each is
+   an `ERROR`. Nor is a first argument on the
    line after the receiver inside parentheses, `(foo` followed by `1)`,
    which Groovy reads as a call because its lexer drops line breaks
    inside parentheses: the scanner tracks no brackets (§6.9), so this
@@ -661,8 +675,8 @@ The resolution we adopt:
    the name is the returned value, so `return obj.m 'x'` is `return
    obj.m` followed by `'x'`, as before #52; Groovy rejects the first and
    reads the second as a `return` and a call. The same holds for a name
-   before `new` or an array type value after `return`, and for a label
-   after `break` or `continue`: `return foo new Foo()` is `return foo`
+   before `new`, an array type value or a command chain in parentheses
+   after `return`, and for a label after `break` or `continue`: `return foo new Foo()` is `return foo`
    followed by the creation, and so is `return` followed by
    `foo new Foo()` on the next line, which Groovy reads as `return null`
    and the call `foo(new Foo())` (observed with Groovy 3).
@@ -675,9 +689,10 @@ The resolution we adopt:
 3. **Argument forms allowed**: the first argument is a literal, a
    closure, or a named arg (`k: v`). It may also be an object or array
    creation (`println new Date()`, `foo new int[3]`,
-   `foo new Foo() { }`) or an array type that is a value
-   (`foo String[].class`, `foo int[]::new`, §6.15), each starting on
-   the receiver's line and each the start of a whole expression:
+   `foo new Foo() { }`), an array type that is a value
+   (`foo String[].class`, `foo int[]::new`, §6.15) or a command chain in
+   parentheses (`println(foo 1)`, item 1), each starting on the
+   receiver's line and each the start of a whole expression:
    `foo new Foo().bar()` passes the result of `bar()`, as Groovy does
    (observed with Groovy 3). `foo` followed by `new Foo()` on the next
    line, also with a comment opening that line, stays two statements.
@@ -708,8 +723,8 @@ The resolution we adopt:
    §6.15).
    In a value (item 1), and after a dotted receiver (item 2), the first
    positional argument is any expression that starts with a literal, an
-   object or array creation or an array type value, as
-   in Apache's `argumentList`: `def x = foo 'a' + b` and
+   object or array creation, an array type value or a command chain in
+   parentheses, as in Apache's `argumentList`: `def x = foo 'a' + b` and
    `log.info 'x: ' + y` pass the sum. Neither takes a closure as the
    first argument: `def c = foo { }` and `list.each { }` stay a
    `method_invocation`, which is how Apache reads a closure after a
@@ -1615,16 +1630,19 @@ is the counterpart of the `record foo() { … }` residual of §6.7.
 
 A parenthesis-free call may be a value: of a declarator or an
 assignment, or the content of parentheses or of an interpolation (§5.5
-item 1), and its receiver may have member accesses (§5.5 item 2). A newline is whitespace, so with only the grammar
-`def x = foo` followed by `1` on the next line would be one call, and
-so would `result.size` followed by `2`; Groovy ends the statement at
-the line break (observed with Groovy 3). Both forms therefore hold an
-empty token, which the scanner emits only when the first argument
-starts on the receiver's line. So does a statement whose receiver is
-one name and whose first argument starts with `new` or is an array
-type that is a value (§5.5 item 3): `foo` followed by `new Bar()` on
+item 1), and its receiver may have member accesses (§5.5 item 2). A
+newline is whitespace, so with only the grammar `def x = foo` followed
+by `1` on the next line would be one call, and so would `result.size`
+followed by `2`; Groovy ends the statement at the line break (observed
+with Groovy 3). Both forms therefore hold an empty token, which the
+scanner emits only when the first argument starts on the receiver's
+line. So does a statement whose receiver is one name and whose first
+argument starts with `new`, is an array type that is a value or is a
+call in parentheses (§5.5 item 3): `foo` followed by `new Bar()` on
 the next line is two statements in Groovy, and the grammar, which
-matches a literal after such a receiver itself, cannot tell.
+matches a literal after such a receiver itself, cannot tell. Nor can
+the grammar tell `println(foo 1)` from `println(x)` at the `(`, where it
+must already have made `println` the receiver or an expression.
 
 ```text
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
@@ -1654,16 +1672,21 @@ when:
   - not: the name is `record`, `trait`, `sealed`, `var`, `yield`, `in`
     or `as` and its own token (§6.7, §6.13, §6.16) is valid there; the
     scanner decides that token instead; and
-  - a creation or an array type value follows, as below.
+  - a creation, an array type value or a call in parentheses follows,
+    as below.
 The token ends before the name.
 
 Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
 a name, with no space anywhere.
 The first argument: after spaces, tabs and line escapes, but no line
 break and no comment, a digit, `'`, `"`, the word `true`, `false` or
-`null`, a creation, an array type value, or a key: a name followed on
+`null`, a creation, an array type value, a key: a name followed on
 the same line by `:` and not `::`, other than `case` and `default`
-(§6.8).
+(§6.8), or a call in parentheses.
+A call in parentheses: `(`, then Groovy's trivia, then a name that is
+not `new`, `switch`, `true`, `false` or `null`, its member accesses as
+above and a first argument other than a call in parentheses, as
+COMMAND_VALUE_START reads them after the `(`.
 A creation: the word `new`, then, after Groovy's trivia (whitespace,
 line breaks, line escapes and comments), a name. The key `new:` is
 not one.
@@ -1687,6 +1710,36 @@ receiver, and COMMAND_PATH_START between its first name and the
 operator after it, where no whitespace, comment or line break may
 come. Every form with a line break after the receiver parses as it did
 before.
+
+A call in parentheses as the first argument (`println(foo 1)`,
+`x.add(foo 'a')`, `def y = bar(foo 1)`) is decided by the token before
+the outer receiver, or after its first name, from what follows the `(`;
+the inner call then opens with COMMAND_VALUE_START, which the scanner
+decides again once the parser is past the `(`. The two read the same
+input with the same rules, so they agree. Inside the parenthesis the
+look-ahead skips line breaks and comments, as Groovy's lexer does there,
+with the state of §6.6, and it stops at the first argument of the inner
+call: a call in parentheses there is not read into, so that each part
+of the input is read a bounded number of times. `println(bar(foo 1))`
+is therefore an `ERROR`, while `(bar(foo 1))` and `def x = bar(foo 1)`
+are calls, as the outer parenthesis there needs no look-ahead. A `(`
+on the line after the receiver is never a first argument, so
+`println` followed by `(foo 1)` on the next line is a call of
+`println` with the `ERROR` `foo 1` in its arguments, as before; Groovy
+reads two statements.
+
+The look-ahead reads the first name inside the parentheses of each call
+that starts a statement or a value or follows a dotted receiver, where
+the scanner stopped at the `(` before. On real Groovy and Gradle files
+the scanner advances over 3.4% more characters, with no more calls, and
+the parse has the same number of steps and no new step with more than
+one stack version, on real files, on Java files and on code made only of
+calls (`foo(a, b)`, `obj.m(a, 'x')`). Code made only of such calls takes
+1.6% more instructions, real files and Java files 0.3% more. One tree
+with no `ERROR` changes: a method header with no body whose parameter is
+named `true`, `false` or `null`, which Groovy rejects. `foo bar(baz true)`
+was the method `bar` with return type `foo`, and is now the statement
+`foo` and the call `bar(baz true)`.
 
 COMMAND_PATH_START makes the scanner read on after a statement's first
 name only when a member access follows it directly. Those statements
@@ -2580,7 +2633,7 @@ How each filed bug closes against this spec.
 | dekobon/big-code-analysis **#246** (Elvis short-circuit) | §3.2 — `elvis_expression` as a distinct named node. §8.1 — pinned corpus test reproducing the issue's `def pick(a, b, c) { … }` snippet with the expected S-expression. The downstream `get_op_type()` impl can now `matches!(id.into(), AMPAMP \| PIPEPIPE \| ELVIS_EXPRESSION)`. No `MISSING` child anywhere. |
 | dekobon/big-code-analysis **#247** umbrella (all operator gaps) | §3.2 row-by-row: every symbol in the issue's three tables maps to a distinct node kind. The "critical" rows (`?:`, `?.`, `as`, `trait`, `..<`) all have dedicated nodes. The "important" rows (`=~`, `==~`, slashy, `===`, `!==`, `<=>`, `!instanceof`, `!in`) likewise. The "niche" rows (`?=`, `?[]`, `.&`, `.@`, `$/…/$`, `==>`) likewise. §8 anchors each with a pinned test. §3.2.1 explicitly handles the subscript-yielding-callable composition (`arr[i](args)`). §3.2.2 documents the lexer trailing-context rule for `!instanceof` / `!in` to avoid mis-tokenisation when followed by an identifier character. |
 | amaanq #2 / #3 (maintenance / license) | The prior grammar is treated as inspiration only — no code is incorporated. This grammar is an independent project, dual-licensed under `Apache-2.0 OR MIT`, with no dependency on the upstream project's release cadence. |
-| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements, to the values of declarations and assignments and to the content of parentheses and interpolations, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
+| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements, to the values of declarations and assignments, to the content of parentheses and interpolations and to a parenthesized first argument of a command chain, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
 | murtaza64 **#16** (empty block comments) | §6.6 — block comments and groovydoc comments are external-scanner tokens that consume the entire `/* … */` or `/** … */` regardless of content. §8.2 — pinned test with `/**/`, `/***/`, `/* */`. |
 | murtaza64 **#22** (multiple assignment) | §4 — `multi_assignment_declaration` rule. §8.2 — pinned test on `def (a, b) = [1, 2]`. |
 | murtaza64 **#27** (publish to npm) | Out of grammar scope. The package layout in §2.1 includes `package.json` and `bindings/node/`; npm publishing is part of release tooling, not the grammar. |

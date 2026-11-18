@@ -63,6 +63,10 @@ if (fileExists 'x', new Z()) { }
 def m = "${sh 'make', new Z()}"
 //         ^ reference.call
 
+println(sh 'make', new Z())
+// <- reference.call
+//      ^ reference.call
+
 new Foo(z())
 //  ^ reference.class
 

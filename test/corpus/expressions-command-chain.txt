@@ -1878,6 +1878,275 @@ def e = "${ { it } }"
               (identifier))))))))
 
 ==================
+Command chain in parentheses as the first argument of a command chain
+==================
+
+println(foo 1)
+println (sh script: 'x', returnStdout: true)
+bar(foo 1, 2)
+println(foo 1), 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (string_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (boolean_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)
+        argument: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))
+    argument: (number_literal)))
+
+==================
+A first argument in parentheses is a whole expression
+==================
+
+println(foo 1).trim()
+bar(foo 1) + 2
+bar(foo 1) { }
+bar(foo 1)[0]
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (number_literal)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (subscript_expression
+      object: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))
+      index: (number_literal))))
+
+==================
+Command chain in parentheses as the first argument after a dotted receiver and in a value
+==================
+
+x.add(foo 'a')
+System.out.println(log.info 'x')
+def y = bar(foo 1)
+y = obj.m(foo a: 1)
+def s = "${bar(foo 1)}"
+z = (bar(foo new Baz()))
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (string_literal))))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (string_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (identifier)
+              value: (number_literal)))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (parenthesized_expression
+              (command_chain
+                receiver: (identifier)
+                argument: (number_literal))))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (parenthesized_expression
+            (command_chain
+              receiver: (identifier)
+              argument: (object_creation_expression
+                type: (type_identifier)
+                arguments: (argument_list)))))))))
+
+==================
+A line break or a comment before a command chain in parentheses
+==================
+
+println(
+  foo 1)
+println(/* c */ foo 1)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (block_comment)
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
+A call whose argument is not a command chain stays a method invocation
+==================
+
+println(foo 1)
+println(foo)
+foo(a: 1)
+foo(bar a: 1)
+foo(new Bar())
+foo(String[].class)
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier))))))
+
+==================
+A name after return before a command chain in parentheses is the returned value
+==================
+
+return println(foo 1)
+
+---
+
+(source_file
+  (return_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
 Command chain with a dotted receiver (#52)
 ==================
 

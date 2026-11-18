@@ -21,7 +21,7 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, and in an interpolation (see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. Not accepted where Groovy takes one: as the only argument of a call (`bar(foo 1)`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19 and #23 below. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19 and #23 below. |
 | §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, in parentheses and in an interpolation. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
@@ -44,7 +44,7 @@ reasoning here.
 | §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
-| §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new` or an array type value follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new` or an array type value, so `foo` followed by `new Bar()` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
+| §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new` or an array type value follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new` or an array type value, so `foo` followed by `new Bar()` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -974,15 +974,13 @@ The Groovy column was observed by running Groovy 3.
 | `def x = foo $/a/$`, `def x = foo .5` | `foo('a')`, `foo(0.5)` | as before: `def x = foo` then the string; an `ERROR` (spec §6.14) |
 | `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
 | `def r = obj.method 1` | a call | `command_chain` value whose receiver is a `field_access` (#52; see #19) |
-| `def x = (foo 1)`, `if (foo 1) { }`, `"${foo 1}"` | a call | a call (#24 below) |
-| `bar(foo 1)` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | `ERROR`, as before |
+| `def x = (foo 1)`, `if (foo 1) { }`, `"${foo 1}"`, `bar(foo 1)` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | a call, and `bar(a, foo 1)` an `ERROR` (#24 below) |
 | `def x = foo 1 b 2` | `foo(1).b(2)` | the chains `foo 1` and `b 2`, as in statement position |
 | `def c = foo { }` | a call with a closure | `method_invocation`, as before |
 | `return foo 1`, `throw foo 1`, `assert foo 1`, `def s = 'a' + foo 1` | rejected | two statements, as before |
 | `def f(a = foo 1) { }` at script or block level | rejected | no `ERROR`: after `def f` a `(` may open the next statement (§3), so this is the declaration `def f`, then a call on `(a = foo 1)` with a trailing closure; before, a `method_declaration` with a local `ERROR` in its parameters. In a class body it is an `ERROR`, as before |
 
-**Action**: a chain as a call's only argument is the form real code is
-likely to need next. A comment between the receiver and
+**Action**: a comment between the receiver and
 the argument needs the look-ahead to read comments without scanning an
 unterminated one twice.
 
@@ -1317,7 +1315,7 @@ have in any expression.
 
 ---
 
-## 24. A parenthesis-free call in parentheses or an interpolation
+## 24. A parenthesis-free call in parentheses or an interpolation, and as a first argument in parentheses
 
 **Apache `GroovyParser.g4`** (4.0.x to 6.0.x): `expressionInPar` is
 `LPAREN enhancedStatementExpression rparen`, and
@@ -1379,11 +1377,54 @@ The Groovy column was observed by running Groovy 3.
 | `def foo(bar 1)`, `def x (foo 1) { }` at script or block level | rejected | no `ERROR`: the declaration of `foo` (`x`), then the parenthesis as the next statement (§3), as `def foo(1)` before; before, a `method_declaration` with an `ERROR` in its parameters. In a class body it is an `ERROR`, as before |
 | `def f(Foo.Bar true)`, `final def g(int null)`, with no body | rejected | the declaration of `f` (`g`), then the parenthesis as the next statement; before, a `method_declaration` whose parameter is named `true` (`null`). With a body it is that `method_declaration`, as before |
 
-The last row is the one change of a tree with no `ERROR`: of 120,000
-inputs a fuzzer built around parentheses, conditions and
-interpolations and 120,000 it
-made by changing corpus inputs and lines of real files, it changed no
-other tree that had no `ERROR`, and made none an `ERROR`. Nor did any
-tree change for the corpus, the highlight, tag and stress tests, or the
-real Groovy, Gradle and Jenkins files, except error recovery in two
+The last row is one of the two changes of a tree with no `ERROR`; the
+other is in the table below.
+
+**A first argument in parentheses.** Apache's `commandExpression` is
+`expression argumentList? commandArgument*`, and the first element of
+`argumentList` may be an `expressionInPar` like any other primary. So
+`println(foo 1)`, which is no `expression` as `foo 1` is no argument of
+a call, is the command `println` whose first argument is `(foo 1)`, and
+an expression may go on after the parenthesis: `println(foo 1).trim()`
+is `println((foo 1).trim())`. It is a command, so it is accepted only
+where one is.
+
+**Current implementation**: the same. The first argument of a
+`command_chain` may start with a `parenthesized_expression` that holds a
+`command_chain`, and the scanner decides it with the token it emits
+before the receiver (`_command_statement_start` or
+`_command_value_start`) or after the receiver's first name
+(`_command_path_start`): `(`, Groovy's trivia (line breaks and comments
+included, as inside parentheses), then a receiver and a first argument
+as `_command_value_start` reads them after the `(` (spec §6.14). The
+look-ahead does not go into a second parenthesis, which keeps it
+linear. No state, conflict, precedence or external token is added. On
+real Groovy and Gradle files the scanner advances over 3.4% more
+characters and the parse takes 0.3% more instructions; code made only of
+calls with parentheses (`foo(a, b)`) takes 1.6% more. Parse steps and
+steps with more than one stack version are unchanged.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `println(foo 1)`, `println (sh script: 'x', returnStdout: true)`, `bar(foo 1, 2)`, `println(foo 1), 2` | `println` called with `foo(1)`, `bar(foo(1, 2))`, `println(foo(1), 2)` | a `command_chain` whose first argument is the `parenthesized_expression`; before, an `ERROR` |
+| `println(foo 1).trim()`, `bar(foo 1) + 2`, `bar(foo 1)[0]`, `bar(foo 1) { }` | the expression is the argument: `println(foo(1).trim())`, and `bar(foo(1, { }))` for the last | the same, the closure a trailing closure of the parenthesis |
+| `x.add(foo 'a')`, `System.out.println(log.info 'x')`, `def y = bar(foo 1)`, `y = obj.m(foo a: 1)`, `"${bar(foo 1)}"`, `(bar(foo 1))` | a call | the same |
+| `println(` then `foo 1)` on the next line, `println(/* c */ foo 1)` | a call | the same |
+| `foo(bar a: 1)`, `foo(bar a: 1, 2)` | `foo(bar([a:1]))`, `foo(bar([a:1], 2))` | the same; `foo(a: 1)` stays a `method_invocation` with a named argument |
+| `println(x)`, `foo(a, b)`, `foo(new Bar())`, `foo(String[].class)` | calls | `method_invocation`, as before |
+| `println(bar(foo 1))` | a call | an `ERROR`, as before: the look-ahead stops at the second parenthesis |
+| `assertEquals(3, foo 1)`, `bar(a, foo 1)`, `a + bar(foo 1)`, `[bar(foo 1)]` | rejected | an `ERROR`, as before |
+| `return bar(foo 1)` | rejected | `return bar`, then `(foo 1)`, as `return foo 1` is `return foo` and `1`; before, an `ERROR` |
+| `println` then `(foo 1)` on the next line | `println`, then the call | an `ERROR`, as before: a `(` on the next line is a call (§3) |
+| `foo(1).bar(baz 2)` | a call | an `ERROR`, as before: a receiver is made of names (spec §5.5 item 2) |
+| `bar(foo 1) 2`, `void foo(bar 1) { }` | `bar(foo(1)).2`; `void.foo(bar(1, { }))` | the call, then `2` (spec §5.5 item 4); `void`, then the call `foo((bar 1) { })`; before, an `ERROR` |
+| `foo bar(baz true)`, `println this(it null)`, with no body | rejected, or after another name `foo.bar(baz(true))` | the statement `foo` (`println`), then the call; before, a method `bar` (`this`) with return type `foo` (`println`) and a parameter named `true` (`null`) |
+
+The last row is the other change of a tree with no `ERROR`. Of 120,000
+inputs a fuzzer built around parentheses, conditions, interpolations
+and calls with parentheses, and 120,000 it made by changing corpus
+inputs and lines of real files, every tree with no `ERROR` that
+changed is in one of the two rows, and none became an `ERROR`. No tree
+changed for the corpus, the highlight, tag and stress tests, or the
+real Groovy, Gradle and Jenkins files, except by error recovery in two
 corpus inputs and 41 Java files parsed as Groovy.

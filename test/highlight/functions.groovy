@@ -46,6 +46,13 @@ if (fileExists 'pom.xml') { }
 def m = "v: ${sh script: 'x'}"
 //             ^ function.call
 
+println(foo 1)
+// <- function.call
+//      ^ function.call
+
+x.add(foo 'a')
+//^ function.call
+
 obj?.method(x)
 //   ^ function.call
 
