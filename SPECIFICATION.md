@@ -627,7 +627,10 @@ The resolution we adopt:
    starts on the receiver's line, so `result.size` followed by `2` on
    the next line, or by `where:`, stays two statements. A statement
    whose receiver is a single name is matched in the grammar instead,
-   and keeps its next-line reading (#90). Not accepted, though Groovy
+   and keeps its next-line reading (#90), unless its first argument is
+   one the grammar cannot tell from a following statement (item 3):
+   such a statement opens with a third scanner token, emitted before
+   the name (§6.14). Not accepted, though Groovy
    takes each as a call (observed): spaces or a line break inside the
    receiver (`obj . m 1`, `obj` followed by `.m 1` on the next line), a
    receiver not made of names (`foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`,
@@ -650,7 +653,15 @@ The resolution we adopt:
    `java.util.List 'foo'(1)`, a call there, is the expression followed
    by `'foo'(1)` here.
 3. **Argument forms allowed**: the first argument is a literal, a
-   closure, or a named arg (`k: v`). After a comma an argument is a
+   closure, or a named arg (`k: v`). It may also be an object or array
+   creation (`println new Date()`, `foo new int[3]`,
+   `foo new Foo() { }`) or an array type that is a value
+   (`foo String[].class`, `foo int[]::new`, §6.15), each starting on
+   the receiver's line and each the start of a whole expression:
+   `foo new Foo().bar()` passes the result of `bar()`, as Groovy does
+   (observed with Groovy 3). `foo` followed by `new Foo()` on the next
+   line, also with a comment opening that line, stays two statements.
+   After a comma an argument is a
    named arg or any expression (`assertEquals 'v', a + b`,
    `foo 'a', x ? 1 : 2`). That is Apache's `argumentListElement`
    without spread arguments: `foo 'a', *args` and `foo a: 1, *:m`
@@ -658,13 +669,26 @@ The resolution we adopt:
    A named-arg key is an identifier; Apache also accepts string keys
    (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
    nested command chains, other than as the value of an assignment
-   (`bar 1, x = foo 2`, item 1), and an identifier or other non-literal
+   (`bar 1, x = foo 2`, item 1), and an identifier or any other
    expression as the first positional argument: `foo bar` is also how
    a typed declaration starts (`Type name = …`), and the parser cannot
    tell the two apart before the `=`. A bare `foo bar` parses as two
-   expression statements.
+   expression statements. Not yet accepted, though Groovy calls each
+   (observed with Groovy 3): `new` after a keyword of the grammar that
+   Groovy takes as a name (`super new Foo()`, `permits new Foo()`), or
+   after `record`, `trait`, `sealed` or `var`, whose own keyword the
+   scanner decides at the same place (§6.7, §6.13, §6.16): each is the
+   name followed by the creation, and `var new Foo()` is an `ERROR`;
+   `yield new Foo()` is a `yield_statement` (§6.16). Nor a
+   qualified inner class creation (`foo.new Inner()`, which is
+   `foo.new` followed by `Inner()`), an annotated created type
+   (`foo new @A Foo()`, an `ERROR`), a bare array type (`foo String[]`,
+   an `ERROR`), and an array type with a package before its class or
+   with type arguments (`foo java.lang.String[].class`, an `ERROR`,
+   §6.15).
    In a value (item 1), and after a dotted receiver (item 2), the first
-   positional argument is any expression that starts with a literal, as
+   positional argument is any expression that starts with a literal, an
+   object or array creation or an array type value, as
    in Apache's `argumentList`: `def x = foo 'a' + b` and
    `log.info 'x: ' + y` pass the sum. Neither takes a closure as the
    first argument: `def c = foo { }` and `list.each { }` stay a
@@ -1021,8 +1045,9 @@ slashy opener, the three comment tokens, the contextual `record`
 (§6.7), `trait` and `sealed` (§6.13) keywords, the contextual `var`,
 `yield`, `in` and `as` keywords and the key a contextual word makes
 (§6.16), the named-argument key of a parenthesis-free call
-(§6.8), the start of such a call that is a value or a statement
-with a dotted receiver (§6.14), the
+(§6.8), the start of such a call that is a value, a statement
+with a dotted receiver or a statement whose first argument is a `new`
+or an array type (§6.14), the
 same-line subscript opener (§6.9), the start of an array type that is
 a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
@@ -1060,6 +1085,7 @@ enum TokenType {
   CONTEXTUAL_KEY,         // §6.16 — `var`, `yield`, `in` or `as` as such a key, the word itself
   COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
   COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
+  COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new` or an array type
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
@@ -1563,7 +1589,7 @@ return type `trait` and no `ERROR`, at statement level and in a member
 list; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`. It
 is the counterpart of the `record foo() { … }` residual of §6.7.
 
-### 6.14 COMMAND_VALUE_START and COMMAND_PATH_START — implementation contract
+### 6.14 COMMAND_VALUE_START, COMMAND_PATH_START and COMMAND_STATEMENT_START — implementation contract
 
 A parenthesis-free call may be the value of a declarator or an
 assignment (§5.5 item 1), and its receiver may have member accesses
@@ -1572,7 +1598,11 @@ assignment (§5.5 item 1), and its receiver may have member accesses
 so would `result.size` followed by `2`; Groovy ends the statement at
 the line break (observed with Groovy 3). Both forms therefore hold an
 empty token, which the scanner emits only when the first argument
-starts on the receiver's line.
+starts on the receiver's line. So does a statement whose receiver is
+one name and whose first argument starts with `new` or is an array
+type that is a value (§5.5 item 3): `foo` followed by `new Bar()` on
+the next line is two statements in Groovy, and the grammar, which
+matches a literal after such a receiver itself, cannot tell.
 
 ```text
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
@@ -1594,29 +1624,51 @@ statement, when:
     and `(` follows it on the line.
 The token ends after the name.
 
+Emit COMMAND_STATEMENT_START, empty, where a statement may start,
+when:
+  - after whitespace, line breaks and line escapes, a name starts that
+    is not a keyword of grammar.js, and no member access follows it;
+    and
+  - not: the name is `record`, `trait`, `sealed`, `var`, `yield`, `in`
+    or `as` and its own token (§6.7, §6.13, §6.16) is valid there; the
+    scanner decides that token instead; and
+  - a creation or an array type value follows, as below.
+The token ends before the name.
+
 Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
 a name, with no space anywhere.
 The first argument: after spaces, tabs and line escapes, but no line
 break and no comment, a digit, `'`, `"`, the word `true`, `false` or
-`null`, or a key: a name followed on the same line by `:` and not
-`::`, other than `case` and `default` (§6.8).
+`null`, a creation, an array type value, or a key: a name followed on
+the same line by `:` and not `::`, other than `case` and `default`
+(§6.8).
+A creation: the word `new`, then, after Groovy's trivia (whitespace,
+line breaks, line escapes and comments), a name. The key `new:` is
+not one.
+An array type value: a capitalized name and any `.Name` after it with
+a capitalized name, or a primitive type name, then dimensions and a
+member access or `::`, as ARRAY_VALUE_START reads them where a type
+may start (§6.15).
 The in-grammar lexer reads the receiver and the argument. On any other
-input return false. Neither token is emitted during error recovery.
+input return false. None of the three tokens is emitted during error
+recovery.
 ```
 
-The two tokens are decided where nothing hides a line break from the
+The three tokens are decided where nothing hides a line break from the
 scanner. Comments are `extras`, so after a comment the parser is where
 it was and the scanner is called again, past the line break it can no
 longer see. A token placed after the receiver would read `def x = foo`
-followed by `/* c */ 1` on the next line as one call.
-COMMAND_VALUE_START is decided before the receiver, and
-COMMAND_PATH_START between its first name and the operator after it,
-where no whitespace, comment or line break may come. Every form with a
-line break after the receiver parses as it did before.
+followed by `/* c */ 1` on the next line as one call, and `foo`
+followed by `/* c */ new Bar()` as well.
+COMMAND_VALUE_START and COMMAND_STATEMENT_START are decided before the
+receiver, and COMMAND_PATH_START between its first name and the
+operator after it, where no whitespace, comment or line break may
+come. Every form with a line break after the receiver parses as it did
+before.
 
-The scanner reads on after a statement's first name only when a member
-access follows it directly, so it reads nothing more on other
-statements. Those that start with a dotted name are read once more. A
+COMMAND_PATH_START makes the scanner read on after a statement's first
+name only when a member access follows it directly. Those statements
+are read once more. A
 value's receiver is read before it, as for a single name, and its
 accesses are read once more as well. Measured against the grammar
 before #52, code made only of such lines (`a.b.c()`, `x.y = 1`,
@@ -1627,8 +1679,52 @@ tell a statement's first name from the start of an expression only by
 the token after it, while in a value the name is an expression, and a
 rule that took the name itself would cost every value a reduction. A
 statement whose receiver is a single name is matched in the grammar
-(§5.5 item 3). `record`, `trait` and `sealed` followed by a member
+(§5.5 item 3), unless COMMAND_STATEMENT_START opens it. `record`,
+`trait` and `sealed` followed by a member
 access are names (§6.7, §6.13), so `record.add 'x'` is a call.
+
+COMMAND_STATEMENT_START is valid wherever a statement may start, so the
+scanner reads the first name of every statement that starts with one,
+and the in-grammar lexer reads it again. A name that cannot be followed
+by a call's first argument is turned down at the character after it
+(`foo(`, `x =`, `obj.m`), and one followed by another name once that
+name can no longer be `new`, a primitive type name or a capitalized
+class name (`def x`, `String name`). The same name may be
+`record`, `trait`, `sealed`, `var`, `yield`, `in`, `as` or the start of
+an array type value, whose tokens are valid at a statement start too;
+the scanner reads it once and decides each of them there, as its other
+branches decide them where no statement may start. The keywords of
+grammar.js are turned down, because after the token the parser takes
+only a name, and the in-grammar lexer would read `return` in
+`return new Foo()` as one. Measured against the grammar before:
+STATE_COUNT 4249 to 4261, LARGE_STATE_COUNT 1565 to 1572, one external
+token and
+no conflict or precedence added; the same number of parse steps and of
+steps with more than one stack version on real files, on Java files and
+on code made only of statements that start with a name. Real Groovy and
+Gradle files take about 1.6% more instructions and 0.3% to 0.7% more
+wall-clock time (a second build of the same grammar differs by up to
+0.4%), Java files about 0.9% more instructions and no measurable time,
+and code made only of statements that start with a name about 2.4% more
+instructions and about 0.7% more time.
+The table change alone costs about 0.1%: the rest is the second read of
+each statement's first name. A token after the receiver, decided as
+COMMAND_NAMED_KEY is (§6.8), costs about 0.1% but reads `foo` followed by
+`/* c */ new Bar()` on the next line as one call.
+
+Trees that change for input that parsed without an `ERROR`: each form
+of §5.5 item 3 with a creation or an array type value as the first
+argument, as a statement, after a dotted receiver or as a value, was
+the receiver followed by the argument as a statement of its own (or a
+declaration whose value is the receiver, followed by that statement).
+It is now one `command_chain`. That holds as well after another
+statement on the same line, where Groovy continues that statement
+instead (§5.5 item 4): `foo 1 bar new Baz()` and `foo bar new Baz()`
+are `foo 1` or `foo`, then the call `bar new Baz()`; and
+`foo new Foo() bar 1` is the call `foo new Foo()` and the chain
+`bar 1`. Every such change was checked mechanically on the cases a
+fuzzer found: with a line break put between each such call's receiver
+and its first argument, the new grammar gives the old tree.
 
 A string after a receiver whose last name is capitalized, followed by
 `(`, is the name of a method: Groovy declares `foo` in
@@ -1641,11 +1737,15 @@ A slashy string is not a first argument, as in Groovy, which reads `/`
 after a name as division. Known differences from Groovy:
 
 - A comment between the receiver and its first argument on one line,
-  `def x = foo /* c */ 1` or `x.y /* c */ 1`, is not a call: the
-  look-ahead reads no comment, so it never scans an unterminated one to
-  the end of the input. The tree is the one from before, the receiver,
-  the comment and `1`. Groovy reads a call (observed with Groovy 3),
-  also when the comment spans lines.
+  `def x = foo /* c */ 1`, `x.y /* c */ 1` or `foo /* c */ new Bar()`,
+  is not a call: the
+  look-ahead reads no comment there, so it never scans an unterminated
+  one to the end of the input. The tree is the one from before, the
+  receiver, the comment and the argument. Groovy reads a call (observed
+  with Groovy 3), also when the comment spans lines. After `new` the
+  look-ahead does read comments and line breaks, as Groovy's
+  `new nls creator` allows (`foo new /* c */ Bar()` is a call), with
+  the state of §6.6.
 - A name as the first argument (`def x = foo bar`) is not taken
   (§5.5 item 3).
 - Two literals Groovy takes as a first argument do not start with a
@@ -1722,7 +1822,9 @@ The rule on the spelling keeps the look-ahead cheap. Names in
 expressions are mostly variables and methods, written in lowercase; a
 lowercase name is read only while it can still become a primitive type
 name, so most are turned down at their first or second character, and
-`a[0]` costs nothing more. `java.lang.String[].class` (a package
+`a[0]` costs nothing more. Where a statement may start the scanner reads
+the whole name for COMMAND_STATEMENT_START (§6.14) and decides this
+token from it as well. `java.lang.String[].class` (a package
 before the class), `foo[]` with a lowercase class `foo`, and a generic
 element type are not taken and read as before: the first two are a
 subscript with a missing index, and `List<String>[].class` is a chain
@@ -1859,9 +1961,11 @@ with the four words, and a statement may start with `int[].class`
 where `in` may follow the statement before it, so ARRAY_VALUE_START is
 decided in the same branch. Each word is turned down at its first
 character that differs (`if`, `it`, `implementation`, `apply`,
-`value`), which is what keeps the cost below. The tokens are emitted
-during error recovery, as RECORD_KEYWORD is: each spans the word, and
-the look-ahead decides as it does on valid input.
+`value`), which is what keeps the cost below. Where a statement may
+start, COMMAND_STATEMENT_START (§6.14) reads the whole name first and
+the four words are decided from it, with the same result. The tokens
+are emitted during error recovery, as RECORD_KEYWORD is: each spans the
+word, and the look-ahead decides as it does on valid input.
 
 Known residuals, each an `ERROR` as before:
 

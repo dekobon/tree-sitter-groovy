@@ -543,6 +543,11 @@ module.exports = grammar({
     // member access after it (`obj` and `.method 1`), emitted only when
     // the first argument follows on the line.
     $._command_path_start,
+    // §6.14 — empty token before the first name of a statement that is a
+    // parenthesis-free call whose first argument the grammar cannot tell
+    // from a following statement (`foo new Bar()`, `foo String[].class`),
+    // emitted only when that argument starts on the receiver's line.
+    $._command_statement_start,
     // §5.10 — `[` on the same line as the token before it (spaces, tabs and
     // line escapes allowed). A `[` after a newline isn't one and can only
     // start a list or map literal: a statement, not a subscript of the line
@@ -757,11 +762,12 @@ module.exports = grammar({
     // assignment (`def out = sh script: 'make', returnStdout: true`),
     // aliased to `command_chain`. A newline is whitespace, so the call
     // opens with `_command_value_start`, which the scanner emits only
-    // when a literal or a `name:` follows the receiver on its line.
+    // when a literal, a `name:`, `new` or an array type value follows the
+    // receiver on its line.
     // Without it `def x = foo` followed by `1` on the next line would be
     // one call. A positional first argument is a whole expression, as in
-    // Apache (`def x = foo 'a' + b`); the token makes it start with a
-    // literal. A closure is not a first argument here: `def c = foo { }`
+    // Apache (`def x = foo 'a' + b`); the token makes it start with one
+    // of those. A closure is not a first argument here: `def c = foo { }`
     // stays a `method_invocation`, as Apache reads it. `prec.right` lets
     // a `,` continue the call, as in Groovy: `def x = foo 1, y = 2`
     // passes `y = 2` to `foo`. The receiver may have member accesses
@@ -775,14 +781,25 @@ module.exports = grammar({
     // §5.5 item 2 — a statement whose receiver has a member access
     // (`obj.method 1`, `a?.b.c x: 1`). Unlike the identifier form above it
     // holds a scanner token between the receiver's first name and its
-    // first access, emitted only when a literal or a `name:` follows the
-    // receiver on its line, so `result.size` followed by `2` on the next
-    // line stays two statements. The arguments are those of the value
-    // form. A value with such a receiver is `_value_command_chain`: a
-    // name in a value is an `_expression` otherwise, and referencing it
-    // here as well would cost every value a reduction.
+    // first access, emitted only when a first argument of the value form
+    // follows the receiver on its line, so `result.size` followed by `2`
+    // on the next line stays two statements. The arguments are those of
+    // the value form. A value with such a receiver is
+    // `_value_command_chain`: a name in a value is an `_expression`
+    // otherwise, and referencing it here as well would cost every value a
+    // reduction.
+    //
+    // A statement whose receiver is one name and whose first argument
+    // starts with `new` or is an array type (`foo new Bar()`,
+    // `foo String[].class`) opens with `_command_statement_start`. The
+    // grammar cannot read it from the name alone: `foo` followed by
+    // `new Bar()` on the next line is two statements, and the scanner
+    // decides before the name, where no comment can hide that line break.
     _path_command_chain: $ => seq(
-      field('receiver', $._statement_command_path),
+      choice(
+        field('receiver', $._statement_command_path),
+        seq($._command_statement_start, field('receiver', $.identifier)),
+      ),
       commandArguments($),
     ),
 

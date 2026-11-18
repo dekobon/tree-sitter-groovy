@@ -201,3 +201,33 @@ x.y \
       object: (identifier)
       field: (identifier))
     argument: (number_literal)))
+
+==================
+Object creation as the first argument of a command chain (CRLF)
+==================
+
+foo new Foo()
+foo
+new Foo()
+foo new
+Foo()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))

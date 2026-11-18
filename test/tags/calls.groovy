@@ -44,6 +44,16 @@ list*.method 'x', new Z()
 obj.&method 'x', new Z()
 //   ^ reference.call
 
+println new Z()
+// <- reference.call
+//          ^ reference.class
+
+obj.method new Z()
+//  ^ reference.call
+
+def r = sh new Z()
+//      ^ reference.call
+
 new Foo(z())
 //  ^ reference.class
 

@@ -373,12 +373,34 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "FIELD",
-          "name": "receiver",
-          "content": {
-            "type": "SYMBOL",
-            "name": "_statement_command_path"
-          }
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "receiver",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_path"
+              }
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_command_statement_start"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "receiver",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "identifier"
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "SEQ",
@@ -11340,6 +11362,10 @@
     {
       "type": "SYMBOL",
       "name": "_command_path_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_command_statement_start"
     },
     {
       "type": "SYMBOL",

@@ -2776,3 +2776,528 @@ Foo.Bar 'x', 2
       field: (identifier))
     argument: (string_literal)
     argument: (number_literal)))
+
+==================
+Object creation as the first argument of a command chain
+==================
+
+foo new Foo()
+println new Date()
+fail new RuntimeException('x')
+foo new a.b.Foo<String>()
+foo new Foo() { }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (string_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier)))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body))))
+
+==================
+Object creation as the first argument followed by more arguments
+==================
+
+foo new Foo(1), 2
+foo new Foo(), bar: 1
+println new Date(), 'a'
+foo new Foo(),
+  new Bar()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (number_literal)))
+    argument: (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))
+    argument: (string_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+Array creation as the first argument of a command chain
+==================
+
+foo new int[3]
+foo new int[] {1, 2}
+foo new String[2][3]
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (number_literal)
+        (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (number_literal))
+      dimensions: (dimensions_expr
+        (number_literal)))))
+
+==================
+A first argument that starts with new is a whole expression
+==================
+
+foo new Foo().bar()
+foo new Foo().x
+foo new Foo() + 1
+foo new Foo() as Bar
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))
+      field: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (cast_expression
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))
+      type: (type_identifier))))
+
+==================
+Object creation as the first argument after a dotted receiver
+==================
+
+x.y new int[2]
+log.info new Foo()
+obj?.m new Foo(), 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (number_literal))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (safe_navigation_expression
+      object: (identifier)
+      property: (identifier))
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))
+    argument: (number_literal)))
+
+==================
+Object creation as the first argument of a command chain value
+==================
+
+def r = foo new Foo()
+x = foo new Foo()
+def (a, b) = f new Pair()
+def s = obj.m new Foo(), 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (command_chain
+      receiver: (identifier)
+      argument: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))
+        argument: (number_literal)))))
+
+==================
+Object creation on the line after the receiver stays a separate statement
+==================
+
+foo new Foo()
+foo
+new Foo()
+foo
+/* c */ new Foo()
+x.y
+new Foo()
+def r = foo
+new Foo()
+foo \
+new Foo()
+foo new
+Foo()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+A comment between the receiver and new is not read past (known divergence)
+==================
+
+foo new /* c */ Foo()
+foo /* c */ new Foo()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      (block_comment)
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+Command chains with an object creation in statement positions
+==================
+
+xs.each { foo new Foo() }
+foo: bar new Baz()
+if (x) foo new Foo() else bar new Bar()
+switch (x) { case 1: foo new Foo() }
+def m() { foo new Foo() }
+x = 1; foo new Foo()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (object_creation_expression
+            type: (type_identifier)
+            arguments: (argument_list))))))
+  (labeled_statement
+    label: (identifier)
+    statement: (command_chain
+      receiver: (identifier)
+      argument: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))))
+  (if_statement
+    condition: (identifier)
+    consequence: (command_chain
+      receiver: (identifier)
+      argument: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)))
+    alternative: (command_chain
+      receiver: (identifier)
+      argument: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (command_chain
+            receiver: (identifier)
+            argument: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)))))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (command_chain
+        receiver: (identifier)
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+A keyword, a named key or a longer name before new is not a command chain
+==================
+
+respond new Book(params)
+return new Foo()
+throw new Foo()
+assert new Foo()
+yield new Foo()
+foo new: 1
+foo newFoo()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (identifier))))
+  (return_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (throw_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (assert_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (yield_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Array type value as the first argument of a command chain
+==================
+
+foo String[].class
+foo int[]::new
+foo Map.Entry[].class, 1
+obj.m String[].class
+def x = foo String[].class
+foo
+String[].class
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (array_type
+        (type_identifier))
+      field: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_reference_expression
+      target: (array_type
+        (type_identifier))))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (array_type
+        (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (field_access
+      object: (array_type
+        (type_identifier))
+      field: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (array_type
+        (type_identifier))
+      field: (identifier))))

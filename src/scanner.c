@@ -12,9 +12,11 @@
 // Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
-// empty token before the receiver of such a call that is a value, and
+// empty token before the receiver of such a call that is a value,
 // COMMAND_PATH_START, one between the first name of a dotted receiver
-// and its first member access;
+// and its first member access, and COMMAND_STATEMENT_START, one before
+// a statement's one-name receiver whose first argument is a `new` or an
+// array type;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
@@ -27,7 +29,8 @@
 // and where a type may start. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
-// SUBSCRIPT_OPEN, ARRAY_VALUE_START, CAST_CLOSE, NOT_IN and the
+// COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, ARRAY_VALUE_START,
+// CAST_CLOSE, NOT_IN and the
 // STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
@@ -55,6 +58,7 @@ enum TokenType {
     CONTEXTUAL_KEY,
     COMMAND_VALUE_START,
     COMMAND_PATH_START,
+    COMMAND_STATEMENT_START,
     SUBSCRIPT_OPEN,
     ARRAY_VALUE_START,
     CAST_CLOSE,
@@ -267,6 +271,13 @@ static bool read_element_type_name(TSLexer *lexer) {
 }
 
 // Defined with the other look-ahead helpers below.
+static bool skip_header_trivia(
+    TSLexer *lexer,
+    bool newlines,
+    bool no_close_ahead,
+    bool *crossed_line,
+    bool *slash
+);
 static bool array_dimensions_follow(
     TSLexer *lexer,
     bool type_may_start,
@@ -438,12 +449,45 @@ static bool scan_command_named_key(
     return false;
 }
 
+// Whether the `new` just consumed opens an object or array creation: the
+// name of the created type follows, after Groovy's trivia, which
+// `new nls creator` in GroovyParser.g4 allows to include line breaks.
+// `x.y new` followed by `(c)` on the next line is not one.
+static bool creation_follows(TSLexer *lexer, bool no_close_ahead) {
+    return skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        && is_identifier_start(lexer->lookahead);
+}
+
+// SPECIFICATION.md §6.15 — whether the name that `read_word` just
+// consumed starts an array type that is a value (`String[].class`,
+// `int[]::new`, `Map.Entry[].class`): a capitalized name and any nested
+// type names, or a primitive type name, then dimensions followed by a
+// member access or `::`. A bare `String[]` is a type, as where a type
+// may start.
+static bool array_value_follows(
+    TSLexer *lexer,
+    const char *word,
+    unsigned len,
+    bool capitalized,
+    bool no_close_ahead
+) {
+    if (lexer->lookahead == '.') {
+        if (!capitalized || !read_nested_type_names(lexer)) {
+            return false;
+        }
+    } else if (!capitalized && !is_primitive_type(word, len)) {
+        return false;
+    }
+    return array_dimensions_follow(lexer, true, no_close_ahead);
+}
+
 // Whether the first argument of a parenthesis-free call starts here, on
 // the line: after spaces, tabs and line escapes, a number, a string,
-// `true`, `false`, `null` or the key of a named argument. A quote is
-// left unread. A slashy string is not an argument here: after a name
-// Groovy reads `/` as division.
-static bool first_argument_follows(TSLexer *lexer) {
+// `true`, `false`, `null`, an object or array creation, the key of a
+// named argument or an array type that is a value. A quote is left
+// unread. A slashy string is not an argument here: after a name Groovy
+// reads `/` as division.
+static bool first_argument_follows(TSLexer *lexer, bool no_close_ahead) {
     if (!skip_same_line_space(lexer, false)) {
         return false;
     }
@@ -454,17 +498,34 @@ static bool first_argument_follows(TSLexer *lexer) {
     if (!is_identifier_start(c)) {
         return false;
     }
+    bool capitalized = is_capital(c);
     char argument[sizeof "default"];
     unsigned argument_len = read_word(lexer, argument, sizeof argument);
-    return is_literal_word(argument, argument_len)
-        || key_colon_follows(lexer, argument, argument_len);
+    if (is_literal_word(argument, argument_len)) {
+        return true;
+    }
+    if (word_is(argument, argument_len, "new")) {
+        return key_colon_follows(lexer, argument, argument_len)
+            || creation_follows(lexer, no_close_ahead);
+    }
+    // A key is one name; only a nested type name can go on.
+    if (lexer->lookahead != '.') {
+        if (key_colon_follows(lexer, argument, argument_len)) {
+            return true;
+        }
+        if (lexer->lookahead != '[') {
+            return false;
+        }
+    }
+    return array_value_follows(lexer, argument, argument_len, capitalized,
+                               no_close_ahead);
 }
 
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
 // here as the value of a declarator or an assignment
 // (`def out = sh script: 'make'`, `def r = obj.method 1`): a name and any
-// member accesses written without spaces, then on its line a number, a
-// string, `true`, `false`, `null` or the key of a named argument. The
+// member accesses written without spaces, then on its line the first
+// argument (`first_argument_follows`). The
 // token is empty and sits before the name, which the in-grammar lexer
 // reads, as it reads the argument. Taking the decision at the name, not
 // after it, keeps a line break hidden by a comment from joining two
@@ -519,7 +580,7 @@ static bool scan_value_start(
         lexer->result_symbol = ARRAY_VALUE_START;
         return true;
     }
-    if (!first_argument_follows(lexer)) {
+    if (!first_argument_follows(lexer, no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
@@ -586,12 +647,12 @@ static bool method_name_follows(TSLexer *lexer) {
 // there; the accesses must follow each other without spaces, and the
 // first argument must start on their line. The caller has seen a member
 // access start.
-static bool scan_command_path_start(TSLexer *lexer) {
+static bool scan_command_path_start(TSLexer *lexer, bool no_close_ahead) {
     lexer->mark_end(lexer);
     int32_t last_name = 0;
     bool nested = false;
     if (!read_member_accesses(lexer, &last_name, &nested)
-        || !first_argument_follows(lexer)) {
+        || !first_argument_follows(lexer, no_close_ahead)) {
         return false;
     }
     // Groovy declares a method when the last name is capitalized
@@ -1109,6 +1170,119 @@ static bool scan_contextual_word(
     return false;
 }
 
+// The keywords of grammar.js that a name can spell. After
+// COMMAND_STATEMENT_START the parser takes only a name, so the in-grammar
+// lexer would read any of them as one: `return new Foo()` would call a
+// method named `return`. The contextual words (§6.7, §6.13, §6.16) are
+// not keywords there and are decided before this list is read.
+static bool is_grammar_keyword(const char *word, unsigned len) {
+    static const char *const keywords[] = {
+        "_", "abstract", "assert", "break", "case", "catch", "class",
+        "continue", "def", "default", "do", "else", "enum", "extends",
+        "false", "final", "finally", "for", "if", "implements", "import",
+        "instanceof", "interface", "native", "new", "null", "package",
+        "permits", "pipeline", "private", "protected", "public", "return",
+        "static", "strictfp", "super", "switch", "synchronized", "throw",
+        "throws", "transient", "true", "try", "volatile", "while",
+    };
+    for (size_t i = 0; i < sizeof keywords / sizeof keywords[0]; i++) {
+        if (word_is(word, len, keywords[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether the first argument of a statement's parenthesis-free call that
+// opens with COMMAND_STATEMENT_START starts here, after the spaces after
+// the receiver: an object or array creation, or an array type that is a
+// value. The key `new` of a named argument (`foo new: 1`) is not one: the
+// grammar's form takes it. A lowercase name is read only while it can
+// still be `new` or a primitive type name.
+static bool statement_argument_follows(TSLexer *lexer, bool no_close_ahead) {
+    if (lexer->lookahead == 'n') {
+        return consume_keyword(lexer, "new")
+            && creation_follows(lexer, no_close_ahead);
+    }
+    return read_element_type_name(lexer)
+        && array_dimensions_follow(lexer, true, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.14 — decides at the first name of a statement,
+// before it, whether the statement is a parenthesis-free call whose
+// receiver is that name and whose first argument starts with `new` or is
+// an array type that is a value (`foo new Bar()`, `foo String[].class`),
+// on the receiver's line. Literal and key arguments are matched in the
+// grammar instead (§5.5 item 3), and a dotted receiver by
+// COMMAND_PATH_START. The token is empty and the in-grammar lexer reads
+// the name. Deciding here rather than after the name keeps a comment
+// that opens the next line from hiding the line break: after `foo` and
+// `/* c */` on the next line the scanner no longer sees one.
+//
+// The same name may be a contextual keyword (§6.7, §6.13, §6.16) or start
+// an array type that is a value (§6.15), whose tokens are valid at a
+// statement start as well. The scanner cannot read the name twice, so
+// each is decided here, as the branches of the scan function decide it
+// where no statement may start.
+//
+// The caller has skipped whitespace and seen an identifier start.
+static bool scan_statement_start(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool wants_array,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    lexer->mark_end(lexer);
+    bool capitalized = is_capital(lexer->lookahead);
+    char word[sizeof "synchronized"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "record") && valid_symbols[RECORD_KEYWORD]) {
+        lexer->result_symbol = RECORD_KEYWORD;
+        return scan_record_header(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "trait") && valid_symbols[TRAIT_KEYWORD]) {
+        lexer->result_symbol = TRAIT_KEYWORD;
+        return scan_trait_header(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "sealed") && valid_symbols[SEALED_KEYWORD]) {
+        lexer->result_symbol = SEALED_KEYWORD;
+        return scan_sealed_target(lexer, no_close_ahead);
+    }
+    if (is_contextual_word(word, len)
+        && contextual_word_may_start(word[0], valid_symbols)) {
+        lexer->mark_end(lexer);
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
+    }
+    if (lexer->lookahead == '.') {
+        // A dotted receiver is decided after the first name.
+        if (!wants_array || !capitalized || !read_nested_type_names(lexer)
+            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '[') {
+        if (!wants_array || (!capitalized && !is_primitive_type(word, len))
+            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    if (!statement_argument_follows(lexer, no_close_ahead)
+        || is_grammar_keyword(word, len)) {
+        return false;
+    }
+    lexer->result_symbol = COMMAND_STATEMENT_START;
+    return true;
+}
+
 // SPECIFICATION.md §6.11 — whether something follows a `)` on its
 // line. The `)` is already consumed when this is called.
 // `castParExpression castOperandExpression` in GroovyParser.g4 has no
@@ -1225,7 +1399,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // characters.
     if (valid_symbols[COMMAND_PATH_START] && !valid_symbols[ERROR_SENTINEL]
         && is_member_access_start(lexer->lookahead)) {
-        return scan_command_path_start(lexer);
+        return scan_command_path_start(lexer, no_comment_close_ahead(scanner));
     }
 
     // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY
@@ -1280,10 +1454,11 @@ bool tree_sitter_groovy_external_scanner_scan(
     // eats `\n`, does NOT re-invoke the external scanner, then
     // fails on the following `/` and consumes it through error
     // recovery. The contextual keywords (§6.7, §6.13) and the receiver
-    // of a call that is a value (§6.14) share the whitespace skip and
-    // are dispatched on their first letter before the `/` branches. A
-    // value may start on the line after its `=`, so that receiver is
-    // looked for past line breaks too.
+    // of a call that is a value or a statement (§6.14) share the
+    // whitespace skip and are dispatched on their first letter before the
+    // `/` branches. A value may start on the line after its `=`, and a
+    // statement on the line after the one before it, so those receivers
+    // are looked for past line breaks too.
     bool wants_comment = valid_symbols[LINE_COMMENT]
         || valid_symbols[BLOCK_COMMENT]
         || valid_symbols[GROOVYDOC_COMMENT];
@@ -1293,13 +1468,15 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_sealed = valid_symbols[SEALED_KEYWORD];
     bool wants_value_start = valid_symbols[COMMAND_VALUE_START]
         && !valid_symbols[ERROR_SENTINEL];
+    bool wants_statement_start = valid_symbols[COMMAND_STATEMENT_START]
+        && !valid_symbols[ERROR_SENTINEL];
     bool wants_cast_close = valid_symbols[CAST_CLOSE]
         && !valid_symbols[ERROR_SENTINEL];
     bool wants_not_in = valid_symbols[NOT_IN]
         && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
-        && !wants_sealed && !wants_value_start && !wants_array
-        && !wants_cast_close && !wants_not_in
+        && !wants_sealed && !wants_value_start && !wants_statement_start
+        && !wants_array && !wants_cast_close && !wants_not_in
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
@@ -1322,6 +1499,12 @@ bool tree_sitter_groovy_external_scanner_scan(
     // rewinds to the token start and the in-grammar lexer reads the
     // word as an identifier.
     bool no_close_ahead = no_comment_close_ahead(scanner);
+    // §6.14 — a statement's first name; it decides the keywords and the
+    // array type below as well.
+    if (wants_statement_start && is_identifier_start(lexer->lookahead)) {
+        return scan_statement_start(lexer, valid_symbols, wants_array,
+                                    type_may_start, no_close_ahead);
+    }
     if (lexer->lookahead == 'r' && wants_record) {
         if (!consume_keyword(lexer, "record")
             || !scan_record_header(lexer, no_close_ahead)) {
