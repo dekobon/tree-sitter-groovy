@@ -1742,11 +1742,18 @@ the scanner advances over 3.4% more characters, with no more calls, and
 the parse has the same number of steps and no new step with more than
 one stack version, on real files, on Java files and on code made only of
 calls (`foo(a, b)`, `obj.m(a, 'x')`). Code made only of such calls takes
-1.6% more instructions, real files and Java files 0.3% more. One tree
-with no `ERROR` changes: a method header with no body whose parameter is
-named `true`, `false` or `null`, which Groovy rejects. `foo bar(baz true)`
-was the method `bar` with return type `foo`, and is now the statement
-`foo` and the call `bar(baz true)`.
+1.6% more instructions, real files and Java files 0.3% more. One kind
+of tree with no `ERROR` changes: a method header whose parameter is
+named `true`, `false` or `null` after a name, with no body, or with one
+when the name before is on the line above. `foo bar(baz true)` was the
+method `bar` with return type `foo`, and is now the statement `foo` and
+the call `bar(baz true)`; Groovy reads the call `foo.bar(baz(true))`
+(§5.5 item 4). `x` followed by `foo(it null, a, b)` on the next line is
+now `x` and the call `foo(it(null, a, b))`, as in Groovy, and `x`
+followed by `C(Foo.Bar true) { }`, which Groovy rejects, is `x` and a
+call of `C`. The same continuation without a literal,
+`foo bar(baz 1)`, was an `ERROR` and is now `foo` and the call
+`bar(baz 1)`, where Groovy reads `foo.bar(baz(1))`.
 
 A keyword that Groovy reserves is no receiver of a value: with
 `def x = return 1` Groovy calls nothing, and it reads `"${return 1}"`

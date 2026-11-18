@@ -1342,7 +1342,8 @@ LARGE_STATE_COUNT 1577 to 1575, `parser.c` 8,188,269 to 8,207,368
 bytes, and no conflict, precedence or external token added. Parse steps
 and steps with more than one stack version are unchanged on real files,
 on Java files and on code made only of parenthesized expressions, casts,
-conditions or interpolations. Real Groovy and Gradle files take 0.3%
+conditions or interpolations; a condition takes one more reduction, for
+the hidden rule below. Real Groovy and Gradle files take 0.3%
 more instructions and Java files 0.6%, with no wall-clock change above
 the noise.
 
@@ -1419,11 +1420,13 @@ steps with more than one stack version are unchanged.
 | `return bar(foo 1)` | rejected | `return bar`, then `(foo 1)`, as `return foo 1` is `return foo` and `1`; before, an `ERROR` |
 | `println` then `(foo 1)` on the next line | `println`, then the call | an `ERROR`, as before: a `(` on the next line is a call (§3) |
 | `foo(1).bar(baz 2)` | a call | an `ERROR`, as before: a receiver is made of names (spec §5.5 item 2) |
-| `bar(foo 1) 2`, `void foo(bar 1) { }` | `bar(foo(1)).2`; `void.foo(bar(1, { }))` | the call, then `2` (spec §5.5 item 4); `void`, then the call `foo((bar 1) { })`; before, an `ERROR` |
+| `bar(foo 1) 2` | `bar(foo(1)).2` | the call, then `2` (spec §5.5 item 4); before, an `ERROR` |
+| `foo bar(baz 1)`, `println foo(bar 1)`, `void foo(bar 1) { }`, `String foo(bar 1) { }` | the chain goes on: `foo.bar(baz(1))`, `println.foo(bar(1))`, `void.foo(bar(1, { }))` | the first name as a statement, then the call: `foo`, then `bar((baz 1))`; `void`, then `foo((bar 1) { })` (spec §5.5 item 4); before, an `ERROR` |
 | `super(foo 1)`, `permits(foo 1)`, `pipeline(foo 1)`, `_(foo 1)` at the start of a statement, `super(foo 1)` in a constructor | calls | the same; before, an `ERROR`. `super new Foo()` stays `super`, then the creation (#23 above) |
-| `foo bar(baz true)`, `println this(it null)`, with no body | rejected, or after another name `foo.bar(baz(true))` | the statement `foo` (`println`), then the call; before, a method `bar` (`this`) with return type `foo` (`println`) and a parameter named `true` (`null`) |
+| `foo bar(baz true)`, `println this(it null)`, with no body | `foo.bar(baz(true))`, or rejected | the statement `foo` (`println`), then the call; before, a method `bar` (`this`) with return type `foo` (`println`) and a parameter named `true` (`null`) |
+| `x` then `foo(it null, a, b)` on the next line; `x` then `C(Foo.Bar true) {` and `}` on the lines after | `x`, then `foo(it(null, a, b))`; rejected | `x`, then the call; before, a method `foo` (`C`) with return type `x`, also with the body. With the return type on the header's line and a body it is that method, as before, also `void f(Foo.Bar true) { }`, which Groovy reads as `void.f(Foo.Bar(true, { }))` |
 
-The last row is the other change of a tree with no `ERROR`. Of
+The last two rows are the other change of a tree with no `ERROR`. Of
 120,000 inputs a fuzzer built around parentheses, conditions,
 interpolations and calls with parentheses, and 120,000 it made by
 changing corpus inputs and lines of real files, every tree with no
