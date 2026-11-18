@@ -19,4 +19,12 @@ record R()
 @Foo(x = @Bar(1))
 // <- attribute
 //       ^ attribute
+// ^ attribute
+//          ^ attribute
 class Baz { }
+
+@groovy.transform.CompileStatic
+//      ^ attribute
+//               ^ attribute
+//                 ^ attribute
+class Qux { }

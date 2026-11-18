@@ -260,3 +260,8 @@
 (annotation
   "@" @attribute
   name: (qualified_name) @attribute)
+
+; The names and dots inside the qualified name are nodes of their own,
+; which layers 2 and 3 captured as @operator and @variable.
+(annotation
+  name: (qualified_name [(identifier) "."] @attribute))
