@@ -21,8 +21,8 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), and in parentheses, also those of a condition (see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. Not accepted where Groovy takes one: as the only argument of a call (`bar(foo 1)`), in an interpolation (`"${foo 1}"`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19 and #23 below. |
-| §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, and in parentheses. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, and in an interpolation (see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. Not accepted where Groovy takes one: as the only argument of a call (`bar(foo 1)`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19 and #23 below. |
+| §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, in parentheses and in an interpolation. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
 | §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. Not supported, each an `ERROR`: an annotation on a `catch` parameter (`catch (@A Exception e)`), a for-in variable (`for (@A x in xs)`), a record component (`record R(@A int a)`) or a type parameter (`class C<@A T>`), and an annotated typed local with no initializer (`@A String x`; with `final` before the type it parses; see #6 below). An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`. An annotation's arguments, the value of each `name = value` in them, and an `@interface` element's `default` (#101) take Apache's `elementValue`: an expression, an annotation, or a list of annotations, nested to any depth (`@Foo(x = [@Bar(@Baz)])`). A list that mixes annotations and expressions (`[@A, 1]`) or holds a list of annotations inside a list (`[[@A]]`) is an `ERROR`: Apache's parser takes both, and Groovy rejects them when it checks the annotation. Outside those three places an annotation is not a value, so `foo(@A)` and `x = [@A]` stay `ERROR`s. The arguments also take the forms of a call's arguments that Apache's one value or list of pairs does not (`@Foo(1, 2)`, `@Foo(x: 1)`, a trailing comma), and an annotation goes wherever an expression does among them (`@A(@B, @C)`, `@A(@B, a = 1)`, `@A(@B,)`), except as the value of `x:`, which stays an expression. One call form is not taken: in a call, `x = a: 1` is a named argument whose key is the assignment `x = a`, while in an annotation `name =` starts a pair, so `@Foo(x = a: 1)` is an `ERROR`, as it is in Groovy. Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
@@ -974,8 +974,8 @@ The Groovy column was observed by running Groovy 3.
 | `def x = foo $/a/$`, `def x = foo .5` | `foo('a')`, `foo(0.5)` | as before: `def x = foo` then the string; an `ERROR` (spec §6.14) |
 | `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
 | `def r = obj.method 1` | a call | `command_chain` value whose receiver is a `field_access` (#52; see #19) |
-| `def x = (foo 1)`, `if (foo 1) { }` | a call | a call (#24 below) |
-| `bar(foo 1)`, `"${foo 1}"` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | `ERROR`, as before |
+| `def x = (foo 1)`, `if (foo 1) { }`, `"${foo 1}"` | a call | a call (#24 below) |
+| `bar(foo 1)` | a call; `bar(foo 1, 2)` is `bar(foo(1, 2))`, and `bar(a, foo 1)` is rejected | `ERROR`, as before |
 | `def x = foo 1 b 2` | `foo(1).b(2)` | the chains `foo 1` and `b 2`, as in statement position |
 | `def c = foo { }` | a call with a closure | `method_invocation`, as before |
 | `return foo 1`, `throw foo 1`, `assert foo 1`, `def s = 'a' + foo 1` | rejected | two statements, as before |
@@ -1299,7 +1299,8 @@ The Groovy column was observed by running Groovy 3.
 | `foo.new Inner()` | `new Inner(foo)` | `foo.new`, then the call `Inner()`, as before |
 | `foo new @A Foo()` | a call | `ERROR`, as before: a creation takes no annotation here |
 | `foo String[]`, `foo java.lang.String[].class` | a call | `ERROR`, as before (#21 above) |
-| `"${foo new Foo()}"`; `[a new B()]` | a call; rejected | `ERROR`, as before (#18 above) |
+| `"${foo new Foo()}"` | a call | a call (#24 below) |
+| `[a new B()]` | rejected | `ERROR`, as before (#18 above) |
 | `x.y new` then `(c)` on the next line | rejected | a method `new` with no body, as before: `new` before `(` is no creation |
 | `foo`, a no-break space (U+00A0) and `new Foo()` | rejected | `ERROR`, as before: the scanner reads the space as part of the name (spec §6.8), and the grammar's lexer does not skip it |
 
@@ -1316,7 +1317,7 @@ have in any expression.
 
 ---
 
-## 24. A parenthesis-free call in parentheses
+## 24. A parenthesis-free call in parentheses or an interpolation
 
 **Apache `GroovyParser.g4`** (4.0.x to 6.0.x): `expressionInPar` is
 `LPAREN enhancedStatementExpression rparen`, and
@@ -1325,31 +1326,38 @@ have in any expression.
 it is a `primary`, which may stand wherever an expression may
 (`return (foo 1)`, `[(foo 1)]`). The parentheses after `if`, `while`,
 `do … while`, `switch` and `synchronized` are `expressionInPar` as
-well.
+well. A `${…}` interpolation is a `closure` (`gstringValue`), and
+`AstBuilder` takes the one expression statement in it as the value, so
+`"${foo 1}"` is a call too; any other content is called as a closure.
 
 **Current implementation**: the content of a `parenthesized_expression`
 may be a `command_chain`, and so may the condition of `if`, `while` and
-`do`, a `switch` value and a `synchronized` lock. It is the value form
+`do`, a `switch` value, a `synchronized` lock and the `value` of a
+`gstring_brace_interpolation`. It is the value form
 (spec §5.5 item 1), which opens with `_command_value_start`, emitted
 only when the first argument starts on the receiver's line (spec
 §6.14). The scanner is unchanged: the token is now also valid after
-`(`.
+`(` and `${`.
 
-Measured against the grammar before: STATE_COUNT 4298 to 4322,
-LARGE_STATE_COUNT 1577 to 1575, `parser.c` 8,188,269 to 8,202,199
+Measured against the grammar before: STATE_COUNT 4298 to 4330,
+LARGE_STATE_COUNT 1577 to 1575, `parser.c` 8,188,269 to 8,207,368
 bytes, and no conflict, precedence or external token added. Parse steps
 and steps with more than one stack version are unchanged on real files,
-on Java files and on code made only of parenthesized expressions, casts
-or conditions. In a parenthesized expression the choice between an
-expression and a call is inline, for 22 states. A condition takes it
-through the hidden rule `_statement_expression`: inline, the choice
-gave each alternative its own copy of the states for the rest of the
-`if` or loop, about 70 states. The rule costs a reduction per
-condition: code made only of conditions takes about 5% more
-instructions, Java files 0.6%, real Groovy and Gradle files 0.1%, with
-no wall-clock change on real files above the noise. A reduction in
-every parenthesis as well cost about 4% more instructions on code made
-of parenthesized expressions.
+on Java files and on code made only of parenthesized expressions, casts,
+conditions or interpolations. Real Groovy and Gradle files take 0.3%
+more instructions and Java files 0.6%, with no wall-clock change above
+the noise.
+
+In a parenthesized expression and an interpolation the choice between an
+expression and a call is inline, for 22 and 8 states. Code made only of
+interpolations takes 1.4% more instructions, as the scanner now reads
+the name after each `${`. A condition takes the choice through the
+hidden rule `_statement_expression`: inline, it gave each alternative
+its own copy of the states for the rest of the `if` or loop, about 70
+states. The rule costs a reduction per condition, and code made only of
+conditions takes about 5% more instructions. A reduction in every
+parenthesis as well cost about 4% more instructions on code made of
+parenthesized expressions.
 
 The Groovy column was observed by running Groovy 3.
 
@@ -1358,7 +1366,10 @@ The Groovy column was observed by running Groovy 3.
 | `(foo 1)`, `def x = (foo 1, 2)`, `(sh script: 'x').trim()`, `((log.info 'x'))`, `(foo new Bar())` | a call | a `parenthesized_expression` holding a `command_chain`; before, an `ERROR` |
 | `return (foo 1)`, `c ? (foo 'a') : 2`, `[(foo 1)]`, `!(foo 1)`, `(foo 1) + (bar 2)` | the call as an operand | the same |
 | `if (fileExists 'pom.xml') { }`, `while (foo 1) { }`, `do { } while (foo 1)`, `switch (foo a: 1) { }`, `synchronized (lock 'a') { }` | a call | the `command_chain` is the `condition`, `value` or `lock`; before, an `ERROR` |
+| `"${foo 1}"`, `"v: ${sh script: 'x', returnStdout: true}"`, `"""${foo 'a', 2}"""`, `/${log.info 'x'}/` | a call | the `command_chain` is the interpolation's `value`; before, an `ERROR` |
 | `(foo) 1`, `(Foo) 'x'`, `(int) 1`, `(a) - 1`, `(a, b) = foo 1` | casts; a multi-assignment | the same, as before: the name is followed by `)` or `,` |
+| `"${foo} 1"`, `"$foo 1"`, `"${foo}1"` | the name, then the text | the same, as before |
+| `"${a; b}"`, `"${def x = 1}"`, `"${foo 1; 2}"`, `"${if (c) 1 else 2}"`; `"${-> x}"` | a closure, called; a closure | an `ERROR`, as before: an interpolation holds one expression |
 | `(int 1)`, `(String 'x')` | calls of the methods `int` and `String` | the same |
 | `(foo` then `1)` on the next line | a call: inside parentheses Groovy's lexer drops line breaks | an `ERROR`, as before (spec §6.9) |
 | `(foo /* c */ 1)` | a call | an `ERROR`, as before (spec §6.14) |
@@ -1369,7 +1380,8 @@ The Groovy column was observed by running Groovy 3.
 | `def f(Foo.Bar true)`, `final def g(int null)`, with no body | rejected | the declaration of `f` (`g`), then the parenthesis as the next statement; before, a `method_declaration` whose parameter is named `true` (`null`). With a body it is that `method_declaration`, as before |
 
 The last row is the one change of a tree with no `ERROR`: of 120,000
-inputs a fuzzer built around parentheses and conditions and 120,000 it
+inputs a fuzzer built around parentheses, conditions and
+interpolations and 120,000 it
 made by changing corpus inputs and lines of real files, it changed no
 other tree that had no `ERROR`, and made none an `ERROR`. Nor did any
 tree change for the corpus, the highlight, tag and stress tests, or the

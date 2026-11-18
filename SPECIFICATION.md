@@ -597,21 +597,25 @@ The resolution we adopt:
    `(a, b) = f 3`), and in parentheses (`(sh script: 'x').trim()`),
    also those of the condition of `if`, `while` and `do`, of a
    `switch` value and of a `synchronized` lock
-   (`if (fileExists 'pom.xml')`). That covers Jenkins'
+   (`if (fileExists 'pom.xml')`), and in a `${…}` interpolation
+   (`"${sh script: 'x'}"`), which Groovy reads as a closure whose one
+   statement is the call. That covers Jenkins'
    `def out = sh script: 'make', returnStdout: true`. A value in
    parentheses is a primary, so it nests wherever an expression does:
    `return (foo 1)`, `c ? (foo 'a') : 2`, `[(foo 1)]`. An assignment is
    an expression, so the value form also nests where an assignment
-   does: `println(x = foo 1)`, `"${x = foo 1}"`. The value form is the
-   same `command_chain` node with the same fields; in parentheses it is
-   the child of a `parenthesized_expression`, and in a condition it is
-   the `condition` (`value`, `lock`) itself. Not accepted here, and
-   taken by Groovy (observed with Groovy 3): a chain as the only
-   argument of a call (`bar(foo 1)`,
+   does: `println(x = foo 1)`. The value form is the same
+   `command_chain` node with the same fields; in parentheses it is the
+   child of a `parenthesized_expression`, and in a condition or an
+   interpolation it is the `condition` (`value`, `lock`) itself. Not
+   accepted here, and taken by Groovy (observed with Groovy 3): a chain
+   as the only argument of a call (`bar(foo 1)`,
    `println(sh script: 'x', returnStdout: true)`, and `bar(foo 1, 2)`,
    which is `bar(foo(1, 2))`), though Groovy rejects one among several
-   arguments (`bar(a, foo 1)`); and a chain in an interpolation
-   (`"${foo 1}"`). Each is an `ERROR`. Nor is a first argument on the
+   arguments (`bar(a, foo 1)`); and more than one statement, a
+   declaration or a closure's parameters in an interpolation
+   (`"${a; b}"`, `"${def x = 1}"`, `"${-> x}"`). Each is an `ERROR`.
+   Nor is a first argument on the
    line after the receiver inside parentheses, `(foo` followed by `1)`,
    which Groovy reads as a call because its lexer drops line breaks
    inside parentheses: the scanner tracks no brackets (§6.9), so this
@@ -756,7 +760,8 @@ forms:
   dotted property access, no method call). The identifier follows
   §5.2, without `$`, so `"値は$名前です"` interpolates `名前です`, as
   in Groovy.
-- `${ expression }` — full expression, recursively parsed.
+- `${ expression }` — full expression, recursively parsed, or a
+  parenthesis-free call (`"${sh script: 'x'}"`, §5.5 item 1).
 
 Grammar:
 
@@ -1608,9 +1613,9 @@ is the counterpart of the `record foo() { … }` residual of §6.7.
 
 ### 6.14 COMMAND_VALUE_START, COMMAND_PATH_START and COMMAND_STATEMENT_START — implementation contract
 
-A parenthesis-free call may be the value of a declarator or an
-assignment (§5.5 item 1), and its receiver may have member accesses
-(§5.5 item 2). A newline is whitespace, so with only the grammar
+A parenthesis-free call may be a value: of a declarator or an
+assignment, or the content of parentheses or of an interpolation (§5.5
+item 1), and its receiver may have member accesses (§5.5 item 2). A newline is whitespace, so with only the grammar
 `def x = foo` followed by `1` on the next line would be one call, and
 so would `result.size` followed by `2`; Groovy ends the statement at
 the line break (observed with Groovy 3). Both forms therefore hold an
@@ -2575,7 +2580,7 @@ How each filed bug closes against this spec.
 | dekobon/big-code-analysis **#246** (Elvis short-circuit) | §3.2 — `elvis_expression` as a distinct named node. §8.1 — pinned corpus test reproducing the issue's `def pick(a, b, c) { … }` snippet with the expected S-expression. The downstream `get_op_type()` impl can now `matches!(id.into(), AMPAMP \| PIPEPIPE \| ELVIS_EXPRESSION)`. No `MISSING` child anywhere. |
 | dekobon/big-code-analysis **#247** umbrella (all operator gaps) | §3.2 row-by-row: every symbol in the issue's three tables maps to a distinct node kind. The "critical" rows (`?:`, `?.`, `as`, `trait`, `..<`) all have dedicated nodes. The "important" rows (`=~`, `==~`, slashy, `===`, `!==`, `<=>`, `!instanceof`, `!in`) likewise. The "niche" rows (`?=`, `?[]`, `.&`, `.@`, `$/…/$`, `==>`) likewise. §8 anchors each with a pinned test. §3.2.1 explicitly handles the subscript-yielding-callable composition (`arr[i](args)`). §3.2.2 documents the lexer trailing-context rule for `!instanceof` / `!in` to avoid mis-tokenisation when followed by an identifier character. |
 | amaanq #2 / #3 (maintenance / license) | The prior grammar is treated as inspiration only — no code is incorporated. This grammar is an independent project, dual-licensed under `Apache-2.0 OR MIT`, with no dependency on the upstream project's release cadence. |
-| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements, to the values of declarations and assignments and to the content of parentheses, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
+| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements, to the values of declarations and assignments and to the content of parentheses and interpolations, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
 | murtaza64 **#16** (empty block comments) | §6.6 — block comments and groovydoc comments are external-scanner tokens that consume the entire `/* … */` or `/** … */` regardless of content. §8.2 — pinned test with `/**/`, `/***/`, `/* */`. |
 | murtaza64 **#22** (multiple assignment) | §4 — `multi_assignment_declaration` rule. §8.2 — pinned test on `def (a, b) = [1, 2]`. |
 | murtaza64 **#27** (publish to npm) | Out of grammar scope. The package layout in §2.1 includes `package.json` and `bindings/node/`; npm publishing is part of release tooling, not the grammar. |

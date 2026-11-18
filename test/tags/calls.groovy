@@ -60,6 +60,9 @@ x = (sh 'make', new Z())
 if (fileExists 'x', new Z()) { }
 //  ^ reference.call
 
+def m = "${sh 'make', new Z()}"
+//         ^ reference.call
+
 new Foo(z())
 //  ^ reference.class
 

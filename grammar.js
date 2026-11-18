@@ -415,7 +415,9 @@ function commandPathRules(path, first) {
  * declarator (`variableInitializer`) or of an assignment (the right side
  * of `#assignmentExprAlt` and `#multipleAssignmentExprAlt`), what is in
  * parentheses (`expressionInPar`, also around the condition of `if`,
- * `while` and `do`, a `switch` value and a `synchronized` lock).
+ * `while` and `do`, a `switch` value and a `synchronized` lock), and a
+ * `${…}` interpolation, whose closure body holds the call as its one
+ * statement.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The value rule.
@@ -787,9 +789,9 @@ module.exports = grammar({
     // the rest of the rule, about 70 in all, most for the `else` of an `if`.
     // The symbol costs a reduction per condition instead, about 5% more
     // instructions on code made only of conditions. A parenthesized
-    // expression ends right after the choice, so it keeps it inline: there
-    // it costs few states, and an extra reduction in every parenthesis cost
-    // about 4%.
+    // expression and an interpolation end right after the choice, so they
+    // keep it inline: there it costs few states, and an extra reduction in
+    // every parenthesis cost about 4%.
     _statement_expression: $ => statementExpression($),
 
     // §5.5 item 2 — a statement whose receiver has a member access
@@ -3003,10 +3005,12 @@ module.exports = grammar({
       String.raw`\$${identifierPattern(false)}(?:\.${identifierPattern(false)})*`,
     )),
 
-    // §5.7 / §6.3 — `${expression}` interpolation.
+    // §5.7 / §6.3 — `${expression}` interpolation. Groovy reads the braces
+    // as a closure whose one statement is the value, so it may be a
+    // parenthesis-free call (`"${sh script: 'x'}"`, §5.5 item 1).
     gstring_brace_interpolation: $ => seq(
       token.immediate('${'),
-      field('value', $._expression),
+      field('value', statementExpression($)),
       '}',
     ),
 

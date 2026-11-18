@@ -1759,6 +1759,125 @@ synchronized (lock 'a') { }
     body: (block)))
 
 ==================
+Command chain in an interpolation
+==================
+
+def a = "${foo 1}"
+def b = "v: ${sh script: 'x', returnStdout: true}"
+def c = """${foo 'a', 2}"""
+def d = /${log.info 'x'}/
+def e = "${foo new Bar()} ${foo}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (identifier)
+              value: (string_literal))
+            argument: (named_argument
+              key: (identifier)
+              value: (boolean_literal)))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (string_literal)
+            argument: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (string_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list))))
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier))))))
+
+==================
+A name in an interpolation before a literal is not a command chain
+==================
+
+def a = "${foo 1}"
+def b = "${foo} 1"
+def c = "$foo 1"
+def d = "${foo}1"
+def e = "${ { it } }"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (closure
+            (expression_statement
+              (identifier))))))))
+
+==================
 Command chain with a dotted receiver (#52)
 ==================
 

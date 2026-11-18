@@ -43,6 +43,9 @@ def p = (log.info 'x')
 if (fileExists 'pom.xml') { }
 //  ^ function.call
 
+def m = "v: ${sh script: 'x'}"
+//             ^ function.call
+
 obj?.method(x)
 //   ^ function.call
 
