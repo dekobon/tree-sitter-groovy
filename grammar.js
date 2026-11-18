@@ -972,19 +972,33 @@ module.exports = grammar({
     // AUTOMATIC_SEMICOLON lands the parser will greedily consume
     // a trailing expression onto `return` / `throw` / `assert`;
     // explicit `;` or statement boundary is recommended in source.
+    // A statement may follow a bare `return`, `break` or `continue`, so
+    // the scanner offers `_command_statement_start` before a name there
+    // (§6.14). Taking it here keeps `return foo new Foo()` the return of
+    // `foo` followed by the creation, as `return foo 1` is; `prec.right`
+    // prefers the shift, as it does for the name itself.
     return_statement: $ => prec.right(seq(
       'return',
-      optional($._expression),
+      optional(choice(
+        $._expression,
+        seq($._command_statement_start, $.identifier),
+      )),
     )),
 
     break_statement: $ => prec.right(seq(
       'break',
-      optional(field('label', $.identifier)),
+      optional(seq(
+        optional($._command_statement_start),
+        field('label', $.identifier),
+      )),
     )),
 
     continue_statement: $ => prec.right(seq(
       'continue',
-      optional(field('label', $.identifier)),
+      optional(seq(
+        optional($._command_statement_start),
+        field('label', $.identifier),
+      )),
     )),
 
     throw_statement: $ => seq('throw', $._expression),
@@ -1721,10 +1735,14 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
+      // A statement may follow `final Type`, a declaration of `Type`, so
+      // the scanner may emit `_command_statement_start` before the name
+      // (§6.14); `final String s new Foo()` still declares `s`.
       prec.dynamic(2, seq(
         repeat($.annotation),
         'final',
         field('type', $._type),
+        optional($._command_statement_start),
         field('name', $.identifier),
       )),
       prec.dynamic(2, seq(

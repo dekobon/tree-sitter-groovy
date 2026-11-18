@@ -645,7 +645,12 @@ The resolution we adopt:
    (`x.y(a.b).c`, item 4). After `return`, on its line or the next one,
    the name is the returned value, so `return obj.m 'x'` is `return
    obj.m` followed by `'x'`, as before #52; Groovy rejects the first and
-   reads the second as a `return` and a call.
+   reads the second as a `return` and a call. The same holds for a name
+   before `new` or an array type value after `return`, and for a label
+   after `break` or `continue`: `return foo new Foo()` is `return foo`
+   followed by the creation, and so is `return` followed by
+   `foo new Foo()` on the next line, which Groovy reads as `return null`
+   and the call `foo(new Foo())` (observed with Groovy 3).
    A capitalized last name before a quoted name and `(` is the return
    type of a method, as in Groovy at script and class level:
    `java.util.List 'foo'() { }` declares `foo`, while `obj.m 'a'() { }` passes `'a'({ })` to `m`. Groovy
@@ -1693,23 +1698,29 @@ class name (`def x`, `String name`). The same name may be
 `record`, `trait`, `sealed`, `var`, `yield`, `in`, `as` or the start of
 an array type value, whose tokens are valid at a statement start too;
 the scanner reads it once and decides each of them there, as its other
-branches decide them where no statement may start. The keywords of
-grammar.js are turned down, because after the token the parser takes
-only a name, and the in-grammar lexer would read `return` in
-`return new Foo()` as one. Measured against the grammar before:
-STATE_COUNT 4249 to 4261, LARGE_STATE_COUNT 1565 to 1572, one external
-token and
-no conflict or precedence added; the same number of parse steps and of
-steps with more than one stack version on real files, on Java files and
-on code made only of statements that start with a name. Real Groovy and
-Gradle files take about 1.6% more instructions and 0.3% to 0.7% more
-wall-clock time (a second build of the same grammar differs by up to
-0.4%), Java files about 0.9% more instructions and no measurable time,
-and code made only of statements that start with a name about 2.4% more
-instructions and about 0.7% more time.
-The table change alone costs about 0.1%: the rest is the second read of
-each statement's first name. A token after the receiver, decided as
-COMMAND_NAMED_KEY is (§6.8), costs about 0.1% but reads `foo` followed by
+branches decide them where no statement may start. A keyword of
+grammar.js is turned down as soon as it is read, because after the
+token the parser takes only a name, and the in-grammar lexer would read
+`return` in `return new Foo()` as one; a test compares the scanner's
+words with `src/grammar.json`. A statement may also follow a bare
+`return`, `break` or `continue`, and `final Type`, which declares
+`Type`, so the token is valid after each, and each takes it before its
+operand or name: `return foo new Foo()` returns `foo`, as
+`return foo 1` does, and `final String s new Foo()` declares `s`.
+
+Measured against the grammar before: STATE_COUNT 4249 to 4298,
+LARGE_STATE_COUNT 1565 to 1577, one external token and no conflict or
+precedence added. The scanner reads the first name of each statement
+once more: it advances over about 23% more characters on real files,
+with no more calls, and the parse has the same number of steps and no
+new step with more than one stack version, on real files, on Java files
+and on code made only of statements that start with a name. With the
+parse table's layout held fixed, real Groovy and Gradle files take
+about 1.4% more time and 1.6% more instructions, Java files about 1.0%
+and 1.1%, and code made only of statements that start with a name about
+0.9% and 2.1%. The table change alone costs about 0.1% of the
+instructions. A token after the receiver, decided as COMMAND_NAMED_KEY
+is (§6.8), costs about 0.1% but reads `foo` followed by
 `/* c */ new Bar()` on the next line as one call.
 
 Trees that change for input that parsed without an `ERROR`: each form
@@ -1722,9 +1733,14 @@ statement on the same line, where Groovy continues that statement
 instead (§5.5 item 4): `foo 1 bar new Baz()` and `foo bar new Baz()`
 are `foo 1` or `foo`, then the call `bar new Baz()`; and
 `foo new Foo() bar 1` is the call `foo new Foo()` and the chain
-`bar 1`. Every such change was checked mechanically on the cases a
-fuzzer found: with a line break put between each such call's receiver
-and its first argument, the new grammar gives the old tree.
+`bar 1`. A call in the branch of an `if` now lets an `else` after it
+continue the `if`: `if (x) foo new Foo() else bar new Bar()` was the
+`if`, the creation, and `else` and `bar` read as names. Every such
+change was checked mechanically on the cases a fuzzer found: with a
+line break put between each such call's receiver and its first
+argument, the new grammar gives the old tree, and, but for that `else`,
+the call sits where the old tree had its receiver, so it takes no
+operand of the statement before it.
 
 A string after a receiver whose last name is capitalized, followed by
 `(`, is the name of a method: Groovy declares `foo` in

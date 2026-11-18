@@ -1175,22 +1175,64 @@ static bool scan_contextual_word(
 // lexer would read any of them as one: `return new Foo()` would call a
 // method named `return`. The contextual words (§6.7, §6.13, §6.16) are
 // not keywords there and are decided before this list is read.
+// bindings/rust/tests/scanner_keywords.rs checks the words against
+// src/grammar.json.
 static bool is_grammar_keyword(const char *word, unsigned len) {
-    static const char *const keywords[] = {
-        "_", "abstract", "assert", "break", "case", "catch", "class",
-        "continue", "def", "default", "do", "else", "enum", "extends",
-        "false", "final", "finally", "for", "if", "implements", "import",
-        "instanceof", "interface", "native", "new", "null", "package",
-        "permits", "pipeline", "private", "protected", "public", "return",
-        "static", "strictfp", "super", "switch", "synchronized", "throw",
-        "throws", "transient", "true", "try", "volatile", "while",
-    };
-    for (size_t i = 0; i < sizeof keywords / sizeof keywords[0]; i++) {
-        if (word_is(word, len, keywords[i])) {
-            return true;
-        }
+    switch (word[0]) {
+        case '_':
+            return word_is(word, len, "_");
+        case 'a':
+            return word_is(word, len, "abstract")
+                || word_is(word, len, "assert");
+        case 'b':
+            return word_is(word, len, "break");
+        case 'c':
+            return word_is(word, len, "case") || word_is(word, len, "catch")
+                || word_is(word, len, "class")
+                || word_is(word, len, "continue");
+        case 'd':
+            return word_is(word, len, "def") || word_is(word, len, "default")
+                || word_is(word, len, "do");
+        case 'e':
+            return word_is(word, len, "else") || word_is(word, len, "enum")
+                || word_is(word, len, "extends");
+        case 'f':
+            return word_is(word, len, "false") || word_is(word, len, "final")
+                || word_is(word, len, "finally") || word_is(word, len, "for");
+        case 'i':
+            return word_is(word, len, "if")
+                || word_is(word, len, "implements")
+                || word_is(word, len, "import")
+                || word_is(word, len, "instanceof")
+                || word_is(word, len, "interface");
+        case 'n':
+            return word_is(word, len, "native") || word_is(word, len, "new")
+                || word_is(word, len, "null");
+        case 'p':
+            return word_is(word, len, "package")
+                || word_is(word, len, "permits")
+                || word_is(word, len, "pipeline")
+                || word_is(word, len, "private")
+                || word_is(word, len, "protected")
+                || word_is(word, len, "public");
+        case 'r':
+            return word_is(word, len, "return");
+        case 's':
+            return word_is(word, len, "static")
+                || word_is(word, len, "strictfp")
+                || word_is(word, len, "super") || word_is(word, len, "switch")
+                || word_is(word, len, "synchronized");
+        case 't':
+            return word_is(word, len, "throw") || word_is(word, len, "throws")
+                || word_is(word, len, "transient")
+                || word_is(word, len, "true") || word_is(word, len, "try");
+        case 'v':
+            return word_is(word, len, "volatile");
+        case 'w':
+            return word_is(word, len, "while");
+        default:
+            return false;
     }
-    return false;
 }
 
 // Whether the first argument of a statement's parenthesis-free call that
@@ -1255,6 +1297,11 @@ static bool scan_statement_start(
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
     }
+    // No keyword is a receiver or the element type of an array type, so
+    // the look-ahead past one would decide nothing.
+    if (is_grammar_keyword(word, len)) {
+        return false;
+    }
     if (lexer->lookahead == '.') {
         // A dotted receiver is decided after the first name.
         if (!wants_array || !capitalized || !read_nested_type_names(lexer)
@@ -1275,8 +1322,7 @@ static bool scan_statement_start(
         lexer->result_symbol = ARRAY_VALUE_START;
         return true;
     }
-    if (!statement_argument_follows(lexer, no_close_ahead)
-        || is_grammar_keyword(word, len)) {
+    if (!statement_argument_follows(lexer, no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_STATEMENT_START;

@@ -1283,8 +1283,13 @@ The Groovy column was observed by running Groovy 3.
 | `foo \` then `new Foo()` on the next line (a line escape), `foo new` then `Foo()` on the next line, `foo new /* c */ Foo()` | a call | a call |
 | `foo /* c */ new Foo()` | a call | `foo`, the comment and the creation, as before (spec §6.14) |
 | `foo new Foo()` then `(c)` on the next line | a call, then `c` | the argument is `new Foo()(c)` (§3); before, `foo`, then `new Foo()(c)` |
+| `foo new Foo()` then `{ }` on the next line | `foo(new Foo().call({ }))` | `{ }` is the creation's anonymous class body (§11); before, the body of the creation as a statement of its own |
+| `if (x) foo new Foo() else bar new Bar()` | an `if` with an `else`, each branch a call | the same; before, the `if`, the creation, and `else` and `bar` read as names |
 | `foo 1 bar new Baz()`, `foo bar new Baz()`, `foo new Foo() bar 1` | a chain: `foo(1).bar(new Baz())`, `foo.bar(new Baz())`, `foo(new Foo()).bar(1)` | two calls, or the statement `foo` and a call (spec §5.5 item 4); before, `bar` and the creation were statements of their own |
 | `return new Foo()`, `throw new Foo()`, `assert new Foo()` | the statement | the same: a keyword of the grammar is not a receiver |
+| `return foo new Foo()`, `return foo String[].class`, `break l new X()`, `continue l new X()` | rejected | `return foo` (`break l`, `continue l`), then the argument as a statement, as before and as `return foo 1` |
+| `final String s new Foo()` | rejected | a declaration of `s`, then the creation, as before |
+| `return` then `foo new Foo()` on the next line | `return null`, then a call | `return foo`, then the creation, as before (spec §5.5 item 2) |
 | `this new Foo()`, `it new Foo()`, `String new Foo()`, `int new Foo()` | calls (`this.this(new Foo())`) | calls; `this` is a name in this grammar |
 | `super new Foo()`, `permits new Foo()`, `record new Foo()`, `trait new Foo()`, `sealed new Foo()` | calls | the name, then the creation, as before |
 | `var new Foo()` | a call | `ERROR`, as before: `var` before a name is the keyword (spec §6.16) |
@@ -1295,10 +1300,12 @@ The Groovy column was observed by running Groovy 3.
 | `foo String[]`, `foo java.lang.String[].class` | a call | `ERROR`, as before (#21 above) |
 | `"${foo new Foo()}"`; `[a new B()]` | a call; rejected | `ERROR`, as before (#18 above) |
 | `x.y new` then `(c)` on the next line | rejected | a method `new` with no body, as before: `new` before `(` is no creation |
+| `foo`, a no-break space (U+00A0) and `new Foo()` | rejected | `ERROR`, as before: the scanner reads the space as part of the name (spec §6.8), and the grammar's lexer does not skip it |
 
-Each change of a tree with no `ERROR` is one of the first rows or the
-chain row: a call that was its receiver followed by its first argument
-as statements of their own. Spec §6.14 describes how this was checked.
+Each change of a tree with no `ERROR` is one of the first rows, the
+`else` row or the chain row: a call that was its receiver followed by
+its first argument as statements of their own. Spec §6.14 describes how
+this was checked.
 
 **Action**: none planned for the keyword receivers, which real code
 does not name methods after. A comment between the receiver and `new`

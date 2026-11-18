@@ -3197,7 +3197,6 @@ x = 1; foo new Foo()
 A keyword, a named key or a longer name before new is not a command chain
 ==================
 
-respond new Book(params)
 return new Foo()
 throw new Foo()
 assert new Foo()
@@ -3208,12 +3207,6 @@ foo newFoo()
 ---
 
 (source_file
-  (command_chain
-    receiver: (identifier)
-    argument: (object_creation_expression
-      type: (type_identifier)
-      arguments: (argument_list
-        (identifier))))
   (return_statement
     (object_creation_expression
       type: (type_identifier)
@@ -3301,3 +3294,543 @@ String[].class
       object: (array_type
         (type_identifier))
       field: (identifier))))
+
+==================
+A name after return, break, continue or a final type before new is its operand
+==================
+
+return foo new Foo()
+return foo String[].class
+return
+foo new Foo()
+while (x) {
+  break l new X()
+  continue l new X()
+}
+final String s new Foo()
+
+---
+
+(source_file
+  (return_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (return_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (array_type
+        (type_identifier))
+      field: (identifier)))
+  (return_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement
+        label: (identifier))
+      (expression_statement
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))
+      (continue_statement
+        label: (identifier))
+      (expression_statement
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list)))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+Keywords of the grammar before new are not receivers
+==================
+
+_ new Foo()
+abstract new Foo()
+assert new Foo()
+break new Foo()
+case new Foo()
+catch new Foo()
+continue new Foo()
+def new Foo()
+default new Foo()
+else new Foo()
+extends new Foo()
+false new Foo()
+final new Foo()
+finally new Foo()
+implements new Foo()
+native new Foo()
+null new Foo()
+permits new Foo()
+private new Foo()
+protected new Foo()
+public new Foo()
+return new Foo()
+static new Foo()
+strictfp new Foo()
+super new Foo()
+synchronized new Foo()
+throw new Foo()
+throws new Foo()
+transient new Foo()
+true new Foo()
+volatile new Foo()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (assert_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (break_statement)
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (continue_statement)
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (boolean_literal))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (expression_statement
+    (null_literal))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (return_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (throw_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters))
+  (expression_statement
+    (boolean_literal))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)))
+
+==================
+The word instanceof before new is not a receiver
+==================
+
+instanceof new Foo()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+A command chain with new after another statement on the same line
+==================
+
+foo 1 bar new Baz()
+foo bar new Baz()
+foo new Foo() bar 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
+
+==================
+Names that are keywords in Groovy but not here are receivers before new
+==================
+
+respond new Book(params)
+this new Foo()
+int new Foo()
+String new Foo()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (identifier))))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+New after a word whose keyword the scanner decides is not a command chain (known divergence)
+==================
+
+super new Foo()
+record new Foo()
+trait new Foo()
+sealed new Foo()
+foo.new Inner()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A brace on the line after a new argument opens its class body (known divergence)
+==================
+
+foo new Foo()
+{ }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body))))
+
+==================
+The keyword class before new is not a receiver
+:error
+==================
+
+class new Foo()
+
+---
+
+==================
+The keyword do before new is not a receiver
+:error
+==================
+
+do new Foo()
+
+---
+
+==================
+The keyword enum before new is not a receiver
+:error
+==================
+
+enum new Foo()
+
+---
+
+==================
+The keyword for before new is not a receiver
+:error
+==================
+
+for new Foo()
+
+---
+
+==================
+The keyword if before new is not a receiver
+:error
+==================
+
+if new Foo()
+
+---
+
+==================
+The keyword import before new is not a receiver
+:error
+==================
+
+import new Foo()
+
+---
+
+==================
+The keyword interface before new is not a receiver
+:error
+==================
+
+interface new Foo()
+
+---
+
+==================
+The keyword package before new is not a receiver
+:error
+==================
+
+package new Foo()
+
+---
+
+==================
+The keyword pipeline before new is not a receiver
+:error
+==================
+
+pipeline new Foo()
+
+---
+
+==================
+The keyword switch before new is not a receiver
+:error
+==================
+
+switch new Foo()
+
+---
+
+==================
+The keyword try before new is not a receiver
+:error
+==================
+
+try new Foo()
+
+---
+
+==================
+The keyword while before new is not a receiver
+:error
+==================
+
+while new Foo()
+
+---
+
+==================
+New after var is unsupported (known divergence)
+:error
+==================
+
+var new Foo()
+
+---
+
+==================
+New with an annotated type as a first argument is unsupported
+:error
+==================
+
+foo new @A Foo()
+
+---
+
+==================
+A bare array type as a first argument is unsupported
+:error
+==================
+
+foo String[]
+
+---
