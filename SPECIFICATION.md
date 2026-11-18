@@ -301,6 +301,7 @@ issue #246's "Suggested fix" path 1.
 | `*:` (prefix in map) | `spread_map_entry` | `value` | Only valid inside map literals. |
 | `?[]` | `safe_subscript_expression` | `object`, `index` | Distinct from regular `subscript`. |
 | `[]` | `subscript_expression` | `object`, `index` | |
+| `T[]` as a value | `array_type` | none | `String[].class`, `int[]::new`, `@A(String[])`: the `array_type` of a declaration, with `type_identifier` or `qualified_type` inside, under the `field_access`, `method_reference_expression` or `method_pointer_expression` that `String.class`, `Foo::new` and `String.&new` have. Groovy reads `a[]` with any `a` as an index with no arguments and makes it a class when `a` names one; here only a primitive or capitalized name is taken (§6.15). |
 | `::` | `method_reference_expression` | `target`, `name` | Groovy 3+. |
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
 | `++` / `--` (postfix) | `update_expression` | `operand`, `operator` | |
@@ -948,7 +949,9 @@ spells the comma handling out; there is no shared helper.
 
 ### 5.14 Method reference `::`
 
-Groovy 3+: `String::length`, `obj::method`, `Foo::new`. Grammar:
+Groovy 3+: `String::length`, `obj::method`, `Foo::new`, and on an
+array type `String[]::new`, whose `target` is the `array_type` of
+§6.15. Grammar:
 
 ```js
 method_reference_expression: $ => prec.left(PREC.ACCESS, seq(
@@ -1012,10 +1015,12 @@ slashy opener, the three comment tokens, the contextual `record`
 (§6.7), `trait` and `sealed` (§6.13) keywords, the named-argument key of a parenthesis-free call
 (§6.8), the start of such a call that is a value or a statement
 with a dotted receiver (§6.14), the
-same-line subscript opener (§6.9), the `)` of a cast
+same-line subscript opener (§6.9), the start of an array type that is
+a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
-unterminated block comment (§6.6), `STRING_BODY` (§6.10),
-which is never emitted and only marks a string body, and
+unterminated block comment (§6.6), `STRING_BODY` (§6.10) and
+`TYPE_START` (§6.15), which are never emitted and only mark a string
+body and where a type may start, and
 `ERROR_SENTINEL`, which no rule references and which only signals
 error recovery; the other tokens listed here are met in-grammar, see
 `docs/divergences-from-spec.md`.
@@ -1042,10 +1047,12 @@ enum TokenType {
   COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
   COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
+  TYPE_START,             // §6.15 — never emitted; valid only where a type may start
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -1649,6 +1656,76 @@ after a name as division. Known differences from Groovy:
   it, so `obj . m 1` and `obj` followed by `.m 1` on the next line are
   not calls; Groovy reads both as `obj.m(1)` (observed). Both read as
   they did before #52.
+
+### 6.15 ARRAY_VALUE_START and TYPE_START — implementation contract
+
+An array type can be a value: `String[].class`, `int[][].class`,
+`String[]::new`, `String[].&new`, `@A(String[])` and
+`Class c() default int[]` (observed with Groovy 3, which reads each as
+a class). Apache's grammar has no rule for it. `String[]` there is a
+`primary` or a dotted name followed by an `indexPropertyArgs` with no
+index, so `a[]` is an index with an empty list for any `a`, and the
+compiler turns it into a class when `a` names one.
+
+The grammar reads such a value as the `array_type` of a declaration,
+`(array_type (type_identifier))`. The parser cannot learn that a name
+is a type at the `]`: by then it has reduced the name to an
+expression, and a rule that kept the name apart until the `]` would
+cost every name in an expression a reduction (measured: about 3%
+slower on real files). The scanner decides at the name instead.
+
+```text
+Emit ARRAY_VALUE_START, empty, where an expression may start, when:
+  - after whitespace, line breaks and line escapes, a name starts that
+    is a primitive type name (boolean, byte, char, double, float, int,
+    long, short), or a capitalized name (A to Z first) followed by any
+    `.Name` with a capitalized name and no space; and
+  - after spaces, tabs and line escapes, `[` follows on the line; and
+  - after Groovy's trivia inside brackets (whitespace, line breaks,
+    line escapes and comments), `]` follows; and
+  - where a type may also start (TYPE_START valid): every further `[`
+    on the line of the `]` before it opens one more `[` `]`, and after
+    the last `]` and spaces on the line comes `.` followed by a name or
+    `&`, or `::`.
+The token ends before the name. On any other input return false. It
+is not emitted during error recovery.
+
+TYPE_START is never emitted. `_type` references it, so it is valid
+exactly where a type may start.
+```
+
+Where a type may start, `String[]` is a type unless what follows the
+dimensions cannot follow one, so `String[] xs`, `(String[]) x`,
+`for (String[] a : xs)` and `String[]` followed by `xs = foo()` on the
+next line read as before. That covers every statement start, `(`, a
+closure's start, and the value after `return`, which a statement may
+follow. There `String[].class` and `int[]::new` are values; a bare
+`String[]` is not (`return String[]`, `(String[])`), and stays the
+error it was.
+
+The rule on the spelling keeps the look-ahead cheap. Names in
+expressions are mostly variables and methods, written in lowercase; a
+lowercase name is read only while it can still become a primitive type
+name, so most are turned down at their first or second character, and
+`a[0]` costs nothing more. `java.lang.String[].class` (a package
+before the class), `foo[]` with a lowercase class `foo`, and a generic
+element type are not taken and read as before: the first two are a
+subscript with a missing index, and `List<String>[].class` is a chain
+of comparisons with no error, which is kept. In `.Name` the names are
+read without spaces, as in §6.14.
+
+The grammar's value rule takes a further `[` after `String[]` as a
+dimension, by precedence, so `int[][]` is two dimensions and
+`String[][0]` is an error, as before. Typed declarations, parameters,
+casts, `as`, `instanceof`, type arguments and array creation do not
+reach the value rule and are unchanged.
+
+Measured against the grammar before: real Groovy and Gradle files
+parse about 1% to 1.5% slower, class bodies and other code made of
+short declarations about 2% slower (TYPE_START changes the parse
+table's layout, not the parser's work), statements that start with a
+typed array declaration (`String[] xs = foo()`) about 2.5% slower, and
+subscripts (`xs[i] = ys[j]`, `foo(a[1], b[2])`) up to about 2%.
 
 ---
 

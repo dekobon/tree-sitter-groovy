@@ -698,3 +698,39 @@ Default-modifier element on the line after an element default
         return_type: (type_identifier)
         name: (identifier)
         parameters: (formal_parameters)))))
+
+==================
+Annotation elements with array type defaults
+==================
+
+@interface Tag {
+  Class a() default String[]
+  Class b() default int[][].class
+  String c()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (array_type
+          (type_identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (array_type
+            (array_type
+              (type_identifier)))
+          field: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))

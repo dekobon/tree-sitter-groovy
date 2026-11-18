@@ -28,3 +28,15 @@ class Baz { }
 //               ^ attribute
 //                 ^ attribute
 class Qux { }
+
+def c = String[].class
+//      ^ type
+//               ^ property
+
+def f = int[]::new
+//      ^ type.builtin
+//             ^ keyword.operator
+
+@Foo(String[])
+//   ^ type
+class Arr { }

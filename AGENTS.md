@@ -47,7 +47,9 @@ The default branch is **`main`**.
   declaration or an assignment, or a statement whose receiver has a
   member access (`obj.method 1`), which needs its first argument on the
   receiver's line (§6.14), a subscript `[` on the same line as the
-  expression before it (§6.9), a `)` with something after it on its
+  expression before it (§6.9), the start of an array type that is a
+  value (`String[].class`), which needs `[]` after the name (§6.15),
+  a `)` with something after it on its
   line, which ranks a cast (§6.11), and the `!in` operator, which
   needs whitespace or a bracket after it (§6.12). Inside a string body
   it emits nothing (§6.10). Its only state is one bit, "no `*/` from

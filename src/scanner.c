@@ -13,15 +13,19 @@
 // COMMAND_PATH_START, one between the first name of a dotted receiver
 // and its first member access;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
-// the same line as the token before it; §6.11 CAST_CLOSE, a `)` with
+// the same line as the token before it; §6.15 ARRAY_VALUE_START, an
+// empty token before an array type that is a value (`String[].class`);
+// §6.11 CAST_CLOSE, a `)` with
 // something after it on its line; and §6.12 NOT_IN, the `!in`
 // operator. UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state.
-// STRING_BODY (§6.10) is never emitted; it is valid only
-// inside a string body, where the scanner emits nothing. ERROR_SENTINEL is never emitted either; the parser marks it
-// valid only during error recovery, where COMMAND_NAMED_KEY,
-// COMMAND_VALUE_START, COMMAND_PATH_START, SUBSCRIPT_OPEN, CAST_CLOSE,
-// NOT_IN and the STRING_BODY check are suppressed.
+// STRING_BODY (§6.10) and TYPE_START (§6.15) are never emitted; they
+// are valid only inside a string body, where the scanner emits nothing,
+// and where a type may start. ERROR_SENTINEL is never emitted either;
+// the parser marks it valid only during error recovery, where
+// COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
+// SUBSCRIPT_OPEN, ARRAY_VALUE_START, CAST_CLOSE, NOT_IN and the
+// STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
 // else is kept between calls.
@@ -43,10 +47,12 @@ enum TokenType {
     COMMAND_VALUE_START,
     COMMAND_PATH_START,
     SUBSCRIPT_OPEN,
+    ARRAY_VALUE_START,
     CAST_CLOSE,
     NOT_IN,
     UNTERMINATED_COMMENT,
     STRING_BODY,
+    TYPE_START,
     ERROR_SENTINEL,
 };
 
@@ -150,6 +156,114 @@ static bool is_literal_word(const char *word, unsigned len) {
         || word_is(word, len, "null");
 }
 
+// SPECIFICATION.md §6.15 — the element type of an array type that is a
+// value is a primitive type or a class, and class names are capitalized
+// by convention, as `scan_command_path_start` also assumes. Checking the
+// spelling lets a lowercase name, nearly always a variable or a method,
+// be turned down after a character or two instead of being read twice.
+static inline bool is_capital(int32_t c) {
+    return c >= 'A' && c <= 'Z';
+}
+
+// Whether a primitive type name or a class name may start with `c`.
+static inline bool is_element_type_start(int32_t c) {
+    return is_capital(c) || c == 'b' || c == 'c' || c == 'd' || c == 'f'
+        || c == 'i' || c == 'l' || c == 's';
+}
+
+// Whether a word that `read_word` returned is a primitive type name.
+static bool is_primitive_type(const char *word, unsigned len) {
+    return word_is(word, len, "boolean") || word_is(word, len, "byte")
+        || word_is(word, len, "char") || word_is(word, len, "double")
+        || word_is(word, len, "float") || word_is(word, len, "int")
+        || word_is(word, len, "long") || word_is(word, len, "short");
+}
+
+// Consumes a name and returns whether it is a primitive type name. It
+// stops at the first character that no such name has there, so most
+// names cost a character or two.
+static bool read_primitive_type(TSLexer *lexer) {
+    const char *first = NULL;
+    const char *second = NULL;
+    switch (lexer->lookahead) {
+        case 'b':
+            first = "boolean";
+            second = "byte";
+            break;
+        case 'c':
+            first = "char";
+            break;
+        case 'd':
+            first = "double";
+            break;
+        case 'f':
+            first = "float";
+            break;
+        case 'i':
+            first = "int";
+            break;
+        case 'l':
+            first = "long";
+            break;
+        case 's':
+            first = "short";
+            break;
+        default:
+            return false;
+    }
+    unsigned i = 0;
+    // EOF-bounded: lookahead is 0 at end of input, which fails the
+    // predicate. A candidate is dropped at its terminating NUL, which no
+    // identifier character equals.
+    for (; is_identifier_char(lexer->lookahead); i++) {
+        if (first != NULL && first[i] != lexer->lookahead) {
+            first = NULL;
+        }
+        if (second != NULL && second[i] != lexer->lookahead) {
+            second = NULL;
+        }
+        if (first == NULL && second == NULL) {
+            return false;
+        }
+        lexer->advance(lexer, false);
+    }
+    return (first != NULL && first[i] == '\0')
+        || (second != NULL && second[i] == '\0');
+}
+
+// Consumes `.Name` for as long as one follows and its name is
+// capitalized, as the names of nested types are (`Map.Entry`). Returns
+// false, with input consumed, at a `.` that no capitalized name follows.
+static bool read_nested_type_names(TSLexer *lexer) {
+    while (lexer->lookahead == '.') {
+        lexer->advance(lexer, false);
+        if (!is_capital(lexer->lookahead)) {
+            return false;
+        }
+        read_word(lexer, NULL, 0);
+    }
+    return true;
+}
+
+// Consumes a name and returns whether it may name the element type of an
+// array type: a primitive type name, or a capitalized name and any nested
+// type names after it. A lowercase name is read only while it can still
+// become a primitive type name.
+static bool read_element_type_name(TSLexer *lexer) {
+    if (is_capital(lexer->lookahead)) {
+        read_word(lexer, NULL, 0);
+        return read_nested_type_names(lexer);
+    }
+    return read_primitive_type(lexer);
+}
+
+// Defined with the other look-ahead helpers below.
+static bool array_dimensions_follow(
+    TSLexer *lexer,
+    bool type_may_start,
+    bool no_close_ahead
+);
+
 // Whether the name that `read_word` just consumed is the key of a named
 // argument: `:` follows on the same line, and not `::`, which makes a
 // method reference. `case:` and `default:` are switch labels, not keys.
@@ -171,35 +285,6 @@ static bool key_colon_follows(TSLexer *lexer, const char *word, unsigned len) {
     return lexer->lookahead != ':';
 }
 
-// Consumes a name and what follows it on its line, and returns whether
-// the name is the key of a named argument.
-static bool read_named_key(TSLexer *lexer) {
-    // Keeps enough characters to tell `default` from a longer word.
-    char word[sizeof "default"];
-    unsigned len = read_word(lexer, word, sizeof word);
-    return key_colon_follows(lexer, word, len);
-}
-
-// SPECIFICATION.md §6.8 — decides that the key of a named argument
-// in a parenthesis-free call (`exclude group: 'a'`) starts here: a
-// name on the current line, followed by `:` and not `::`. The token is
-// empty. `mark_end` fixes it at the start of the name, and the
-// in-grammar lexer reads the name itself, so the key is an identifier
-// by the grammar's own definition, non-ASCII letters included. A
-// newline before the key means a new statement (a Spock `where:`
-// label, say), so the caller does not skip one.
-//
-// The caller has skipped the same-line space and seen an identifier
-// start.
-static bool scan_command_named_key(TSLexer *lexer) {
-    lexer->mark_end(lexer);
-    if (!read_named_key(lexer)) {
-        return false;
-    }
-    lexer->result_symbol = COMMAND_NAMED_KEY;
-    return true;
-}
-
 // Whether a member access may start here: the first character of every
 // operator `read_member_access` reads.
 static inline bool is_member_access_start(int32_t c) {
@@ -208,12 +293,17 @@ static inline bool is_member_access_start(int32_t c) {
 
 // Consumes one of the operators that join the names of a
 // parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&` and
-// `.@`. Returns false, with input consumed, on anything else.
-static bool read_member_access(TSLexer *lexer) {
+// `.@`, and clears `dot` unless it is `.`. Returns false, with input
+// consumed, on anything else.
+static bool read_member_access(TSLexer *lexer, bool *dot) {
+    if (lexer->lookahead != '.') {
+        *dot = false;
+    }
     switch (lexer->lookahead) {
         case '.':
             lexer->advance(lexer, false);
             if (lexer->lookahead == '&' || lexer->lookahead == '@') {
+                *dot = false;
                 lexer->advance(lexer, false);
             }
             return true;
@@ -238,18 +328,76 @@ static bool read_member_access(TSLexer *lexer) {
 
 // Consumes member accesses, each an operator and a name, for as long as
 // one starts here, and sets `last_name` to the first character of the last
-// name read. Returns false, with input consumed, at an operator that is not
-// one of them or that no name follows.
-static bool read_member_accesses(TSLexer *lexer, int32_t *last_name) {
+// name read. Sets `nested` to whether every access is `.` and every name
+// after one is capitalized, as in the name of a nested type. Returns
+// false, with input consumed, at an operator that is not one of them or
+// that no name follows.
+static bool read_member_accesses(
+    TSLexer *lexer,
+    int32_t *last_name,
+    bool *nested
+) {
+    *nested = true;
     while (is_member_access_start(lexer->lookahead)) {
-        if (!read_member_access(lexer)
+        if (!read_member_access(lexer, nested)
             || !is_identifier_start(lexer->lookahead)) {
             return false;
         }
         *last_name = lexer->lookahead;
+        if (!is_capital(*last_name)) {
+            *nested = false;
+        }
         read_word(lexer, NULL, 0);
     }
     return true;
+}
+
+// SPECIFICATION.md §6.8 — decides that the key of a named argument
+// in a parenthesis-free call (`exclude group: 'a'`) starts here: a
+// name on the current line, followed by `:` and not `::`. The token is
+// empty. `mark_end` fixes it at the start of the name, and the
+// in-grammar lexer reads the name itself, so the key is an identifier
+// by the grammar's own definition, non-ASCII letters included. A
+// newline before the key means a new statement (a Spock `where:`
+// label, say), so the caller does not skip one.
+//
+// An argument after a comma may also be an array type (§6.15,
+// `foo 'a', String[]`), which the same name starts. The scanner cannot
+// read the name twice, so ARRAY_VALUE_START is decided here as well when
+// `wants_array` is set.
+//
+// The caller has skipped the same-line space and seen an identifier
+// start.
+static bool scan_command_named_key(
+    TSLexer *lexer,
+    bool wants_array,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    lexer->mark_end(lexer);
+    bool capitalized = is_capital(lexer->lookahead);
+    char word[sizeof "default"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (lexer->lookahead == '.') {
+        // A key is one name; only a nested type name can go on.
+        if (!wants_array || !capitalized || !read_nested_type_names(lexer)
+            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    if (key_colon_follows(lexer, word, len)) {
+        lexer->result_symbol = COMMAND_NAMED_KEY;
+        return true;
+    }
+    if (wants_array && lexer->lookahead == '['
+        && (capitalized || is_primitive_type(word, len))
+        && array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    return false;
 }
 
 // Whether the first argument of a parenthesis-free call starts here, on
@@ -285,19 +433,55 @@ static bool first_argument_follows(TSLexer *lexer) {
 // statements: in `def x = foo` followed by `/* c */ 1` on the next line,
 // the token after the comment would no longer see the line break.
 //
+// §6.15 — the same name may start an array type that is a value
+// (`def c = String[].class`), and ARRAY_VALUE_START, which sits at the
+// same place, is decided here too: the two need different things after
+// the names, `[` and an argument.
+//
 // The caller has skipped whitespace and seen an identifier start.
-static bool scan_command_value_start(TSLexer *lexer) {
+static bool scan_value_start(
+    TSLexer *lexer,
+    bool wants_command,
+    bool wants_array,
+    bool type_may_start,
+    bool no_close_ahead
+) {
     lexer->mark_end(lexer);
-    char word[sizeof "switch"];
+    if (!wants_command) {
+        if (!read_element_type_name(lexer)
+            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    bool capitalized = is_capital(lexer->lookahead);
+    char word[sizeof "boolean"];
     unsigned len = read_word(lexer, word, sizeof word);
     // The words that start a value as keywords keep that reading.
     if (word_is(word, len, "new") || word_is(word, len, "switch")
         || is_literal_word(word, len)) {
         return false;
     }
+    bool accesses = is_member_access_start(lexer->lookahead);
     int32_t last_name = 0;
-    if (!read_member_accesses(lexer, &last_name)
-        || !first_argument_follows(lexer)) {
+    bool nested = false;
+    if (!read_member_accesses(lexer, &last_name, &nested)
+        || !skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '[') {
+        bool element = capitalized
+            ? nested
+            : !accesses && is_primitive_type(word, len);
+        if (!wants_array || !element
+            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = ARRAY_VALUE_START;
+        return true;
+    }
+    if (!first_argument_follows(lexer)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
@@ -367,7 +551,8 @@ static bool method_name_follows(TSLexer *lexer) {
 static bool scan_command_path_start(TSLexer *lexer) {
     lexer->mark_end(lexer);
     int32_t last_name = 0;
-    if (!read_member_accesses(lexer, &last_name)
+    bool nested = false;
+    if (!read_member_accesses(lexer, &last_name, &nested)
         || !first_argument_follows(lexer)) {
         return false;
     }
@@ -445,6 +630,50 @@ static bool skip_header_trivia(
             return false;
         }
     }
+}
+
+// SPECIFICATION.md §6.15 — whether the dimensions of an array type start
+// here, after the name: on the name's line `[`, then `]` with Groovy's
+// trivia between, as inside brackets its lexer drops line breaks and
+// comments. `String[0]` and `a[i]` are subscripts.
+//
+// Where a type may also start (TYPE_START valid: at a statement, after
+// `(` or after `return`, which a statement may follow), `String[] xs`
+// and `(String[]) x` keep their reading. There every dimension is read,
+// each further `[` on the line of the `]` before it, and what follows
+// them must be what no type is: a member access (`.class`, `.&new`) or
+// a method reference (`::new`).
+static bool array_dimensions_follow(
+    TSLexer *lexer,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    do {
+        if (!skip_same_line_space(lexer, false) || lexer->lookahead != '[') {
+            return false;
+        }
+        advance(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)
+            || lexer->lookahead != ']') {
+            return false;
+        }
+        if (!type_may_start) {
+            return true;
+        }
+        advance(lexer);
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+    } while (lexer->lookahead == '[');
+    if (lexer->lookahead == ':') {
+        advance(lexer);
+        return lexer->lookahead == ':';
+    }
+    if (lexer->lookahead != '.') {
+        return false;
+    }
+    advance(lexer);
+    return lexer->lookahead == '&' || is_identifier_start(lexer->lookahead);
 }
 
 // Consumes `keyword` and returns whether the input spells it as a whole
@@ -720,6 +949,11 @@ bool tree_sitter_groovy_external_scanner_scan(
     // both.
     bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
+    // §6.15 — TYPE_START is never emitted; it is valid where a type may
+    // start, which narrows ARRAY_VALUE_START there.
+    bool wants_array = valid_symbols[ARRAY_VALUE_START]
+        && !valid_symbols[ERROR_SENTINEL];
+    bool type_may_start = valid_symbols[TYPE_START];
     if ((wants_subscript || wants_named_key)
         && !valid_symbols[ERROR_SENTINEL]) {
         if (!skip_same_line_space(lexer, true)) {
@@ -744,7 +978,8 @@ bool tree_sitter_groovy_external_scanner_scan(
         // while a declaration there is not valid Groovy. A keyword on the
         // next line is not reached here, since a newline is not skipped.
         if (wants_named_key && is_identifier_start(lexer->lookahead)) {
-            return scan_command_named_key(lexer);
+            return scan_command_named_key(lexer, wants_array, type_may_start,
+                                          no_comment_close_ahead(scanner));
         }
     }
 
@@ -775,8 +1010,8 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_not_in = valid_symbols[NOT_IN]
         && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
-        && !wants_sealed && !wants_value_start && !wants_cast_close
-        && !wants_not_in) {
+        && !wants_sealed && !wants_value_start && !wants_array
+        && !wants_cast_close && !wants_not_in) {
         return false;
     }
 
@@ -820,8 +1055,10 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->result_symbol = SEALED_KEYWORD;
         return true;
     }
-    if (wants_value_start && is_identifier_start(lexer->lookahead)) {
-        return scan_command_value_start(lexer);
+    if ((wants_value_start && is_identifier_start(lexer->lookahead))
+        || (wants_array && is_element_type_start(lexer->lookahead))) {
+        return scan_value_start(lexer, wants_value_start, wants_array,
+                                type_may_start, no_close_ahead);
     }
     if (lexer->lookahead == '!' && wants_not_in) {
         // SPECIFICATION.md §6.12 — `!in` is an operator only before

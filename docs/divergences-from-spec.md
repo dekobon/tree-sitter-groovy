@@ -45,6 +45,7 @@ reasoning here.
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal or a key follows the receiver on its line, so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A comment between the receiver and the argument on one line is not read past (see #18 and #19 below). |
+| §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -1112,3 +1113,39 @@ parse records; the rows marked `.g4` are read off the grammar.
 **Action**: none planned. Fields, constructors and local variables
 could take the modifier through rules of their own, as methods do;
 Groovy 3 ignores it on all of them.
+
+---
+
+## 21. Array types as values
+
+**Apache `GroovyParser.g4`** (4.0.x branch) has no rule for an array
+type as a value. `String[]` in an expression is a `primary` (or a
+dotted name) followed by a `pathElement` `indexPropertyArgs` whose
+`expressionList` is empty, an index with no arguments, which Groovy's
+compiler turns into a class when the name before it is one.
+
+**Current implementation**: such a value is the `array_type` that a
+declaration has, under the node that `String.class`, `Foo::new` or
+`String.&new` has (spec §6.15). The scanner decides at the name, by
+its spelling, so the grammar recognizes fewer forms than Groovy. The
+Groovy column was observed with Groovy 3.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `def c = String[].class`, `foo(int[][].class)`, `x == byte[].class`, `case String[]:`, `return String[].class`, `[String[], int[]]`, `[k: int[]]`, `x in String[]`, `c ? String[] : int[]` | a class | `array_type` in the value; before, a subscript with a `MISSING` index |
+| `def f = String[]::new`, `xs.toArray(int[]::new)`, `String[].&new` | a method reference or pointer on the class | `method_reference_expression` or `method_pointer_expression` with an `array_type` target; before, a `MISSING` index |
+| `@A(String[])`, `@A(value = int[])`, `@A([String[], int[].class])`, `Class c() default String[]` | a class | `array_type`; before, a `MISSING` index |
+| `def e = Map.Entry[].class` | a class | `array_type` with a `qualified_type`; before, a `MISSING` index |
+| `String[ ].class`, `String[` then `].class` on the next line, `String[/* c */].class` | a class | `array_type`; before, a `MISSING` index |
+| `String[].class`, `int[]::new` as a statement, in a closure body, in `(…)` or as an enum constant's argument | a class | `array_type`; before, an `ERROR` |
+| `return String[]`, `(String[])`, `{ -> int[] }` | a class | an `ERROR` or a `MISSING` node, as before: a type may start there, and only `.name`, `.&` or `::` after the dimensions makes the name a value |
+| `def i = java.lang.String[].class` | a class | a `MISSING` index, as before: the name starts with a package |
+| `def a = foo[].class` | an index with no arguments on `foo`, or a class if `foo` is one | a `MISSING` index, as before: the name is lowercase |
+| `def q = List<String>[].class` | a class | comparisons and a list, with no `ERROR`, as before |
+| `String[]` then `xs = foo()` on the next line | a class, then an assignment | a declaration of `xs`, as before |
+| `String[][0]` | an index on the class | an `ERROR`; before, a `MISSING` index |
+
+**Action**: none planned. Taking a package-qualified name would mean
+reading every dotted chain in an expression a second time, and a
+lowercase class name is rare enough not to pay for. A generic element
+type would turn trees without an error into other trees.

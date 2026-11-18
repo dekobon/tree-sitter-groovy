@@ -98,6 +98,407 @@ def a = xs as Object []
           (type_identifier))))))
 
 ==================
+Array class literal
+==================
+
+def c = String[].class
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (type_identifier))
+        field: (identifier)))))
+
+==================
+Two-dimensional primitive array class literal
+==================
+
+def d = int[][].class
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (array_type
+            (type_identifier)))
+        field: (identifier)))))
+
+==================
+Array type as a value
+==================
+
+def t = String[]
+foo()
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_type
+        (type_identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Array class literal of a nested type
+==================
+
+def e = Map.Entry[].class
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (qualified_type
+            (type_identifier)
+            (type_identifier)))
+        field: (identifier)))))
+
+==================
+Array class literals with trivia inside the brackets
+==================
+
+def a = String[ ].class
+def b = String[
+].class
+def c = String[/* none */].class
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (type_identifier))
+        field: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (type_identifier))
+        field: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (type_identifier)
+          (block_comment))
+        field: (identifier)))))
+
+==================
+Array types in lists, maps, comparisons, membership and ternaries
+==================
+
+def all = [String[], int[].class]
+def byName = [s: String[], i: int[]]
+def same = x.class == byte[].class
+def has = x in String[]
+def pick = c ? String[] : int[]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (array_type
+          (type_identifier))
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (array_type
+            (type_identifier)))
+        (map_entry
+          key: (identifier)
+          value: (array_type
+            (type_identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (field_access
+          object: (identifier)
+          field: (identifier))
+        right: (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (identifier)
+        collection: (array_type
+          (type_identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (ternary_expression
+        condition: (identifier)
+        consequence: (array_type
+          (type_identifier))
+        alternative: (array_type
+          (type_identifier))))))
+
+==================
+Array types as arguments
+==================
+
+foo(String[], int[][].class)
+foo 'a', String[]
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (array_type
+          (type_identifier))
+        (field_access
+          object: (array_type
+            (array_type
+              (type_identifier)))
+          field: (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (array_type
+      (type_identifier))))
+
+==================
+Array types as case labels
+==================
+
+switch (x) {
+  case String[]: break
+  case int[].class: break
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (array_type
+            (type_identifier))
+          (break_statement))
+        (switch_case
+          value: (field_access
+            object: (array_type
+              (type_identifier))
+            field: (identifier))
+          (break_statement))))))
+
+==================
+Array class literal returned
+==================
+
+def m() { return String[].class }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier))))))
+
+==================
+Array class literals where a declaration may start
+==================
+
+(byte[].class).name
+def f = { -> String[]::new }
+def m() { int[].class }
+enum E { A(long[].class) }
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (parenthesized_expression
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))
+      field: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters)
+        (expression_statement
+          (method_reference_expression
+            target: (array_type
+              (type_identifier)))))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (field_access
+            object: (array_type
+              (type_identifier))
+            field: (identifier)))))))
+
+==================
+Array type before a name on the next line stays a declaration
+==================
+
+String[]
+xs = foo()
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Subscripts before a class literal and a method reference
+==================
+
+def x = a[0].class
+def y = a[i]::foo
+xs[i] = ys[j]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (subscript_expression
+          object: (identifier)
+          index: (number_literal))
+        field: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_reference_expression
+        target: (subscript_expression
+          object: (identifier)
+          index: (identifier))
+        name: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      right: (subscript_expression
+        object: (identifier)
+        index: (identifier)))))
+
+==================
+Bracket on the line after a type name starts a list
+==================
+
+def c = String
+[].class
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (field_access
+      object: (list_literal)
+      field: (identifier))))
+
+==================
+Array types after a cast, as and instanceof
+==================
+
+def y = (String[]) x
+def z = x as int[][]
+def w = x instanceof Object[]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (array_type
+          (type_identifier))
+        value: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (cast_expression
+        value: (identifier)
+        type: (array_type
+          (array_type
+            (type_identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (instanceof_expression
+        value: (identifier)
+        type: (array_type
+          (type_identifier))))))
+
+==================
 Array type continued on a new line inside parentheses is unsupported
 :error
 ==================
@@ -114,5 +515,32 @@ Array type continued on a new line in a parameter is unsupported
 
 def m(String
   [] a) { }
+
+---
+
+==================
+Package-qualified array class literal is unsupported
+:error
+==================
+
+def i = java.lang.String[].class
+
+---
+
+==================
+Array type of a lowercase name as a value is unsupported
+:error
+==================
+
+def a = foo[].class
+
+---
+
+==================
+Bare array type where a type may start is unsupported
+:error
+==================
+
+def m() { return String[] }
 
 ---

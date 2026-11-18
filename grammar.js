@@ -14,9 +14,10 @@
  *   - The contextual `record`, `trait` and `sealed` keywords, emitted
  *     only before a declaration so each word stays an identifier
  *     everywhere else
- *   - Four decisions that depend on what shares a line: the key of
+ *   - Five decisions that depend on what shares a line: the key of
  *     a named argument in a parenthesis-free call, the start of such
- *     a call that is a value, a subscript `[`, and the `)` of a cast
+ *     a call that is a value, a subscript `[`, an array type that is a
+ *     value (`String[].class`), and the `)` of a cast
  *   - The `!in` operator, which depends on the character after it
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
@@ -484,9 +485,9 @@ module.exports = grammar({
   // `_error_sentinel`: it exists so the scanner can detect error
   // recovery, when tree-sitter marks every external valid. It is kept
   // last here and in the scanner's `TokenType` enum, and the two
-  // orders must match. The scanner never emits `_string_body`: a
-  // string body references it so that the scanner can tell it is
-  // inside one.
+  // orders must match. The scanner never emits `_string_body` or
+  // `_type_start`: a string body and a type reference them so that the
+  // scanner can tell it is inside one or where one may start.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -525,6 +526,11 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
+    // §6.15 — empty token before an array type that is a value
+    // (`String[].class`, `foo(int[])`), emitted when a name and `[]`
+    // follow. Without it the parser would learn that `String` is a type
+    // only at `]`, after it had reduced the name to an expression.
+    $._array_value_start,
     // §6.11 — a `)` with something after it on the same line. A cast
     // that closes with it outranks a parenthesized expression; a cast
     // whose operand is on a later line ranks below one, so `x = (a)`
@@ -540,6 +546,9 @@ module.exports = grammar({
     // offers them there too; the scanner must emit nothing, or `//` and
     // `/*` at a piece boundary become comments.
     $._string_body,
+    // §6.15 — never emitted: valid wherever a type may start, so that the
+    // scanner can tell `(String[]) x` from `foo(String[])`.
+    $._type_start,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1859,6 +1868,7 @@ module.exports = grammar({
       $.method_reference_expression,
       $.object_creation_expression,
       $.array_creation_expression,
+      alias($._array_type_value, $.array_type),
       $.parenthesized_type_cast,
       $.cast_expression,
       $.membership_expression,
@@ -2154,6 +2164,9 @@ module.exports = grammar({
       $.array_type,
       $.qualified_type,
       $.generic_type,
+      // §6.15 — never matches, as the scanner never emits `_type_start`.
+      // It makes the token valid wherever a type may start.
+      seq($._type_start, alias($.identifier, $.type_identifier)),
     ),
 
     // Near-twin of `_dotted_type` below; the two cannot be merged
@@ -2168,6 +2181,26 @@ module.exports = grammar({
     )),
 
     array_type: $ => prec(PREC.ARRAY_TYPE, seq($._type, alias($._subscript_open, '['), ']')),
+
+    // §6.15 — an array type as a value (`String[].class`, `int[]::new`,
+    // `@A(String[])`), which Groovy reads as a class (Apache's `primary`
+    // or a dotted name, then an `indexPropertyArgs` with no index). The
+    // scanner emits `_array_value_start` before the name only when `[]`
+    // follows it, so that a name in an expression is reduced as before;
+    // the parser cannot wait for the `]` without keeping every such name
+    // apart from a plain expression. The precedence makes a further `[`
+    // a dimension, not a subscript.
+    _array_type_value: $ => prec(1, seq(
+      choice(
+        seq(
+          $._array_value_start,
+          choice(alias($.identifier, $.type_identifier), $.qualified_type),
+        ),
+        alias($._array_type_value, $.array_type),
+      ),
+      alias($._subscript_open, '['),
+      ']',
+    )),
 
     // §4 / §5.14 — Java-style generic type arguments. Allows nested
     // generics (`Map<String, List<Integer>>`) and bounded wildcards

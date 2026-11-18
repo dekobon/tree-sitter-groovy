@@ -881,3 +881,71 @@ Colon after an annotation's named value is an error
 class X { }
 
 ---
+
+==================
+Annotation argument that is an array class literal
+==================
+
+@Foo(String[].class) class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation arguments that are bare array types
+==================
+
+@Foo(String[]) class X { }
+@Foo(value = int[]) class Y { }
+@Foo([String[], int[][].class]) class Z { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (array_type
+          (type_identifier))))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (array_type
+            (type_identifier)))))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (array_type
+            (type_identifier))
+          (field_access
+            object: (array_type
+              (array_type
+                (type_identifier)))
+            field: (identifier)))))
+    name: (identifier)
+    body: (class_body)))
