@@ -169,6 +169,10 @@ as = it in xs
 // <- variable
 //      ^ keyword.operator
 
+var (p, q) = pair()
+// <- keyword
+var(p, q)
+// <- function.call
 final var = 1
 //    ^ variable
 

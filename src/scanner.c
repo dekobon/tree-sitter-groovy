@@ -47,6 +47,7 @@ enum TokenType {
     TRAIT_KEYWORD,
     SEALED_KEYWORD,
     VAR_KEYWORD,
+    VAR_NAMES_KEYWORD,
     YIELD_KEYWORD,
     IN_KEYWORD,
     AS_KEYWORD,
@@ -906,16 +907,70 @@ static bool expression_follows(TSLexer *lexer, bool no_close_ahead) {
     }
 }
 
+// SPECIFICATION.md §6.16 — the names of a multi-assignment declaration
+// opened by `var` alone, from its `(`, then `)` and `=`: `var (a, b) = l`.
+// `var(a, b)` and `var (a, b).foo()` call a method named `var`. Only what
+// a list of names and types holds is read: names, `,`, `*` (a rest
+// binding), `:` (a keyed pair), `.`, `<`, `>`, `?`, `[` and `]`, with
+// Groovy's trivia. Any other character ends the look-ahead, so it reads
+// no `(` and cannot read the same text twice. Line breaks are allowed
+// inside the parentheses and before the `=`, as in Groovy.
+static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
+    advance(lexer);
+    for (;;) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (is_identifier_start(c)) {
+            read_word(lexer, NULL, 0);
+            continue;
+        }
+        if (c == ')') {
+            break;
+        }
+        if (c != ',' && c != '*' && c != ':' && c != '.' && c != '<'
+            && c != '>' && c != '?' && c != '[' && c != ']') {
+            return false;
+        }
+        advance(lexer);
+    }
+    advance(lexer);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        || lexer->lookahead != '=') {
+        return false;
+    }
+    advance(lexer);
+    return lexer->lookahead != '=' && lexer->lookahead != '~';
+}
+
 // SPECIFICATION.md §6.16 — `var` declares the name that follows it, on
 // the line or a later one (`var x = 1`, `def f(var x)`), as it did when
-// the word was always a keyword, and opens a multi-assignment before `(`
-// (`final var (a, b) = l`). Anywhere else the word is a name.
-static bool scan_var(TSLexer *lexer, bool no_close_ahead) {
+// the word was always a keyword. Before `(` it opens a multi-assignment:
+// where `var` alone may open one (VAR_NAMES_KEYWORD valid), only when
+// the names, `)` and `=` follow; after `final`, always. Anywhere else the
+// word is a name.
+static bool scan_var(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool no_close_ahead
+) {
     if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
         return false;
     }
+    if (is_identifier_start(lexer->lookahead)) {
+        lexer->result_symbol = VAR_KEYWORD;
+        return valid_symbols[VAR_KEYWORD];
+    }
+    if (lexer->lookahead != '(') {
+        return false;
+    }
+    if (valid_symbols[VAR_NAMES_KEYWORD]) {
+        lexer->result_symbol = VAR_NAMES_KEYWORD;
+        return names_assignment_follows(lexer, no_close_ahead);
+    }
     lexer->result_symbol = VAR_KEYWORD;
-    return is_identifier_start(lexer->lookahead) || lexer->lookahead == '(';
+    return valid_symbols[VAR_KEYWORD];
 }
 
 // Whether `word` is one of the contextual keywords of §6.16.
@@ -931,7 +986,8 @@ static inline bool contextual_word_may_start(
 ) {
     switch (c) {
         case 'v':
-            return valid_symbols[VAR_KEYWORD];
+            return valid_symbols[VAR_KEYWORD]
+                || valid_symbols[VAR_NAMES_KEYWORD];
         case 'y':
             return valid_symbols[YIELD_KEYWORD];
         case 'i':
@@ -995,7 +1051,8 @@ static bool scan_contextual_word(
     bool no_close_ahead
 ) {
     if (word_is(word, len, "var")) {
-        return valid_symbols[VAR_KEYWORD] && scan_var(lexer, no_close_ahead);
+        return (valid_symbols[VAR_KEYWORD] || valid_symbols[VAR_NAMES_KEYWORD])
+            && scan_var(lexer, valid_symbols, no_close_ahead);
     }
     if (word_is(word, len, "yield")) {
         lexer->result_symbol = YIELD_KEYWORD;
@@ -1207,8 +1264,8 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
         && !wants_sealed && !wants_value_start && !wants_array
         && !wants_cast_close && !wants_not_in
-        && !valid_symbols[VAR_KEYWORD] && !valid_symbols[YIELD_KEYWORD]
-        && !valid_symbols[IN_KEYWORD]
+        && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
+        && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
         return false;
     }

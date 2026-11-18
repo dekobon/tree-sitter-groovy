@@ -573,13 +573,56 @@ def m() {
           arguments: (argument_list))))))
 
 ==================
-Multi-assignment with var alone is not accepted
-:error
+Multi-assignment with var alone
 ==================
 
 var (a, b) = l
 
 ---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+A call of a method named var is not a multi-assignment
+==================
+
+var(a, b)
+var (a, b).foo()
+var (a, b) == c
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (binary_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)
+          (identifier)))
+      right: (identifier))))
 
 ==================
 Multi-assignment with annotations alone is not accepted
@@ -600,13 +643,38 @@ static def (a, b) = l
 ---
 
 ==================
-Multi-assignment with var in a class body is not accepted
-:error
+Multi-assignment with var in a class body
 ==================
 
-class C { var (a, b) = l }
+class C {
+  var (a, b) = l
+  private var (c, d) = l
+  var x = 1
+}
 
 ---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
 
 ==================
 Multi-assignment mixing names and keyed pairs is not accepted

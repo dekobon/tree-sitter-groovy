@@ -689,14 +689,20 @@ def c = { @A _ x -> x }
           (identifier))))))
 
 ==================
-A method named as with a return type, where a statement starts
+Methods named var and as with a return type, where a statement starts
 ==================
 
+void var() { }
 int as(int x) { x }
 
 ---
 
 (source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
   (method_declaration
     return_type: (type_identifier)
     name: (identifier)

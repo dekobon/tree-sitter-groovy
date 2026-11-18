@@ -215,8 +215,9 @@ function sealedModifier($) {
 /**
  * The `var` that stands where `def` or a type can, before a declared
  * name. The scanner emits it only when a name, or the `(` of a
- * multi-assignment, follows (SPECIFICATION.md §6.16), so `var` is a
- * name everywhere else (`int var = 1`, `var.foo()`, `def f(var)`).
+ * multi-assignment after `final`, follows (SPECIFICATION.md §6.16), so
+ * `var` is a name everywhere else (`int var = 1`, `var.foo()`,
+ * `def f(var)`).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {AliasRule} The keyword.
@@ -516,10 +517,12 @@ module.exports = grammar({
     $._trait_keyword,
     $._sealed_keyword,
     // §6.16 — `var`, `yield`, `in` and `as`, each emitted only where its
-    // construct follows: `var` before a declared name or `(`, `yield`
-    // and `in` before an expression, `as` before a type. Anywhere else
-    // each word is an identifier.
+    // construct follows: `var` before a declared name, `var` before the
+    // `(…) =` of a multi-assignment, `yield` and `in` before an
+    // expression, `as` before a type. Anywhere else each word is an
+    // identifier.
     $._var_keyword,
+    $._var_names_keyword,
     $._yield_keyword,
     $._in_keyword,
     $._as_keyword,
@@ -1735,19 +1738,24 @@ module.exports = grammar({
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
     // `typeNamePairs`. Closes murtaza64 #22. The form without `def` is
     // `multi_assignment_expression`. It takes annotations, then `def`,
-    // `final def`, `final var` or `final` alone. Apache takes any
-    // modifiers, and annotations alone. Like a local here it does not
-    // take `static` and the rest, and it does not take annotations
-    // alone: in `@A (a, b) = …` the `(` would open the annotation's
-    // arguments or the names, a fork at every annotation with arguments
-    // where a statement starts.
+    // `final def`, `final var`, `final` alone or `var` alone. Apache
+    // takes any modifiers, and annotations alone. Like a local here it
+    // does not take `static` and the rest, and it does not take
+    // annotations alone: in `@A (a, b) = …` the `(` would open the
+    // annotation's arguments or the names, a fork at every annotation
+    // with arguments where a statement starts.
     //
-    // Nor does it take `var` alone, which Groovy does: the scanner takes
-    // `var` before `(` as the keyword, so `var(a, b)`, a call in Groovy,
-    // is an ERROR too.
+    // `var` alone has its own token: `var(a, b)` and `var (a, b).foo()`
+    // call a method named `var`, so the scanner emits it only when names,
+    // `)` and `=` follow (§6.16). After `final` the `var` before `(` is
+    // always the keyword, as it was before `var` could be a name.
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
-      choice(seq(optional('final'), 'def'), seq('final', optional(varKeyword($)))),
+      choice(
+        seq(optional('final'), 'def'),
+        seq('final', optional(varKeyword($))),
+        alias($._var_names_keyword, 'var'),
+      ),
       $._multi_assignment_names,
       '=',
       field('value', assignedValue($)),
@@ -1755,11 +1763,15 @@ module.exports = grammar({
 
     // The same in a type body, Apache `fieldDeclaration`, with the
     // modifiers of a field. Groovy parses it and then drops it: it
-    // declares no field. `var` is not a keyword in a body (`var x = 1`
-    // there is a field of type `var`), so it does not start one.
+    // declares no field. `var` opens one with the token of `var` alone
+    // (`private var (a, b) = l`). It is not a keyword before a name in a
+    // body, where `var x = 1` is a field of type `var`.
     _multi_assignment_field: $ => seq(
       repeat($.annotation),
-      choice(seq(repeat($._modifier), 'def'), repeat1($._modifier)),
+      choice(
+        seq(repeat($._modifier), choice('def', alias($._var_names_keyword, 'var'))),
+        repeat1($._modifier),
+      ),
       $._multi_assignment_names,
       '=',
       field('value', assignedValue($)),

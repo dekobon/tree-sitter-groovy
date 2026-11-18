@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final` and `final var` (`final (int a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body. Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by `var` alone (`var (a, b) = …`, which Groovy accepts; `var` before `(` is the keyword, see SPECIFICATION.md §6.16), by annotations alone (`@A (a, b) = …`), by modifiers other than `final` where a statement starts (`static def (a, b) = …`) or by `var` in a type body. Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final`, `final var` and `var` alone (`final (int a, b) = …`, `var (a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body (`private var (a, b) = …` included). Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by annotations alone (`@A (a, b) = …`) or by modifiers other than `final` where a statement starts (`static def (a, b) = …`). Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -1193,8 +1193,9 @@ for that through an `identifier_or_contextual` fallback.
 
 **Current implementation**: the keywords come from the external
 scanner, as `record`, `trait` and `sealed` do (spec §6.16): `var`
-before a declared name or `(`; `yield` and `in` before an expression;
-`as` before a type. Everywhere else the word is an `identifier`. Before,
+before a declared name, or before the `(…) =` of a multi-assignment
+when it stands alone; `yield` and `in` before an expression; `as`
+before a type. Everywhere else the word is an `identifier`. Before,
 each was a grammar literal and a keyword wherever it had an action,
 which was after any statement that can end (`var`, `yield`) or after
 any expression (`in`, `as`). The Groovy column was observed with
@@ -1208,8 +1209,10 @@ and later is read off `GroovyParser.g4`.
 | `var = 2`, `var.foo()`, `var[0]`, `var++`, `var()`, `return var`, `yield.foo()`, `yield = 1`, `yield()`, `yield++` | names | `ERROR` | names |
 | `foo()` then `in.read()` on the next line; `x = 1` then `in = 2` | two statements | `ERROR` | two statements |
 | `{ var -> var }`, `{ yield -> yield }`, `var: foo()`, `yield: foo()` | names, labels | `ERROR` | names, labels |
-| `int as(int x) { x }` where a statement starts | a method | `ERROR` | a method |
+| `void var() { }`, `int as(int x) { x }` where a statement starts | methods | `ERROR` | methods |
 | `for (String in : xs)` | a loop over `in` | `ERROR` | a loop over `in` |
+| `var (a, b) = l`, and `private var (a, b) = l` in a class body | declarations | `ERROR` | declarations |
+| `var(a, b)`, `var (a, b).foo()` in a method | calls of `var` | `ERROR` | calls |
 | `import a.B` then `as = 1` on the next line | an import and an assignment | `ERROR` | the same as Groovy |
 | `println var`, `println in` | calls | `ERROR` | two statements, as `println x` (spec §5.5 item 3) |
 | `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | the same as before |
@@ -1220,13 +1223,15 @@ and later is read off `GroovyParser.g4`.
 | `var instanceof T` | `var instanceof T` | a declaration of `instanceof`, then `T` | the same as before |
 | `for (var in xs)` | a loop over `var` | `ERROR` | `ERROR`: `var` before a name is the keyword |
 | `int in(int x) { x }` where a statement starts | a method | `ERROR` | `ERROR`: before `(` the word is the operator, as in `a in (b)` |
-| `var (a, b) = l`, `var(a, b)`, `var (a, b).foo()`, `void var() { }` where a statement starts | a declaration, calls, a method | `ERROR` | `ERROR`: before `(` the word is the keyword |
 | `final var(x) { }` in a script | a method `var` | `ERROR` | `ERROR`: after `final`, `var (` is the keyword |
 | `x = (b)` then `in` on the next line | two statements | a cast of `in` | two statements |
+| `def y = (x)` then `var (a, b) = l` on the next line | two statements | a cast of the call `var(a, b)`, assigned | two statements |
 
-The last row changed a tree that had no `ERROR`. Spec §6.16 describes
-the kind: where the old keyword ended one of two readings, the new
-tree is the one an ordinary name gets.
+The last two rows changed trees that had no `ERROR`. Spec §6.16
+describes both kinds: where the old keyword ended one of two
+readings, the new tree is the one an ordinary name gets; and a
+multi-assignment opened by `var` alone reads as the one opened by
+`def`.
 
 **Action**: none planned. `for (var in xs)` needs the scanner to know
 it is in a `for` header, and taking `var` as a name before `in`, `as`
