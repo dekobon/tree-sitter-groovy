@@ -591,20 +591,31 @@ The resolution we adopt:
    An operand and the value of `return`, `throw`, `assert` or `yield`
    take an `expression`, so `return foo 1` is rejected by Groovy and is
    `return foo` followed by `1` here. The
-   grammar accepts a command chain as a statement, and as the value of
+   grammar accepts a command chain as a statement, and as a value: of
    a declarator (a local variable, a field, `def (a, b) = …`) or of an
    assignment with any operator (`x = foo 1`, `x.y += foo 1`,
-   `(a, b) = f 3`). That covers Jenkins' `def out = sh script: 'make',
-   returnStdout: true`. An assignment is an expression, so the value
-   form nests where an assignment does: `println(x = foo 1)`,
-   `"${x = foo 1}"`. The value form is the same `command_chain` node
-   with the same fields. Not accepted here, and taken by Groovy
-   (observed with Groovy 3): a chain in parentheses (`(foo 1)`,
-   `if (foo 1)`); a chain as the only argument of a call (`bar(foo 1)`,
+   `(a, b) = f 3`), and in parentheses (`(sh script: 'x').trim()`),
+   also those of the condition of `if`, `while` and `do`, of a
+   `switch` value and of a `synchronized` lock
+   (`if (fileExists 'pom.xml')`). That covers Jenkins'
+   `def out = sh script: 'make', returnStdout: true`. A value in
+   parentheses is a primary, so it nests wherever an expression does:
+   `return (foo 1)`, `c ? (foo 'a') : 2`, `[(foo 1)]`. An assignment is
+   an expression, so the value form also nests where an assignment
+   does: `println(x = foo 1)`, `"${x = foo 1}"`. The value form is the
+   same `command_chain` node with the same fields; in parentheses it is
+   the child of a `parenthesized_expression`, and in a condition it is
+   the `condition` (`value`, `lock`) itself. Not accepted here, and
+   taken by Groovy (observed with Groovy 3): a chain as the only
+   argument of a call (`bar(foo 1)`,
    `println(sh script: 'x', returnStdout: true)`, and `bar(foo 1, 2)`,
    which is `bar(foo(1, 2))`), though Groovy rejects one among several
    arguments (`bar(a, foo 1)`); and a chain in an interpolation
-   (`"${foo 1}"`). Each is an `ERROR`. Nor is a lambda body, which the
+   (`"${foo 1}"`). Each is an `ERROR`. Nor is a first argument on the
+   line after the receiver inside parentheses, `(foo` followed by `1)`,
+   which Groovy reads as a call because its lexer drops line breaks
+   inside parentheses: the scanner tracks no brackets (§6.9), so this
+   is an `ERROR`, as before. Nor is a lambda body, which the
    grammar does not have. Apache's array initializer
    (`variableInitializers`) takes the rule too, and `AstBuilder` then
    rejects a command there. A newline is whitespace (§5.10), so a value
@@ -731,8 +742,9 @@ Groovy lets you write `println foo` for `println(foo)`. That **is** a
 juxt-function call (§5.5) and is the dominant form. Method calls
 *nested in expressions* require parentheses (`return f(x)` not
 `return f x`), except as the whole value of a declaration or an
-assignment (`def x = f 1`, §5.5 item 1). The grammar does not need a
-separate rule.
+assignment (`def x = f 1`) and as the whole content of parentheses
+(`return (f 1)`, §5.5 item 1). The grammar does not need a separate
+rule.
 
 ### 5.7 GString interpolation
 
@@ -2563,7 +2575,7 @@ How each filed bug closes against this spec.
 | dekobon/big-code-analysis **#246** (Elvis short-circuit) | §3.2 — `elvis_expression` as a distinct named node. §8.1 — pinned corpus test reproducing the issue's `def pick(a, b, c) { … }` snippet with the expected S-expression. The downstream `get_op_type()` impl can now `matches!(id.into(), AMPAMP \| PIPEPIPE \| ELVIS_EXPRESSION)`. No `MISSING` child anywhere. |
 | dekobon/big-code-analysis **#247** umbrella (all operator gaps) | §3.2 row-by-row: every symbol in the issue's three tables maps to a distinct node kind. The "critical" rows (`?:`, `?.`, `as`, `trait`, `..<`) all have dedicated nodes. The "important" rows (`=~`, `==~`, slashy, `===`, `!==`, `<=>`, `!instanceof`, `!in`) likewise. The "niche" rows (`?=`, `?[]`, `.&`, `.@`, `$/…/$`, `==>`) likewise. §8 anchors each with a pinned test. §3.2.1 explicitly handles the subscript-yielding-callable composition (`arr[i](args)`). §3.2.2 documents the lexer trailing-context rule for `!instanceof` / `!in` to avoid mis-tokenisation when followed by an identifier character. |
 | amaanq #2 / #3 (maintenance / license) | The prior grammar is treated as inspiration only — no code is incorporated. This grammar is an independent project, dual-licensed under `Apache-2.0 OR MIT`, with no dependency on the upstream project's release cadence. |
-| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements and to the values of declarations and assignments, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
+| murtaza64 **#5** (juxt_function_call ambiguity) | §5.5 — command chains restricted to statements, to the values of declarations and assignments and to the content of parentheses, the receiver a name or a name with member accesses, conflicts with `binary_expression` resolved by precedence. §8.2 — pinned test on `f y:b ? … : …` resolving to `f(y:b)` then ternary. |
 | murtaza64 **#16** (empty block comments) | §6.6 — block comments and groovydoc comments are external-scanner tokens that consume the entire `/* … */` or `/** … */` regardless of content. §8.2 — pinned test with `/**/`, `/***/`, `/* */`. |
 | murtaza64 **#22** (multiple assignment) | §4 — `multi_assignment_declaration` rule. §8.2 — pinned test on `def (a, b) = [1, 2]`. |
 | murtaza64 **#27** (publish to npm) | Out of grammar scope. The package layout in §2.1 includes `package.json` and `bindings/node/`; npm publishing is part of release tooling, not the grammar. |

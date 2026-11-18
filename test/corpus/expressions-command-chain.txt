@@ -1550,6 +1550,215 @@ def x = foo 'a', *args
 ---
 
 ==================
+Command chain in parentheses
+==================
+
+(foo 1).bar()
+def x = (foo 1, 2)
+y = (sh script: 'x', returnStdout: true).trim()
+z = ((log.info 'x'))
+w = (foo new Bar())
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (number_literal)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)
+          argument: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (field_access
+          object: (parenthesized_expression
+            (command_chain
+              receiver: (identifier)
+              argument: (named_argument
+                key: (identifier)
+                value: (string_literal))
+              argument: (named_argument
+                key: (identifier)
+                value: (boolean_literal))))
+          field: (identifier))
+        arguments: (argument_list))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (parenthesized_expression
+          (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (string_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (object_creation_expression
+            type: (type_identifier)
+            arguments: (argument_list)))))))
+
+==================
+Command chain in parentheses is a whole expression
+==================
+
+return (foo 'a' + b)
+c ? (foo 'a') : (bar b: 2)
+[(foo String[].class)]
+x = !(obj.ready 'x')
+
+---
+
+(source_file
+  (return_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (binary_expression
+          left: (string_literal)
+          right: (identifier)))))
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (string_literal)))
+      alternative: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (named_argument
+            key: (identifier)
+            value: (number_literal))))))
+  (expression_statement
+    (list_literal
+      (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (field_access
+            object: (array_type
+              (type_identifier))
+            field: (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (parenthesized_expression
+          (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (string_literal)))))))
+
+==================
+A name in parentheses before a literal is a cast, not a command chain
+==================
+
+(a, b) = foo 1
+a = (foo 1)
+b = (foo) 1
+c = (Foo 'x')
+d = (Foo) 'x'
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (string_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (string_literal)))))
+
+==================
+Command chain as a condition
+==================
+
+if (fileExists 'pom.xml') { }
+while (foo 1) { }
+do { } while (obj.ready 'x')
+switch (foo a: 1) { }
+synchronized (lock 'a') { }
+
+---
+
+(source_file
+  (if_statement
+    condition: (command_chain
+      receiver: (identifier)
+      argument: (string_literal))
+    consequence: (block))
+  (while_statement
+    condition: (command_chain
+      receiver: (identifier)
+      argument: (number_literal))
+    body: (block))
+  (do_while_statement
+    body: (block)
+    condition: (command_chain
+      receiver: (field_access
+        object: (identifier)
+        field: (identifier))
+      argument: (string_literal)))
+  (expression_statement
+    (switch_expression
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))
+      body: (switch_block)))
+  (synchronized_statement
+    lock: (command_chain
+      receiver: (identifier)
+      argument: (string_literal))
+    body: (block)))
+
+==================
 Command chain with a dotted receiver (#52)
 ==================
 

@@ -54,6 +54,12 @@ obj.method new Z()
 def r = sh new Z()
 //      ^ reference.call
 
+x = (sh 'make', new Z())
+//   ^ reference.call
+
+if (fileExists 'x', new Z()) { }
+//  ^ reference.call
+
 new Foo(z())
 //  ^ reference.class
 

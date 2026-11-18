@@ -37,6 +37,12 @@ log.info new Foo()
 def r = foo new Foo()
 //      ^ function.call
 
+def p = (log.info 'x')
+//           ^ function.call
+
+if (fileExists 'pom.xml') { }
+//  ^ function.call
+
 obj?.method(x)
 //   ^ function.call
 

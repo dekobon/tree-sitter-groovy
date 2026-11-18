@@ -410,14 +410,17 @@ function commandPathRules(path, first) {
 }
 
 /**
- * The value of a declarator or an assignment: an expression or a
- * parenthesis-free call (Apache `variableInitializer`, and the right
- * side of `#assignmentExprAlt` and `#multipleAssignmentExprAlt`).
+ * An expression or a parenthesis-free call, Apache's
+ * `enhancedStatementExpression` without lambdas: the value of a
+ * declarator (`variableInitializer`) or of an assignment (the right side
+ * of `#assignmentExprAlt` and `#multipleAssignmentExprAlt`), what is in
+ * parentheses (`expressionInPar`, also around the condition of `if`,
+ * `while` and `do`, a `switch` value and a `synchronized` lock).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The value rule.
  */
-function assignedValue($) {
+function statementExpression($) {
   return choice($._expression, alias($._value_command_chain, $.command_chain));
 }
 
@@ -778,6 +781,17 @@ module.exports = grammar({
       commandArguments($),
     )),
 
+    // `statementExpression` as one symbol, for the condition of `if`,
+    // `while` and `do`, a `switch` value and a `synchronized` lock. Inline,
+    // its choice would give each alternative its own copy of the states for
+    // the rest of the rule, about 70 in all, most for the `else` of an `if`.
+    // The symbol costs a reduction per condition instead, about 5% more
+    // instructions on code made only of conditions. A parenthesized
+    // expression ends right after the choice, so it keeps it inline: there
+    // it costs few states, and an extra reduction in every parenthesis cost
+    // about 4%.
+    _statement_expression: $ => statementExpression($),
+
     // §5.5 item 2 — a statement whose receiver has a member access
     // (`obj.method 1`, `a?.b.c x: 1`). Unlike the identifier form above it
     // holds a scanner token between the receiver's first name and its
@@ -911,7 +925,7 @@ module.exports = grammar({
     if_statement: $ => prec.right(seq(
       'if',
       '(',
-      field('condition', $._expression),
+      field('condition', $._statement_expression),
       ')',
       field('consequence', choice($.block, $._statement)),
       optional(';'),
@@ -925,7 +939,7 @@ module.exports = grammar({
     while_statement: $ => seq(
       'while',
       '(',
-      field('condition', $._expression),
+      field('condition', $._statement_expression),
       ')',
       field('body', choice($.block, $._statement)),
     ),
@@ -964,7 +978,7 @@ module.exports = grammar({
       optional(';'),
       'while',
       '(',
-      field('condition', $._expression),
+      field('condition', $._statement_expression),
       ')',
     ),
 
@@ -1040,7 +1054,7 @@ module.exports = grammar({
     synchronized_statement: $ => seq(
       'synchronized',
       '(',
-      field('lock', $._expression),
+      field('lock', $._statement_expression),
       ')',
       field('body', $.block),
     ),
@@ -1762,12 +1776,12 @@ module.exports = grammar({
     _initialized_declarator: $ => seq(
       field('name', $.identifier),
       '=',
-      field('value', assignedValue($)),
+      field('value', statementExpression($)),
     ),
 
     variable_declarator: $ => seq(
       field('name', $.identifier),
-      optional(seq('=', field('value', assignedValue($)))),
+      optional(seq('=', field('value', statementExpression($)))),
     ),
 
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
@@ -1793,7 +1807,7 @@ module.exports = grammar({
       ),
       $._multi_assignment_names,
       '=',
-      field('value', assignedValue($)),
+      field('value', statementExpression($)),
     ),
 
     // The same in a type body, Apache `fieldDeclaration`, with the
@@ -1809,7 +1823,7 @@ module.exports = grammar({
       ),
       $._multi_assignment_names,
       '=',
-      field('value', assignedValue($)),
+      field('value', statementExpression($)),
     ),
 
     // Apache `typeNamePairs`. A typed name is a `variable_declarator`
@@ -1967,7 +1981,7 @@ module.exports = grammar({
     _statement_assignment: $ => prec.right(PREC.ASSIGN, seq(
       field('left', $.identifier),
       field('operator', '='),
-      field('right', assignedValue($)),
+      field('right', statementExpression($)),
     )),
 
     // §3.2 PRIMARY — minimal alternative set for now. Every primary
@@ -2026,7 +2040,7 @@ module.exports = grammar({
     switch_expression: $ => seq(
       'switch',
       '(',
-      field('value', $._expression),
+      field('value', $._statement_expression),
       ')',
       field('body', $.switch_block),
     ),
@@ -2578,7 +2592,7 @@ module.exports = grammar({
       return choice(...ops.map(op => prec.right(PREC.ASSIGN, seq(
         field('left', $._expression),
         field('operator', op),
-        field('right', assignedValue($)),
+        field('right', statementExpression($)),
       ))));
     },
 
@@ -2606,7 +2620,7 @@ module.exports = grammar({
       repeat1(seq(',', field('name', $.identifier))),
       ')',
       '=',
-      field('value', assignedValue($)),
+      field('value', statementExpression($)),
     )),
 
     // §3.1 level 14 / §3.2 — ternary and Elvis share the CONDITIONAL
@@ -2834,10 +2848,11 @@ module.exports = grammar({
     // (§5.15); the parser disambiguates by what's inside the parens
     // and after them. `_cast_close` is the `)` that has something
     // after it on its line (§6.11). It closes this rule too, so that
-    // `(a) * b` and `((a))` stay open to both readings.
+    // `(a) * b` and `((a))` stay open to both readings. The content may
+    // be a parenthesis-free call (`(sh script: 'x').trim()`, §5.5 item 1).
     parenthesized_expression: $ => seq(
       '(',
-      $._expression,
+      statementExpression($),
       choice(')', alias($._cast_close, ')')),
     ),
 

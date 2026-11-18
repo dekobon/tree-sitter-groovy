@@ -3484,6 +3484,10 @@
             "named": true
           },
           {
+            "type": "command_chain",
+            "named": true
+          },
+          {
             "type": "direct_field_access_expression",
             "named": true
           },
@@ -6561,6 +6565,10 @@
           },
           {
             "type": "closure",
+            "named": true
+          },
+          {
+            "type": "command_chain",
             "named": true
           },
           {
@@ -10517,6 +10525,10 @@
         },
         {
           "type": "closure",
+          "named": true
+        },
+        {
+          "type": "command_chain",
           "named": true
         },
         {
@@ -16058,6 +16070,10 @@
             "named": true
           },
           {
+            "type": "command_chain",
+            "named": true
+          },
+          {
             "type": "direct_field_access_expression",
             "named": true
           },
@@ -16245,6 +16261,10 @@
           },
           {
             "type": "closure",
+            "named": true
+          },
+          {
+            "type": "command_chain",
             "named": true
           },
           {
@@ -18316,6 +18336,10 @@
           },
           {
             "type": "closure",
+            "named": true
+          },
+          {
+            "type": "command_chain",
             "named": true
           },
           {
