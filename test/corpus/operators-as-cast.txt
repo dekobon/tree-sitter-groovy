@@ -109,3 +109,30 @@ x as a.b.c.d.E
         (type_identifier)
         (type_identifier)))))
 
+==================
+as as a name next to the operator
+==================
+
+x = y as String
+as = x as int
+int as = 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))

@@ -330,3 +330,40 @@ class Hero {
               field: (identifier)))
           (return_statement
             (identifier)))))))
+
+==================
+var and yield as names in expressions
+==================
+
+var = yield
+var.foo()
+var[0]
+var++
+x = var + 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal)))
+  (expression_statement
+    (update_expression
+      operand: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (number_literal)))))

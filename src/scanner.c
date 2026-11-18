@@ -6,7 +6,10 @@
 // dispatch keeps the in-grammar lexer from partially consuming the
 // leading `/`. The keywords are look-ahead decisions the grammar
 // cannot express: each word is a keyword only when the declaration it
-// opens follows it. Also handles §6.8
+// opens follows it. §6.16 does the same for `var`, `yield`, `in` and
+// `as`, each a keyword only before what it declares, takes or opens,
+// and for such a word as a named argument's key (CONTEXTUAL_KEY).
+// Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
 // empty token before the receiver of such a call that is a value, and
@@ -43,7 +46,12 @@ enum TokenType {
     RECORD_KEYWORD,
     TRAIT_KEYWORD,
     SEALED_KEYWORD,
+    VAR_KEYWORD,
+    YIELD_KEYWORD,
+    IN_KEYWORD,
+    AS_KEYWORD,
     COMMAND_NAMED_KEY,
+    CONTEXTUAL_KEY,
     COMMAND_VALUE_START,
     COMMAND_PATH_START,
     SUBSCRIPT_OPEN,
@@ -263,6 +271,14 @@ static bool array_dimensions_follow(
     bool type_may_start,
     bool no_close_ahead
 );
+static bool is_contextual_word(const char *word, unsigned len);
+static bool scan_contextual_word(
+    TSLexer *lexer,
+    const char *word,
+    unsigned len,
+    const bool *valid_symbols,
+    bool no_close_ahead
+);
 
 // Whether the name that `read_word` just consumed is the key of a named
 // argument: `:` follows on the same line, and not `::`, which makes a
@@ -366,10 +382,18 @@ static bool read_member_accesses(
 // read the name twice, so ARRAY_VALUE_START is decided here as well when
 // `wants_array` is set.
 //
+// §6.16 — the same name may be `var`, `yield`, `in` or `as`, after a
+// statement's first name (`it in xs`, `it as T`). Its keyword must end
+// at the word, and whether it is a key is known only past the spaces
+// after it (`foo in : 1`), so the word ends the token in either case:
+// such a key is CONTEXTUAL_KEY, which spans the word and which the
+// grammar aliases to `identifier`.
+//
 // The caller has skipped the same-line space and seen an identifier
 // start.
 static bool scan_command_named_key(
     TSLexer *lexer,
+    const bool *valid_symbols,
     bool wants_array,
     bool type_may_start,
     bool no_close_ahead
@@ -378,6 +402,19 @@ static bool scan_command_named_key(
     bool capitalized = is_capital(lexer->lookahead);
     char word[sizeof "default"];
     unsigned len = read_word(lexer, word, sizeof word);
+    if (is_contextual_word(word, len)) {
+        lexer->mark_end(lexer);
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+        if (lexer->lookahead == ':') {
+            lexer->advance(lexer, false);
+            lexer->result_symbol = CONTEXTUAL_KEY;
+            return valid_symbols[CONTEXTUAL_KEY] && lexer->lookahead != ':';
+        }
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
+    }
     if (lexer->lookahead == '.') {
         // A key is one name; only a nested type name can go on.
         if (!wants_array || !capitalized || !read_nested_type_names(lexer)
@@ -572,7 +609,9 @@ static bool scan_command_path_start(TSLexer *lexer) {
 // spaces, tabs, line escapes and block comments, plus line breaks and
 // line comments when `newlines` is set. Returns false on a `/` that
 // opens neither comment kind (a slashy string or division cannot be
-// part of a header), on a `\` that is not a line escape, and on an
+// part of a header), unless `slash` is not NULL: that `/` is then
+// consumed, `*slash` is set and the result is true. Returns false on a
+// `\` that is not a line escape, and on an
 // unterminated block comment. `no_close_ahead` says that every block
 // comment from here on is unterminated. Finding that out here cannot
 // be remembered: the token would have to start at the keyword, which
@@ -583,7 +622,8 @@ static bool skip_header_trivia(
     TSLexer *lexer,
     bool newlines,
     bool no_close_ahead,
-    bool *crossed_line
+    bool *crossed_line,
+    bool *slash
 ) {
     for (;;) {
         for (;;) {
@@ -626,6 +666,9 @@ static bool skip_header_trivia(
             while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
                 advance(lexer);
             }
+        } else if (slash != NULL) {
+            *slash = true;
+            return true;
         } else {
             return false;
         }
@@ -653,7 +696,7 @@ static bool array_dimensions_follow(
             return false;
         }
         advance(lexer);
-        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
             || lexer->lookahead != ']') {
             return false;
         }
@@ -703,7 +746,7 @@ static bool scan_header_name(TSLexer *lexer, bool no_close_ahead) {
         && lexer->lookahead != '\\') {
         return false;
     }
-    if (!skip_header_trivia(lexer, false, no_close_ahead, NULL)) {
+    if (!skip_header_trivia(lexer, false, no_close_ahead, NULL, NULL)) {
         return false;
     }
     if (!is_identifier_start(lexer->lookahead)) {
@@ -739,7 +782,7 @@ static bool scan_record_header(TSLexer *lexer, bool no_close_ahead) {
     if (lexer->lookahead == '<') {
         return true;
     }
-    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
         return false;
     }
     return lexer->lookahead == '(';
@@ -758,7 +801,7 @@ static bool scan_trait_header(TSLexer *lexer, bool no_close_ahead) {
     if (!scan_header_name(lexer, no_close_ahead)) {
         return false;
     }
-    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL)) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
         return false;
     }
     if (lexer->lookahead == '{' || lexer->lookahead == '<') {
@@ -799,7 +842,7 @@ static bool is_modifier_word(const char *word, unsigned len) {
 static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
     lexer->mark_end(lexer);
     bool crossed_line = false;
-    if (!skip_header_trivia(lexer, true, no_close_ahead, &crossed_line)) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, &crossed_line, NULL)) {
         return false;
     }
     if (lexer->lookahead == '@') {
@@ -820,6 +863,157 @@ static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
     }
     return is_modifier_word(word, len) || word_is(word, len, "record")
         || word_is(word, len, "enum");
+}
+
+// SPECIFICATION.md §6.16 — whether an expression starts here, after
+// Groovy's trivia, line breaks and comments included: what `yield` and
+// `in` need after them to be keywords. The characters are those an
+// expression of the grammar can start with. `!`, `+` and `-` start one
+// unless they are `!=`, `+=`, `-=` or `->`. `++` and `--` start one only
+// when an operand follows them, so `in++` and `yield++` update a name;
+// they are read in a loop, not by recursion, which a long run of them
+// would turn into a deep stack. `()` starts none, so `yield()` is a call.
+// A `/` starts a slashy string unless a space or `=` follows it.
+static bool expression_follows(TSLexer *lexer, bool no_close_ahead) {
+    for (;;) {
+        bool slash = false;
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (slash) {
+            return !lexer->eof(lexer) && !is_whitespace(c) && c != '=';
+        }
+        if (is_identifier_start(c) || (c >= '0' && c <= '9') || c == '\''
+            || c == '"' || c == '[' || c == '{' || c == '~') {
+            return true;
+        }
+        if (c != '(' && c != '!' && c != '+' && c != '-') {
+            return false;
+        }
+        advance(lexer);
+        if (c == '(') {
+            return !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+                || lexer->lookahead != ')';
+        }
+        if (c == '!') {
+            return lexer->lookahead != '=';
+        }
+        if (lexer->lookahead != c) {
+            return lexer->lookahead != '=' && lexer->lookahead != '>';
+        }
+        advance(lexer);
+    }
+}
+
+// SPECIFICATION.md §6.16 — `var` declares the name that follows it, on
+// the line or a later one (`var x = 1`, `def f(var x)`), as it did when
+// the word was always a keyword, and opens a multi-assignment before `(`
+// (`final var (a, b) = l`). Anywhere else the word is a name.
+static bool scan_var(TSLexer *lexer, bool no_close_ahead) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+        return false;
+    }
+    lexer->result_symbol = VAR_KEYWORD;
+    return is_identifier_start(lexer->lookahead) || lexer->lookahead == '(';
+}
+
+// Whether `word` is one of the contextual keywords of §6.16.
+static bool is_contextual_word(const char *word, unsigned len) {
+    return word_is(word, len, "var") || word_is(word, len, "yield")
+        || word_is(word, len, "in") || word_is(word, len, "as");
+}
+
+// Whether `c` may start one of the words of §6.16 whose token is valid.
+static inline bool contextual_word_may_start(
+    int32_t c,
+    const bool *valid_symbols
+) {
+    switch (c) {
+        case 'v':
+            return valid_symbols[VAR_KEYWORD];
+        case 'y':
+            return valid_symbols[YIELD_KEYWORD];
+        case 'i':
+            return valid_symbols[IN_KEYWORD];
+        case 'a':
+            return valid_symbols[AS_KEYWORD];
+        default:
+            return false;
+    }
+}
+
+// Consumes the word that starts here for as long as it can still be
+// `var`, `yield`, `in`, `as` or `int`, and returns which of them it is,
+// or NULL. The words that start a statement after another one (`if`,
+// `it`, `implementation`, `apply`) are turned down at their first or
+// second character, and are not read twice.
+static const char *read_contextual_word(TSLexer *lexer) {
+    const char *word = NULL;
+    switch (lexer->lookahead) {
+        case 'v':
+            word = "var";
+            break;
+        case 'y':
+            word = "yield";
+            break;
+        case 'i':
+            word = "in";
+            break;
+        case 'a':
+            word = "as";
+            break;
+        default:
+            return NULL;
+    }
+    for (const char *c = word; *c != '\0'; c++) {
+        if (lexer->lookahead != *c) {
+            return NULL;
+        }
+        advance(lexer);
+    }
+    if (word[0] == 'i' && lexer->lookahead == 't') {
+        advance(lexer);
+        word = "int";
+    }
+    return is_identifier_char(lexer->lookahead) ? NULL : word;
+}
+
+// SPECIFICATION.md §6.16 — decides the keyword for `var`, `yield`, `in`
+// or `as`, which the caller has consumed and marked as the token's end.
+// Apache's `identifier` rule lists each word, so each is a name wherever
+// its construct does not follow: `yield` and `in` need an expression
+// after them, `as` a type, `var` a name or a multi-assignment's names.
+// Line breaks and comments before those count as nothing, as they did
+// when the words were grammar literals. On false the in-grammar lexer
+// reads the word as an `identifier`.
+static bool scan_contextual_word(
+    TSLexer *lexer,
+    const char *word,
+    unsigned len,
+    const bool *valid_symbols,
+    bool no_close_ahead
+) {
+    if (word_is(word, len, "var")) {
+        return valid_symbols[VAR_KEYWORD] && scan_var(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "yield")) {
+        lexer->result_symbol = YIELD_KEYWORD;
+        return valid_symbols[YIELD_KEYWORD]
+            && expression_follows(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "in")) {
+        lexer->result_symbol = IN_KEYWORD;
+        return valid_symbols[IN_KEYWORD]
+            && expression_follows(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "as")) {
+        lexer->result_symbol = AS_KEYWORD;
+        return valid_symbols[AS_KEYWORD]
+            && skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+            && is_identifier_start(lexer->lookahead);
+    }
+    return false;
 }
 
 // SPECIFICATION.md §6.11 — whether something follows a `)` on its
@@ -978,7 +1172,8 @@ bool tree_sitter_groovy_external_scanner_scan(
         // while a declaration there is not valid Groovy. A keyword on the
         // next line is not reached here, since a newline is not skipped.
         if (wants_named_key && is_identifier_start(lexer->lookahead)) {
-            return scan_command_named_key(lexer, wants_array, type_may_start,
+            return scan_command_named_key(lexer, valid_symbols, wants_array,
+                                          type_may_start,
                                           no_comment_close_ahead(scanner));
         }
     }
@@ -1011,7 +1206,10 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
         && !wants_sealed && !wants_value_start && !wants_array
-        && !wants_cast_close && !wants_not_in) {
+        && !wants_cast_close && !wants_not_in
+        && !valid_symbols[VAR_KEYWORD] && !valid_symbols[YIELD_KEYWORD]
+        && !valid_symbols[IN_KEYWORD]
+        && !valid_symbols[AS_KEYWORD]) {
         return false;
     }
 
@@ -1069,6 +1267,30 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         lexer->result_symbol = SEALED_KEYWORD;
         return true;
+    }
+    // §6.16 — `var`, `yield`, `in` and `as`. `int` is the one element
+    // type name (§6.15) that shares a first letter with them, and it may
+    // start a statement where `in` may follow the one before, so it is
+    // decided here too; the array token is empty and ends here.
+    if (contextual_word_may_start(lexer->lookahead, valid_symbols)) {
+        lexer->mark_end(lexer);
+        const char *word = read_contextual_word(lexer);
+        if (word == NULL) {
+            return false;
+        }
+        unsigned len = (unsigned)strlen(word);
+        if (word_is(word, len, "int")) {
+            if (!wants_array
+                || !array_dimensions_follow(lexer, type_may_start,
+                                            no_close_ahead)) {
+                return false;
+            }
+            lexer->result_symbol = ARRAY_VALUE_START;
+            return true;
+        }
+        lexer->mark_end(lexer);
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
     }
     if ((wants_value_start && is_identifier_start(lexer->lookahead))
         || (wants_array && is_element_type_start(lexer->lookahead))) {

@@ -16,9 +16,9 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final` and `final var` (`final (int a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body. Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by `var` alone (`var (a, b) = …`, which Groovy accepts; it waits for `var` to be usable as a name, see SPECIFICATION.md §4, which also covers the error recovery that `final var (a, b)` still disturbs), by annotations alone (`@A (a, b) = …`), by modifiers other than `final` where a statement starts (`static def (a, b) = …`) or by `var` in a type body. Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final` and `final var` (`final (int a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body. Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by `var` alone (`var (a, b) = …`, which Groovy accepts; `var` before `(` is the keyword, see SPECIFICATION.md §6.16), by annotations alone (`@A (a, b) = …`), by modifiers other than `final` where a statement starts (`static def (a, b) = …`) or by `var` in a type body. Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
-| §5.2 Contextual keywords | **Mostly done** | `var`, `non-sealed`, `permits`, `yield` parsed contextually as grammar literals. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), so each is an identifier everywhere else (see #12 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
+| §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
 | §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement and as the value of a declaration or an assignment (#95). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). Not accepted where Groovy takes one: in parentheses (`(foo 1)`), as the only argument of a call (`bar(foo 1)`), in an interpolation (`"${foo 1}"`), with a name as the first argument, with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18 and #19 below. |
@@ -463,6 +463,9 @@ the parser layer.
    shape follows (`async {`, `await <expr>`, `defer {`), so the word
    lexes as an identifier everywhere else. The scanner decides by
    look-ahead, which is exactly the fallback the lexer layer lacks.
+   `var`, `yield`, `in` and `as` take this route now (spec §6.16,
+   #22 below); `await <expr>` could reuse the look-ahead that `yield`
+   and `in` use.
 
 Until then, code containing `val` / `async` / `await` / `defer`
 parses with these tokens as plain identifiers, which matches the
@@ -1178,3 +1181,57 @@ Groovy column was observed with Groovy 3.
 reading every dotted chain in an expression a second time, and a
 lowercase class name is rare enough not to pay for. A generic element
 type would turn trees without an error into other trees.
+
+---
+
+## 22. `var`, `yield`, `in` and `as`: keyword or name
+
+**Apache `GroovyParser.g4`** lists `AS`, `IN`, `VAR` and `YIELD` in
+its `identifier` rule (4.0.x to 6.0.x), so the four words name
+variables, fields, parameters, methods and labels. **Spec §5.2** asks
+for that through an `identifier_or_contextual` fallback.
+
+**Current implementation**: the keywords come from the external
+scanner, as `record`, `trait` and `sealed` do (spec §6.16): `var`
+before a declared name or `(`; `yield` and `in` before an expression;
+`as` before a type. Everywhere else the word is an `identifier`. Before,
+each was a grammar literal and a keyword wherever it had an action,
+which was after any statement that can end (`var`, `yield`) or after
+any expression (`in`, `as`). The Groovy column was observed with
+Groovy 3, in which `yield` is not a keyword; what it says of Groovy 4
+and later is read off `GroovyParser.g4`.
+
+| Input | Groovy | Before | Now |
+|---|---|---|---|
+| `int var = 1`, `String yield = 'a'`, `InputStream in = open()`, `int as = 1` | declarations | `ERROR` | declarations |
+| `final var = (1)` in a method | a declaration of `var` | `ERROR`, which could take in the rest of the method | a declaration of `var` |
+| `var = 2`, `var.foo()`, `var[0]`, `var++`, `var()`, `return var`, `yield.foo()`, `yield = 1`, `yield()`, `yield++` | names | `ERROR` | names |
+| `foo()` then `in.read()` on the next line; `x = 1` then `in = 2` | two statements | `ERROR` | two statements |
+| `{ var -> var }`, `{ yield -> yield }`, `var: foo()`, `yield: foo()` | names, labels | `ERROR` | names, labels |
+| `int as(int x) { x }` where a statement starts | a method | `ERROR` | a method |
+| `for (String in : xs)` | a loop over `in` | `ERROR` | a loop over `in` |
+| `import a.B` then `as = 1` on the next line | an import and an assignment | `ERROR` | the same as Groovy |
+| `println var`, `println in` | calls | `ERROR` | two statements, as `println x` (spec §5.5 item 3) |
+| `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | the same as before |
+| `var` then `x = 1` on the next line | a declaration of `x` | the same | the same |
+| `return var` then `x = 1` on the next line | `return var`, then an assignment | `return`, then a declaration of `x` | the same as before |
+| `yield x`, `yield (x)`, `yield -1`, `yield [1]` outside a switch expression | a call, a call, a subtraction, an index (Groovy 4 and later: the same, read off the `.g4`) | `yield_statement` | the same as before |
+| `var in xs`, `var as T` | a declaration of `xs` of type `in` (`T` of type `as`) | a declaration of `in` (`as`), then `xs` (`T`) | the same as before |
+| `var instanceof T` | `var instanceof T` | a declaration of `instanceof`, then `T` | the same as before |
+| `for (var in xs)` | a loop over `var` | `ERROR` | `ERROR`: `var` before a name is the keyword |
+| `int in(int x) { x }` where a statement starts | a method | `ERROR` | `ERROR`: before `(` the word is the operator, as in `a in (b)` |
+| `var (a, b) = l`, `var(a, b)`, `var (a, b).foo()`, `void var() { }` where a statement starts | a declaration, calls, a method | `ERROR` | `ERROR`: before `(` the word is the keyword |
+| `final var(x) { }` in a script | a method `var` | `ERROR` | `ERROR`: after `final`, `var (` is the keyword |
+| `x = (b)` then `in` on the next line | two statements | a cast of `in` | two statements |
+
+The last row changed a tree that had no `ERROR`. Spec §6.16 describes
+the kind: where the old keyword ended one of two readings, the new
+tree is the one an ordinary name gets.
+
+**Action**: none planned. `for (var in xs)` needs the scanner to know
+it is in a `for` header, and taking `var` as a name before `in`, `as`
+and `instanceof` everywhere would change the trees of `var in xs`,
+`var as T` and `var instanceof T`, which parse without an `ERROR`. A
+method named `in` with a return type would need the operator to look
+past the parentheses to a body, where `a in (b) { … }` is a membership
+test of a call with a closure in Groovy too.

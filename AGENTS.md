@@ -41,7 +41,10 @@ The default branch is **`main`**.
   the grammar cannot: slashy-vs-division, the line / block / Groovydoc
   comment single-token emit, the contextual `record`, `trait` and
   `sealed` keywords, each emitted only before the declaration it
-  opens (§6.7, §6.13), the key of a named
+  opens (§6.7, §6.13), the contextual `var`, `yield`, `in` and `as`
+  keywords, emitted only before a declared name or a multi-assignment's
+  names, an expression, or a type, and such a word as a named
+  argument's key (§6.16), the key of a named
   argument in a parenthesis-free call, which needs `:` on the same
   line (§6.8), the start of such a call that is the value of a
   declaration or an assignment, or a statement whose receiver has a

@@ -516,6 +516,63 @@ def (def a, b) = l
     value: (identifier)))
 
 ==================
+Locals named var, yield, in and as
+==================
+
+int var = 1
+String yield = 'a'
+InputStream in = open()
+String as = 'x'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+A final local named var
+==================
+
+def m() {
+  final var = (1)
+  foo()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (number_literal))))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
 Multi-assignment with var alone is not accepted
 :error
 ==================

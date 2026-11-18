@@ -13,7 +13,8 @@
  *   - Line / block / Groovydoc comment single-token emit
  *   - The contextual `record`, `trait` and `sealed` keywords, emitted
  *     only before a declaration so each word stays an identifier
- *     everywhere else
+ *     everywhere else, and `var`, `yield`, `in` and `as`, emitted only
+ *     before what each declares, opens or takes
  *   - Five decisions that depend on what shares a line: the key of
  *     a named argument in a parenthesis-free call, the start of such
  *     a call that is a value, a subscript `[`, an array type that is a
@@ -212,6 +213,19 @@ function sealedModifier($) {
 }
 
 /**
+ * The `var` that stands where `def` or a type can, before a declared
+ * name. The scanner emits it only when a name, or the `(` of a
+ * multi-assignment, follows (SPECIFICATION.md §6.16), so `var` is a
+ * name everywhere else (`int var = 1`, `var.foo()`, `def f(var)`).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {AliasRule} The keyword.
+ */
+function varKeyword($) {
+  return alias($._var_keyword, 'var');
+}
+
+/**
  * A constructor. The enum position directly after a trailing comma
  * requires an access modifier (see `enum_declaration`); everywhere
  * else any modifiers are optional.
@@ -296,15 +310,8 @@ function parameter($) {
     seq(
       repeat($.annotation),
       optional('final'),
-      choice(
-        seq(
-          optional(choice('def', 'var', field('type', choice($._type, $.varargs_type)))),
-          field('name', $.identifier),
-        ),
-        // `var` is a contextual keyword and a valid name: `def f(var)`.
-        // With no name after it, it is the name.
-        field('name', alias('var', $.identifier)),
-      ),
+      optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
+      field('name', $.identifier),
       defaultValue,
     ),
     // `_` is a literal directly after an annotation where a statement
@@ -508,11 +515,22 @@ module.exports = grammar({
     // `interface` or `trait`. Anywhere else each word is an identifier.
     $._trait_keyword,
     $._sealed_keyword,
+    // §6.16 — `var`, `yield`, `in` and `as`, each emitted only where its
+    // construct follows: `var` before a declared name or `(`, `yield`
+    // and `in` before an expression, `as` before a type. Anywhere else
+    // each word is an identifier.
+    $._var_keyword,
+    $._yield_keyword,
+    $._in_keyword,
+    $._as_keyword,
     // §5.5 — empty token before the `name:` key of a named argument in
     // a parenthesis-free call. Scanner-side so the newline before a Spock
     // label (`result` then `where:`) is not swallowed, and so
     // `Type name =` stays a declaration.
     $._command_named_key,
+    // §6.16 — the key `var`, `yield`, `in` or `as` of such an argument,
+    // the word itself.
+    $._contextual_key,
     // §6.14 — empty token before the receiver of a parenthesis-free call
     // that is a value (`def x = foo 1`), emitted only when the first
     // argument starts on the receiver's line. `def x = foo` followed by
@@ -783,9 +801,17 @@ module.exports = grammar({
     // keyword is a valid key (Apache `namedArgLabel`): it has no
     // action after the empty token, so it lexes as an identifier, and
     // the empty `property` set does the same for the reserved `new`.
+    //
+    // The key `var`, `yield`, `in` or `as` is a token of its own that
+    // spans the word, aliased to `identifier`. After `it`, the scanner
+    // reads past the word to tell `it in: 1` from `it in xs`, and the
+    // keyword it may emit instead must end at the word, where an empty
+    // key cannot (§6.16).
     _command_named_argument: $ => seq(
-      $._command_named_key,
-      field('key', reserved('property', $.identifier)),
+      choice(
+        seq($._command_named_key, field('key', reserved('property', $.identifier))),
+        field('key', alias($._contextual_key, $.identifier)),
+      ),
       ':',
       field('value', $._expression),
     ),
@@ -944,11 +970,12 @@ module.exports = grammar({
     throw_statement: $ => seq('throw', $._expression),
 
     // §4 — `yield expr` in a Groovy 4 switch expression's case
-    // body. `yield` is a contextual keyword (§5.2) so it remains
-    // a usable identifier elsewhere — tree-sitter's word:
-    // directive resolves the ambiguity.
+    // body. The scanner emits the keyword only when an expression
+    // follows (§6.16), so `yield.foo()` and `yield = 1` use a name. It
+    // does so wherever a statement may start, not only in a switch
+    // expression, so `yield x` elsewhere stays a yield statement.
     yield_statement: $ => prec.right(seq(
-      'yield',
+      alias($._yield_keyword, 'yield'),
       $._expression,
     )),
 
@@ -998,14 +1025,8 @@ module.exports = grammar({
 
     resource: $ => seq(
       optional('final'),
-      choice(
-        seq(
-          optional(choice('def', 'var', field('type', $._type))),
-          field('name', $.identifier),
-        ),
-        // `var` alone is the name: `try (var = open())`.
-        field('name', alias('var', $.identifier)),
-      ),
+      optional(choice('def', varKeyword($), field('type', $._type))),
+      field('name', $.identifier),
       '=',
       field('value', $._expression),
     ),
@@ -1024,14 +1045,8 @@ module.exports = grammar({
     // bare `catch (e) { … }`, implicitly typed as Exception.
     catch_formal_parameter: $ => seq(
       optional('final'),
-      choice(
-        seq(
-          optional(choice('def', 'var', field('type', choice($._type, $.multi_type)))),
-          field('name', $.identifier),
-        ),
-        // `var` alone is the name: `catch (var)`.
-        field('name', alias('var', $.identifier)),
-      ),
+      optional(choice('def', varKeyword($), field('type', choice($._type, $.multi_type)))),
+      field('name', $.identifier),
     ),
 
     multi_type: $ => seq(
@@ -1618,7 +1633,7 @@ module.exports = grammar({
       optional('static'),
       field('name', $.qualified_name),
       optional(token('.*')),
-      optional(seq('as', field('alias', $.identifier))),
+      optional(seq(alias($._as_keyword, 'as'), field('alias', $.identifier))),
     ),
 
     qualified_name: $ => seq(
@@ -1669,7 +1684,7 @@ module.exports = grammar({
       seq(
         repeat($.annotation),
         optional('final'),
-        choice('def', 'var'),
+        choice('def', varKeyword($)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
@@ -1727,16 +1742,12 @@ module.exports = grammar({
     // arguments or the names, a fork at every annotation with arguments
     // where a statement starts.
     //
-    // Nor does it take `var` alone, which Groovy does. `var` is a
-    // keyword where a statement starts, so `var` used as a name there
-    // (`int var = (x)`, `var = (x)`) is an ERROR, and with a `(` valid
-    // after `var` the recovery from it resumes at that `(` and can turn
-    // the whole method into an ERROR. `final var (` is still taken, so
-    // that happens after `final` (`final var = (1)`) until `var` is
-    // accepted as a name.
+    // Nor does it take `var` alone, which Groovy does: the scanner takes
+    // `var` before `(` as the keyword, so `var(a, b)`, a call in Groovy,
+    // is an ERROR too.
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
-      choice(seq(optional('final'), 'def'), seq('final', optional('var'))),
+      choice(seq(optional('final'), 'def'), seq('final', optional(varKeyword($)))),
       $._multi_assignment_names,
       '=',
       field('value', assignedValue($)),
@@ -1873,14 +1884,16 @@ module.exports = grammar({
     // (def x : xs)`. The `in` / `:` keyword here is a structural
     // delimiter, not the membership_expression operator or a
     // labelled_statement colon — context disambiguates because the
-    // for-header is not an expression position.
+    // for-header is not an expression position. The `in` is the
+    // operator's scanner token (§6.16), so the loop variable and an
+    // expression in a classic `for` init still fork on one token.
     for_in_statement: $ => seq(
       'for',
       '(',
       optional('final'),
       optional(choice('def', field('type', $._type))),
       field('variable', $.identifier),
-      choice('in', ':'),
+      choice(alias($._in_keyword, 'in'), ':'),
       field('value', $._expression),
       ')',
       field('body', choice($.block, $._statement)),
@@ -2021,7 +2034,7 @@ module.exports = grammar({
     // `field_access` at higher precedence than `cast_expression`).
     cast_expression: $ => prec.left(PREC.RELATIONAL, seq(
       field('value', $._expression),
-      'as',
+      alias($._as_keyword, 'as'),
       field('type', $._cast_type),
     )),
 
@@ -2057,7 +2070,7 @@ module.exports = grammar({
     // `a !in[1, 2]` an ERROR: the `[` was part of the operator.
     membership_expression: $ => {
       const ops = [
-        'in',
+        alias($._in_keyword, 'in'),
         alias($._not_in, '!in'),
       ];
       return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(

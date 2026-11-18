@@ -75,3 +75,26 @@ outer: for (i in xs) inner: for (j in ys) f(i, j)
               arguments: (argument_list
                 (identifier)
                 (identifier)))))))))
+
+==================
+Labels named var and yield
+==================
+
+var: foo()
+yield: bar()
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))

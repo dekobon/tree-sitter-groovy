@@ -154,3 +154,26 @@ class Pair {
     //                ^ variable
     //                      ^ variable
 }
+
+int var = yield
+//  ^ variable
+//        ^ variable
+
+foo()
+in.close()
+// <- variable
+
+x = y as String
+//    ^ keyword.operator
+as = it in xs
+// <- variable
+//      ^ keyword.operator
+
+final var = 1
+//    ^ variable
+
+for (v in vs) { }
+//     ^ keyword.operator
+
+switch (x) { case 1 -> yield 2 }
+//                     ^ keyword.control

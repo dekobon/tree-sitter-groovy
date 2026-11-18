@@ -63,3 +63,33 @@ switch (x) {
             (binary_expression
               left: (identifier)
               right: (identifier))))))))
+
+==================
+yield as a name
+==================
+
+yield = 1
+yield.foo()
+yield()
+yield++
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (update_expression
+      operand: (identifier))))

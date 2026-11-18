@@ -141,3 +141,53 @@ def r = !inside
       name: (identifier)
       value: (unary_expression
         operand: (identifier)))))
+
+==================
+in as a name, a key and the operator
+==================
+
+foo()
+in.read()
+x = 1
+in.close()
+foo in: 1
+foo in : 2
+it in xs
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier))))
