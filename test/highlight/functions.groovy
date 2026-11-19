@@ -124,3 +124,20 @@ record Warning(String message) {
         assert message
     }
 }
+
+def inc = x -> x + 1
+//        ^ variable.parameter
+//          ^ operator
+
+list.sort((a, b) -> a <=> b)
+//         ^ variable.parameter
+//            ^ variable.parameter
+//               ^ operator
+
+foo(item -> item.name)
+//  ^ variable.parameter
+//                ^ property
+
+def c = { a = b -> a }
+//        ^ variable.parameter
+//            ^ variable

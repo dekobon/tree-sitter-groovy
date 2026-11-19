@@ -10,6 +10,7 @@
 (switch_block) @fold
 (block) @fold
 (closure) @fold
+(lambda_expression) @fold
 (list_literal) @fold
 (map_literal) @fold
 (array_initializer) @fold

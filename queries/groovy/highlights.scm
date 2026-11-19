@@ -220,6 +220,7 @@
 (compact_constructor_declaration name: (identifier) @constructor)
 (formal_parameter name: (identifier) @variable.parameter)
 (closure_parameter name: (identifier) @variable.parameter)
+(lambda_expression parameters: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)
 (variable_declarator name: (identifier) @variable)
 (field_declaration (variable_declarator name: (identifier) @property))

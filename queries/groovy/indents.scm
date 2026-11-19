@@ -14,6 +14,7 @@
   (switch_block)
   (block)
   (closure)
+  (lambda_expression)
   (list_literal)
   (map_literal)
   (array_initializer)
