@@ -976,7 +976,7 @@ foo (a, b) = c
       right: (identifier))))
 
 ==================
-Parenthesized names on the line after a call are its arguments (divergence 3)
+Parenthesized names on the line after a call start a multi-assignment
 ==================
 
 foo()
@@ -986,20 +986,19 @@ foo()
 
 (source_file
   (expression_statement
-    (assignment_expression
-      left: (method_invocation
-        function: (method_invocation
-          function: (identifier)
-          arguments: (argument_list))
-        arguments: (argument_list
-          (identifier)
-          (identifier)))
-      right: (list_literal
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
         (number_literal)
         (number_literal)))))
 
 ==================
-Two multi-assignments without def on consecutive lines read as one statement (divergence 3)
+Two multi-assignments without def on consecutive lines are two statements
 ==================
 
 (a, b) = [1, 2]
@@ -1012,17 +1011,16 @@ Two multi-assignments without def on consecutive lines read as one statement (di
     (multi_assignment_expression
       name: (identifier)
       name: (identifier)
-      value: (assignment_expression
-        left: (method_invocation
-          function: (list_literal
-            (number_literal)
-            (number_literal))
-          arguments: (argument_list
-            (identifier)
-            (identifier)))
-        right: (list_literal
-          (number_literal)
-          (number_literal))))))
+      value: (list_literal
+        (number_literal)
+        (number_literal))))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
 
 ==================
 Method head followed by an equals sign reads as a declaration and a multi-assignment (divergence 3)

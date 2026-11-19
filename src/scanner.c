@@ -18,7 +18,9 @@
 // a statement's one-name receiver whose first argument is a `new`, an
 // array type, such a call in parentheses or a name;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
-// the same line as the token before it; §6.15 ARRAY_VALUE_START, an
+// the same line as the token before it; §6.18 STATEMENT_PAREN, a `(`
+// that starts a line after an expression where a statement may start
+// and the parentheses can open one; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
 // §6.11 CAST_CLOSE, a `)` with
 // something after it on its line; §6.12 NOT_IN, the `!in`
@@ -32,9 +34,9 @@
 // and where a type may start. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
-// COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, ARRAY_VALUE_START,
-// CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START and the
-// STRING_BODY check are suppressed.
+// COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
+// ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START
+// and the STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
 // else is kept between calls.
@@ -63,6 +65,7 @@ enum TokenType {
     COMMAND_PATH_START,
     COMMAND_STATEMENT_START,
     SUBSCRIPT_OPEN,
+    STATEMENT_PAREN,
     ARRAY_VALUE_START,
     CAST_CLOSE,
     NOT_IN,
@@ -2373,6 +2376,124 @@ static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
     return arrow_follows(lexer, no_close_ahead) && named;
 }
 
+// SPECIFICATION.md §6.18 — at a `(` that starts a line after an expression,
+// where a statement may start: whether the parentheses can open that
+// statement, which Groovy reads there as its lexer ends the one before at
+// the line break. They cannot when they are empty, when an element is a
+// spread (`*a`) or a named argument (`a: 1`), when a `,` follows them, or
+// when they hold a `,` with no bracket open, unless they hold only names
+// and `=` follows them (`(a, b) = l`, a multi-assignment) or the first
+// element is a parenthesis-free call (`(foo 1, 2)`: a name that is no value
+// keyword, any member accesses, and on its line a name other than `in`, `as`
+// and `instanceof`, a number or a string). Groovy rejects such a line; Java,
+// which much Groovy code is written like, reads a call (`foo` followed by
+// `(a, b);`), and so does the grammar, as before. When `->` follows them,
+// Groovy appends the lambda to the expression (`pathElement`'s
+// `nls closureOrLambdaExpression`), and they are the arguments here as
+// before. The elements are read as Groovy's tokens within the budget of
+// the lambda look-ahead. At its end, and at a `/` or a dollar-slashy string
+// that opens an element, whose end the look-ahead does not look for, the
+// parentheses open the statement. The token is the `(` alone.
+static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
+    advance(lexer);
+    lexer->mark_end(lexer);
+    unsigned items = 0;
+    bool names = true;
+    bool comma = false;
+    bool command = false;
+    for (;;) {
+        if (!spend_lambda_item(&items)
+            || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return true;
+        }
+        if (lexer->lookahead == ')') {
+            if (!comma) {
+                return false;
+            }
+            names = false;
+            break;
+        }
+        if (lexer->lookahead == '*') {
+            return false;
+        }
+        if (is_identifier_start(lexer->lookahead)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            if (word_is(word, len, "$") && lexer->lookahead == '/') {
+                return true;
+            }
+            bool receiver = !comma
+                && !is_value_keyword(word, len, lexer->lookahead);
+            bool bare = !is_member_access_start(lexer->lookahead);
+            if (!bare) {
+                names = false;
+                int32_t last_name = word[0];
+                bool nested = false;
+                bool ends_in_new = false;
+                receiver = receiver
+                    && read_member_accesses(lexer, &last_name, &nested,
+                                            &ends_in_new);
+            }
+            if (!skip_same_line_space(lexer, false)) {
+                return true;
+            }
+            int32_t c = lexer->lookahead;
+            if (c == ':' && bare && !command) {
+                advance(lexer);
+                if (lexer->lookahead != ':') {
+                    return false;
+                }
+            } else if (receiver && is_identifier_start(c)) {
+                char next_word[sizeof "instanceof"];
+                unsigned next_len =
+                    read_word(lexer, next_word, sizeof next_word);
+                names = false;
+                command = !word_is(next_word, next_len, "in")
+                    && !word_is(next_word, next_len, "as")
+                    && !word_is(next_word, next_len, "instanceof");
+            } else if (receiver && is_literal_start(c)) {
+                command = true;
+            }
+        }
+        if (lexer->lookahead != ',' && lexer->lookahead != ')') {
+            names = false;
+            if (!skip_lambda_tokens(lexer, &items, true, no_close_ahead)) {
+                return true;
+            }
+        }
+        if (lexer->lookahead == ')') {
+            break;
+        }
+        comma = true;
+        advance(lexer);
+    }
+    if (comma && !names && !command) {
+        return false;
+    }
+    advance(lexer);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+        return true;
+    }
+    int32_t next = lexer->lookahead;
+    if (next == ',') {
+        return false;
+    }
+    if (next == '-') {
+        advance(lexer);
+        if (lexer->lookahead == '>') {
+            return false;
+        }
+    }
+    if (!comma || command) {
+        return true;
+    }
+    if (next != '=') {
+        return false;
+    }
+    advance(lexer);
+    return lexer->lookahead != '=' && lexer->lookahead != '~';
+}
+
 void *tree_sitter_groovy_external_scanner_create(void) {
     return ts_calloc(1, sizeof(Scanner));
 }
@@ -2446,15 +2567,23 @@ bool tree_sitter_groovy_external_scanner_scan(
     // same-line whitespace of Groovy's lexer; at a newline we fall
     // through to the branches below. Their first characters (`[` vs. an
     // identifier start) are disjoint, so one whitespace skip serves
-    // both.
+    // both. STATEMENT_PAREN (§6.18) shares the skip to turn down a `(`
+    // on the line, which leaves the branches below a `(` only after a
+    // line break. NOT_IN is valid exactly after an expression. Only rules
+    // that may open a statement take STATEMENT_PAREN, so after an
+    // expression it is valid exactly where a statement may start: inside
+    // parentheses and brackets, where Groovy's lexer drops line breaks, it
+    // is not, and the `(` on a later line opens a call's arguments there.
     bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
+    bool wants_statement_paren = valid_symbols[STATEMENT_PAREN]
+        && valid_symbols[NOT_IN] && !valid_symbols[ERROR_SENTINEL];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
     // §6.15 — TYPE_START is never emitted; it is valid where a type may
     // start, which narrows ARRAY_VALUE_START there.
     bool wants_array = valid_symbols[ARRAY_VALUE_START]
         && !valid_symbols[ERROR_SENTINEL];
     bool type_may_start = valid_symbols[TYPE_START];
-    if ((wants_subscript || wants_named_key)
+    if ((wants_subscript || wants_named_key || wants_statement_paren)
         && !valid_symbols[ERROR_SENTINEL]) {
         if (!skip_same_line_space(lexer, true)) {
             return false;
@@ -2466,6 +2595,9 @@ bool tree_sitter_groovy_external_scanner_scan(
             lexer->advance(lexer, false);
             lexer->result_symbol = SUBSCRIPT_OPEN;
             return true;
+        }
+        if (wants_statement_paren && lexer->lookahead == '(') {
+            return false;
         }
         // An identifier is either the key or, once consumed, not something
         // the code below could start (a comment or slashy string), so stop
@@ -2653,6 +2785,15 @@ bool tree_sitter_groovy_external_scanner_scan(
             return false;
         }
         lexer->result_symbol = CAST_CLOSE;
+        return true;
+    }
+    if (lexer->lookahead == '(' && wants_statement_paren) {
+        // On `false` the runtime rewinds and the in-grammar lexer reads
+        // the `(` of a call's arguments.
+        if (!parentheses_open_statement(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = STATEMENT_PAREN;
         return true;
     }
     if (lexer->lookahead == '(' && wants_lambda) {

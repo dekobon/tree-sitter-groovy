@@ -194,3 +194,452 @@ f(g(x))
         (method_invocation
           function: (identifier)
           arguments: (argument_list (identifier)))))))
+
+==================
+A parenthesis on the line after an expression opens the next statement
+==================
+
+foo
+(1)
+x = foo
+(a)
+println x
+(1..3).each { }
+foo.bar(1)
+(2)
+'str'
+(1)
+x = y
+(a?: b)
+x = y
+($/a, b/$)
+x = y
+(a) - 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (range_expression
+            start: (number_literal)
+            end: (number_literal)))
+        field: (identifier))
+      closure: (closure)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (expression_statement
+    (string_literal))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (elvis_expression
+        value: (identifier)
+        default: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (string_literal
+        (string_fragment))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (unary_expression
+        operand: (number_literal)))))
+
+==================
+A parenthesis on the line after an expression in a block, a closure or a method opens the next statement
+==================
+
+def m() {
+    return foo
+    (1)
+}
+list.each {
+    foo
+    (1)
+}
+if (x) {
+    foo
+    (1)
+} else foo
+(2)
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (identifier))
+      (expression_statement
+        (parenthesized_expression
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (identifier))
+        (expression_statement
+          (parenthesized_expression
+            (number_literal))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (parenthesized_expression
+          (number_literal))))
+    alternative: (expression_statement
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal))))
+
+==================
+A parenthesis on the line after an expression in parentheses or brackets continues it, as one on its line does
+==================
+
+bar(foo
+(1))
+[foo
+(1)]
+if (foo
+(1)) { }
+foo (1)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (number_literal))))))
+  (expression_statement
+    (list_literal
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (number_literal)))))
+  (if_statement
+    condition: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)))
+    consequence: (block))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)))))
+
+==================
+A line escape or a comment across the line break keeps a call's parentheses on its line
+==================
+
+foo \
+(1)
+foo /* a
+b */ (1)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      (block_comment)
+      arguments: (argument_list
+        (number_literal)))))
+
+==================
+A comment before the line break does not keep a call's parentheses on its line
+==================
+
+foo // c
+(1)
+foo /* c */
+(1)
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (line_comment)
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (parenthesized_expression
+      (number_literal))))
+
+==================
+A cast on the line after a call is a statement of its own
+==================
+
+def score = compute(a) * coefficient(b)
+(int) Math.round(score)
+x = (a)
+(b)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)))
+        right: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier))))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (method_invocation
+        function: (field_access
+          object: (identifier)
+          field: (identifier))
+        arguments: (argument_list
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
+
+==================
+Parentheses on the next line that cannot open a statement are the call's arguments, which Groovy rejects
+==================
+
+foo
+(a, b)
+foo
+()
+foo
+(*args)
+foo
+(a: 1)
+proguardFiles getDefaultProguardFile
+('a.txt'), 'b.pro'
+foo
+(new Foo(), 1)
+foo
+(a instanceof B, c)
+foo
+(a.b, c) = l
+foo
+(a, b,) = l
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (string_literal)))
+    argument: (string_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))
+        (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (instanceof_expression
+          value: (identifier)
+          type: (type_identifier))
+        (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (field_access
+            object: (identifier)
+            field: (identifier))
+          (identifier)))
+      right: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)
+          (identifier)))
+      right: (identifier))))
+
+==================
+A parenthesis-free call in parentheses on the next line opens a statement
+==================
+
+foo
+(bar 1, 2)
+foo
+(sh script: 'x', returnStdout: true).trim()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)
+        argument: (number_literal))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (identifier)
+              value: (string_literal))
+            argument: (named_argument
+              key: (identifier)
+              value: (boolean_literal))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A lambda on the line after a closure parameter's default is appended to it (known divergence)
+==================
+
+def c = {
+    x = y
+    (a) -> a
+}
+def d = {
+    x = y
+    (a)
+    -> a
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (identifier)))))
+        (expression_statement
+          (identifier))))))

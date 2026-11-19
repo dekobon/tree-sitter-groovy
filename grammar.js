@@ -560,6 +560,22 @@ function arrayInitializer(element) {
 }
 
 /**
+ * The `(` of a rule that may open a statement: a parenthesized expression,
+ * a cast or a multi-assignment without `def`. Besides the in-grammar `(` it
+ * takes `_statement_paren` (§6.18), the `(` the scanner emits where a line
+ * starts with one after an expression and a statement may start. A call's
+ * arguments take only the in-grammar `(`, so such a line opens the next
+ * statement, as in Groovy: `foo()` followed by `(a, b) = [1, 2]` is a call
+ * and a multi-assignment.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The opening parenthesis.
+ */
+function statementParen($) {
+  return choice('(', alias($._statement_paren, '('));
+}
+
+/**
  * The parentheses of a call or an annotation around `argument`s separated
  * by commas, with a trailing comma allowed after the last one.
  *
@@ -675,6 +691,11 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
+    // §6.18 — a `(` that starts a line after an expression, where a
+    // statement may start and the parentheses can open one. Groovy ends
+    // the statement at that line break, so the `(` opens the next
+    // statement rather than a call's arguments of the line above.
+    $._statement_paren,
     // §6.15 — empty token before an array type that is a value
     // (`String[].class`, `foo(int[])`), emitted when a name and `[]`
     // follow. Without it the parser would learn that `String` is a type
@@ -2431,13 +2452,13 @@ module.exports = grammar({
     // once #83 added its forks.
     parenthesized_type_cast: $ => choice(
       prec.dynamic(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
-        '(',
+        statementParen($),
         field('type', $._type),
         alias($._cast_close, ')'),
         field('value', $._expression),
       ))),
       prec.dynamic(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
-        '(',
+        statementParen($),
         field('type', $._type),
         ')',
         field('value', $._expression),
@@ -2628,6 +2649,12 @@ module.exports = grammar({
     // method_invocation node (arguments AND closure fields on the
     // same node) instead of GLR instead reaching the same span by
     // nesting a closure-only method_invocation around a plain call.
+    //
+    // The arguments take only the in-grammar `(`. A `(` that starts a
+    // line where a statement may start is `_statement_paren` (§6.18),
+    // which opens the next statement, as Apache's `arguments` has no `nls`
+    // before it. A `{` on the next line still joins (`pathElement`'s
+    // `nls closureOrLambdaExpression`).
     method_invocation: $ => choice(
       prec.left(PREC.POSTFIX + 1, seq(
         field('function', $._expression),
@@ -2751,7 +2778,7 @@ module.exports = grammar({
     // next line, and it also accepts `def f(a, b) = list`, which Groovy
     // rejects (divergence 3).
     multi_assignment_expression: $ => prec.right(PREC.ASSIGN, seq(
-      '(',
+      statementParen($),
       field('name', $.identifier),
       repeat1(seq(',', field('name', $.identifier))),
       ')',
@@ -3060,7 +3087,7 @@ module.exports = grammar({
     // `(a) * b` and `((a))` stay open to both readings. The content may
     // be a parenthesis-free call (`(sh script: 'x').trim()`, §5.5 item 1).
     parenthesized_expression: $ => seq(
-      '(',
+      statementParen($),
       enhancedStatementExpression($),
       choice(')', alias($._cast_close, ')')),
     ),

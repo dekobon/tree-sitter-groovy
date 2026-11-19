@@ -468,7 +468,7 @@ foo 1, 2
       closure: (closure))))
 
 ==================
-Parenthesis on the line after a multi-argument command chain
+Parenthesis on the line after a multi-argument command chain starts a statement
 ==================
 
 foo 1, 2
@@ -480,10 +480,10 @@ foo 1, 2
   (command_chain
     receiver: (identifier)
     argument: (number_literal)
-    argument: (method_invocation
-      function: (number_literal)
-      arguments: (argument_list
-        (identifier)))))
+    argument: (number_literal))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
 
 ==================
 Prefix increment on the line after a multi-argument command chain
@@ -522,7 +522,7 @@ foo 1, 2
     (identifier)))
 
 ==================
-Parenthesis on the line after a single named argument
+Parenthesis on the line after a single named argument starts a statement
 ==================
 
 foo a: 1
@@ -535,10 +535,10 @@ foo a: 1
     receiver: (identifier)
     argument: (named_argument
       key: (identifier)
-      value: (method_invocation
-        function: (number_literal)
-        arguments: (argument_list
-          (identifier))))))
+      value: (number_literal)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
 
 ==================
 Label after a block comment on the next line becomes a named argument
@@ -1412,7 +1412,7 @@ x = 1
       right: (number_literal))))
 
 ==================
-A brace or a parenthesis on the line after a declaration continues its value as before
+A brace on the line after a declaration continues its value, a parenthesis starts a statement
 ==================
 
 def a = foo
@@ -1432,13 +1432,13 @@ def b = foo
   (local_variable_declaration
     (variable_declarator
       name: (identifier)
-      value: (method_invocation
-        function: (identifier)
-        arguments: (argument_list
-          (identifier))))))
+      value: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
 
 ==================
-A parenthesis on the line after a command chain value joins its last argument
+A parenthesis on the line after a command chain value starts a statement
 ==================
 
 def x = foo 1
@@ -1452,10 +1452,10 @@ def x = foo 1
       name: (identifier)
       value: (command_chain
         receiver: (identifier)
-        argument: (method_invocation
-          function: (number_literal)
-          arguments: (argument_list
-            (identifier)))))))
+        argument: (number_literal))))
+  (expression_statement
+    (parenthesized_expression
+      (identifier))))
 
 ==================
 A closure after the receiver of a declaration value stays a method invocation
@@ -5492,7 +5492,7 @@ c = { a b c }
           (identifier))))))
 
 ==================
-A line that continues a name argument joins it (known divergence)
+A parenthesis on the line after a name argument starts a statement, a minus joins it (known divergence)
 ==================
 
 foo bar
@@ -5505,10 +5505,10 @@ foo bar
 (source_file
   (command_chain
     receiver: (identifier)
-    argument: (method_invocation
-      function: (identifier)
-      arguments: (argument_list
-        (number_literal))))
+    argument: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
   (command_chain
     receiver: (identifier)
     argument: (binary_expression
