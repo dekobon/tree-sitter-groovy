@@ -67,6 +67,18 @@ println(sh 'make', new Z())
 // <- reference.call
 //      ^ reference.call
 
+println x, new Z()
+// <- reference.call
+
+def r = sh x, new Z()
+//      ^ reference.call
+
+obj.method x, new Z()
+//  ^ reference.call
+
+x = (sh x, new Z())
+//   ^ reference.call
+
 new Foo(z())
 //  ^ reference.class
 

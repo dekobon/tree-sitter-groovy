@@ -54,6 +54,21 @@ x.add(foo 'a')
 //^ function.call
 //    ^ function.call
 
+println x
+// <- function.call
+
+assertEquals expected, actual
+// <- function.call
+
+def r = foo bar
+//      ^ function.call
+
+obj.method arg
+//  ^ function.call
+
+then: thrown IllegalStateException
+//    ^ function.call
+
 obj?.method(x)
 //   ^ function.call
 
