@@ -16,14 +16,18 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// `sealed`, and after a comment that does close. Five hold
 /// parenthesis-free calls (§6.14), as values and as statements with a
 /// dotted receiver, whose start token depends on the receiver and on
-/// what follows it on its line, so an edit there must lex it again. The
-/// last five hold a cast whose `)` an unterminated comment follows, where a
+/// what follows it on its line, so an edit there must lex it again. Five
+/// after those hold a cast whose `)` an unterminated comment follows, where a
 /// cast and a parenthesized expression are both possible at the `/*`: the
 /// look-ahead for a lambda (§6.17) reads from the `(` through the comment,
 /// for a name, a primitive and a dotted type alike, so inserting `*/` makes
 /// the runtime lex the `(` again. The one before them holds lambdas, whose
 /// start tokens depend on the `->` after the parentheses or the name, also
-/// across a line break or a comment.
+/// across a line break or a comment. The last six open lines with `(` after
+/// an expression (§6.18), which opens a statement or a call's arguments by
+/// the line break before it, by whether a statement may start there and by
+/// what the parentheses hold, so inserting or deleting a line break, a `,`
+/// or an `=` there must lex the `(` again and parse the line above anew.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -46,10 +50,18 @@ const TEXTS: &[&str] = &[
     "x = (int)/* n\nc",
     "x = (a.b.C)/* n\nc",
     "foo((a.B)/* why\narg)",
+    "foo\n(1)\nx = y\n(a)\n",
+    "bar(foo\n(1))\n[foo\n(1)]\n",
+    "foo()\n(a, b) = l\n(c, d) = m\n",
+    "while (c) go()\n(a, b) = l\n",
+    "foo\n(a, b)\nfoo()\n()\n",
+    "println x\n(1..3).each { }\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
-const INSERTIONS: &[&str] = &["", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x", ".", "->"];
+const INSERTIONS: &[&str] = &[
+    "", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x", ".", "->", "(", ")", ",", "=",
+];
 
 /// Byte lengths an edit removes.
 const REMOVED_LENGTHS: &[usize] = &[0, 1, 2, 3];
