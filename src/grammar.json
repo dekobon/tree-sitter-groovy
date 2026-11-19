@@ -12143,10 +12143,6 @@
     },
     {
       "type": "SYMBOL",
-      "name": "_statement_paren"
-    },
-    {
-      "type": "SYMBOL",
       "name": "_array_value_start"
     },
     {
@@ -12176,6 +12172,10 @@
     {
       "type": "SYMBOL",
       "name": "_type_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_statement_paren"
     },
     {
       "type": "SYMBOL",

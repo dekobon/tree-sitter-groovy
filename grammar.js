@@ -691,11 +691,6 @@ module.exports = grammar({
     // start a list or map literal: a statement, not a subscript of the line
     // above.
     $._subscript_open,
-    // §6.18 — a `(` that starts a line after an expression, where a
-    // statement may start and the parentheses can open one. Groovy ends
-    // the statement at that line break, so the `(` opens the next
-    // statement rather than a call's arguments of the line above.
-    $._statement_paren,
     // §6.15 — empty token before an array type that is a value
     // (`String[].class`, `foo(int[])`), emitted when a name and `[]`
     // follow. Without it the parser would learn that `String` is a type
@@ -728,6 +723,14 @@ module.exports = grammar({
     // §6.15 — never emitted: valid wherever a type may start, so that the
     // scanner can tell `(String[]) x` from `foo(String[])`.
     $._type_start,
+    // §6.18 — a `(` that starts a line after an expression, where a
+    // statement may start and the parentheses can open one. Groovy ends
+    // the statement at that line break, so the `(` opens the next
+    // statement rather than a call's arguments of the line above. Last but
+    // for the sentinel: listed after `_subscript_open` it renumbered the
+    // symbols after it, which changed error recovery (`enum E<T> { A }`
+    // lost its `enum_declaration`).
+    $._statement_paren,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
