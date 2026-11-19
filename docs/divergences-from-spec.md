@@ -201,13 +201,20 @@ still continues the expression, as Groovy's lexer drops line breaks
 there (`bar(foo` followed by `(1))`). These differences remain:
 
 - Parentheses that cannot open a statement are a call's arguments, as
-  before: empty ones, ones that hold a spread or a named argument, ones
-  that a `,` or `->` follows, and ones with a `,` inside that hold
-  neither a multi-assignment's names nor a parenthesis-free call
-  (`foo` followed by `(a, b);`, as Java code is often written). Groovy
-  rejects each such line, except before `->`, where it appends the
-  lambda to the expression, which this grammar does not take (spec
-  §5.16).
+  before: empty ones, ones that hold a spread or a named argument with a
+  key of any kind (`a: 1`, `'a': 1`, `"$a": 1`, `1: 2`, `(a): 1`), ones
+  that a `,`, `->` or `else` follows, and ones with a `,` inside, outside
+  brackets and type arguments, that hold neither a multi-assignment's
+  names nor a parenthesis-free call (`foo` followed by `(a, b);`, as Java
+  code is often written). Groovy rejects each such line, except before
+  `->`, where it appends the lambda to the expression, which this
+  grammar does not take (spec §5.16). Parentheses the look-ahead cannot
+  read to their end are judged as if they closed where it stopped, so
+  `(a, b` while it is typed is a call's arguments, as `(a, b)` is.
+- Two lists with a `,` that Groovy reads as statements stay arguments,
+  as this grammar takes neither as a statement: `(a in b, c)`, a call
+  `a.in(b, c)` to Groovy, and `(Map<K, V> m, x)`, a call of
+  `Map<K, V>` with `m` and `x`.
 - A block comment that opens the `(` line hides the line break, as for
   `[` (spec §6.9): `foo` followed by `/* c */ (1)` is a call.
 - Where no statement may start but Groovy's lexer does not drop the

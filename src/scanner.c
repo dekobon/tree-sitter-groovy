@@ -2349,7 +2349,9 @@ static bool lambda_parameter_follows(
 // and the trivia after it as well, and turned down only then. The runtime
 // counts what the scanner read against the `(`, so an edit in that trivia,
 // such as closing a comment that did not close (§6.6), makes it lex the `(`
-// again, as it does after `(String)`.
+// again, as it does after `(String)`. `*closed` is set once the look-ahead
+// has passed the `)`, so that a caller can read on from where it stopped
+// (§6.18).
 static bool lambda_parameters_follow(
     TSLexer *lexer,
     bool no_close_ahead,
