@@ -1489,10 +1489,11 @@ The Groovy column was observed by running Groovy 3.
 | `then: thrown IllegalStateException`, `{ foo bar }` | a call | `command_chain` |
 | `foo bar() { }`, `foo bar(a) { }`, `task copy(type: Copy) { }` | `foo(bar({ }))` | the same; before, a `method_declaration` with return type `foo`, or two statements for the last |
 | `foo bar(int a) { }`, `foo bar(String a, b) { }`, `foo bar(final a) { }` | rejected | a `method_declaration`, as before |
-| `{ foo a -> a }`, `{ foo a, b -> a }` | closure parameters, the first of type `foo` | the same, as before |
+| `{ foo a -> a }`, `{ foo a, b -> a }`, `{ foo a` then `-> a }` on the next line | closure parameters, the first of type `foo` | the same, as before |
 | `{ foo a, final` then `b -> a }` on the next line | closure parameters | `ERROR`: the look-ahead for `->` stays on the line after a word |
 | `foo a bar`, `a b c d`, `foo bar baz qux` | `foo(a).bar`, `a(b).c(d)`, `foo(bar).baz(qux)` | the calls `foo a` and the statement `bar`, the calls `a b` and `c d` (spec §5.5 item 4); before, one statement per name |
 | `foo bar 1`, `foo bar baz: 1`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
+| `foo bar x = 1` | `foo.bar(x = 1)` | `foo` and the declaration `bar x = 1`, as before (spec §5.5 item 4) |
 | `foo bar` then `(1)` or `-1` on the next line | a call, then the expression | one call with the argument `bar(1)` or `bar - 1` (§3); before, `foo` and `bar(1)` or `bar - 1` |
 | `foo bar` then `{ }` on the next line | `foo(bar({ }))` | the same; before, `foo` and the chain `bar { }` |
 | `return foo bar`, `throw foo bar`, `assert foo bar` | rejected | the statement with `foo`, then `bar`, as before |
@@ -1506,9 +1507,11 @@ The `foo bar` then `(1)` row is the general reading of a line that
 starts with what continues an expression (#3 above), which a name
 argument now takes as well. The rows with "before" changed trees that
 had no `ERROR`; spec §6.14 lists the kinds and how each was checked.
-Of 118,000 fuzzed inputs, 61 that had no `ERROR` have one, and Groovy 3
-rejects all but four: the line break inside closure parameters above,
-and three where a `(` on the line after a name argument continues it.
+Of 235,000 fuzzed inputs, 106 that had no `ERROR` have one, and Groovy 3
+rejects all but ten: five where a line after a name argument continues
+it, two closure parameter lists with a line break after a modifier or a
+comment inside a parameter, and three with a contextual word as the name
+argument before more (spec §6.14).
 
 **Action**: the chain continuation (spec §5.5 item 4) would make the
 chain forms one call; measured, it grows the parse table by about 30%

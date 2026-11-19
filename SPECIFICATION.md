@@ -719,9 +719,10 @@ The resolution we adopt:
    `Point(int x)` and `foo(String a)` hold no call. A name is no first
    argument when the receiver is `var`, `yield`, `in` or `as` (§6.16); when
    it is a keyword Groovy reserves (`if (c) foo else bar`), `in` or `as`,
-   which go on with the receiver as operators; when `->`, or names and
-   commas that end in `->` on the line, follow it, which makes closure
-   parameters, the first of type `foo` (`{ foo a, b -> }`); and when it
+   which go on with the receiver as operators; when `->`, also on a
+   later line, or names and commas that end in `->` follow it, which
+   makes closure parameters, the first of type `foo` (`{ foo a, b -> }`);
+   and when it
    names a method whose parentheses hold typed parameters
    (`foo bar(int a) { }` stays a method, which Groovy rejects). With
    untyped parameters or none it is a call (`foo bar(a) { }`,
@@ -781,8 +782,11 @@ The resolution we adopt:
    `foo bar(baz 1)` and `foo x.y 'a'` are `foo` (`foo`) followed by the
    call `bar 1` (`bar baz: 1`, …), where Groovy reads `foo(bar).1`,
    `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))` and
-   `foo(x.y).a` (observed with Groovy 3). Taking the name would leave
-   the rest a statement that is often no statement (`foo bar 1, 2`).
+   `foo(x.y).a` (observed with Groovy 3). So is a name and `=` after the
+   name: `foo bar x = 1` is `foo` and the declaration `bar x = 1`, where
+   Groovy reads `foo.bar(x = 1)`. Taking the name would leave the rest a
+   statement that is often no statement (`foo bar 1, 2`,
+   `foo bar x = 1, y = 2`).
 5. **Conflicts** with `binary_expression` (where `a - b` could be
    "call `a` with `-b`") are resolved by giving `binary_expression`
    higher precedence: a command chain *only* matches when the token
@@ -1753,15 +1757,17 @@ A name argument: after spaces, tabs and line escapes, on the line:
     any member accesses or a `[` directly after it, on the line none of:
     a first argument as above other than a call in parentheses (a
     literal, `true`, `false`, `null`, a key, a creation or an array
-    type value, Groovy's chain continuation, §5.5 item 4); `(` that
+    type value), or a name and `=` that is not `==` or `=~` (each
+    Groovy's chain continuation, §5.5 item 4); `(` that
     holds, after Groovy's trivia, a call in parentheses' receiver and
     first argument, `@`, `final`, `def`, or a receiver that may not take
     a name argument followed, after type arguments and dimensions on
     the line, by a name (typed parameters); `->`; and, in a statement
     (COMMAND_PATH_START and COMMAND_STATEMENT_START), `=` that is not
-    `==` or `=~` (a declaration), or `,` followed by names, member
-    accesses, type punctuation and commas, a line break allowed after
-    each comma, that end in `->` (closure parameters).
+    `==` or `=~` (a declaration), a line break and, after whitespace,
+    `->`, or `,` followed by names, member accesses, type punctuation
+    and commas, a line break allowed after each comma and before the
+    `->`, that end in `->` (closure parameters).
   Inside the parentheses that a call in parentheses or typed parameters
   are read from, a `(` after the name is not read into.
 A creation: the word `new`, then, after Groovy's trivia (whitespace,
@@ -1977,15 +1983,18 @@ where Groovy reads one (observed with Groovy 3):
   a name: before, the receiver and the string.
 
 Every such change was checked mechanically on the cases a fuzzer found:
-of 8,792 trees without an `ERROR` that changed among 118,000 inputs,
+of 18,331 trees without an `ERROR` that changed among 235,000 inputs,
 putting a line break between each new call's receiver and its first
-argument gives the old tree for 8,268; 499 have a line escape or a
-comment there, which keep the call, and the other 25 have nothing
+argument gives the old tree for 17,356; 929 have a line escape or a
+comment there, which keep the call, and the other 46 have nothing
 between the two to break (`foo!x`, `foo~x`) or a dollar-slashy string.
-61 inputs went from no `ERROR` to one; Groovy 3 rejects all but four:
-`{ foo a, final` then `x -> }` on the next line, closure parameters
-with a line break inside one, and three in which a `(` on the line after
-a name argument continues it (above).
+106 inputs went from no `ERROR` to one; Groovy 3 rejects all but ten:
+five in which a line after a name argument continues it (a `(`, or an
+`in` on a later line, above), two closure parameter lists with a line
+break after a modifier or a comment inside a parameter
+(`{ foo a, final` then `x -> }`), and three in which a contextual word
+is the name argument before more (`foo record x<T>() { }`,
+`task var` then `default \` and `var`).
 
 A string after a receiver whose last name is capitalized, followed by
 `(`, is the name of a method: Groovy declares `foo` in
