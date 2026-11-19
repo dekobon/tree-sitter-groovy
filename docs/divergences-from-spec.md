@@ -32,7 +32,7 @@ reasoning here.
 | §5.13 Trailing commas | **Done** | accepted in list / map / argument / enum-constant lists. A parameter list takes none, as in Apache's `formalParameterList`. |
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
-| §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`; see #26 below. |
+| §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). A `{` that is the body of `if`, `else`, a loop, an arrow case or a lambda is a block before a closure, as in Groovy, also when it holds a lambda (`if (x) { a = b -> c }`). An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`, and a `{` that opens a statement stays a closure; see #26 below. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
@@ -855,8 +855,12 @@ differed at v0.6.0 from other causes. The same happened with
 The scanner's look-ahead at the `(` of `(a)` and `(String)` now reads
 through the `)` and the comment, and the runtime counts it against the
 `(`, so the edit makes it lex the `(` again and both reparses are the
-parse from scratch. `bindings/rust/tests/incremental_reparse.rs` holds
-both texts among those it edits.
+parse from scratch. It reads on through a type that names no parameter
+as well (`(int)`, `(a.b.C)`, `(String[])`), so a primitive or dotted
+type, which the look-ahead first turned down before the `)` and the
+same edit left reused, is lexed again too.
+`bindings/rust/tests/incremental_reparse.rs` holds the texts with a
+name, a primitive and a dotted type among those it edits.
 
 A change of included ranges with no edit is a third case, shared with
 every other token: a range added later that contains `*/` does not
@@ -1551,7 +1555,10 @@ stands only in `enhancedStatementExpression`,
 `enhancedArgumentListElement` and `enhancedExpression` (the last from
 5.0.x). A closure's optional parameter list is tried first, so where
 an expression may be followed by `->`, the end of a closure
-parameter's default and of a case value, Groovy keeps that reading.
+parameter's default and of a case value, Groovy keeps that reading
+where only a closure can stand. Where a block can stand too, the body
+of `if`, `else`, a loop, an arrow case and a lambda, `statement` and
+`lambdaBody` try the block first.
 
 **Current implementation**: spec §5.16 and §6.17. Before the
 `lambda_expression` node every lambda was an `ERROR`. Measured over the
@@ -1576,24 +1583,58 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `(foo a) -> a` | a lambda with the parameter type `foo` | an `ERROR`, as before: the parentheses read as the call `foo a` (spec §6.14) |
 | `foo(null -> 1)`, `foo(int -> 1)`, `(int) -> 1`, `(if) -> 1` | rejected | an `ERROR`, as before: a reserved word, a primitive type or `void` names no parameter |
 | `(_) -> 1`, `_ -> 1`, `var -> var`, `(String this) -> 1` | a lambda | the same |
-| `{ a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }` | the closure parameter `a` with a default | the same, as before |
+| `def c = { a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }`, `{ a = (b) -> { } }`, as a value or an argument | the closure parameter `a` with a default | the same, as before |
+| `if (x) { a = b -> c }`, `else { a = (b) -> c }`, `while (x) { String a = b -> c }`, `for (…) { def g = t -> 1 }`, `do { … } while (x)`, `case 1 -> { a = b -> c }`, `default -> { … }` | a block that holds the lambda | the same; **before, the closure with the parameter `a`** (the BREAKING class below) |
+| `f(x -> { Consumer<String> c = s -> foo(s); c.accept(x) })`, `(x) -> { b = (t) -> 1 }` | a block that holds the lambda | the same |
+| `{ a = b -> c }` that opens a statement, `lbl: { a = (b) -> c }`, `case 1: { a = b -> c }` | a block that holds the lambda | the closure parameter `a`, as before: such a `{` is a closure here (the next row) |
+| `{ foo() }` that opens a statement, a labeled statement or a colon case's statement | a block | a closure, as before lambdas |
 | `case (A) -> 1`, `case 1 + (a) -> 1` | a case with the value `(A)` or `1 + (a)` | the same, as before |
 | `{ p = a = b -> c }`, `{ a, b = x += y -> z }`, `case x.y = it -> 1` | the parameter with the assignment as its default; the case with the assignment as its value | the closure body `p = (a = (b -> c))`; an `ERROR` for the second and third: the lambda without parentheses is taken after an assignment |
 | `{ a = (var b) -> c }`, `case (var a) -> 1` | the default or value `var(b)` | the lambda `(var b) -> c` assigned to `a`; an `ERROR` for the case: the scanner reads `var` before a name as the keyword (spec §6.16) |
-| `case (A) -> (b) -> b`, `{ a = (b) -> (d) -> e }` | the value `(A)` and the body `(b) -> b`; the default `(b)` | the value `(A) -> (b)` and the body `b`; the default `(b) -> (d)`; before, an `ERROR` |
+| `case (A) -> (b) -> b`, `{ a = (b) -> (d) -> e }` | the value `(A)` and the body `(b) -> b`; the default `(b)` and the body `(d) -> e` | the same; before, an `ERROR` |
+| `def c = { v = (A<B> a) -> a }`, `{ v = (String[] a) -> a }`, `{ a = (int a) -> 1 }` | the parameter `v` (`a`) with the default `A<B>(a)`, `String[](a)` or `int(a)`, a call | `v = …` assigned the lambda; before, an `ERROR`: those parentheses are no expression here |
+| `def v = a -> { } + 1` | the body `{ } + 1` | the body `{ }`, and `+ 1` a statement of its own; before, an `ERROR` |
+| `def v = (x) -> { y -> y }.call()`, `foo((x) -> { y -> y } + 1)` | the body `{ y -> y }.call()` and `{ y -> y } + 1` | the lambda called, and the lambda added; before, an `ERROR`. Without parentheses the body takes it (`foo(x -> { y -> y } + 1)`) |
+| `(y.y) if (z) { a() } else { b() }` on one line | rejected | the parenthesized expression and the `if` statement; **before, the cast of a call named `if`** and a call named `else` (a BREAKING class below) |
 
-The rows with the assignment and `var` changed trees that had no
-`ERROR`. They are the only such changes found: of 120,000 inputs built
-from lambda-shaped templates, 122 that had no `ERROR` changed, all of
-those two kinds, and of 116,000 mutations of the corpus, real and Java
-inputs none did. Taking the lambda in a nested assignment the same way
-in every context is what keeps the grammar small: deciding it by
-context gave every expression state in a closure parameter's default
-and a case value a copy of its own, 8% more states. The last row has
-no `ERROR` now and was one before; each reading has one lambda and one
-parenthesized expression, so the weights tie, and Groovy, which tries
-the parenthesized expression first at each `(`, reads the other.
+Four kinds of trees that had no `ERROR` changed. No input from the
+corpus, the 266 real files or the 24,548 Java files is among them:
+
+- **A brace body that holds a lambda** (`if (x) { a = b -> c }` and
+  the other bodies in the table). Before lambdas the block reading
+  failed and the closure with the parameter `a` was the only one; now
+  the block wins, as in Groovy, which agreed in 60 of 60 sampled
+  inputs (Groovy 3). Of 27,957 inputs built with such bodies in every
+  position of a `{`, 2,439 changed so.
+- **An assignment in a closure parameter's default or a case value,
+  and `var` called in parentheses there** (the two rows above). Of
+  120,000 inputs built from lambda-shaped templates, 116 changed so.
+  Taking the lambda in a nested assignment the same way in every
+  context is what keeps the grammar small: deciding it by context gave
+  every expression state in a closure parameter's default and a case
+  value a copy of its own, 8% more states.
+- **A keyword call that is a cast's operand** (`(y.y) if (z) { … }` on
+  one line): the weight of an `if`'s block makes the statement outrank
+  the cast of a call named `if`, which Groovy, reserving `if`, never
+  reads. 3 of 236,000 fuzzed inputs, none of them valid Groovy.
+
+Of 116,000 mutations of the corpus, real and Java inputs, the third
+kind accounts for the only 2 changed trees that had no `ERROR`.
 
 **Action**: the call forms in the fourth row would need the scanner to
 read every call's arguments; measured on code made of calls, the
 reading the scanner does now costs about 1.5% more instructions.
+
+A `{` that opens a statement, a labeled statement or a colon case's
+statement would be a block, as in Groovy, if `block` were one of
+`_statement`'s alternatives with `BODY_BLOCK_WEIGHT`, the body
+positions then reading their `{` through it. A prototype needed one
+precedence changed (`array_initializer` above `block` and `closure` in
+a nested initializer) and kept the table size (4,510 states). It
+changes trees that have no `ERROR`: 3 corpus inputs (`{ }`, `{ x }`
+and a closure of several statements at the start of a statement), no
+real Groovy file, and 139 of the 19,257 Java files without an
+`ERROR`, whose nested blocks (`{ int x = 1; … }` in a method) are
+closures now; on code made of conditions it takes about 3% more
+instructions. That is a change of the AST of valid input, left to a
+release that may break it.

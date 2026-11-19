@@ -1157,10 +1157,11 @@ Groovy 3 added Java's lambdas next to closures. Apache's grammar
 
 `lambdaBody` is a `block` or a `statementExpression`: an expression or
 a parenthesis-free call (`x -> println x`), taking all it can, so
-`(a) -> a + 1 as String` casts the sum. A `{` opens a block, which
-Apache tries first, unless only a closure can follow
-(`x -> { y -> y }`). A line break may come before and after the `->`
-(`NL* ARROW NL*`).
+`(a) -> a + 1 as String` casts the sum. A `{` opens a block wherever
+one parses, as Apache tries the block first, and a closure only where
+no block does (`x -> { y -> y }`). `x -> { a = b -> c }` is a block
+that assigns a lambda, not a closure with the parameter `a`. A line
+break may come before and after the `->` (`NL* ARROW NL*`).
 
 The node is `lambda_expression` with the fields `parameters` and
 `body`, as in tree-sitter-java. The parameters in parentheses reuse
@@ -1184,20 +1185,46 @@ positions.
 
 Where an expression may be followed by `->`, the end of a closure
 parameter's default and of a case value, the same tokens can also be
-the default or the value, as Groovy reads them:
-`{ a = (b) -> c }` and `{ a = b -> c }` are closures with the
-parameter `a`, and `case (A) -> 1` is a case with the value `(A)`
-(observed with Groovy 3 for the closures; Groovy 3 has no arrow
-cases). A parenthesized expression after `_lambda_start`
+the default or the value. Groovy's choice depends on what the `{` may
+open:
+
+- Where only a closure can stand, a value or an argument
+  (`def c = { a = (b) -> c }`, `foo { a = b -> c }`), Groovy tries the
+  closure's parameters first: the closure has the parameter `a`.
+  `case (A) -> 1` is likewise a case with the value `(A)` (observed
+  with Groovy 3 for the closures; Groovy 3 has no arrow cases).
+- Where a block can stand too, the body of `if`, `else`, a loop, an
+  arrow case and a lambda, Groovy tries the block first (Apache
+  `statement` and `lambdaBody`): `if (x) { a = b -> c }`,
+  `while (x) { String a = (b) -> c }` and `f(x -> { a = b -> c })` are
+  blocks that hold the lambda (observed with Groovy 3).
+
+The grammar keeps all readings and ranks them with dynamic
+precedences. A parenthesized expression after `_lambda_start`
 (`_lambda_parenthesized_expression`) and a closure parameter's
 default that is a name after `_bare_lambda_start` (`_bare_lambda_name`)
-keep those readings, and the lambda's negative dynamic precedence
-(`LAMBDA_WEIGHT` in `grammar.js`) ranks it below them. In the closure
-the name is reduced at the `->` by static precedence. An assignment
-in such a default or case value (`{ p = a = b -> c }`,
+keep the closure's reading; the lambda's negative weight
+(`LAMBDA_WEIGHT`) ranks a lambda below it. A block in a body position
+outweighs the lambda in it (`BODY_BLOCK_WEIGHT`), and a lambda whose
+whole body is a closure or a parenthesized expression ranks below one
+that holds one more lambda (`DEMOTED_LAMBDA_WEIGHT`), so that the
+lambda's block wins and `{ a = (b) -> (d) -> e }` keeps the parameter
+`a = (b)` and the body `(d) -> e`, as Groovy, which tries the
+parenthesized expression first at each `(`, reads it. A `{` that opens
+a statement, a labeled statement or a colon case's statement is a
+closure here, where Groovy reads a block (`{ foo() }` at the start of a
+statement, `docs/divergences-from-spec.md` §26), so there
+`{ a = b -> c }` keeps the closure's parameter. An assignment in a
+closure parameter's default or a case value (`{ p = a = b -> c }`,
 `case x += y -> z`) and `var` called in parentheses there
 (`{ a = (var b) -> c }`) are read as lambdas instead; see
 `docs/divergences-from-spec.md` §26.
+
+Read differently from Groovy (observed with Groovy 3): a closure or a
+block as the whole body when an operator follows it, `a -> { } + 1`
+(the body ends at the block) and `(x) -> { y -> y }.call()` (the
+access applies to the lambda; without parentheses around the parameter
+the closure takes it, `foo(x -> { y -> y }.call())`).
 
 Not accepted, though Groovy takes each (observed with Groovy 3): a
 lambda as the parenthesis-free first argument of a call or appended to
@@ -1421,7 +1448,9 @@ a `parenthesized_type_cast` over `c`. The look-ahead for a lambda
 (§6.17) now reads from the `(` through the `)` and the comment, and
 the runtime counts what the scanner read against the `(`, so the
 insertion makes it lex the `(` again and the reparse is the parse from
-scratch; the same holds for `foo((String)/* why` followed by `arg)`.
+scratch. The same holds for `foo((String)/* why` followed by `arg)`
+and for the types without a name the look-ahead reads on through
+(`x = (int)/* n`, `(a.b.C)`, `(String[])`, `(List<String>)`).
 `bindings/rust/tests/incremental_reparse.rs` checks reparses against
 parses from scratch, both texts among them.
 
@@ -2496,7 +2525,9 @@ call's arguments), and:
     and `pipeline`, no primitive type name and no `void`, not right after
     one `.` and not inside `<…>`); and after `=`, not `==` or `=~`, a
     default value read token by token, brackets counted and strings
-    closing on their line skipped, to the `,` or `)` that ends it;
+    closing on their line skipped, to the `,` or `)` that ends it. A
+    parameter with no such name (`(int)`, `(a.b.C)`, `(String[])`) is
+    read on as well, and the token is turned down after the `)`;
   - after the `)` and Groovy's trivia, `->`;
   - all within LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256) items: a word, a
     string, a comment, an annotation or a punctuation character.
@@ -2549,21 +2580,29 @@ before what they open, so a comment between them and the `(` or the
 name cannot hide a line break (§6.14).
 
 Because the look-ahead at a `(` reads through the `)` and the trivia
-after it, an unterminated `/*` there is read to the end of input, once
-per `(` that reaches it within the budget. That fixed the one reparse
-that differed from a parse from scratch (§6.6).
+after it, for a cast's type as well as for parameters, an unterminated
+`/*` there is read to the end of input, once per `(` that reaches it
+within the budget. That fixed the one reparse that differed from a
+parse from scratch (§6.6), for a name, a primitive, a dotted, an array
+and a generic type alike.
 
-Measured against the grammar before: STATE_COUNT 4330 to 4490 (+3.7%),
-LARGE_STATE_COUNT 1575 to 1672, `parser.c` 8.2 to 8.8 MB, two
-external tokens and one precedence (`PREC.LAMBDA`, below assignment,
-so the body takes all it can) and one dynamic precedence
-(`LAMBDA_WEIGHT`) added, no conflict. A build with the tables and none
-of the look-ahead runs as many instructions as the grammar before, so
-the cost is the scanner's reading: about 0.6% more instructions on
+Measured against the grammar before: STATE_COUNT 4330 to 4516 (+4.3%),
+LARGE_STATE_COUNT 1575 to 1693, `parser.c` 8.2 to 8.9 MB, two
+external tokens, one precedence (`PREC.LAMBDA`, below assignment, so
+the body takes all it can), three dynamic precedences (`LAMBDA_WEIGHT`,
+`BODY_BLOCK_WEIGHT`, `DEMOTED_LAMBDA_WEIGHT`) and one conflict
+(`[_bare_lambda_name, _bare_lambda_expression]`) added. The rankings
+of §5.16 account for 26 of the states. About 0.6% more instructions on
 real Groovy and Gradle files and on Java files without a lambda, 1.5%
 on code made of calls with names for arguments and 2% on code made of
-parenthesized expressions and casts; Java files with lambdas, which
-were errors, take 11% fewer. Two other designs were measured and
+parenthesized expressions, casts, or `if` and loop statements, whose
+block bodies take one more reduction each, and 5% on code of closures
+of which a tenth have a name as their first parameter's default
+(`{ a = b -> c }`), where the parser keeps the parameter and the
+lambda readings to the end;
+Java files with lambdas, which were errors, take 11% fewer. A build
+with the tables and none of the look-ahead ran as many instructions as
+the grammar before, so the rest is the scanner's reading. Two other designs were measured and
 dropped: deciding `x ->` in the grammar (+3.6% states, a fifth more
 reductions on such calls), and deciding it by context to keep the
 closure readings (+8% states, as every expression state in a closure
