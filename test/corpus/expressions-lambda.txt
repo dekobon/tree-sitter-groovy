@@ -551,6 +551,7 @@ Lambda body takes the whole expression after the arrow
 def f = (a) -> a + 1 as String
 def g = x -> x ? 1 : 2
 def h = x -> x = 1
+def i = (x) -> x = 1
 
 ---
 
@@ -581,6 +582,16 @@ def h = x -> x = 1
       name: (identifier)
       value: (lambda_expression
         parameters: (identifier)
+        body: (assignment_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
         body: (assignment_expression
           left: (identifier)
           right: (number_literal))))))
@@ -1071,6 +1082,7 @@ A keyword or a primitive type is no lambda parameter
 foo(it -> 1)
 foo(null -> 1)
 def f = (int) -> 1
+foo(this -> 1)
 
 ---
 
@@ -1095,7 +1107,14 @@ def f = (int) -> 1
       value: (parenthesized_type_cast
         type: (type_identifier)
         (ERROR)
-        value: (number_literal)))))
+        value: (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (ERROR
+          (number_literal))))))
 
 ==================
 A lambda in parentheses after a call's name is no argument of it
@@ -1451,3 +1470,83 @@ def v = switch (k) { case (A) -> (b) -> b }
                   (formal_parameter
                     name: (identifier)))
                 body: (identifier)))))))))
+
+==================
+Lambda arrow after a line break with no comment
+==================
+
+def g = x
+  -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier)))))
+
+==================
+Lambda parameter defaults holding brackets in strings
+==================
+
+def f = (a = ')') -> a
+def g = (a = "(") -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        body: (identifier)))))
+
+==================
+Lambda parameter named with an underscore
+==================
+
+def f = (_) -> 1
+def g = _ -> 1
+foo(_ -> 1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (number_literal))))))
