@@ -1620,6 +1620,9 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `def c = { a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }`, `{ a = (b) -> { } }`, as a value or an argument | the closure parameter `a` with a default | the same, as before |
 | `if (x) { a = b -> c }`, `else { a = (b) -> c }`, `while (x) { String a = b -> c }`, `for (…) { def g = t -> 1 }`, `do { … } while (x)`, `case 1 -> { a = b -> c }`, `default -> { … }` | a block that holds the lambda | the same; **before, the closure with the parameter `a`** (the BREAKING class below) |
 | `f(x -> { Consumer<String> c = s -> foo(s); c.accept(x) })`, `(x) -> { b = (t) -> 1 }` | a block that holds the lambda | the same |
+| `if (x) { a = b -> { p -> p } }`, `while (x) { cb = v -> { -> v } }`, `if (x) { a = b -> { c = d -> e } }`, `f(x -> { a = b -> { c = d -> e } })` | blocks that hold the lambdas | the same, for nests of up to ten lambdas, each in the block of the one before (`LAMBDA_NESTING_DEPTH`); **before, the closure with the parameter `a`** where such a block held a lambda whose body is a closure or two lambdas, or a lambda's block two lambdas |
+| `x -> { a = b -> { p -> p } }`, `if (x) { a = b -> { c = d -> { p -> p } } }`, a nest of more than ten lambdas | blocks that hold the lambdas | the closure with the parameter `a` (`c`), as before: a block in a lambda's body has no weight of its own, and one that outweighed the lambda in it would make `def c = { a = (b) -> { } }` a closure that assigns `a` a lambda |
+| `{ T a = (U) (b, c) -> (d) -> e }`, `{ T a = (b, c) -> (d) -> e }` | the default `(U)` cast of the lambda `(b, c) -> (d)`, or that lambda, and the body `e` | the default `(U)` called with `b` and `c` and the body `(d) -> e`; no parameter and a body that declares `a`. Read as Groovy reads them until a parenthesized expression as a lambda's whole body was ranked low for `{ a = (b) -> (d) -> e }` (the row above), which needs that weight below a lambda's, and the cast's default above one less a cast |
 | `{ a = b -> c }` that opens a statement, `lbl: { a = (b) -> c }`, `case 1: { a = b -> c }` | a block that holds the lambda | the closure parameter `a`, as before: such a `{` is a closure here (the next row) |
 | `{ foo() }` that opens a statement, a labeled statement or a colon case's statement | a block | a closure, as before lambdas |
 | `case (A) -> 1`, `case 1 + (a) -> 1` | a case with the value `(A)` or `1 + (a)` | the same, as before |
@@ -1639,7 +1642,22 @@ corpus, the 266 real files or the 24,548 Java files is among them:
   failed and the closure with the parameter `a` was the only one; now
   the block wins, as in Groovy, which agreed in 60 of 60 sampled
   inputs (Groovy 3). Of 27,957 inputs built with such bodies in every
-  position of a `{`, 2,439 changed so.
+  position of a `{`, 2,439 changed so. The block's weight beats the
+  closure reading only for nests of up to ten lambdas: one more lambda
+  in the block costs the block's reading `LAMBDA_WEIGHT` and the closure
+  reading nothing, and a lambda's block has no weight to spend. When
+  the nest bound was raised from what one or two lambdas need to ten,
+  1,018 of 61,246 template inputs and 915 of 60,319 mutations of the
+  corpus and lambda probes changed between trees without an `ERROR`.
+  Groovy 3 read 655 of the 759 template inputs it accepts the new way
+  (75 of them up to the statement count of a class body or an
+  interpolation's closure), none the old way. Of the 838 mutations it
+  accepts, 442 read the new way and 12 the old way: a body block
+  followed on its line by what continues the closure in Groovy
+  (`if (x) { a = b -> { p -> p } } - 1`), which now reads like every
+  other such block, a block and a statement of its own.
+  On nests of lambdas generated against Groovy 3, the mismatches fell
+  from 932 of 4,000 to 254.
 - **An assignment in a closure parameter's default or a case value,
   and `var` called in parentheses there** (the two rows above). Of
   120,000 inputs built from lambda-shaped templates, 116 changed so.

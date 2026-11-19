@@ -1215,11 +1215,17 @@ precedences. A parenthesized expression after `_lambda_start`
 (`_lambda_parenthesized_expression`) and a closure parameter's
 default that is a name after `_bare_lambda_start` (`_bare_lambda_name`)
 keep the closure's reading; the lambda's negative weight
-(`LAMBDA_WEIGHT`) ranks a lambda below it. A block in a body position
-outweighs the lambda in it (`BODY_BLOCK_WEIGHT`), and a lambda whose
-whole body is a closure or a parenthesized expression ranks below one
-that holds one more lambda (`DEMOTED_LAMBDA_WEIGHT`), so that the
-lambda's block wins and `{ a = (b) -> (d) -> e }` keeps the parameter
+(`LAMBDA_WEIGHT`) ranks a lambda below it. A lambda whose whole body
+is a closure or a parenthesized expression ranks below ten lambdas
+(`DEMOTED_LAMBDA_WEIGHT`), and a block in the body of `if`, `else`, a
+loop or an arrow case outweighs such a lambda, or ten lambdas
+(`BODY_BLOCK_WEIGHT`). The closure reading makes the first assignment
+in the braces a parameter and every lambda in it one, so it holds fewer
+lambdas, and the blocks win for nests of up to ten lambdas, each in the
+block of the one before (`LAMBDA_NESTING_DEPTH`):
+`if (x) { a = b -> { p -> p } }`, `if (x) { a = b -> { c = d -> e } }`
+and `f(x -> { a = b -> { c = d -> e } })` are blocks, as in Groovy.
+And `{ a = (b) -> (d) -> e }` keeps the parameter
 `a = (b)` and the body `(d) -> e`, as Groovy, which tries the
 parenthesized expression first at each `(`, reads it. A `{` that opens
 a statement, a labeled statement or a colon case's statement is a
@@ -1235,7 +1241,18 @@ Read differently from Groovy (observed with Groovy 3): a closure or a
 block as the whole body when an operator follows it, `a -> { } + 1`
 (the body ends at the block) and `(x) -> { y -> y }.call()` (the
 access applies to the lambda; without parentheses around the parameter
-the closure takes it, `foo(x -> { y -> y }.call())`).
+the closure takes it, `foo(x -> { y -> y }.call())`). A block in a
+lambda's body that holds a lambda whose body is a closure,
+`x -> { a = b -> { p -> p } }`, and so any nest that ends in one, is
+the closure with the parameter `a`: such a block has no weight of its
+own, as one would make `def c = { a = (b) -> { } }` a block too. A
+typed closure parameter whose default casts a lambda before a lambda,
+`{ T a = (U) (b, c) -> (d) -> e }`, has the default `(U)` called with
+`b` and `c` and the body `(d) -> e`, and `{ T a = (b, c) -> (d) -> e }`
+no parameter, a body that declares `a`: Groovy's default ends at the
+parenthesized expression, a lambda's whole body, which ranks low for
+`{ a = (b) -> (d) -> e }`. And a nest of more than ten lambdas reads
+the closures (`docs/divergences-from-spec.md` §26).
 
 Not accepted, though Groovy takes each (observed with Groovy 3): a
 lambda as the parenthesis-free first argument of a call or appended to
