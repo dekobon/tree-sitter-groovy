@@ -5287,6 +5287,10 @@ c = { foo a, b -> a }
 c = { foo a, final b -> a }
 c = { foo a,
   b -> a }
+c = { foo a
+  -> a }
+c = { foo a, b
+  -> a }
 list.each { println it }
 
 ---
@@ -5346,6 +5350,28 @@ list.each { println it }
         (expression_statement
           (identifier)))))
   (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
     (method_invocation
       function: (field_access
         object: (identifier)
@@ -5384,6 +5410,8 @@ foo bar baz: 1
 foo bar(baz 1)
 foo bar new Baz()
 foo x.y 'a'
+foo bar x = 1
+foo bar x == 1
 c = { a b c }
 
 ---
@@ -5434,6 +5462,19 @@ c = { a b c }
       object: (identifier)
       field: (identifier))
     argument: (string_literal))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
   (expression_statement
     (assignment_expression
       left: (identifier)

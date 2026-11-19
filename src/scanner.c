@@ -574,12 +574,26 @@ static bool dotted_argument_rest(TSLexer *lexer, bool no_close_ahead) {
     return !first_argument_follows(lexer, false, false, false, no_close_ahead);
 }
 
-// After the `,` of `foo a,` in a statement: whether `->` ends the list on
-// its line, which makes it a closure's parameters, the first of type `foo`
+// At a line break after closure parameters' last name: whether `->`
+// follows after whitespace, as Groovy allows line breaks before it.
+static bool arrow_follows(TSLexer *lexer) {
+    while (lexer->lookahead == ' ' || lexer->lookahead == '\t'
+           || lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+        lexer->advance(lexer, false);
+    }
+    if (lexer->lookahead != '-') {
+        return false;
+    }
+    lexer->advance(lexer, false);
+    return lexer->lookahead == '>';
+}
+
+// After the `,` of `foo a,` in a statement: whether `->` ends the list,
+// which makes it a closure's parameters, the first of type `foo`
 // (`{ foo a, b -> }`, `{ foo a, final b -> }`). Each element is read as
 // names, member accesses and the punctuation of a type; a line break may
-// follow the comma. Anything else, which only an argument has, stops the
-// look-ahead, so that the list is read once.
+// follow a comma or come before the `->`. Anything else, which only an
+// argument has, stops the look-ahead, so that the list is read once.
 static bool parameters_follow(TSLexer *lexer, bool no_close_ahead) {
     for (;;) {
         lexer->advance(lexer, false);
@@ -600,12 +614,8 @@ static bool parameters_follow(TSLexer *lexer, bool no_close_ahead) {
                 return false;
             }
         }
-        if (lexer->lookahead == '-') {
-            lexer->advance(lexer, false);
-            return lexer->lookahead == '>';
-        }
         if (lexer->lookahead != ',') {
-            return false;
+            return arrow_follows(lexer);
         }
     }
 }
@@ -619,10 +629,12 @@ static bool parameters_follow(TSLexer *lexer, bool no_close_ahead) {
 //     parameters, the first of type `foo`;
 //   - the first argument of a call as the grammar takes it after a name
 //     (`first_argument_follows` without names: a literal, a key, a creation
-//     or an array type value): in Groovy the name before it is a further
-//     call in the chain (`foo bar 1` is `foo(bar).1`, `foo bar baz: 1` is
-//     `foo.bar(baz: 1)`, `foo bar new Baz()` is `foo.bar(new Baz())`, §5.5
-//     item 4), left as before: `foo` and the call after it;
+//     or an array type value), or a name and `=`: in Groovy the name
+//     before it is a further call in the chain (`foo bar 1` is
+//     `foo(bar).1`, `foo bar baz: 1` is `foo.bar(baz: 1)`,
+//     `foo bar new Baz()` is `foo.bar(new Baz())`, `foo bar x = y` is
+//     `foo.bar(x = y)`, §5.5 item 4), left as before: `foo` and the call
+//     or declaration after it;
 //   - `(` with a parenthesis-free call or typed parameters in it: in
 //     Groovy `foo bar(baz 1)` is `foo.bar(baz(1))`, and Groovy rejects
 //     `foo bar(int a) { }`, which stays a method here. Inside the one
@@ -640,8 +652,16 @@ static bool name_argument_rest(
         return nested || call_arguments_follow(lexer, no_close_ahead);
     }
     if (is_literal_start(c) || is_identifier_start(c)) {
-        return !first_argument_follows(lexer, false, false, false,
-                                       no_close_ahead);
+        if (first_argument_follows(lexer, false, false, false,
+                                   no_close_ahead)) {
+            return false;
+        }
+        // After a name the spaces are skipped; a `=` here follows it.
+        if (!is_identifier_start(c) || lexer->lookahead != '=') {
+            return true;
+        }
+        lexer->advance(lexer, false);
+        return lexer->lookahead == '=' || lexer->lookahead == '~';
     }
     if (c == '-') {
         lexer->advance(lexer, false);
@@ -649,6 +669,9 @@ static bool name_argument_rest(
     }
     if (statement && c == ',') {
         return !parameters_follow(lexer, no_close_ahead);
+    }
+    if (statement && (c == '\n' || c == '\r')) {
+        return !arrow_follows(lexer);
     }
     if (statement && c == '=') {
         lexer->advance(lexer, false);
