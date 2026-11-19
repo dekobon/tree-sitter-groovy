@@ -116,28 +116,47 @@ const CAST_WEIGHT = 1;
 const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
 
 /*
- * The dynamic precedence of a block that is the body of `if`, `else`, a
- * loop or an arrow case, where Groovy tries a block before a closure
- * (Apache `statement` lists `block` first). `if (x) { a = b -> c }` is a
- * block that assigns a lambda, and also a closure with the parameter `a`;
- * the block must outweigh the lambda in it.
+ * How many lambdas, each in a brace body of the one before it, the two
+ * weights below rank as Groovy reads them:
+ * `x -> { a = b -> { c = d -> e } }` and
+ * `if (x) { a = b -> { c = d -> { e = f -> g } } }` hold three. Taking a
+ * closure for one of those bodies makes the assignment in it a closure
+ * parameter, and so every lambda nested in it, so that reading holds fewer
+ * lambdas. Deeper nests read the closures.
  */
-const BODY_BLOCK_WEIGHT = -LAMBDA_WEIGHT + 1;
+const LAMBDA_NESTING_DEPTH = 10;
 
 /*
  * The dynamic precedence of a lambda whose body is a closure or a
  * parenthesized expression, either of which another reading of the same
  * tokens holds otherwise. A lambda's body is a block before a closure
  * (Apache `lambdaBody`), so `x -> { a = b -> c }` must rank its block,
- * which holds a lambda, above the closure with the parameter `a`. And a
- * parenthesized expression is a lambda's whole body only before a `->`
- * that the lambda cannot take: `{ a = (b) -> (d) -> e }` is the parameter
- * `a = (b)` and the body `(d) -> e` in Groovy, which tries the
+ * which holds a lambda, above the closure with the parameter `a`, and a
+ * nest of LAMBDA_NESTING_DEPTH lambdas above the lambda whose closure holds
+ * none. And a parenthesized expression is a lambda's whole body only before
+ * a `->` that the lambda cannot take: `{ a = (b) -> (d) -> e }` is the
+ * parameter `a = (b)` and the body `(d) -> e` in Groovy, which tries the
  * parenthesized expression first, and also the parameter
- * `a = (b) -> (d)` and the body `e`. The weight is below a lambda that
- * holds one more lambda.
+ * `a = (b) -> (d)` and the body `e`. The weight is below that of
+ * LAMBDA_NESTING_DEPTH lambdas.
  */
-const DEMOTED_LAMBDA_WEIGHT = 2 * LAMBDA_WEIGHT - 1;
+const DEMOTED_LAMBDA_WEIGHT = LAMBDA_NESTING_DEPTH * LAMBDA_WEIGHT - 1;
+
+/*
+ * The dynamic precedence of a block that is the body of `if`, `else`, a
+ * loop or an arrow case, where Groovy tries a block before a closure
+ * (Apache `statement` lists `block` first). `if (x) { a = b -> c }` is a
+ * block that assigns a lambda, and also a closure with the parameter `a`,
+ * whose reading holds no lambda. The block must outweigh what it holds and
+ * the closure does not: a nest of LAMBDA_NESTING_DEPTH lambdas, or a
+ * lambda whose body is a closure (`if (x) { a = b -> { p -> p } }`), which
+ * is demoted. A block in a lambda's body has no weight of its own, so a
+ * lambda there whose body is a closure loses to the closure reading:
+ * `x -> { a = b -> { p -> p } }` is the closure with the parameter `a`. A
+ * weight that outweighed the lambda in such a block would also make
+ * `def c = { a = (b) -> { } }` a closure that assigns `a` a lambda.
+ */
+const BODY_BLOCK_WEIGHT = -DEMOTED_LAMBDA_WEIGHT + 1;
 
 /*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and

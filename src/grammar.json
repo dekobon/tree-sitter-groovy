@@ -1423,7 +1423,7 @@
               "members": [
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": 4,
+                  "value": 32,
                   "content": {
                     "type": "SYMBOL",
                     "name": "block"
@@ -10824,7 +10824,7 @@
                   },
                   {
                     "type": "PREC_DYNAMIC",
-                    "value": -7,
+                    "value": -31,
                     "content": {
                       "type": "PREC",
                       "value": 1,
@@ -10836,7 +10836,7 @@
                   },
                   {
                     "type": "PREC_DYNAMIC",
-                    "value": -7,
+                    "value": -31,
                     "content": {
                       "type": "PREC",
                       "value": 1,
@@ -10913,7 +10913,7 @@
                   },
                   {
                     "type": "PREC_DYNAMIC",
-                    "value": -7,
+                    "value": -31,
                     "content": {
                       "type": "PREC",
                       "value": 1,
@@ -10925,7 +10925,7 @@
                   },
                   {
                     "type": "PREC_DYNAMIC",
-                    "value": -7,
+                    "value": -31,
                     "content": {
                       "type": "PREC",
                       "value": 1,
@@ -10984,7 +10984,7 @@
     },
     "_body_block": {
       "type": "PREC_DYNAMIC",
-      "value": 4,
+      "value": 32,
       "content": {
         "type": "ALIAS",
         "content": {

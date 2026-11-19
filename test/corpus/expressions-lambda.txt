@@ -1550,3 +1550,286 @@ foo(_ -> 1)
         (lambda_expression
           parameters: (identifier)
           body: (number_literal))))))
+
+==================
+Body block: a lambda whose body is a closure is no closure parameter
+==================
+
+if (x) { a = b -> { p -> p } }
+while (x) { cb = v -> { -> v } }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier))))))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (closure
+              (closure_parameters)
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Body block and lambda body: nested lambdas in blocks are no closure parameters
+==================
+
+if (x) { a = b -> { c = d -> e } }
+f(x -> { a = b -> { c = d -> e } })
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (block
+              (expression_statement
+                (assignment_expression
+                  left: (identifier)
+                  right: (lambda_expression
+                    parameters: (identifier)
+                    body: (identifier))))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (block
+            (expression_statement
+              (assignment_expression
+                left: (identifier)
+                right: (lambda_expression
+                  parameters: (identifier)
+                  body: (block
+                    (expression_statement
+                      (assignment_expression
+                        left: (identifier)
+                        right: (lambda_expression
+                          parameters: (identifier)
+                          body: (identifier))))))))))))))
+
+==================
+Body block: ten lambdas nested in blocks are no closure parameters
+==================
+
+if (x) { a1 = b1 -> { a2 = b2 -> { a3 = b3 -> { a4 = b4 -> { a5 = b5 -> { a6 = b6 -> { a7 = b7 -> { a8 = b8 -> { a9 = b9 -> { z = w -> c } } } } } } } } } }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (block
+              (expression_statement
+                (assignment_expression
+                  left: (identifier)
+                  right: (lambda_expression
+                    parameters: (identifier)
+                    body: (block
+                      (expression_statement
+                        (assignment_expression
+                          left: (identifier)
+                          right: (lambda_expression
+                            parameters: (identifier)
+                            body: (block
+                              (expression_statement
+                                (assignment_expression
+                                  left: (identifier)
+                                  right: (lambda_expression
+                                    parameters: (identifier)
+                                    body: (block
+                                      (expression_statement
+                                        (assignment_expression
+                                          left: (identifier)
+                                          right: (lambda_expression
+                                            parameters: (identifier)
+                                            body: (block
+                                              (expression_statement
+                                                (assignment_expression
+                                                  left: (identifier)
+                                                  right: (lambda_expression
+                                                    parameters: (identifier)
+                                                    body: (block
+                                                      (expression_statement
+                                                        (assignment_expression
+                                                          left: (identifier)
+                                                          right: (lambda_expression
+                                                            parameters: (identifier)
+                                                            body: (block
+                                                              (expression_statement
+                                                                (assignment_expression
+                                                                  left: (identifier)
+                                                                  right: (lambda_expression
+                                                                    parameters: (identifier)
+                                                                    body: (block
+                                                                      (expression_statement
+                                                                        (assignment_expression
+                                                                          left: (identifier)
+                                                                          right: (lambda_expression
+                                                                            parameters: (identifier)
+                                                                            body: (block
+                                                                              (expression_statement
+                                                                                (assignment_expression
+                                                                                  left: (identifier)
+                                                                                  right: (lambda_expression
+                                                                                    parameters: (identifier)
+                                                                                    body: (identifier)))))))))))))))))))))))))))))))))))))))))))
+
+==================
+Lambda body: ten lambdas nested in blocks are no closure parameters
+==================
+
+f(x -> { a1 = b1 -> { a2 = b2 -> { a3 = b3 -> { a4 = b4 -> { a5 = b5 -> { a6 = b6 -> { a7 = b7 -> { a8 = b8 -> { z = w -> c } } } } } } } } })
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (block
+            (expression_statement
+              (assignment_expression
+                left: (identifier)
+                right: (lambda_expression
+                  parameters: (identifier)
+                  body: (block
+                    (expression_statement
+                      (assignment_expression
+                        left: (identifier)
+                        right: (lambda_expression
+                          parameters: (identifier)
+                          body: (block
+                            (expression_statement
+                              (assignment_expression
+                                left: (identifier)
+                                right: (lambda_expression
+                                  parameters: (identifier)
+                                  body: (block
+                                    (expression_statement
+                                      (assignment_expression
+                                        left: (identifier)
+                                        right: (lambda_expression
+                                          parameters: (identifier)
+                                          body: (block
+                                            (expression_statement
+                                              (assignment_expression
+                                                left: (identifier)
+                                                right: (lambda_expression
+                                                  parameters: (identifier)
+                                                  body: (block
+                                                    (expression_statement
+                                                      (assignment_expression
+                                                        left: (identifier)
+                                                        right: (lambda_expression
+                                                          parameters: (identifier)
+                                                          body: (block
+                                                            (expression_statement
+                                                              (assignment_expression
+                                                                left: (identifier)
+                                                                right: (lambda_expression
+                                                                  parameters: (identifier)
+                                                                  body: (block
+                                                                    (expression_statement
+                                                                      (assignment_expression
+                                                                        left: (identifier)
+                                                                        right: (lambda_expression
+                                                                          parameters: (identifier)
+                                                                          body: (block
+                                                                            (expression_statement
+                                                                              (assignment_expression
+                                                                                left: (identifier)
+                                                                                right: (lambda_expression
+                                                                                  parameters: (identifier)
+                                                                                  body: (identifier))))))))))))))))))))))))))))))))))))))))))
+
+==================
+Lambda body: a block holding a lambda whose body is a closure reads as a closure (divergence 26)
+==================
+
+def f = x -> { a = b -> { p -> p } }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)
+              default: (identifier)))
+          (expression_statement
+            (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Typed closure parameter whose default casts a lambda before a lambda reads as a call (divergence 26)
+==================
+
+def c = { T a = (U) (b, c) -> (d) -> e }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (method_invocation
+              function: (parenthesized_expression
+                (identifier))
+              arguments: (argument_list
+                (identifier)
+                (identifier)))))
+        (expression_statement
+          (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier)))))))
