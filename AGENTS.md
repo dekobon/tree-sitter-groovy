@@ -59,8 +59,10 @@ The default branch is **`main`**.
   expression before it (§6.9), the start of an array type that is a
   value (`String[].class`), which needs `[]` after the name (§6.15),
   a `)` with something after it on its
-  line, which ranks a cast (§6.11), and the `!in` operator, which
-  needs whitespace or a bracket after it (§6.12). Inside a string body
+  line, which ranks a cast (§6.11), the `!in` operator, which
+  needs whitespace or a bracket after it (§6.12), and the start of a
+  lambda, before its parameters in parentheses or its one name, when
+  `->` follows (§6.17). Inside a string body
   it emits nothing (§6.10). Its only state is one bit, "no `*/` from
   here on", carried by an empty hidden token at the first unterminated
   `/*` (§6.6). GString interpolation, automatic semicolons and label

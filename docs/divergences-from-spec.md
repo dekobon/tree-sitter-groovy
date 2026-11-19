@@ -32,11 +32,12 @@ reasoning here.
 | §5.13 Trailing commas | **Done** | accepted in list / map / argument / enum-constant lists. A parameter list takes none, as in Apache's `formalParameterList`. |
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
+| §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`; see #26 below. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
-| §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. A `/*` with no `*/` is not a comment; the first one emits an empty hidden `_unterminated_comment` extra that carries the scanner's one bit of state, so later ones do not read to the end of input again (#75). Error recovery near that first `/*` can differ from v0.6.0, for worse as well as better, and one reparse differs from a parse from scratch; see #16 below. |
+| §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. A `/*` with no `*/` is not a comment; the first one emits an empty hidden `_unterminated_comment` extra that carries the scanner's one bit of state, so later ones do not read to the end of input again (#75). Error recovery near that first `/*` can differ from v0.6.0, for worse as well as better; see #16 below. |
 | §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
 | §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
 | §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (the scanner tracks no brackets; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
@@ -45,6 +46,7 @@ reasoning here.
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new`, an array type value or a name follows the receiver on its line (a name only after a receiver that may not name a type, see #25 below), so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new`, an array type value or a name (`println x`), so `foo` followed by `new Bar()` or `bar` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A keyword Groovy reserves is no receiver of a value (`def x = return 1`); `super`, `permits`, `pipeline` and `_` are, and start a statement's call before a call in parentheses (`super(foo 1)`). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
+| §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -832,8 +834,9 @@ single `/*` insertions into the corpus inputs, 233 trees (1.8%)
 changed: 86 with more bytes inside `ERROR`, 59 with fewer, 88 with the
 same. No input that parsed without an `ERROR` is affected.
 
-**Incremental reparse**: because the marker is empty, one reparse is
-not the parse from scratch.
+**Incremental reparse**: because the marker is empty, one reparse was
+not the parse from scratch, until the look-ahead for a lambda (spec
+§6.17) made the runtime lex the `(` again.
 
 | Step | Text | Tree |
 |---|---|---|
@@ -847,17 +850,20 @@ before the other path reduces, so `(a)` is reduced with one path
 alive, is not marked as the outcome of a conflict, and is reused. The
 reparse has no error and the next edit to that node corrects it. In
 1_000_000 random chained edits this happened 4 times; 3 reparses
-differed at v0.6.0 from other causes. The same happens with
+differed at v0.6.0 from other causes. The same happened with
 `foo((String)/* why` then `arg)` when `*/` is inserted before `arg`.
-`bindings/rust/tests/incremental_reparse.rs` pins the first case and
-fails if the two parses start to agree.
+The scanner's look-ahead at the `(` of `(a)` and `(String)` now reads
+through the `)` and the comment, and the runtime counts it against the
+`(`, so the edit makes it lex the `(` again and both reparses are the
+parse from scratch. `bindings/rust/tests/incremental_reparse.rs` holds
+both texts among those it edits.
 
 A change of included ranges with no edit is a third case, shared with
 every other token: a range added later that contains `*/` does not
 make the runtime lex the marker again.
 
-**Action**: none planned. A marker with a width would need a token the
-grammar accepts wherever `/` can appear.
+**Action**: none planned for error recovery. A marker with a width
+would need a token the grammar accepts wherever `/` can appear.
 
 ---
 
@@ -1533,3 +1539,61 @@ chain forms one call; measured, it grows the parse table by about 30%
 for the one real file of 266 that has the form. A name argument after a
 capitalized receiver in a value would need to tell `(Foo bar)` from
 `(Foo bar) -> …` and parameter lists.
+
+---
+
+## 26. Lambda expressions
+
+**Apache `GroovyParser.g4`** (4.0.x to 6.0.x, and Groovy 3):
+`lambdaExpression`, with its parameters in parentheses, is a `primary`;
+`standardLambdaExpression` also takes one name with no parentheses and
+stands only in `enhancedStatementExpression`,
+`enhancedArgumentListElement` and `enhancedExpression` (the last from
+5.0.x). A closure's optional parameter list is tried first, so where
+an expression may be followed by `->`, the end of a closure
+parameter's default and of a case value, Groovy keeps that reading.
+
+**Current implementation**: spec §5.16 and §6.17. Before the
+`lambda_expression` node every lambda was an `ERROR`. Measured over the
+corpus inputs, 266 real Groovy and Gradle files and 24,548 Java files:
+no tree that had no `ERROR` changed; 308 Java files went from an
+`ERROR` to none, and the lines with `->` in an `ERROR` fell from 4,253
+to 171, each a form Groovy rejects too (`return t -> t`,
+`(Function<A, B>) x -> …`, `p -> s -> …`) or Java syntax Groovy
+lacks (`(A & B)` casts, `case String s ->`). Real Groovy files hold no
+lambda and are unchanged.
+
+The Groovy column was observed by running Groovy 3, which has no arrow
+cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `def f = (a, b) -> a + b`, `() -> 42`, `(int a, String b = 'x') -> { a }`, `(final x) -> x`, `(@A a, def b, var c, String... d) -> a` | a lambda | `lambda_expression`; before, an `ERROR` |
+| `x -> x + 1` as a value, an argument (`list.map(x -> x * 2)`), in parentheses or as a map entry's or named argument's value (`foo(k: x -> x)`) | a lambda | the same |
+| `return x -> x`, `[x -> x]`, `c ? x -> x : y`, `foo 1, x -> x`, `a -> b -> c`, `x -> x` as a statement | rejected | an `ERROR`, as before |
+| `foo (x) -> x`, `list.each (x) -> println x`, `foo()` then `(a) -> a` on the next line | `foo((x) -> x)` | the call `foo(x)` and an `ERROR`, as before: the scanner does not read the arguments of a call (spec §6.17) |
+| `foo a: x -> x` | rejected by Groovy 3, a call in 5.0.x and later | an `ERROR`, as before: in a parenthesis-free call's named argument only a lambda with parentheses is taken (`foo a: (x) -> x`). With it, the grammar grew by about 50 states |
+| `(foo a) -> a` | a lambda with the parameter type `foo` | an `ERROR`, as before: the parentheses read as the call `foo a` (spec §6.14) |
+| `foo(null -> 1)`, `foo(int -> 1)`, `(int) -> 1`, `(if) -> 1` | rejected | an `ERROR`, as before: a reserved word, a primitive type or `void` names no parameter |
+| `(_) -> 1`, `_ -> 1`, `var -> var`, `(String this) -> 1` | a lambda | the same |
+| `{ a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }` | the closure parameter `a` with a default | the same, as before |
+| `case (A) -> 1`, `case 1 + (a) -> 1` | a case with the value `(A)` or `1 + (a)` | the same, as before |
+| `{ p = a = b -> c }`, `{ a, b = x += y -> z }`, `case x.y = it -> 1` | the parameter with the assignment as its default; the case with the assignment as its value | the closure body `p = (a = (b -> c))`; an `ERROR` for the second and third: the lambda without parentheses is taken after an assignment |
+| `{ a = (var b) -> c }`, `case (var a) -> 1` | the default or value `var(b)` | the lambda `(var b) -> c` assigned to `a`; an `ERROR` for the case: the scanner reads `var` before a name as the keyword (spec §6.16) |
+| `case (A) -> (b) -> b`, `{ a = (b) -> (d) -> e }` | the value `(A)` and the body `(b) -> b`; the default `(b)` | the value `(A) -> (b)` and the body `b`; the default `(b) -> (d)`; before, an `ERROR` |
+
+The rows with the assignment and `var` changed trees that had no
+`ERROR`. They are the only such changes found: of 120,000 inputs built
+from lambda-shaped templates, 122 that had no `ERROR` changed, all of
+those two kinds, and of 116,000 mutations of the corpus, real and Java
+inputs none did. Taking the lambda in a nested assignment the same way
+in every context is what keeps the grammar small: deciding it by
+context gave every expression state in a closure parameter's default
+and a case value a copy of its own, 8% more states. The last row has
+no `ERROR` now and was one before; each reading has one lambda and one
+parenthesized expression, so the weights tie, and Groovy, which tries
+the parenthesized expression first at each `(`, reads the other.
+
+**Action**: the call forms in the fourth row would need the scanner to
+read every call's arguments; measured on code made of calls, the
+reading the scanner does now costs about 1.5% more instructions.

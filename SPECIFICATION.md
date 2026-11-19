@@ -311,6 +311,7 @@ issue #246's "Suggested fix" path 1.
 | `=` and all augmented assignments | `assignment_expression` | `left`, `operator`, `right` | One node kind, operator field distinguishes. Includes `?=` (Elvis assign). |
 | `?=` | `assignment_expression` (operator `"?="`) | as above | Distinct via operator field; semantically "assign if currently null/falsy." |
 | `(a, b) =` | `multi_assignment_expression` | `name` (one per name), `value` | Two or more names and `=` only; see §4. The declaration form `def (a, b) =` is `multi_assignment_declaration`. |
+| `->` (lambda) | `lambda_expression` | `parameters`, `body` | Groovy 3+. `parameters` is a `formal_parameters` (`(a, b) -> …`, `() -> …`, `(int a, String b = 'x') -> …`) or one `identifier` (`x -> …`); `body` is a `block` or an expression or a parenthesis-free call. The shape of tree-sitter-java's, whose untyped parameters are an `inferred_parameters` instead. See §5.16. |
 
 The full list of *symbols* required by issue #247 and resolved here:
 `?:` ✓ `?.` ✓ `as` ✓ `..<` ✓ `*args` (spread args) ✓ `*.` ✓ `*:` ✓
@@ -636,8 +637,8 @@ The resolution we adopt:
    followed by `1)`,
    which Groovy reads as a call because its lexer drops line breaks
    inside parentheses: the scanner tracks no brackets (§6.9), so this
-   is an `ERROR`, as before. Nor is a lambda body, which the
-   grammar does not have. Apache's array initializer
+   is an `ERROR`, as before. A lambda's body is accepted too
+   (`x -> println x`, `(a) -> foo 1, 2`, §5.16). Apache's array initializer
    (`variableInitializers`) takes the rule too, and `AstBuilder` then
    rejects a command there. A newline is whitespace (§5.10), so a value
    form needs its first argument on the receiver's line: `def x = foo`
@@ -1131,6 +1132,83 @@ Two rules settle it, both from Apache's
 Without the two weights the readings were unranked and the result
 depended on the surrounding code.
 
+### 5.16 Lambda expressions
+
+Groovy 3 added Java's lambdas next to closures. Apache's grammar
+(`GroovyParser.g4`, the same rules from 4.0.x to 6.0.x) has two forms:
+
+- `lambdaExpression`, with parameters in parentheses
+  (`formalParameters`), is a `primary`: an expression wherever one is.
+  `(a, b) -> a + b`, `() -> 42`, `(int a, String b = 'x') -> { … }`
+  are operands (`1 + (a) -> a * 2`), list elements, the value of
+  `return`, `throw` or `assert`, ternary branches, a cast's operand
+  (`(Runnable) () -> { }`), statements and lambda bodies
+  (`(a) -> (b) -> a + b`).
+- `standardLambdaExpression` also takes one name with no parentheses
+  (`x -> x + 1`), and Apache lists it only in
+  `enhancedStatementExpression` (the value of a declarator, of an
+  assignment other than `(a, b) = …`, and what is in parentheses,
+  conditions included), `enhancedArgumentListElement` (an argument in
+  parentheses) and `enhancedExpression` (the value of a map entry or a
+  named argument, Groovy 5 and later). The comment there gives the
+  reason: `{ a -> a * 2 }` must stay a closure. So `return x -> x`,
+  `[x -> x]`, `c ? x -> x : y`, `foo 1, x -> x` and `a -> b -> c` are
+  errors in Groovy (observed with Groovy 3) and here.
+
+`lambdaBody` is a `block` or a `statementExpression`: an expression or
+a parenthesis-free call (`x -> println x`), taking all it can, so
+`(a) -> a + 1 as String` casts the sum. A `{` opens a block, which
+Apache tries first, unless only a closure can follow
+(`x -> { y -> y }`). A line break may come before and after the `->`
+(`NL* ARROW NL*`).
+
+The node is `lambda_expression` with the fields `parameters` and
+`body`, as in tree-sitter-java. The parameters in parentheses reuse
+`formal_parameters`, whose `formal_parameter` already takes Groovy's
+untyped names, defaults, annotations, `final`, `def`, `var` and
+varargs; tree-sitter-java's separate `inferred_parameters` would only
+duplicate it. The one name without parentheses is the `identifier`
+itself. `locals.scm` makes the lambda a scope and its parameters
+definitions, and `highlights.scm` highlights the name as a parameter,
+as for a closure.
+
+Both forms open with an empty scanner token, `_lambda_start` before
+the `(` and `_bare_lambda_start` before the name, emitted only when
+`->` follows (§6.17). The parser cannot wait for the `->`: `(a)` is
+also a parenthesized expression, a cast and a multi-assignment's
+start, and `x` in an argument or a value is also an expression, so a
+decision there would fork the parse at every `(identifier)` or cost
+every such name a reduction. The tokens are valid only where the
+grammar takes each form, so the scanner reads names only in those
+positions.
+
+Where an expression may be followed by `->`, the end of a closure
+parameter's default and of a case value, the same tokens can also be
+the default or the value, as Groovy reads them:
+`{ a = (b) -> c }` and `{ a = b -> c }` are closures with the
+parameter `a`, and `case (A) -> 1` is a case with the value `(A)`
+(observed with Groovy 3 for the closures; Groovy 3 has no arrow
+cases). A parenthesized expression after `_lambda_start`
+(`_lambda_parenthesized_expression`) and a closure parameter's
+default that is a name after `_bare_lambda_start` (`_bare_lambda_name`)
+keep those readings, and the lambda's negative dynamic precedence
+(`LAMBDA_WEIGHT` in `grammar.js`) ranks it below them. In the closure
+the name is reduced at the `->` by static precedence. An assignment
+in such a default or case value (`{ p = a = b -> c }`,
+`case x += y -> z`) and `var` called in parentheses there
+(`{ a = (var b) -> c }`) are read as lambdas instead; see
+`docs/divergences-from-spec.md` §26.
+
+Not accepted, though Groovy takes each (observed with Groovy 3): a
+lambda as the parenthesis-free first argument of a call or appended to
+one, `foo (x) -> x`, `list.each (x) -> println x`, also `foo()`
+followed by `(a) -> a` on the next line, which are the call `foo(x)`
+followed by an `ERROR`; a lambda without parentheses as a named
+argument of a parenthesis-free call, `foo a: x -> x` (Groovy 5 and
+later); and a parameter whose type is a lowercase name,
+`(foo a) -> a`, where the scanner's §6.14 rules read `foo a` as a call.
+Each is an `ERROR`, as before lambdas.
+
 ---
 
 ## 6. External scanner design
@@ -1149,7 +1227,8 @@ or an array type (§6.14), the
 same-line subscript opener (§6.9), the start of an array type that is
 a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
-unterminated block comment (§6.6), `STRING_BODY` (§6.10) and
+unterminated block comment (§6.6), the start of a lambda (§6.17),
+`STRING_BODY` (§6.10) and
 `TYPE_START` (§6.15), which are never emitted and only mark a string
 body and where a type may start, and
 `ERROR_SENTINEL`, which no rule references and which only signals
@@ -1188,6 +1267,8 @@ enum TokenType {
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
+  LAMBDA_START,           // §6.17 — empty; before the `(` of a lambda's parameters
+  BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
@@ -1327,21 +1408,22 @@ added later that contains `*/` leaves the marker in place, because
 the runtime checks only a node's own look-ahead, as it does for every
 other token.
 
-One reparse differs from a parse from scratch because the marker is
-empty. In `x = (a)/* n` followed by `c` on the next line, a cast and
-a parenthesized expression are both possible when the parser reaches
-`/*`. The parse path of the cast shifts the marker, fails on `/` and
-is dropped before the other path reduces, so `(a)` is reduced with
-one path alive and is not marked as the outcome of a conflict.
-Inserting `*/` before `c` makes the text valid, and the reparse
-reuses that `parenthesized_expression`: `x = (a)`, a comment, and `c`
-as a second statement, where a parse from scratch gives one statement
-with a `parenthesized_type_cast` over `c`. The reparse has no error,
-and the next edit to that node corrects it. This is accepted. It was
-4 in 1_000_000 random chained edits, where 3 differed before the
-marker existed, from other causes.
+One reparse used to differ from a parse from scratch because the
+marker is empty. In `x = (a)/* n` followed by `c` on the next line, a
+cast and a parenthesized expression are both possible when the parser
+reaches `/*`. The parse path of the cast shifts the marker, fails on
+`/` and is dropped before the other path reduces, so `(a)` is reduced
+with one path alive and is not marked as the outcome of a conflict.
+Inserting `*/` before `c` made the text valid, and the reparse reused
+that `parenthesized_expression`: `x = (a)`, a comment, and `c` as a
+second statement, where a parse from scratch gives one statement with
+a `parenthesized_type_cast` over `c`. The look-ahead for a lambda
+(§6.17) now reads from the `(` through the `)` and the comment, and
+the runtime counts what the scanner read against the `(`, so the
+insertion makes it lex the `(` again and the reparse is the parse from
+scratch; the same holds for `foo((String)/* why` followed by `arg)`.
 `bindings/rust/tests/incremental_reparse.rs` checks reparses against
-parses from scratch and pins this case.
+parses from scratch, both texts among them.
 
 Input that parsed without an error has no unterminated comment, never
 sees the marker and is unaffected. On malformed input the marker is
@@ -2386,6 +2468,107 @@ Gradle files and Java files take about 0.1% to 0.2% more instructions
 the same grammar). Code dense with `as`, `in`, `var` or `yield` parses
 within about 2% of before, faster or slower depending on the code.
 
+### 6.17 LAMBDA_START and BARE_LAMBDA_START — implementation contract
+
+A lambda (§5.16) starts like an expression the parser has to treat
+otherwise until the `->`: `(a)` is also a parenthesized expression, a
+cast's type and the start of `(a, b) = …`, and `x` in an argument or a
+value is also a name. Deciding at the `->` cost either a fork at every
+`(identifier)` or, for `x`, a reduction of every name in an argument
+or a value of its own: tree-sitter skips the step from a name to an
+expression only in a state with no other action, and the shift of the
+`->` after the name is one. On calls whose arguments are names that
+was a fifth more reductions and 8% more instructions. The scanner
+decides before the `(` or the name instead, as it does for the
+receiver of a parenthesis-free call (§6.14).
+
+```text
+Emit LAMBDA_START, empty, at a `(` where an expression may start, when
+NOT_IN is not valid (no expression ends here; after one the `(` opens a
+call's arguments), and:
+  - after the `(` and Groovy's trivia (whitespace, line breaks, line
+    escapes and comments), `)` follows, or parameters separated by `,`,
+    each read as: annotations, each `@`, a dotted name and arguments in
+    parentheses read token by token with brackets counted; words and the
+    punctuation of a type (`.`, `...`, `[`, `]`, and `<` … `>` with `,`,
+    `?` and `&` inside); a last word that may name the parameter (no
+    keyword of grammar.js other than `final` and `def`, `_`, `permits`
+    and `pipeline`, no primitive type name and no `void`, not right after
+    one `.` and not inside `<…>`); and after `=`, not `==` or `=~`, a
+    default value read token by token, brackets counted and strings
+    closing on their line skipped, to the `,` or `)` that ends it;
+  - after the `)` and Groovy's trivia, `->`;
+  - all within LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256) items: a word, a
+    string, a comment, an annotation or a punctuation character.
+Emit BARE_LAMBDA_START, empty, before a name where the grammar takes a
+lambda without parentheses (an argument, the value of a map entry, a
+declarator, an assignment other than `(a, b) = …`, a closure
+parameter's default, what is in parentheses, a condition), when after
+the name and spaces, tabs and line escapes comes `->`, or a `-`, `/`
+or line break after which Groovy's trivia lead to `->`, and the name
+is none of the words above that cannot name a parameter, nor `this`.
+Neither is emitted during error recovery.
+```
+
+The look-ahead reads the shape, not the grammar: what it takes and
+`formal_parameter` does not, the order of modifiers for one, is an
+`ERROR` either way, as it was before lambdas. Its early stops make it
+cheap where no lambda is: `(a + b)` ends at the `+`, `(x == y)` at the
+`==`, `(foo())` at the second `(`, `('s')` at the quote, `((a))` at
+the inner `(`, and `(String) x` at the `x` after the `)`. A name with
+no `-`, `/` or line break after it costs one read of the name. Where
+COMMAND_VALUE_START or ARRAY_VALUE_START is valid too, the name is
+read once for all of them (`scan_value_start`,
+`scan_bare_lambda_start`), and a `-`, `/` or line break after it
+starts no first argument of a call, so a value that is no lambda there
+is no call either.
+
+The look-ahead does not run after an expression, where NOT_IN is
+valid. There a `(` is a call's arguments unless the next statement
+starts, and reading every call's arguments for the rare lambda
+statement after an expression would cost more than it is worth:
+`foo (x) -> x`, which Groovy reads as `foo((x) -> x)`, stays the call
+`foo(x)` and an `ERROR`, and so does `foo()` followed by `(a) -> a` on
+the next line.
+
+The budget keeps the parse linear. A default value may hold a `(`
+where an expression starts, which the scanner reads again, so without
+it `x = (a = (a = (a = …` was read in time quadratic in the nesting
+(the bytes the parser asks for per input byte went from 256 to 2,007
+for 500 and 4,000 levels; with it, 70 and 74).
+`bindings/rust/tests/lambda_parameters_cost.rs` checks that, nested
+parentheses, a long list of names with no `->` and many lambdas on one
+line. A parameter list longer than the budget reads as no lambda's.
+
+The scanner reads only the shape and the `->`, and an expression may
+be followed by `->` as a closure parameter's default or a case value
+(§5.16). The grammar keeps those readings next to the lambda's: after
+LAMBDA_START a parenthesized expression, after BARE_LAMBDA_START at a
+closure parameter's default a name. Both tokens are empty and sit
+before what they open, so a comment between them and the `(` or the
+name cannot hide a line break (§6.14).
+
+Because the look-ahead at a `(` reads through the `)` and the trivia
+after it, an unterminated `/*` there is read to the end of input, once
+per `(` that reaches it within the budget. That fixed the one reparse
+that differed from a parse from scratch (§6.6).
+
+Measured against the grammar before: STATE_COUNT 4330 to 4490 (+3.7%),
+LARGE_STATE_COUNT 1575 to 1672, `parser.c` 8.2 to 8.8 MB, two
+external tokens and one precedence (`PREC.LAMBDA`, below assignment,
+so the body takes all it can) and one dynamic precedence
+(`LAMBDA_WEIGHT`) added, no conflict. A build with the tables and none
+of the look-ahead runs as many instructions as the grammar before, so
+the cost is the scanner's reading: about 0.6% more instructions on
+real Groovy and Gradle files and on Java files without a lambda, 1.5%
+on code made of calls with names for arguments and 2% on code made of
+parenthesized expressions and casts; Java files with lambdas, which
+were errors, take 11% fewer. Two other designs were measured and
+dropped: deciding `x ->` in the grammar (+3.6% states, a fifth more
+reductions on such calls), and deciding it by context to keep the
+closure readings (+8% states, as every expression state in a closure
+parameter's default and a case value got a copy of its own).
+
 ---
 
 ## 7. Tree-sitter conflict declarations
@@ -2586,6 +2769,10 @@ Other per-operator corpus files mandated:
 - `operators-implication.txt` (==>)
 - `operators-power.txt` (** including `2 ** 3 ** 2` right-assoc test)
 - `operators-safe-chain-dot.txt` (??.) — Groovy 4+; v2 addition
+- `expressions-lambda.txt` (`->` lambdas, §5.16) — every position of
+  each form, the bodies, the arrow after a line break or a comment,
+  the forms Groovy rejects, and the closure defaults and case values
+  that keep their reading next to a lambda
 - `operators-precedence-tiebreaks.txt` — explicit tests that pin
   the Apache precedence ordering on the tie-break cases:
   - `0..n<<1` → `(0..n)<<1` (range/shift same level, left-assoc)
@@ -2847,6 +3034,8 @@ Standard tree-sitter highlighting captures:
 - `@type` — class names in declaration position and after `:`.
 - `@function` — identifier in method declaration and at call site.
 - `@variable` — bare identifiers in expression position.
+- `@variable.parameter` — the names of method, closure and lambda
+  parameters, the one name of `x -> …` included.
 - `@comment` — `block_comment`, `line_comment`, `groovydoc_comment`.
 
 ### 9.2 injections.scm
@@ -2865,7 +3054,9 @@ Standard tree-sitter highlighting captures:
 Standard Groovy scope rules:
 
 - `method_declaration.parameters`, `closure.parameters`, `for_loop`,
-  `for_in_statement`, `catch_clause.parameter` are scopes.
+  `for_in_statement`, `catch_clause.parameter` are scopes, and so is
+  `lambda_expression`, whose parameters (a `formal_parameter`, or the
+  one `identifier` of `x -> …`) are definitions.
 - `formal_parameter`, `variable_declarator`, `multi_assignment_declaration`
   define identifiers. The names of a `multi_assignment_expression` are
   references, as it declares nothing.
