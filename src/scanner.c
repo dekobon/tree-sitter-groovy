@@ -2350,7 +2350,11 @@ static bool lambda_parameter_follows(
 // counts what the scanner read against the `(`, so an edit in that trivia,
 // such as closing a comment that did not close (§6.6), makes it lex the `(`
 // again, as it does after `(String)`.
-static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
+static bool lambda_parameters_follow(
+    TSLexer *lexer,
+    bool no_close_ahead,
+    bool *closed
+) {
     unsigned items = 0;
     bool named = true;
     advance(lexer);
@@ -2373,6 +2377,7 @@ static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
         }
     }
     advance(lexer);
+    *closed = true;
     return arrow_follows(lexer, no_close_ahead) && named;
 }
 
@@ -2702,6 +2707,67 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
     return lexer->lookahead != '=' && lexer->lookahead != '~';
 }
 
+// SPECIFICATION.md §6.18 — where STATEMENT_PAREN is valid but no expression
+// ends, as at a statement's start, the `(` after a line break is read as far
+// as `parentheses_open_statement` reads it where it decides: through the
+// `)` that closes it (from where the lambda look-ahead stopped, `closed`
+// once that passed it), the trivia after it, and the word or the
+// character after a `=` or `-` there. The runtime counts what the scanner
+// read against the in-grammar `(` that follows, so a reparse that reused
+// the statement before reads that `(` again after an edit that would
+// change the decision, as it does where the decision is made.
+static void read_parentheses_extent(
+    TSLexer *lexer,
+    bool closed,
+    bool no_close_ahead
+) {
+    unsigned items = 0;
+    unsigned depth = 0;
+    while (!closed) {
+        bool slash = false;
+        if (!spend_lambda_item(&items)
+            || !skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
+            || lexer->eof(lexer)) {
+            return;
+        }
+        int32_t c = lexer->lookahead;
+        if (slash) {
+            continue;
+        }
+        if (c == '\'' || c == '"') {
+            if (!skip_string(lexer)) {
+                return;
+            }
+            continue;
+        }
+        if (is_identifier_char(c)) {
+            read_word(lexer, NULL, 0);
+            continue;
+        }
+        advance(lexer);
+        if (c == '(' || c == '[' || c == '{') {
+            depth++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (depth == 0) {
+                if (c != ')') {
+                    return;
+                }
+                closed = true;
+            } else {
+                depth--;
+            }
+        }
+    }
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+        return;
+    }
+    if (is_identifier_start(lexer->lookahead)) {
+        read_word(lexer, NULL, 0);
+    } else if (lexer->lookahead == '=' || lexer->lookahead == '-') {
+        advance(lexer);
+    }
+}
+
 void *tree_sitter_groovy_external_scanner_create(void) {
     return ts_calloc(1, sizeof(Scanner));
 }
@@ -2785,6 +2851,10 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
     bool wants_statement_paren = valid_symbols[STATEMENT_PAREN]
         && valid_symbols[NOT_IN] && !valid_symbols[ERROR_SENTINEL];
+    // §6.18 — where no expression ends, the same `(` is read as far, so
+    // that its token depends on the same text in both states.
+    bool wants_paren_extent = valid_symbols[STATEMENT_PAREN]
+        && !valid_symbols[NOT_IN] && !valid_symbols[ERROR_SENTINEL];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
     // §6.15 — TYPE_START is never emitted; it is valid where a type may
     // start, which narrows ARRAY_VALUE_START there.
@@ -2866,7 +2936,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
         && !wants_sealed && !wants_value_start && !wants_statement_start
         && !wants_array && !wants_cast_close && !wants_not_in && !wants_lambda
-        && !wants_bare_lambda
+        && !wants_bare_lambda && !wants_paren_extent
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
@@ -2875,12 +2945,14 @@ bool tree_sitter_groovy_external_scanner_scan(
 
     // A line escape is whitespace too, so a comment, a slashy string or
     // a keyword may follow one.
+    bool crossed_line = false;
     while (is_whitespace(lexer->lookahead) || lexer->lookahead == '\\') {
         if (lexer->lookahead == '\\') {
             if (!skip_same_line_space(lexer, true)) {
                 return false;
             }
         } else {
+            crossed_line = crossed_line || is_line_break(lexer->lookahead);
             lexer->advance(lexer, true);
         }
     }
@@ -3008,11 +3080,19 @@ bool tree_sitter_groovy_external_scanner_scan(
         // The token is empty and ends here. On `false` the runtime rewinds
         // and the in-grammar lexer reads the `(`.
         lexer->mark_end(lexer);
-        if (!lambda_parameters_follow(lexer, no_close_ahead)) {
+        bool closed = false;
+        if (!lambda_parameters_follow(lexer, no_close_ahead, &closed)) {
+            if (wants_paren_extent && crossed_line) {
+                read_parentheses_extent(lexer, closed, no_close_ahead);
+            }
             return false;
         }
         lexer->result_symbol = LAMBDA_START;
         return true;
+    }
+    if (lexer->lookahead == '(' && wants_paren_extent && crossed_line) {
+        parentheses_open_statement(lexer, no_close_ahead);
+        return false;
     }
     if (lexer->lookahead != '/') {
         return false;

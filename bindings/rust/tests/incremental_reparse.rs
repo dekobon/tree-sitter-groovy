@@ -7,6 +7,10 @@
 //! case here parses a text, applies one edit, reparses with the old
 //! tree, and requires the result to equal a parse of the edited text
 //! from scratch.
+//!
+//! A `(` that opens a line after an expression (§6.18) opens a statement
+//! by what the parentheses hold, so edits there must make the statement
+//! before it parse again, also after a reparse that reused it.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -163,4 +167,88 @@ fn reparse_after_edit_matches_parse_from_scratch() {
         }
     }
     assert!(cases > 0, "no edit was tried");
+}
+
+/// An edit: the offset, the number of bytes removed there, and the text
+/// inserted in their place.
+type Edit = (usize, usize, &'static str);
+
+/// Texts with a `(` that opens a line after an expression (§6.18), each
+/// with a sequence of edits: the first makes the reparse reuse the
+/// statement before the `(`, the second turns `=` into `==` and with it
+/// the parentheses from a multi-assignment into a call's arguments. The
+/// scanner reads the parentheses as far where it can open no statement
+/// as where it decides, so the second reparse lexes the `(` again.
+const EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    ("foo\n(c, d) = [3, 4]\n", &[(13, 0, " "), (12, 0, "=")]),
+    ("foo()\n(a, b) = l\n", &[(15, 0, " "), (14, 0, "=")]),
+    ("println x\n(a, b) = l\n", &[(19, 0, " "), (18, 0, "=")]),
+    (
+        "while (c) go()\n(a, b) = l\n",
+        &[(24, 0, " "), (23, 0, "=")],
+    ),
+];
+
+#[test]
+fn reparse_after_edit_sequence_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in EDIT_SEQUENCES {
+        let mut current = text.to_owned();
+        let mut tree = parser.parse(&current, None).expect("parse original");
+        for &(start, removed, insertion) in edits {
+            let old_end = start + removed;
+            let mut edited = String::with_capacity(current.len() + insertion.len());
+            edited.push_str(&current[..start]);
+            edited.push_str(insertion);
+            edited.push_str(&current[old_end..]);
+            let new_end = start + insertion.len();
+            tree.edit(&InputEdit {
+                start_byte: start,
+                old_end_byte: old_end,
+                new_end_byte: new_end,
+                start_position: point_at(&current, start),
+                old_end_position: point_at(&current, old_end),
+                new_end_position: point_at(&edited, new_end),
+            });
+            tree = parser
+                .parse(&edited, Some(&tree))
+                .expect("incremental parse");
+            let fresh = parser.parse(&edited, None).expect("fresh parse");
+            assert_eq!(
+                dumped(&tree),
+                dumped(&fresh),
+                "replacing {start}..{old_end} of {current:?} with {insertion:?}",
+            );
+            current = edited;
+        }
+    }
+}
+
+/// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a
+/// node only while one stack version exists. A typed declaration keeps
+/// two alive to its end, so the statement after it is reused at the
+/// fork although the `(` on the line after it now makes the
+/// parentheses its arguments. The reparse is free of errors but reads
+/// the first line as `String` and `s = "a"`. This test pins the
+/// difference. If it fails, the two parses agree again: remove the
+/// limitation from §6.18 and move the text to `TEXTS`.
+#[test]
+fn a_comma_after_a_typed_declaration_reuses_the_split_statement() {
+    const TEXT: &str = "String s = \"a\"\nprintln x\n(a)\n";
+    /// The offset before the `)`, where `,` is inserted.
+    const INSERT_AT: usize = 27;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, ",");
+    assert_eq!(edited, "String s = \"a\"\nprintln x\n(a,)\n");
+    assert!(!incremental.root_node().has_error());
+    assert!(!fresh.root_node().has_error());
+
+    let fresh = fresh.root_node().to_sexp();
+    let incremental = incremental.root_node().to_sexp();
+    assert!(fresh.contains("local_variable_declaration"), "{fresh}");
+    assert!(
+        !incremental.contains("local_variable_declaration"),
+        "the reparse now matches the parse from scratch: {incremental}",
+    );
 }
