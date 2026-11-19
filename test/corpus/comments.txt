@@ -136,10 +136,9 @@ bar c /** z
 
 (source_file
   (block_comment)
-  (expression_statement
-    (identifier))
-  (expression_statement
-    (binary_expression
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
       left: (identifier)
       (ERROR)
       right: (identifier)))
@@ -150,10 +149,9 @@ bar c /** z
       left: (identifier)
       (ERROR)
       right: (identifier)))
-  (expression_statement
-    (identifier))
-  (expression_statement
-    (power_expression
+  (command_chain
+    receiver: (identifier)
+    argument: (power_expression
       left: (binary_expression
         left: (identifier)
         right: (MISSING identifier))

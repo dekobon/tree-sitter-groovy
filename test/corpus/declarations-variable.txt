@@ -1585,10 +1585,9 @@ pipeline { agent any }
       name: (identifier)))
   (pipeline_statement
     body: (closure
-      (expression_statement
-        (identifier))
-      (expression_statement
-        (identifier)))))
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier)))))
 
 ==================
 Annotated declaration and annotated parameter at the start of a closure

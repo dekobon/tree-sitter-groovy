@@ -71,7 +71,7 @@ Closure with multiple parameters
 Closure with multiple statements in body
 ==================
 
-{ a b c }
+{ a; b; c }
 
 ---
 

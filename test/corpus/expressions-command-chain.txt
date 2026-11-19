@@ -1493,7 +1493,7 @@ def x = foo /* c */ 1
     (number_literal)))
 
 ==================
-An identifier as the first argument of a value is not a command chain
+An identifier as the first argument of a value
 ==================
 
 def x = foo bar
@@ -1504,9 +1504,9 @@ def x = foo bar
   (local_variable_declaration
     (variable_declarator
       name: (identifier)
-      value: (identifier)))
-  (expression_statement
-    (identifier)))
+      value: (command_chain
+        receiver: (identifier)
+        argument: (identifier)))))
 
 ==================
 A receiver inside a binary expression is not a command chain value
@@ -2729,7 +2729,6 @@ class A {
 Dotted expressions that are not command chains
 ==================
 
-a.b c
 a.b instanceof C
 a.b as C
 a.b in c
@@ -2742,7 +2741,6 @@ obj.m (1)
 obj.m { }
 obj.prop = 1
 obj.m /x/
-def x = a.b c
 a..b 'x'
 a*b 'x'
 x.y?b:c
@@ -2750,12 +2748,6 @@ x.y?b:c
 ---
 
 (source_file
-  (expression_statement
-    (field_access
-      object: (identifier)
-      field: (identifier)))
-  (expression_statement
-    (identifier))
   (expression_statement
     (instanceof_expression
       value: (field_access
@@ -2833,14 +2825,6 @@ x.y?b:c
   (expression_statement
     (string_literal
       (string_fragment)))
-  (local_variable_declaration
-    (variable_declarator
-      name: (identifier)
-      value: (field_access
-        object: (identifier)
-        field: (identifier))))
-  (expression_statement
-    (identifier))
   (expression_statement
     (range_expression
       start: (identifier)
@@ -2962,10 +2946,9 @@ println x.y
       field: (identifier)))
   (expression_statement
     (null_literal))
-  (expression_statement
-    (identifier))
-  (expression_statement
-    (field_access
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
       object: (identifier)
       field: (identifier)))
   (expression_statement
@@ -3454,7 +3437,6 @@ foo[0].bar 5
 'str'.m 6
 obj.'quoted name' 7
 obj::m 8
-obj.m $/x/$
 
 ---
 
@@ -3511,14 +3493,7 @@ obj.m $/x/$
       target: (identifier)
       name: (identifier)))
   (expression_statement
-    (number_literal))
-  (expression_statement
-    (field_access
-      object: (identifier)
-      field: (identifier)))
-  (expression_statement
-    (string_literal
-      (string_fragment))))
+    (number_literal)))
 
 ==================
 Spread argument in a command chain with a dotted receiver is unsupported
@@ -3977,7 +3952,7 @@ x = 1; foo new Foo()
       arguments: (argument_list))))
 
 ==================
-A keyword, a named key or a longer name before new is not a command chain
+A keyword or a named key before new is not a command chain, nor a longer name a creation
 ==================
 
 return new Foo()
@@ -4011,10 +3986,9 @@ foo newFoo()
     argument: (named_argument
       key: (identifier)
       value: (number_literal)))
-  (expression_statement
-    (identifier))
-  (expression_statement
-    (method_invocation
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
       function: (identifier)
       arguments: (argument_list))))
 
@@ -4610,10 +4584,943 @@ foo new @A Foo()
 ---
 
 ==================
-A bare array type as a first argument is unsupported
-:error
+A bare array type as a first argument
 ==================
 
 foo String[]
 
 ---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (array_type
+      (type_identifier))))
+
+==================
+A name as the first argument of a command chain
+==================
+
+println x
+echo msg
+foo Bar
+foo this
+foo it
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+An expression that starts with a name as the first argument
+==================
+
+println x + 1
+foo x.y
+foo x()
+foo xs[0]
+foo x ? 1 : 2
+foo x as T
+foo bar { }
+foo bar
+.baz()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (subscript_expression
+      object: (identifier)
+      index: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (cast_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A negation or a bitwise not as the first argument
+==================
+
+foo !x
+foo ~x
+foo!x
+foo !inside
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (unary_expression
+      operand: (identifier))))
+
+==================
+Operators that start with an exclamation mark are not a first argument
+==================
+
+foo != x
+foo !in xs
+foo !instanceof T
+foo !x
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (unary_expression
+      operand: (identifier))))
+
+==================
+More arguments after a name argument
+==================
+
+assertEquals expected, actual
+foo x, y: 1
+foo x,
+  y
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier)))
+
+==================
+A name argument after a dotted receiver
+==================
+
+obj.m arg
+a.b c.d
+x?.y z
+this.foo bar
+obj.m $/x/$
+obj.m !x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (safe_navigation_expression
+      object: (identifier)
+      property: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (unary_expression
+      operand: (identifier))))
+
+==================
+A name as the first argument of a value
+==================
+
+def r = foo bar
+x = foo bar
+def y = a.b c
+def z = foo bar = 1
+def v = foo ~x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (assignment_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (unary_expression
+          operand: (identifier))))))
+
+==================
+A name as the first argument of a command chain in parentheses or an interpolation
+==================
+
+(foo bar)
+println(foo bar)
+"${foo bar}"
+if (foo bar) { }
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (command_chain
+          receiver: (identifier)
+          argument: (identifier)))))
+  (if_statement
+    condition: (command_chain
+      receiver: (identifier)
+      argument: (identifier))
+    consequence: (block)))
+
+==================
+Continuations of the receiver are not a first argument
+==================
+
+foo -1
+foo [1]
+foo *x
+foo (1)
+foo in xs
+foo as T
+foo instanceof T
+foo ? a : b
+foo++
+foo == x
+foo bar
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier)))
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (identifier)
+      alternative: (identifier)))
+  (expression_statement
+    (update_expression
+      operand: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+A receiver that may name a type takes no name argument
+==================
+
+Foo bar
+int x
+void x
+foo.Bar baz
+foo bar
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+A declaration whose name an equals sign follows is not a command chain
+==================
+
+foo bar = 1
+foo.bar baz = 1
+foo bar == 1
+foo bar =~ /x/
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier))
+    name: (identifier)
+    value: (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (regex_find_expression
+      subject: (identifier)
+      pattern: (string_literal
+        (string_fragment)))))
+
+==================
+A name argument on the next line stays a statement
+==================
+
+foo
+bar
+obj.m
+arg
+def x = foo
+bar
+foo
+/* c */ bar
+foo /* c */ bar
+foo bar
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+A contextual word is not the receiver of a name argument
+==================
+
+in x
+record foo
+trait foo
+sealed foo
+var x
+yield x
+foo record
+foo var
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (yield_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+A keyword is not a first argument, and return takes the name before one
+==================
+
+if (c) foo else bar
+do foo while (c)
+foo super
+return foo bar
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))
+    alternative: (expression_statement
+      (identifier)))
+  (do_while_statement
+    body: (expression_statement
+      (identifier))
+    condition: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (return_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+Call of a lowercase name with a closure and a method with typed parameters
+==================
+
+foo bar() { }
+foo bar(a) { }
+task copy(type: Copy) { from 'a' }
+foo bar(int a) { }
+foo bar(String a, b) { }
+foo bar(final a) { }
+foo bar(def a) { }
+foo bar(@A a) { }
+foo bar(List<String> a) { }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (identifier)))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (string_literal)))))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))
+    body: (block)))
+
+==================
+Labels before a name argument
+==================
+
+then: thrown IllegalStateException
+expect: foo bar
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (command_chain
+      receiver: (identifier)
+      argument: (identifier)))
+  (labeled_statement
+    label: (identifier)
+    statement: (command_chain
+      receiver: (identifier)
+      argument: (identifier))))
+
+==================
+Closures with a name argument and closure parameters with a lowercase type
+==================
+
+c = { foo bar }
+c = { foo a -> a }
+c = { foo a, b -> a }
+c = { foo a, final b -> a }
+c = { foo a,
+  b -> a }
+list.each { println it }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier))))))
+
+==================
+Command chains in the branches of an if
+==================
+
+if (x) foo bar else baz qux
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (command_chain
+      receiver: (identifier)
+      argument: (identifier))
+    alternative: (command_chain
+      receiver: (identifier)
+      argument: (identifier))))
+
+==================
+Chain forms Groovy continues are left split (known divergence)
+==================
+
+foo a bar
+a b c d
+foo bar 1
+foo bar baz: 1
+foo bar(baz 1)
+foo bar new Baz()
+foo x.y 'a'
+c = { a b c }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier))
+        (expression_statement
+          (identifier))))))
+
+==================
+A line that continues a name argument joins it (known divergence)
+==================
+
+foo bar
+(1)
+foo bar
+-1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A capitalized receiver of a value takes no name argument (known divergence)
+==================
+
+def x = Foo bar
+def y = foo bar
+def t = this.new Inner()
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A literal first argument of a statement is not a whole expression (known divergence)
+==================
+
+foo true + 1
+foo 1 + 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (boolean_literal))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal))))
