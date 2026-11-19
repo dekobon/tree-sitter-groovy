@@ -13,10 +13,16 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// Texts with zero, one or several unterminated block comments, in
 /// the positions the scanner treats differently: after an expression,
 /// at a statement start, inside a record or trait header, after
-/// `sealed`, and after a comment that does close. The last five hold
+/// `sealed`, and after a comment that does close. Five hold
 /// parenthesis-free calls (§6.14), as values and as statements with a
 /// dotted receiver, whose start token depends on the receiver and on
-/// what follows it on its line, so an edit there must lex it again.
+/// what follows it on its line, so an edit there must lex it again. The
+/// last two hold a cast whose `)` an unterminated comment follows, where a
+/// cast and a parenthesized expression are both possible at the `/*`: the
+/// look-ahead for a lambda (§6.17) reads from the `(` through the comment,
+/// so inserting `*/` makes the runtime lex the `(` again. The one before
+/// them holds lambdas, whose start tokens depend on the `->` after the
+/// parentheses or the name, also across a line break or a comment.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -33,10 +39,13 @@ const TEXTS: &[&str] = &[
     "obj.m 1\nx.y\n'a'\nrecord.add a: 1, 2\n",
     "def r = a?.b 'c'\nx.y a.b 'c'\nfoo\nobj.m /* c */ 1\n",
     "java.util.List 'f'() { }\nobj.m 'a'(b)\n",
+    "def f = (a, b) -> a\nfoo(x -> x, (y)\n-> y)\ndef c = { a = (b) -> c }\ng = x /* c */ -> x\n",
+    "x = (a)/* n\nc",
+    "foo((String)/* why\narg)",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
-const INSERTIONS: &[&str] = &["", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x", "."];
+const INSERTIONS: &[&str] = &["", "*/", "/*", " */ ", "/** ", "/", "*", "\n", "x", ".", "->"];
 
 /// Byte lengths an edit removes.
 const REMOVED_LENGTHS: &[usize] = &[0, 1, 2, 3];
@@ -138,33 +147,4 @@ fn reparse_after_edit_matches_parse_from_scratch() {
         }
     }
     assert!(cases > 0, "no edit was tried");
-}
-
-/// A known limitation (`SPECIFICATION.md` §6.6): the marker of an
-/// unterminated comment is empty, and where a cast and a
-/// parenthesized expression are both still possible at the first
-/// unterminated `/*`, the node before it is reused after the comment
-/// is closed. The reparse is free of errors but is not the parse from
-/// scratch. This test pins the difference. If it fails, the two
-/// parses agree again: remove the limitation from §6.6 and from
-/// `docs/divergences-from-spec.md`, and move the text to `TEXTS`.
-#[test]
-fn closing_a_comment_after_a_cast_reuses_the_parenthesized_expression() {
-    const TEXT: &str = "x = (a)/* n\nc";
-    /// The offset after the line break, where `*/` is inserted.
-    const INSERT_AT: usize = 12;
-
-    let mut parser = parser();
-    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, "*/");
-    assert_eq!(edited, "x = (a)/* n\n*/c");
-    assert!(!incremental.root_node().has_error());
-    assert!(!fresh.root_node().has_error());
-
-    let fresh = fresh.root_node().to_sexp();
-    let incremental = incremental.root_node().to_sexp();
-    assert!(fresh.contains("parenthesized_type_cast"), "{fresh}");
-    assert!(
-        incremental.contains("parenthesized_expression"),
-        "the reparse now matches the parse from scratch: {incremental}",
-    );
 }

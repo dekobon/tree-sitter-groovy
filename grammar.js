@@ -20,6 +20,8 @@
  *     a call that is a value, a subscript `[`, an array type that is a
  *     value (`String[].class`), and the `)` of a cast
  *   - The `!in` operator, which depends on the character after it
+ *   - The start of a lambda: the parameters in parentheses, or the one
+ *     name, that `->` follows
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
  */
@@ -35,6 +37,7 @@ const PREC = {
   // Higher number = tighter binding in tree-sitter.
   // Mirrors apache/groovy:GroovyParser.g4 `expression` rule.
   // See SPECIFICATION.md §3.1.
+  LAMBDA: -1,                 // (a) -> body, x -> body: the body takes all it can
   ASSIGN: 1,                  // = += -= *= /= %= **= <<= >>= >>>= &= ^= |= ?=
   CONDITIONAL: 2,             // ?: (Elvis) and ? : (ternary) — same level
   IMPLICATION: 3,             // ==>
@@ -88,6 +91,29 @@ const COMPACT_CONSTRUCTOR_WEIGHT = TYPED_FIELD_WEIGHT - MODIFIER_ONLY_FIELD_WEIG
  */
 const RECORD_TYPE_MEMBER_WEIGHT =
   MODIFIER_ONLY_FIELD_WEIGHT + 2 * TYPED_FIELD_WEIGHT + COMPACT_CONSTRUCTOR_WEIGHT + 1;
+
+/*
+ * The dynamic precedence of a typed local variable declaration, which
+ * its tokens also parse as an expression followed by an assignment.
+ */
+const TYPED_LOCAL_WEIGHT = 1;
+
+/*
+ * The dynamic precedence of a cast whose operand is on the line of its
+ * `)`, and the negative one of a cast whose operand is on a later line
+ * (see `parenthesized_type_cast`).
+ */
+const CAST_WEIGHT = 1;
+
+/*
+ * The dynamic precedence of a lambda. A closure parameter's default may
+ * end where a lambda's parameters do: `{ a = (b) -> c }` is a closure with
+ * the parameter `a` in Groovy, and also a closure whose body assigns `a`
+ * the lambda `(b) -> c`. The weight must outweigh what else the second
+ * reading may hold and the first not: a typed local and a cast, as in
+ * `{ String a = (T) (b, c) -> d }`, where the first reading calls `(T)`.
+ */
+const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
 
 /*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
@@ -303,10 +329,11 @@ function methodDeclaration($, head) {
  * type. Those are not accepted (divergence 14).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} [value] The rule of a default value.
  * @returns {ChoiceRule} The parameter rule body.
  */
-function parameter($) {
-  const defaultValue = optional(seq('=', field('default', $._expression)));
+function parameter($, value = $._expression) {
+  const defaultValue = optional(seq('=', field('default', value)));
   return choice(
     seq(
       repeat($.annotation),
@@ -424,6 +451,59 @@ function commandPathRules(path, first) {
  */
 function statementExpression($) {
   return choice($._expression, alias($._value_command_chain, $.command_chain));
+}
+
+/**
+ * A `statementExpression` or a lambda whose one parameter has no
+ * parentheses (`x -> x + 1`), Apache's `enhancedStatementExpression`: the
+ * value of a declarator or an assignment other than `(a, b) = …`, and what
+ * is in parentheses. Apache takes such a lambda nowhere else but in an
+ * argument and the value of a map entry or a named argument
+ * (`enhancedArgumentListElement`, `enhancedExpression`), so
+ * `return x -> x`, `[x -> x]` and `a -> b -> c` stay errors. A lambda with
+ * parentheses is an `_expression`.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The value rule.
+ */
+function enhancedStatementExpression($) {
+  return choice(statementExpression($), bareLambda($));
+}
+
+/**
+ * A lambda whose one parameter has no parentheses, aliased to
+ * `lambda_expression`.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {AliasRule} The lambda rule.
+ */
+function bareLambda($) {
+  return alias($._bare_lambda_expression, $.lambda_expression);
+}
+
+/**
+ * An expression, or a lambda whose one parameter has no parentheses:
+ * Apache's `enhancedExpression`, the value of a map entry or a named
+ * argument (Groovy 5 and later), and an argument in parentheses.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The value rule.
+ */
+function enhancedExpression($) {
+  return choice($._expression, bareLambda($));
+}
+
+/**
+ * The body of a lambda, Apache's `lambdaBody`: a block, or an expression
+ * or a parenthesis-free call. `() -> { }` holds a block: `block` outranks
+ * a closure. A lambda without parentheses is no body, so `a -> b -> c` is
+ * an error in Groovy and here; `a -> (b) -> c` is not.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The body rule.
+ */
+function lambdaBody($) {
+  return choice($.block, statementExpression($));
 }
 
 /**
@@ -571,6 +651,15 @@ module.exports = grammar({
     // §6.12 — the `!in` operator, which needs whitespace or an opening
     // bracket after it. The scanner reads that character and leaves it.
     $._not_in,
+    // §6.17 — empty token before the `(` of a lambda's parameters, emitted
+    // when what the parentheses hold reads as parameters and `->` follows
+    // them. Without it the parser would learn that `(a)` opens a lambda only
+    // at the `->`, after it had reduced `a` as an expression, a cast's type
+    // and a parameter.
+    $._lambda_start,
+    // §6.17 — empty token before the name of a lambda's one parameter
+    // without parentheses (`x -> x`), emitted when `->` follows the name.
+    $._bare_lambda_start,
     // §6.6 — see `extras`.
     $._unterminated_comment,
     // §6.10 — never emitted: valid only between the quotes of a string
@@ -649,10 +738,10 @@ module.exports = grammar({
     // a constant's argument (`_expression`) or a constructor's untyped
     // parameter (`formal_parameter`); the `{` after `)` decides. The
     // conflict is global by necessity — it is between the two
-    // reductions, not their containers — and was checked inert
-    // outside an enum body: declaring it on the v0.3.0 grammar makes
-    // tree-sitter report it unnecessary. Regenerate without it to
-    // confirm that still holds.
+    // reductions, not their containers. Outside an enum body it is live
+    // in one more place: after `_lambda_start` (§6.17), where `(b)` opens
+    // a lambda's parameters or, as a closure parameter's default or a case
+    // value, is an expression (`_lambda_parenthesized_expression`).
     [$.formal_parameter, $._expression],
     // §4 — after an enum's trailing comma, `private` may open a
     // constructor (`private E() { }`) or any other member.
@@ -689,11 +778,14 @@ module.exports = grammar({
     // Two things keep these forks from changing a valid parse, and a
     // new rule must keep both. `closure_parameter` carries no dynamic
     // precedence, so a reading that survives to the `->` wins by being
-    // the only one left. And `->` appears nowhere at the top level of
-    // a closure body: only in `closure_parameters` and in the arrow
-    // forms of `switch`. On invalid input the parameter reading can
-    // win, because a missing `->` is a cheaper repair than an ERROR:
-    // `{ x = 1, y }` recovers as two parameters.
+    // the only one left. And `->` appears at the top level of a closure
+    // body only where a reading without it is ranked first: in the
+    // arrow forms of `switch`, and in a lambda, whose weight is negative
+    // (LAMBDA_WEIGHT). `{ a = (b) -> c }` holds both: the parameter `a`,
+    // and `a` assigned the lambda `(b) -> c`; Groovy reads the parameter.
+    // On invalid input the parameter reading can win, because a missing
+    // `->` is a cheaper repair than an ERROR: `{ x = 1, y }` recovers as
+    // two parameters.
   ],
 
   rules: {
@@ -783,7 +875,7 @@ module.exports = grammar({
       commandArguments($),
     )),
 
-    // `statementExpression` as one symbol, for the condition of `if`,
+    // `enhancedStatementExpression` as one symbol, for the condition of `if`,
     // `while` and `do`, a `switch` value and a `synchronized` lock. Inline,
     // its choice would give each alternative its own copy of the states for
     // the rest of the rule, about 70 in all, most for the `else` of an `if`.
@@ -792,7 +884,7 @@ module.exports = grammar({
     // expression and an interpolation end right after the choice, so they
     // keep it inline: there it costs few states, and an extra reduction in
     // every parenthesis cost about 4%.
-    _statement_expression: $ => statementExpression($),
+    _statement_expression: $ => enhancedStatementExpression($),
 
     // §5.5 item 2 — a statement whose receiver has a member access
     // (`obj.method 1`, `a?.b.c x: 1`). Unlike the identifier form above it
@@ -1738,7 +1830,7 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
-      prec.dynamic(1, seq(
+      prec.dynamic(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
         optional('final'),
         field('type', $._type),
@@ -1778,12 +1870,12 @@ module.exports = grammar({
     _initialized_declarator: $ => seq(
       field('name', $.identifier),
       '=',
-      field('value', statementExpression($)),
+      field('value', enhancedStatementExpression($)),
     ),
 
     variable_declarator: $ => seq(
       field('name', $.identifier),
-      optional(seq('=', field('value', statementExpression($)))),
+      optional(seq('=', field('value', enhancedStatementExpression($)))),
     ),
 
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
@@ -1809,7 +1901,7 @@ module.exports = grammar({
       ),
       $._multi_assignment_names,
       '=',
-      field('value', statementExpression($)),
+      field('value', enhancedStatementExpression($)),
     ),
 
     // The same in a type body, Apache `fieldDeclaration`, with the
@@ -1825,7 +1917,7 @@ module.exports = grammar({
       ),
       $._multi_assignment_names,
       '=',
-      field('value', statementExpression($)),
+      field('value', enhancedStatementExpression($)),
     ),
 
     // Apache `typeNamePairs`. A typed name is a `variable_declarator`
@@ -1983,7 +2075,7 @@ module.exports = grammar({
     _statement_assignment: $ => prec.right(PREC.ASSIGN, seq(
       field('left', $.identifier),
       field('operator', '='),
-      field('right', statementExpression($)),
+      field('right', enhancedStatementExpression($)),
     )),
 
     // §3.2 PRIMARY — minimal alternative set for now. Every primary
@@ -2032,6 +2124,8 @@ module.exports = grammar({
       $.membership_expression,
       $.instanceof_expression,
       $.switch_expression,
+      $.lambda_expression,
+      alias($._lambda_parenthesized_expression, $.parenthesized_expression),
     ),
 
     // §4 — Groovy 4 switch-expression. Single rule for both classic
@@ -2296,13 +2390,13 @@ module.exports = grammar({
     // followed by a line that starts with a literal lost the cast
     // once #83 added its forks.
     parenthesized_type_cast: $ => choice(
-      prec.dynamic(1, prec.right(PREC.UNARY, seq(
+      prec.dynamic(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         '(',
         field('type', $._type),
         alias($._cast_close, ')'),
         field('value', $._expression),
       ))),
-      prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+      prec.dynamic(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         '(',
         field('type', $._type),
         ')',
@@ -2517,7 +2611,7 @@ module.exports = grammar({
     argument_list: $ => argumentList($._argument),
 
     _argument: $ => choice(
-      $._expression,
+      enhancedExpression($),
       alias($.map_entry, $.named_argument),
       $.spread_arguments,
     ),
@@ -2594,7 +2688,7 @@ module.exports = grammar({
       return choice(...ops.map(op => prec.right(PREC.ASSIGN, seq(
         field('left', $._expression),
         field('operator', op),
-        field('right', statementExpression($)),
+        field('right', enhancedStatementExpression($)),
       ))));
     },
 
@@ -2789,7 +2883,67 @@ module.exports = grammar({
       '->',
     ),
 
-    closure_parameter: $ => parameter($),
+    closure_parameter: $ => parameter($, choice($._expression, $._bare_lambda_name)),
+
+    // §5.16 — a Java-style lambda with parentheses, Apache's
+    // `lambdaExpression`: `(a, b) -> a + b`, `() -> { }`,
+    // `(int a, String b = 'x') -> …`. Apache lists it in `primary`, so it is
+    // an expression wherever one is: an operand, a list element, the value
+    // of `return`, a cast's operand (`(Runnable) () -> { }`). The parameters
+    // are a method's (`formal_parameters`). `_lambda_start` (§6.17) is the
+    // scanner's decision that the parentheses hold parameters and `->`
+    // follows them; without it the parser could tell `(a) ->` from `(a)` only
+    // at the `->`.
+    //
+    // The body takes all it can, as Apache's greedy `lambdaBody` does:
+    // `(a) -> a + 1 as T` is a lambda whose body is the cast.
+    lambda_expression: $ => prec.dynamic(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+      $._lambda_start,
+      field('parameters', $.formal_parameters),
+      '->',
+      field('body', lambdaBody($)),
+    ))),
+
+    // A lambda whose one parameter has no parentheses (`x -> x + 1`),
+    // Apache's `standardLambdaExpression` with a `variableDeclaratorId`,
+    // aliased to `lambda_expression`. It stands only where Apache takes it
+    // (see `enhancedStatementExpression`). `_bare_lambda_start` (§6.17) is
+    // the scanner's decision that `->` follows the name. Decided by the
+    // `->` after the name, every name in an argument or a value cost a
+    // reduction of its own: tree-sitter skips the step from a name to an
+    // expression only in a state that has no other action, and a call with
+    // names for arguments took a fifth more reductions.
+    _bare_lambda_expression: $ => prec.dynamic(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+      $._bare_lambda_start,
+      field('parameters', $.identifier),
+      '->',
+      field('body', lambdaBody($)),
+    ))),
+
+    // The name of a closure parameter's default that `_bare_lambda_start`
+    // opens. At the start of a closure the default and the value of a
+    // declaration or an assignment share their tokens (`{ a = b -> c }`,
+    // `{ String a = b -> c }`), and the scanner reads only the name and the
+    // `->`. Groovy reads the parameter; reducing this rule outranks the
+    // lambda's `->`.
+    _bare_lambda_name: $ => seq($._bare_lambda_start, $.identifier),
+
+    // A parenthesized expression after `_lambda_start`, aliased to
+    // `parenthesized_expression`. The scanner reads only the parentheses
+    // and the `->`, and an expression may be followed by `->`: a closure
+    // parameter's default (`{ a = (b) -> c }`) and a case value
+    // (`case (A) -> 1`). Groovy reads both so. The `[formal_parameter,
+    // _expression]` conflict keeps the lambda reading too, until the token
+    // after the `->` or the end of the case ends it; where both survive, the
+    // lambda's weight ranks it last. Elsewhere this reading ends at the `->`,
+    // which nothing else takes after an expression, two tokens after the
+    // `(`.
+    _lambda_parenthesized_expression: $ => seq(
+      $._lambda_start,
+      '(',
+      statementExpression($),
+      ')',
+    ),
 
     // §3.2 PRIMARY / §5.13 — list literal with trailing-comma support.
     // Empty list is `[]`; the empty map literal is the distinct `[:]`
@@ -2834,7 +2988,7 @@ module.exports = grammar({
     map_entry: $ => seq(
       field('key', $._expression),
       ':',
-      field('value', $._expression),
+      field('value', enhancedExpression($)),
     ),
 
     // §5.11 — `*: expr` only inside a map literal. `*:` is a single
@@ -2854,7 +3008,7 @@ module.exports = grammar({
     // be a parenthesis-free call (`(sh script: 'x').trim()`, §5.5 item 1).
     parenthesized_expression: $ => seq(
       '(',
-      statementExpression($),
+      enhancedStatementExpression($),
       choice(')', alias($._cast_close, ')')),
     ),
 

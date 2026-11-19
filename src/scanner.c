@@ -21,8 +21,11 @@
 // the same line as the token before it; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
 // §6.11 CAST_CLOSE, a `)` with
-// something after it on its line; and §6.12 NOT_IN, the `!in`
-// operator. UNTERMINATED_COMMENT (§6.6) is an empty token at the
+// something after it on its line; §6.12 NOT_IN, the `!in`
+// operator; and §6.17 LAMBDA_START and BARE_LAMBDA_START, empty tokens
+// before a lambda's parameters in parentheses and before its one name
+// without them, when `->` follows. UNTERMINATED_COMMENT (§6.6) is an
+// empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state.
 // STRING_BODY (§6.10) and TYPE_START (§6.15) are never emitted; they
 // are valid only inside a string body, where the scanner emits nothing,
@@ -30,7 +33,7 @@
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, ARRAY_VALUE_START,
-// CAST_CLOSE, NOT_IN and the
+// CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START and the
 // STRING_BODY check are suppressed.
 //
 // One bit of state, `Scanner.no_comment_close_ahead` (§6.6). Nothing
@@ -63,6 +66,8 @@ enum TokenType {
     ARRAY_VALUE_START,
     CAST_CLOSE,
     NOT_IN,
+    LAMBDA_START,
+    BARE_LAMBDA_START,
     UNTERMINATED_COMMENT,
     STRING_BODY,
     TYPE_START,
@@ -507,8 +512,10 @@ static bool parenthesized_command_follows(
 );
 static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead);
 
-// Defined after is_grammar_keyword, which it calls.
+// Defined after is_grammar_keyword, which they call.
 static bool is_value_keyword(const char *word, unsigned len, int32_t next);
+static bool is_reserved_lambda_name(const char *word, unsigned len);
+static bool is_reserved_bare_lambda_name(const char *word, unsigned len);
 
 // SPECIFICATION.md §6.14 — the most the look-ahead after a name argument
 // reads of a list (`parameters_follow`, `call_arguments_follow`), in items:
@@ -1124,6 +1131,68 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
     return true;
 }
 
+// SPECIFICATION.md §6.17 — after the name of a lambda's one parameter
+// without parentheses and the spaces after it: whether `->` follows, also
+// after line breaks and comments (Apache `NL* ARROW`). Only a `-`, a line
+// break or a `/` may start the arrow or the trivia before it; at any other
+// character this returns false and reads nothing. Otherwise it sets `*read`,
+// as it consumes input. None of the three starts the first argument of a
+// call (`first_argument_follows`), so a value that is no lambda there is no
+// call either.
+static bool bare_lambda_arrow_follows(
+    TSLexer *lexer,
+    bool no_close_ahead,
+    bool *read
+) {
+    int32_t c = lexer->lookahead;
+    if (c != '-' && c != '/' && !is_line_break(c)) {
+        return false;
+    }
+    *read = true;
+    return arrow_follows(lexer, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.17 — decides BARE_LAMBDA_START, an empty token before
+// the name of a lambda's one parameter without parentheses (`x -> x`),
+// where no call that is a value may start: in an argument, the value of a
+// map entry and a closure parameter's default. The name is read once, so
+// ARRAY_VALUE_START, valid at the same place (`foo(String[].class)`), is
+// decided here too. A name that cannot be a parameter's is checked only
+// once the arrow is found, so that the other names cost no comparison.
+// The caller has skipped whitespace and seen an identifier start.
+static bool scan_bare_lambda_start(
+    TSLexer *lexer,
+    bool wants_array,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    bool capitalized = is_capital(lexer->lookahead);
+    char word[sizeof "synchronized"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (lexer->lookahead != '.' && lexer->lookahead != '[') {
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+        bool read = false;
+        if (bare_lambda_arrow_follows(lexer, no_close_ahead, &read)) {
+            lexer->result_symbol = BARE_LAMBDA_START;
+            return !is_reserved_bare_lambda_name(word, len);
+        }
+        if (read) {
+            return false;
+        }
+    }
+    // `read_element_type_name`, from the end of the name.
+    if (!wants_array
+        || (capitalized ? !read_nested_type_names(lexer)
+                        : !is_primitive_type(word, len))
+        || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
+        return false;
+    }
+    lexer->result_symbol = ARRAY_VALUE_START;
+    return true;
+}
+
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
 // here as a value: of a declarator or an assignment
 // (`def out = sh script: 'make'`, `def r = obj.method 1`), or in
@@ -1146,12 +1215,17 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
 static bool scan_value_start(
     TSLexer *lexer,
     bool wants_command,
+    bool wants_bare_lambda,
     bool wants_array,
     bool type_may_start,
     bool no_close_ahead
 ) {
     lexer->mark_end(lexer);
     if (!wants_command) {
+        if (wants_bare_lambda) {
+            return scan_bare_lambda_start(lexer, wants_array, type_may_start,
+                                          no_close_ahead);
+        }
         if (!read_element_type_name(lexer)
             || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
             return false;
@@ -1167,6 +1241,19 @@ static bool scan_value_start(
         return false;
     }
     bool accesses = is_member_access_start(lexer->lookahead);
+    if (wants_bare_lambda && !accesses && lexer->lookahead != '[') {
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+        bool read = false;
+        if (bare_lambda_arrow_follows(lexer, no_close_ahead, &read)) {
+            lexer->result_symbol = BARE_LAMBDA_START;
+            return !is_reserved_bare_lambda_name(word, len);
+        }
+        if (read) {
+            return false;
+        }
+    }
     int32_t last_name = 0;
     bool nested = false;
     bool ends_in_new = false;
@@ -1852,6 +1939,26 @@ static bool is_value_keyword(const char *word, unsigned len, int32_t next) {
         && !word_is(word, len, "_");
 }
 
+// SPECIFICATION.md §6.17 — whether a word that `read_word` returned cannot
+// name a lambda's parameter: a keyword of grammar.js that Groovy reserves
+// (`null`, `new`, `if`; `_`, `permits` and `pipeline` are names), a
+// primitive type name or `void`, which Groovy's `variableDeclaratorId`
+// takes only to report the mistake. Taken as a parameter, the in-grammar
+// lexer would read any of them as a name.
+static bool is_reserved_lambda_name(const char *word, unsigned len) {
+    if (is_primitive_type(word, len) || word_is(word, len, "void")) {
+        return true;
+    }
+    return is_grammar_keyword(word, len) && !word_is(word, len, "_")
+        && !word_is(word, len, "permits") && !word_is(word, len, "pipeline");
+}
+
+// The same for the one parameter without parentheses, where `this` is no
+// name either; with them a type may come first (`(String this) -> 1`).
+static bool is_reserved_bare_lambda_name(const char *word, unsigned len) {
+    return is_reserved_lambda_name(word, len) || word_is(word, len, "this");
+}
+
 // Whether the first argument of a statement's parenthesis-free call that
 // opens with COMMAND_STATEMENT_START starts here, after the spaces after
 // the receiver: an object or array creation, an array type that is a
@@ -2052,6 +2159,207 @@ static bool cast_operand_follows(TSLexer *lexer) {
     }
 }
 
+// SPECIFICATION.md §6.17 — the most the look-ahead for a lambda's
+// parameters reads, in items: a word, a string, a comment, an annotation or
+// a punctuation character. It runs at every `(` that may start an
+// expression, and the `(` of a default value may start one too, so without a
+// bound `(a = (a = (a = …` would be read in time quadratic in its depth.
+// With it each `(` reads at most this many items, and the parse stays
+// linear. A parameter list longer than this is read as no lambda's; real
+// ones are a few items.
+static const unsigned LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS = 256;
+
+// Counts one item of the look-ahead for a lambda's parameters. Returns false
+// once the budget is spent.
+static inline bool spend_lambda_item(unsigned *items) {
+    if (*items >= LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS) {
+        return false;
+    }
+    (*items)++;
+    return true;
+}
+
+// Reads Groovy's tokens, counting brackets, up to a `)` with no bracket
+// open, and, when `comma` is set, a `,` with none open; it leaves that
+// character. That is a parameter's default value (`comma`) or the arguments
+// of an annotation, from after their `(`. Strings that close on their line
+// and comments are items of their own, and line breaks are trivia, as inside
+// parentheses for Groovy's lexer. Returns false at the end of input, an
+// unterminated block comment, a closing bracket that does not match and the
+// end of the budget.
+static bool skip_lambda_tokens(
+    TSLexer *lexer,
+    unsigned *items,
+    bool comma,
+    bool no_close_ahead
+) {
+    unsigned depth = 0;
+    while (spend_lambda_item(items)) {
+        bool slash = false;
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
+            || lexer->eof(lexer)) {
+            return false;
+        }
+        if (slash) {
+            continue;
+        }
+        int32_t c = lexer->lookahead;
+        if (c == '\'' || c == '"') {
+            if (!skip_quoted(lexer)) {
+                return false;
+            }
+            continue;
+        }
+        if (is_identifier_char(c)) {
+            read_word(lexer, NULL, 0);
+            continue;
+        }
+        if (c == '(' || c == '[' || c == '{') {
+            depth++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (depth == 0) {
+                return c == ')';
+            }
+            depth--;
+        } else if (c == ',' && depth == 0 && comma) {
+            return true;
+        }
+        advance(lexer);
+    }
+    return false;
+}
+
+// Reads one parameter of a lambda, with the trivia around it, and leaves
+// what follows it: annotations, each a name and arguments in parentheses;
+// words (`final`, `def`, a type's names, the parameter's name) and the
+// punctuation of a type (`.`, `...`, `[]`, type arguments in `<…>`); then a
+// default value after `=`. Apart from the name being last, it does not check
+// the order: what it takes and `formal_parameter` does not is an `ERROR`
+// either way. Returns false where no parameter can be, as at the operator of
+// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where no
+// name ends it (`(String[])`, `(a.b)`, `(int)`, `(final)`) or a keyword is
+// in it (`(if)`).
+static bool lambda_parameter_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool no_close_ahead
+) {
+    for (;;) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        if (lexer->lookahead != '@') {
+            break;
+        }
+        if (!spend_lambda_item(items)) {
+            return false;
+        }
+        advance(lexer);
+        if (!is_identifier_start(lexer->lookahead)) {
+            return false;
+        }
+        read_word(lexer, NULL, 0);
+        while (lexer->lookahead == '.') {
+            advance(lexer);
+            if (!is_identifier_start(lexer->lookahead)) {
+                return false;
+            }
+            read_word(lexer, NULL, 0);
+        }
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        if (lexer->lookahead == '(') {
+            advance(lexer);
+            if (!skip_lambda_tokens(lexer, items, false, no_close_ahead)) {
+                return false;
+            }
+            advance(lexer);
+        }
+    }
+    unsigned angles = 0;
+    // Whether the last item is a word that may name the parameter, and how
+    // many dots come right before the current item: after one, a word is
+    // part of a qualified type (`a.b.C`); after three, a name (`String... a`).
+    bool named = false;
+    unsigned dots = 0;
+    for (;;) {
+        int32_t c = lexer->lookahead;
+        if (is_identifier_start(c)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            bool modifier = word_is(word, len, "final")
+                || word_is(word, len, "def");
+            if (!modifier && is_reserved_lambda_name(word, len)
+                && !is_primitive_type(word, len)) {
+                return false;
+            }
+            named = !modifier && angles == 0 && dots != 1
+                && !is_reserved_lambda_name(word, len);
+            dots = 0;
+        } else if (c == '.') {
+            named = false;
+            dots++;
+            advance(lexer);
+        } else if (c == '<' || (c == '>' && angles > 0) || c == '[' || c == ']'
+                   || (angles > 0 && (c == ',' || c == '?' || c == '&'))) {
+            if (c == '<') {
+                angles++;
+            } else if (c == '>') {
+                angles--;
+            }
+            named = false;
+            dots = 0;
+            advance(lexer);
+        } else {
+            break;
+        }
+        if (!spend_lambda_item(items)
+            || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+    }
+    if (!named || angles > 0) {
+        return false;
+    }
+    if (lexer->lookahead != '=') {
+        return true;
+    }
+    advance(lexer);
+    if (lexer->lookahead == '=' || lexer->lookahead == '~') {
+        return false;
+    }
+    return skip_lambda_tokens(lexer, items, true, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.17 — whether the `(` here opens a lambda's parameters:
+// what the parentheses hold reads as parameters (`lambda_parameter_follows`)
+// and `->` follows the `)`, after Groovy's trivia, line breaks included
+// (Apache `NL* ARROW`). The `(` is not consumed when this is called.
+static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
+    unsigned items = 0;
+    advance(lexer);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+        return false;
+    }
+    if (lexer->lookahead != ')') {
+        for (;;) {
+            if (!lambda_parameter_follows(lexer, &items, no_close_ahead)) {
+                return false;
+            }
+            if (lexer->lookahead == ')') {
+                break;
+            }
+            if (lexer->lookahead != ',') {
+                return false;
+            }
+            advance(lexer);
+        }
+    }
+    advance(lexer);
+    return arrow_follows(lexer, no_close_ahead);
+}
+
 void *tree_sitter_groovy_external_scanner_create(void) {
     return ts_calloc(1, sizeof(Scanner));
 }
@@ -2192,9 +2500,20 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !valid_symbols[ERROR_SENTINEL];
     bool wants_not_in = valid_symbols[NOT_IN]
         && !valid_symbols[ERROR_SENTINEL];
+    // §6.17 — NOT_IN is valid only after an expression, where a `(` opens a
+    // call's arguments (`foo(a) -> b`, an `ERROR`). A lambda may start there
+    // only as the next statement, which is left unread: reading the
+    // arguments of every such call would cost more than the rare lambda
+    // statement after an expression is worth (`foo()` then `(a) -> a` on the
+    // next line, which Groovy also reads as a call).
+    bool wants_lambda = valid_symbols[LAMBDA_START]
+        && !valid_symbols[ERROR_SENTINEL] && !valid_symbols[NOT_IN];
+    bool wants_bare_lambda = valid_symbols[BARE_LAMBDA_START]
+        && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait
         && !wants_sealed && !wants_value_start && !wants_statement_start
-        && !wants_array && !wants_cast_close && !wants_not_in
+        && !wants_array && !wants_cast_close && !wants_not_in && !wants_lambda
+        && !wants_bare_lambda
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
@@ -2286,10 +2605,11 @@ bool tree_sitter_groovy_external_scanner_scan(
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
     }
-    if ((wants_value_start && is_identifier_start(lexer->lookahead))
+    if (((wants_value_start || wants_bare_lambda)
+         && is_identifier_start(lexer->lookahead))
         || (wants_array && is_element_type_start(lexer->lookahead))) {
-        return scan_value_start(lexer, wants_value_start, wants_array,
-                                type_may_start, no_close_ahead);
+        return scan_value_start(lexer, wants_value_start, wants_bare_lambda,
+                                wants_array, type_may_start, no_close_ahead);
     }
     if (lexer->lookahead == '!' && wants_not_in) {
         // SPECIFICATION.md §6.12 — `!in` is an operator only before
@@ -2320,6 +2640,16 @@ bool tree_sitter_groovy_external_scanner_scan(
             return false;
         }
         lexer->result_symbol = CAST_CLOSE;
+        return true;
+    }
+    if (lexer->lookahead == '(' && wants_lambda) {
+        // The token is empty and ends here. On `false` the runtime rewinds
+        // and the in-grammar lexer reads the `(`.
+        lexer->mark_end(lexer);
+        if (!lambda_parameters_follow(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = LAMBDA_START;
         return true;
     }
     if (lexer->lookahead != '/') {

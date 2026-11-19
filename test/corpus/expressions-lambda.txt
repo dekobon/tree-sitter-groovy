@@ -1,0 +1,1126 @@
+==================
+Lambda with two untyped parameters as a declaration's value
+==================
+
+def add = (a, b) -> a + b
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier))
+          (formal_parameter
+            name: (identifier)))
+        body: (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+Lambda with no parameters
+==================
+
+def answer = () -> 42
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters)
+        body: (number_literal)))))
+
+==================
+Lambda with typed parameters and a block body
+==================
+
+def f = (int a, String b) -> { a + b }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (binary_expression
+              left: (identifier)
+              right: (identifier))))))))
+
+==================
+Lambda parameters with a default value and final
+==================
+
+def f = (a, b = 2) -> a + b
+def g = (final x) -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier))
+          (formal_parameter
+            name: (identifier)
+            default: (number_literal)))
+        body: (binary_expression
+          left: (identifier)
+          right: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Lambda parameters with annotations, def, var, varargs, generic and array types
+==================
+
+def f = (@A a, @B(value = 1) def b, var c, String... d) -> a
+def g = (List<String> a, Map<K, V> b, int[] c) -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier))
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (assignment_expression
+                  left: (identifier)
+                  right: (number_literal))))
+            name: (identifier))
+          (formal_parameter
+            name: (identifier))
+          (formal_parameter
+            type: (varargs_type
+              (type_identifier))
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            name: (identifier))
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)
+                (type_identifier)))
+            name: (identifier))
+          (formal_parameter
+            type: (array_type
+              (type_identifier))
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Lambda parameters on several lines, with comments
+==================
+
+def f = (a, // first
+         b /* second */) -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier))
+          (line_comment)
+          (formal_parameter
+            name: (identifier))
+          (block_comment))
+        body: (identifier)))))
+
+==================
+Lambda with one parameter without parentheses
+==================
+
+def inc = x -> x + 1
+Function<Integer, Integer> twice = x -> x * 2
+def (a, b) = x -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (type_identifier)))
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (identifier))))
+
+==================
+Lambdas without parentheses as call arguments
+==================
+
+list.stream().map(x -> x * 2).filter(x -> x > 1)
+foo(a, x -> x, b)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (field_access
+            object: (method_invocation
+              function: (field_access
+                object: (identifier)
+                field: (identifier))
+              arguments: (argument_list))
+            field: (identifier))
+          arguments: (argument_list
+            (lambda_expression
+              parameters: (identifier)
+              body: (binary_expression
+                left: (identifier)
+                right: (number_literal)))))
+        field: (identifier))
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (binary_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (lambda_expression
+          parameters: (identifier)
+          body: (identifier))
+        (identifier)))))
+
+==================
+Lambdas with parentheses as call arguments
+==================
+
+foo((a, b) -> a + b)
+reduce(0, (a, b) -> a + b)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier))
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (identifier)
+            right: (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier))
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (identifier)
+            right: (identifier)))))))
+
+==================
+Lambda as the value of a named argument and a map entry
+==================
+
+foo(key: x -> x, other: (y) -> y)
+def m = [key: x -> x]
+foo key: (x) -> x
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (identifier)))
+        (named_argument
+          key: (identifier)
+          value: (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Lambda with parentheses as a return value, a list element and a ternary branch
+==================
+
+return (x) -> x
+def l = [(x) -> x, () -> 1]
+def t = c ? (x) -> x : (y) -> y
+
+---
+
+(source_file
+  (return_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier))
+        (lambda_expression
+          parameters: (formal_parameters)
+          body: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (ternary_expression
+        condition: (identifier)
+        consequence: (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier))
+        alternative: (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier))))))
+
+==================
+Lambda with parentheses as an operand
+==================
+
+def s = 1 + (a) -> a * 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (number_literal)
+        right: (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (identifier)
+            right: (number_literal)))))))
+
+==================
+Nested lambdas
+==================
+
+def f = a -> (b) -> a + b
+def g = (a) -> (b) -> a + b
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (identifier)
+            right: (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (identifier)
+            right: (identifier)))))))
+
+==================
+Lambda as a cast's operand
+==================
+
+def r = (Runnable) () -> { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (lambda_expression
+          parameters: (formal_parameters)
+          body: (block))))))
+
+==================
+Lambda whose body is a parenthesis-free call
+==================
+
+def f = x -> println x
+def g = (x) -> foo 1, 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (command_chain
+          receiver: (identifier)
+          argument: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (command_chain
+          receiver: (identifier)
+          argument: (number_literal)
+          argument: (number_literal))))))
+
+==================
+Lambda statements in a method and a closure
+==================
+
+def m() { (a) -> a }
+def c = { (a, b) -> a }
+def d = { x -> (y) -> y }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier))
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier)))))))
+
+==================
+Lambda body takes the whole expression after the arrow
+==================
+
+def f = (a) -> a + 1 as String
+def g = x -> x ? 1 : 2
+def h = x -> x = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (cast_expression
+          value: (binary_expression
+            left: (identifier)
+            right: (number_literal))
+          type: (type_identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (ternary_expression
+          condition: (identifier)
+          consequence: (number_literal)
+          alternative: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (assignment_expression
+          left: (identifier)
+          right: (number_literal))))))
+
+==================
+Lambda body: a block outranks a closure, which takes parameters
+==================
+
+def f = () -> { }
+def g = x -> { y -> y }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters)
+        body: (block))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier)))))))
+
+==================
+Lambda arrow after a line break or a comment
+==================
+
+def f = (x)
+  -> x + 1
+def g = x // c
+  -> x
+def h = x ->
+  x + 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (binary_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        (line_comment)
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (identifier)
+          right: (number_literal))))))
+
+==================
+Lambda as the value of an assignment
+==================
+
+x = y -> y
+this.handler = e -> e.run()
+x += (a) -> a
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (lambda_expression
+        parameters: (identifier)
+        body: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (identifier)
+        field: (identifier))
+      right: (lambda_expression
+        parameters: (identifier)
+        body: (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Lambda without parentheses in parentheses and in a condition
+==================
+
+def f = (x -> x)
+if (x -> x) { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_expression
+        (lambda_expression
+          parameters: (identifier)
+          body: (identifier)))))
+  (if_statement
+    condition: (lambda_expression
+      parameters: (identifier)
+      body: (identifier))
+    consequence: (block)))
+
+==================
+Lambda with parentheses in an interpolation
+==================
+
+def s = "${(x) -> x}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier)))))))
+
+==================
+Lambda in a switch arrow's body
+==================
+
+def v = switch (k) { case 1 -> (a) -> a; default -> (x) -> x }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (number_literal)
+            body: (expression_statement
+              (lambda_expression
+                parameters: (formal_parameters
+                  (formal_parameter
+                    name: (identifier)))
+                body: (identifier))))
+          (switch_default
+            body: (expression_statement
+              (lambda_expression
+                parameters: (formal_parameters
+                  (formal_parameter
+                    name: (identifier)))
+                body: (identifier)))))))))
+
+==================
+A lambda without parentheses is no return value or list element
+==================
+
+def l = [(x) -> x]
+return x -> x
+def m = [x -> x]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier)))))
+  (return_statement
+    (identifier))
+  (ERROR)
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (identifier)
+        (ERROR
+          (identifier))))))
+
+==================
+A lambda without parentheses is no lambda's body
+==================
+
+def f = a -> b -> a + b
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier))))
+  (ERROR)
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+A lambda without parentheses is no argument of a parenthesis-free call
+==================
+
+foo 1, (x) -> x
+foo 1, x -> x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (identifier))
+  (ERROR)
+  (expression_statement
+    (identifier)))
+
+==================
+Closure parameter whose default is in parentheses, before a lambda
+==================
+
+def c = { a = (b) -> c }
+def d = { String a = (b) -> c }
+def e = { a = (foo b) -> c }
+def l = (b) -> c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (identifier))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (parenthesized_expression
+              (identifier))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (command_chain
+                receiver: (identifier)
+                argument: (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Closure parameter whose default is a name, before a lambda
+==================
+
+def c = { a = b -> c }
+def d = { String a = b -> c }
+def l = b -> c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier)))))
+
+==================
+Closure parameter whose default ends in parentheses, before a lambda
+==================
+
+def c = { a = 1 + (b) -> c }
+def d = { String a = (T) (b, c) -> d }
+def l = (b) -> c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (binary_expression
+              left: (number_literal)
+              right: (parenthesized_expression
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (method_invocation
+              function: (parenthesized_expression
+                (identifier))
+              arguments: (argument_list
+                (identifier)
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+Switch arrow case whose value is in parentheses, next to a lambda
+==================
+
+def v = switch (k) { case (A) -> 1; case 2 -> (b) -> b }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (parenthesized_expression
+              (identifier))
+            body: (expression_statement
+              (number_literal)))
+          (switch_arrow_case
+            value: (number_literal)
+            body: (expression_statement
+              (lambda_expression
+                parameters: (formal_parameters
+                  (formal_parameter
+                    name: (identifier)))
+                body: (identifier)))))))))
+
+==================
+Multi-assignment, cast and parenthesized expression next to a lambda
+==================
+
+(a, b) = [1, 2]
+def s = (String) x
+def p = (a + b) * c
+def l = (a, b) -> a
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (parenthesized_expression
+          (binary_expression
+            left: (identifier)
+            right: (identifier)))
+        right: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier))
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+A keyword or a primitive type is no lambda parameter
+==================
+
+foo(it -> 1)
+foo(null -> 1)
+def f = (int) -> 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (null_literal)
+        (ERROR
+          (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (type_identifier)
+        (ERROR)
+        value: (number_literal)))))
+
+==================
+A lambda in parentheses after a call's name is no argument of it
+==================
+
+foo((x) -> x)
+foo (x) -> x
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (ERROR)
+  (expression_statement
+    (identifier)))
