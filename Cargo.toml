@@ -47,6 +47,10 @@ path = "bindings/rust/tests/name_argument_cost.rs"
 name = "lambda_parameters_cost"
 path = "bindings/rust/tests/lambda_parameters_cost.rs"
 
+[[test]]
+name = "statement_paren_cost"
+path = "bindings/rust/tests/statement_paren_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 
