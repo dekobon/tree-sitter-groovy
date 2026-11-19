@@ -1833,3 +1833,482 @@ def c = { T a = (U) (b, c) -> (d) -> e }
               (formal_parameter
                 name: (identifier)))
             body: (identifier)))))))
+
+==================
+Lambda body: a closure that a call, a subscript or a closure argument follows takes it
+==================
+
+def a = x -> { y -> y }()
+def b = x -> { y -> y }[0]
+def c = x -> { y -> y } { z }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (method_invocation
+          function: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          arguments: (argument_list)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (subscript_expression
+          object: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          index: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (method_invocation
+          function: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          closure: (closure
+            (expression_statement
+              (identifier))))))))
+
+==================
+Lambda body: braces that an operator follows are a closure that takes it
+==================
+
+def a = x -> { } + 1
+def b = x -> { y -> y } ?: z
+foo((x) -> { y -> y } + 1)
+def c = x -> { y -> y }::call
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (closure)
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (elvis_expression
+          value: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          default: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              name: (identifier)))
+          body: (binary_expression
+            left: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))
+            right: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (method_reference_expression
+          target: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          name: (identifier))))))
+
+==================
+Lambda in parentheses: a closure body takes what follows it, a block leaves it to the lambda
+==================
+
+def a = (x) -> { y -> y }.call()
+def b = (x) -> { foo() }.call()
+def c = (x) -> { y -> y } as T
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (method_invocation
+          function: (field_access
+            object: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))
+            field: (identifier))
+          arguments: (argument_list)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (field_access
+          object: (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (block
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list)))))
+          field: (identifier))
+        arguments: (argument_list))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (cast_expression
+          value: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          type: (type_identifier))))))
+
+==================
+Lambda body: what continues it after a line break
+==================
+
+def a = (x) -> { y -> y }
+  .call()
+def b = x -> { foo() }
++ 1
+def c = x -> { y -> y }
+(1)
+def d = x -> { y -> y }
+/x/
+foo(x -> { y -> y }
+  + 1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (method_invocation
+          function: (field_access
+            object: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))
+            field: (identifier))
+          arguments: (argument_list)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (binary_expression
+            left: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))
+            right: (number_literal)))))))
+
+==================
+Lambda body: a comment after it stays outside
+==================
+
+def a = x -> { y -> y } // c
+foo(x -> { foo() } /* c */, b)
+def b = (x) -> { y -> y } /* c */ .call()
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier))))))
+  (line_comment)
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (block
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list)))))
+        (block_comment)
+        (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (method_invocation
+          function: (field_access
+            object: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier)))
+            (block_comment)
+            field: (identifier))
+          arguments: (argument_list))))))
+
+==================
+Lambda body: in, !in, as and instanceof continue it, else ends it
+==================
+
+def a = (x) -> { y -> y } in l
+def b = (x) -> { y -> y } !in l
+def c = (x) -> { y -> y } instanceof T
+if (c) f = x -> { y -> y } else g()
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (membership_expression
+          element: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          collection: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (membership_expression
+          element: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          collection: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (instanceof_expression
+          value: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))
+          type: (type_identifier)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (assignment_expression
+        left: (identifier)
+        right: (lambda_expression
+          parameters: (identifier)
+          body: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier))))))
+    alternative: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+Lambda body: an assignment followed by an operator, closure parameters in a continued block, a brace on the next line (divergence 26)
+==================
+
+v = x -> { foo() } == 1
+def a = (x) -> { b = (c) -> { } }.call()
+def b = x -> { y -> y }
+{ z }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (closure
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list))))
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (method_invocation
+          function: (field_access
+            object: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)
+                  default: (parenthesized_expression
+                    (identifier))))
+              (expression_statement
+                (closure)))
+            field: (identifier))
+          arguments: (argument_list)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (closure
+      (expression_statement
+        (identifier)))))
+
+==================
+Lambda body before a block comment that does not close
+==================
+
+def v = x -> { foo() } /* c
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (ERROR)
+  (expression_statement
+    (identifier)))

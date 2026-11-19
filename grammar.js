@@ -543,22 +543,34 @@ function enhancedExpression($) {
  * blocks, `x -> { y -> y }` a closure. A closure and a parenthesized
  * expression are also alternatives of their own, ranked low
  * (DEMOTED_LAMBDA_WEIGHT); the static precedence makes the parser reduce
- * them here rather than as an expression, which would carry no weight.
- * A lambda without parentheses is no body, so `a -> b -> c` is an error in
- * Groovy and here; `a -> (b) -> c` is not.
+ * the parenthesized expression here rather than as an expression, which
+ * would carry no weight. A lambda without parentheses is no body, so
+ * `a -> b -> c` is an error in Groovy and here; `a -> (b) -> c` is not.
+ *
+ * A brace body ends at its `}` only where `_lambda_body_end` (§6.19)
+ * follows, which the scanner emits unless an expression continues there.
+ * Otherwise the braces are a closure that starts the body:
+ * `a -> { y -> y }.call()` and `a -> { } + 1` call and add the closure, as
+ * in Groovy. A lambda in parentheses is an expression that may go on
+ * itself, so its block may be followed by anything (`(a) -> { foo() }.call()`
+ * calls the lambda); where the braces are a block and a closure alike, the
+ * block's static precedence keeps the block. A lambda without parentheses
+ * may not, so its block needs the token.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
- * @returns {ChoiceRule} The body rule.
+ * @param {boolean} bare Whether the lambda has no parentheses.
+ * @returns {ChoiceRule} The body rule, its `body` field on the body alone.
  */
-function lambdaBody($) {
+function lambdaBody($, bare) {
+  const body = (rule) => field('body', rule);
   return choice(
-    $.block,
-    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, $.closure)),
-    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, alias(
+    seq(body($.block), bare ? $._lambda_body_end : optional($._lambda_body_end)),
+    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, seq(body($.closure), $._lambda_body_end)),
+    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, body(alias(
       $._lambda_parenthesized_expression,
       $.parenthesized_expression,
-    ))),
-    statementExpression($),
+    )))),
+    body(statementExpression($)),
   );
 }
 
@@ -641,6 +653,8 @@ module.exports = grammar({
     // §6.6 — an empty, hidden token at the first `/*` that has no `*/`.
     // It adds no syntax: the scanner needs a token to carry that fact
     // forward, and only an extra is valid wherever a comment may start.
+    // §6.19 has the scanner emit it after the `}` of a lambda's brace body
+    // too, to carry a decision made past the token that follows.
     $._unterminated_comment,
   ],
 
@@ -750,6 +764,11 @@ module.exports = grammar({
     // symbols after it, which changed error recovery (`enum E<T> { A }`
     // lost its `enum_declaration`).
     $._statement_paren,
+    // §6.19 — empty token after the `}` of a lambda's brace body that is
+    // its whole body: emitted unless what follows continues an expression.
+    // Listed last but for the sentinel too, so that it renumbers no symbol
+    // before it.
+    $._lambda_body_end,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2990,7 +3009,7 @@ module.exports = grammar({
       $._lambda_start,
       field('parameters', $.formal_parameters),
       '->',
-      field('body', lambdaBody($)),
+      lambdaBody($, false),
     ))),
 
     // A lambda whose one parameter has no parentheses (`x -> x + 1`),
@@ -3006,7 +3025,7 @@ module.exports = grammar({
       $._bare_lambda_start,
       field('parameters', $.identifier),
       '->',
-      field('body', lambdaBody($)),
+      lambdaBody($, true),
     ))),
 
     // The name of a closure parameter's default that `_bare_lambda_start`
