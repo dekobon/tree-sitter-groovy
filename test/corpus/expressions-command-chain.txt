@@ -5412,6 +5412,7 @@ foo bar new Baz()
 foo x.y 'a'
 foo bar x = 1
 foo bar x == 1
+foo bar true
 c = { a b c }
 
 ---
@@ -5475,6 +5476,11 @@ c = { a b c }
     (binary_expression
       left: (identifier)
       right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (boolean_literal))
   (expression_statement
     (assignment_expression
       left: (identifier)
@@ -5565,3 +5571,513 @@ foo 1 + 2
   (expression_statement
     (unary_expression
       operand: (number_literal))))
+
+==================
+Comments after a name argument are trivia
+==================
+
+myType x /* c */ = compute()
+foo bar /* c
+  */ = 1
+c = { foo a /* c */ -> a }
+c = { foo a /* c */, b -> a }
+c = { foo a, b /* c */ -> a }
+c = { foo a, b // c
+  -> a }
+c = { foo a // c
+  -> a }
+c = { foo a, b // (x
+  -> a }
+foo a /* c */ b
+println x // c
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    (block_comment)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    (block_comment)
+    value: (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (block_comment))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (block_comment)
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier))
+          (block_comment))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier))
+          (line_comment))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (line_comment))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier))
+          (line_comment))
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (line_comment))
+
+==================
+Closure parameters with a lowercase type before defaults, annotations and modifiers
+==================
+
+c = { foo a, b = 1 -> a }
+c = { foo a, @A b -> a }
+c = { foo a, @A(x) b = [1] -> a }
+c = { foo a, final
+  b -> a }
+c = { foo a, Map<K, V> b -> a }
+c = { foo a, b = { it } -> a }
+c = { foo a, b = '->' }
+c = { foo a, b = { x -> x } }
+foo a, b = 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (identifier)))
+            name: (identifier)
+            default: (list_literal
+              (number_literal))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)
+                (type_identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (closure
+              (expression_statement
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (assignment_expression
+            left: (identifier)
+            right: (string_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (assignment_expression
+            left: (identifier)
+            right: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)))
+              (expression_statement
+                (identifier))))))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Parameters after a lowercase name before parentheses keep the method
+==================
+
+foo bar(Map<String, List<X>> a, int b) { }
+foo bar(a, int b) { }
+foo bar(String... a) { }
+foo bar(int
+  a) { }
+bar sh(println
+  List)
+foo bar x(Map<K, V> a, int b) { }
+foo bar(a, b) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))))
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (varargs_type
+          (type_identifier))
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))))
+  (expression_statement
+    (identifier))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (type_identifier)))
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier))
+      closure: (closure))))
+
+==================
+A declaring word as a name argument before a name
+==================
+
+foo var x
+foo var x, y
+foo yield x
+foo record x
+obj.m var x
+foo var
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier))
+  (yield_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+Further names after a name argument in a value
+==================
+
+class C { def r = a b c }
+def x = foo bar baz
+def y = foo bar as T
+def z = foo bar baz.qux
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (cast_expression
+          value: (identifier)
+          type: (type_identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier))))
+
+==================
+A key after a name argument
+==================
+
+compile group as: 1, name: 2
+foo bar x: 1
+foo bar
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))
+
+==================
+A receiver with a non-ASCII capital takes no name argument
+==================
+
+Été x
+Ωmega x
+Жук x
+été x
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)))

@@ -112,6 +112,22 @@ static inline bool is_identifier_char(int32_t c) {
     return is_identifier_start(c) || (c >= '0' && c <= '9');
 }
 
+static inline void advance(TSLexer *lexer) {
+    lexer->advance(lexer, false);
+}
+
+static inline bool is_whitespace(int32_t c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static inline bool is_inline_space(int32_t c) {
+    return c == ' ' || c == '\t';
+}
+
+static inline bool is_line_break(int32_t c) {
+    return c == '\n' || c == '\r';
+}
+
 // SPECIFICATION.md §5.10 — a line escape, `\` followed by a line
 // break, is whitespace to Groovy's lexer (GroovyLexer.g4
 // `WS : ([ \t]+ | LineEscape+)`), so the line after it continues the
@@ -494,26 +510,68 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead);
 // Defined after is_grammar_keyword, which it calls.
 static bool is_value_keyword(const char *word, unsigned len, int32_t next);
 
+// SPECIFICATION.md §6.14 — the most the look-ahead after a name argument
+// reads of a list (`parameters_follow`, `call_arguments_follow`), in items:
+// a word, a number, a string, a comment, a line break or a punctuation
+// character. Malformed input can restart a statement at every element of a
+// long list (`{ bar a, bar b, … }` with no `->`), and each restart reads
+// ahead from there, so without a bound the parse takes time quadratic in
+// the list. With it each restart reads at most this many items, and the
+// parse stays linear. A list longer than this after a lowercase-typed
+// first closure parameter is read as a call's arguments; real lists are a
+// few items.
+static const unsigned NAME_ARGUMENT_LOOKAHEAD_ITEMS = 256;
+
+static bool is_modifier_word(const char *word, unsigned len);
+
+// The code points of the upper-case letters `is_upper_letter` knows
+// beyond A to Z: the capitals of Latin-1 (`À` to `Þ`, but for the
+// multiplication sign `×`), of Greek (`Α` to `Ω`, but for the unassigned
+// code point between `Ρ` and `Σ`) and of Cyrillic (`Ѐ` to `Я`).
+enum {
+    LATIN1_CAPITAL_FIRST = 0xC0,
+    LATIN1_CAPITAL_LAST = 0xDE,
+    MULTIPLICATION_SIGN = 0xD7,
+    GREEK_CAPITAL_FIRST = 0x391,
+    GREEK_CAPITAL_LAST = 0x3A9,
+    GREEK_CAPITAL_UNASSIGNED = 0x3A2,
+    CYRILLIC_CAPITAL_FIRST = 0x400,
+    CYRILLIC_CAPITAL_LAST = 0x42F,
+};
+
+// SPECIFICATION.md §6.14 — whether `c` is an upper-case letter, which
+// Apache's isInvalidLocalVariableDeclaration asks of a receiver's first
+// letter (`Character.isUpperCase`): A to Z, and the capitals of Latin-1,
+// Greek and Cyrillic. A capital of any other script reads as lower case;
+// the scanner has no Unicode tables.
+static inline bool is_upper_letter(int32_t c) {
+    return is_capital(c)
+        || (c >= LATIN1_CAPITAL_FIRST && c <= LATIN1_CAPITAL_LAST
+            && c != MULTIPLICATION_SIGN)
+        || (c >= GREEK_CAPITAL_FIRST && c <= GREEK_CAPITAL_LAST
+            && c != GREEK_CAPITAL_UNASSIGNED)
+        || (c >= CYRILLIC_CAPITAL_FIRST && c <= CYRILLIC_CAPITAL_LAST);
+}
+
 // SPECIFICATION.md §6.14 — whether a receiver, one name that `read_word`
 // returned, may instead be the type of a declaration: a primitive type name,
-// `void` or a capitalized name. That is how Apache's
-// isInvalidLocalVariableDeclaration (the same from Groovy 3 to 6) tells
-// `String s` and `int x` from the call `foo bar`; for a dotted name it
-// looks at the last name (`foo.Bar x`), which the callers check. Such a
-// receiver takes no name as its first argument, in a value as well, so
+// `void` or a name with an upper-case first letter (`upper`). That is how
+// Apache's isInvalidLocalVariableDeclaration (the same from Groovy 3 to 6)
+// tells `String s` and `int x` from the call `foo bar`; for a dotted name it
+// looks at the last name (`foo.Bar x`, `path_takes_names`). Such a receiver
+// takes no name as its first argument, in a value as well, so
 // `Point(int x)` and `foo(String a)` hold no call.
-static bool may_name_type(const char *word, unsigned len, bool capitalized) {
-    return capitalized || is_primitive_type(word, len)
-        || word_is(word, len, "void");
+static bool may_name_type(const char *word, unsigned len, bool upper) {
+    return upper || is_primitive_type(word, len) || word_is(word, len, "void");
 }
 
 // Whether a receiver that ends in member accesses, read by
 // `read_member_accesses`, takes a name as its first argument: its last name
-// is not capitalized (`a.b c`, but `foo.Bar x` declares) and is not `new`
-// (`this.new Inner()` creates an inner class's instance, Apache
-// `DOT NEW creator`).
+// does not start with an upper-case letter (`a.b c`, but `foo.Bar x`
+// declares) and is not `new` (`this.new Inner()` creates an inner class's
+// instance, Apache `DOT NEW creator`).
 static inline bool path_takes_names(int32_t last_name, bool ends_in_new) {
-    return !is_capital(last_name) && !ends_in_new;
+    return !is_upper_letter(last_name) && !ends_in_new;
 }
 
 // After `!`, which the caller has seen: a negation, the first argument of a
@@ -521,7 +579,7 @@ static inline bool path_takes_names(int32_t last_name, bool ends_in_new) {
 // before what makes them operators (§6.12): whitespace or, after `!in`, a
 // bracket.
 static bool negation_follows(TSLexer *lexer) {
-    lexer->advance(lexer, false);
+    advance(lexer);
     if (lexer->lookahead == '=') {
         return false;
     }
@@ -531,11 +589,11 @@ static bool negation_follows(TSLexer *lexer) {
     char word[sizeof "instanceof"];
     unsigned len = read_word(lexer, word, sizeof word);
     int32_t next = lexer->lookahead;
-    bool space = next == ' ' || next == '\t' || next == '\n' || next == '\r';
     if (word_is(word, len, "in")) {
-        return !space && next != '[' && next != '(' && next != '{';
+        return !is_whitespace(next) && next != '[' && next != '('
+            && next != '{';
     }
-    return !(word_is(word, len, "instanceof") && space);
+    return !(word_is(word, len, "instanceof") && is_whitespace(next));
 }
 
 // Whether a name that `read_word` returned, with `next` the character after
@@ -544,6 +602,16 @@ static bool negation_follows(TSLexer *lexer) {
 static bool name_may_be_argument(const char *word, unsigned len, int32_t next) {
     return !is_value_keyword(word, len, next) && !word_is(word, len, "in")
         && !word_is(word, len, "as");
+}
+
+// Whether a name argument spelled `word` starts what Groovy may read as a
+// declaration or a statement of its own when a name follows it: `var`,
+// `yield`, `record`, `trait` and `sealed`. `foo var x` is left as before,
+// `foo` and the declaration `var x`; Groovy reads `foo(var).x`.
+static bool is_declaring_word(const char *word, unsigned len) {
+    return word_is(word, len, "var") || word_is(word, len, "yield")
+        || word_is(word, len, "record") || word_is(word, len, "trait")
+        || word_is(word, len, "sealed");
 }
 
 // Whether a number or a string starts with `c`.
@@ -559,11 +627,35 @@ static bool first_argument_follows(
     bool no_close_ahead
 );
 
+// The trivia after a name argument, which Groovy's lexer hides: spaces,
+// tabs, line escapes and block comments, which may span lines; a line
+// comment is read to the end of its line. Returns false where the look-ahead
+// must stop: at a `/` that opens no comment (division, consumed), and at a
+// block comment that does not close (§6.6). A comment is no trivia between
+// the receiver and the name argument (§6.14), only after the argument.
+static bool skip_argument_trivia(TSLexer *lexer, bool no_close_ahead) {
+    bool slash = false;
+    if (!skip_header_trivia(lexer, false, no_close_ahead, NULL, &slash)) {
+        return false;
+    }
+    if (!slash) {
+        return true;
+    }
+    if (lexer->lookahead != '/') {
+        return false;
+    }
+    while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
+        advance(lexer);
+    }
+    return true;
+}
+
 // After a name argument that `.` or `[` follows (`foo x.y`, `foo xs[0]`):
 // its member accesses, then on the line no first argument as the grammar
-// takes it after a name (see `name_argument_rest`). In Groovy
+// takes it after a name (see `continuation_follows`). In Groovy
 // `foo x.y 'a'` is `foo(x.y).a`, a chain continuation, which is left as
-// before: `foo` and the call `x.y 'a'`.
+// before: `foo` and the call `x.y 'a'`. A subscript is not read past, so
+// `foo xs[0] 1` is the call `foo xs[0]` and the statement `1`.
 static bool dotted_argument_rest(TSLexer *lexer, bool no_close_ahead) {
     int32_t last_name = 0;
     bool nested = false;
@@ -574,108 +666,243 @@ static bool dotted_argument_rest(TSLexer *lexer, bool no_close_ahead) {
     return !first_argument_follows(lexer, false, false, false, no_close_ahead);
 }
 
-// At a line break after closure parameters' last name: whether `->`
-// follows after whitespace, as Groovy allows line breaks before it.
-static bool arrow_follows(TSLexer *lexer) {
-    while (lexer->lookahead == ' ' || lexer->lookahead == '\t'
-           || lexer->lookahead == '\n' || lexer->lookahead == '\r') {
-        lexer->advance(lexer, false);
+// After a name argument, at a name that follows it: whether that name
+// starts a chain continuation, which is left as before (§5.5 item 4) —
+// a literal word, a key, a creation or an array type value, the first
+// argument as the grammar takes it after a name (`foo bar true`,
+// `foo bar baz: 1`, `foo bar new Baz()`, `foo bar String[].class`), or a
+// name and `=` (`foo bar x = 1`, Groovy's `foo.bar(x = 1)`); in a value
+// any name (`def r = a b c` is Groovy's `a(b).c`, and the rest would be no
+// member of a class body). After `var`, `yield`, `record`, `trait` or
+// `sealed` (`declaring`) any name does. So does a name before parentheses
+// that hold parameters or a parenthesis-free call (`call_arguments_follow`):
+// `foo bar baz(int a) { }` stays `foo` and a method, which Groovy reads as
+// `foo(bar).baz(…)`; inside the one parenthesis already read (`nested`)
+// that is not looked into. `in`, `as` and `instanceof` go on with the
+// argument as operators, unless a key (`foo bar as: 1`).
+static bool continuation_follows(
+    TSLexer *lexer,
+    bool statement,
+    bool declaring,
+    bool nested,
+    bool no_close_ahead
+) {
+    bool capitalized = is_capital(lexer->lookahead);
+    char word[sizeof "instanceof"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "in") || word_is(word, len, "as")
+        || word_is(word, len, "instanceof")) {
+        return key_colon_follows(lexer, word, len);
     }
-    if (lexer->lookahead != '-') {
+    if (declaring || is_literal_word(word, len)) {
+        return true;
+    }
+    if (word_is(word, len, "new")) {
+        return key_colon_follows(lexer, word, len)
+            || creation_follows(lexer, no_close_ahead);
+    }
+    if (lexer->lookahead == '.' || lexer->lookahead == '[') {
+        return array_value_follows(lexer, word, len, capitalized,
+                                   no_close_ahead)
+            || !statement;
+    }
+    if (key_colon_follows(lexer, word, len)) {
+        return true;
+    }
+    if (lexer->lookahead == '=') {
+        advance(lexer);
+        return lexer->lookahead != '=' && lexer->lookahead != '~';
+    }
+    if (lexer->lookahead == '(' && !nested) {
+        return !call_arguments_follow(lexer, no_close_ahead);
+    }
+    return !statement;
+}
+
+// At the end of closure parameters, past a line break or a comment: whether
+// `->` follows after Groovy's trivia (whitespace, line breaks and comments),
+// as Groovy allows them before it. The trivia is read once per call; no
+// statement can start inside it, so no restart reads it again.
+static bool arrow_follows(TSLexer *lexer, bool no_close_ahead) {
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        || lexer->lookahead != '-') {
         return false;
     }
-    lexer->advance(lexer, false);
+    advance(lexer);
     return lexer->lookahead == '>';
+}
+
+// Reads a string that closes on its line, from its quote. Returns false at
+// a line break or the end of input before the close.
+static bool skip_quoted(TSLexer *lexer) {
+    int32_t quote = lexer->lookahead;
+    advance(lexer);
+    while (lexer->lookahead != quote) {
+        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+            return false;
+        }
+        if (lexer->lookahead == '\\') {
+            advance(lexer);
+            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                return false;
+            }
+        }
+        advance(lexer);
+    }
+    advance(lexer);
+    return true;
+}
+
+// Reads a block comment from its `*`, the `/` before it consumed, to its
+// close. Returns false at the end of input, where it does not close.
+static bool skip_comment_body(TSLexer *lexer) {
+    advance(lexer);
+    for (;;) {
+        if (lexer->eof(lexer)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        advance(lexer);
+        if (c == '*' && lexer->lookahead == '/') {
+            advance(lexer);
+            return true;
+        }
+    }
 }
 
 // After the `,` of `foo a,` in a statement: whether `->` ends the list,
 // which makes it a closure's parameters, the first of type `foo`
-// (`{ foo a, b -> }`, `{ foo a, final b -> }`). Each element is read as
-// names, member accesses and the punctuation of a type; a line break may
-// follow a comma or come before the `->`. Anything else, which only an
-// argument has, stops the look-ahead, so that the list is read once.
+// (`{ foo a, b -> }`, `{ foo a, @A b = 1 -> }`). The elements are read as
+// Groovy's tokens, bracket depth counted, so that a default value may hold
+// anything; comments are trivia. A line break ends the list unless a comma,
+// a modifier, an operator or an open bracket comes before it, or `->` after
+// it: a call's last argument ends at it (`foo a, b` then the next
+// statement). `;`, a closing bracket with none open and the end of the
+// budget end the look-ahead with no `->`.
 static bool parameters_follow(TSLexer *lexer, bool no_close_ahead) {
-    for (;;) {
-        lexer->advance(lexer, false);
-        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+    unsigned depth = 0;
+    bool continued = true;
+    for (unsigned items = 0; items < NAME_ARGUMENT_LOOKAHEAD_ITEMS; items++) {
+        if (!skip_same_line_space(lexer, false) || lexer->eof(lexer)) {
             return false;
         }
-        for (;;) {
-            int32_t c = lexer->lookahead;
-            if (is_identifier_start(c)) {
-                read_word(lexer, NULL, 0);
-            } else if (c == '.' || c == '[' || c == ']' || c == '<'
-                       || c == '>' || c == '?' || c == '&') {
-                lexer->advance(lexer, false);
-            } else {
-                break;
+        int32_t c = lexer->lookahead;
+        if (is_line_break(c)) {
+            if (depth == 0 && !continued) {
+                return arrow_follows(lexer, no_close_ahead);
             }
-            if (!skip_same_line_space(lexer, false)) {
+            advance(lexer);
+            continue;
+        }
+        if (c == '/') {
+            advance(lexer);
+            if (lexer->lookahead == '/') {
+                while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
+                    advance(lexer);
+                }
+                continue;
+            }
+            if (lexer->lookahead == '*') {
+                if (no_close_ahead || !skip_comment_body(lexer)) {
+                    return false;
+                }
+                continue;
+            }
+            continued = true;
+            continue;
+        }
+        if (c == '-') {
+            advance(lexer);
+            if (lexer->lookahead == '>' && depth == 0) {
+                return true;
+            }
+            continued = true;
+            continue;
+        }
+        if (c == '\'' || c == '"') {
+            if (!skip_quoted(lexer)) {
                 return false;
             }
+            continued = false;
+            continue;
         }
-        if (lexer->lookahead != ',') {
-            return arrow_follows(lexer);
+        if (is_identifier_char(c)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            continued = is_modifier_word(word, len) || word_is(word, len, "def");
+            continue;
         }
+        if (c == '(' || c == '[' || c == '{') {
+            depth++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (depth == 0) {
+                return false;
+            }
+            depth--;
+        } else if (c == ';' && depth == 0) {
+            return false;
+        }
+        advance(lexer);
+        continued = c != ')' && c != ']' && c != '}';
     }
+    return false;
 }
 
 // After a name argument and the spaces after it, which `key_colon_follows`
 // has skipped: whether the name is all of the first argument's start, which
-// it is unless what follows makes the input something else:
+// it is unless what follows, past comments (`skip_argument_trivia`), makes
+// the input something else:
 //   - `=` in a statement: `foo bar = 1` declares `bar`, by Apache's rule
 //     (`==` and `=~` are operators of the argument);
-//   - `->`, or a list of names that ends in `->`, in a statement: closure
-//     parameters, the first of type `foo`;
-//   - the first argument of a call as the grammar takes it after a name
-//     (`first_argument_follows` without names: a literal, a key, a creation
-//     or an array type value), or a name and `=`: in Groovy the name
-//     before it is a further call in the chain (`foo bar 1` is
-//     `foo(bar).1`, `foo bar baz: 1` is `foo.bar(baz: 1)`,
-//     `foo bar new Baz()` is `foo.bar(new Baz())`, `foo bar x = y` is
-//     `foo.bar(x = y)`, §5.5 item 4), left as before: `foo` and the call
-//     or declaration after it;
+//   - `->`, or a list that ends in `->`, in a statement, also on a later
+//     line: closure parameters, the first of type `foo`;
+//   - a literal, or a name that `continuation_follows` takes: in Groovy a
+//     further call in the chain, left as before (§5.5 item 4);
 //   - `(` with a parenthesis-free call or typed parameters in it: in
 //     Groovy `foo bar(baz 1)` is `foo.bar(baz(1))`, and Groovy rejects
 //     `foo bar(int a) { }`, which stays a method here. Inside the one
 //     parenthesis the look-ahead reads (`nested`), the call is taken as it
 //     is, so that no part of the input is read more than a bounded number
 //     of times.
+// `declaring` is set when the name argument is `var`, `yield`, `record`,
+// `trait` or `sealed` (`is_declaring_word`).
 static bool name_argument_rest(
     TSLexer *lexer,
     bool statement,
     bool nested,
+    bool declaring,
     bool no_close_ahead
 ) {
+    if (!skip_argument_trivia(lexer, no_close_ahead)) {
+        return true;
+    }
     int32_t c = lexer->lookahead;
     if (c == '(') {
         return nested || call_arguments_follow(lexer, no_close_ahead);
     }
-    if (is_literal_start(c) || is_identifier_start(c)) {
-        if (first_argument_follows(lexer, false, false, false,
-                                   no_close_ahead)) {
-            return false;
-        }
-        // After a name the spaces are skipped; a `=` here follows it.
-        if (!is_identifier_start(c) || lexer->lookahead != '=') {
-            return true;
-        }
-        lexer->advance(lexer, false);
-        return lexer->lookahead == '=' || lexer->lookahead == '~';
+    if (is_literal_start(c)) {
+        return false;
+    }
+    if (is_identifier_start(c)) {
+        return !continuation_follows(lexer, statement, declaring, nested,
+                                     no_close_ahead);
     }
     if (c == '-') {
-        lexer->advance(lexer, false);
+        advance(lexer);
         return lexer->lookahead != '>';
     }
-    if (statement && c == ',') {
+    if (!statement) {
+        return true;
+    }
+    if (c == ',') {
         return !parameters_follow(lexer, no_close_ahead);
     }
-    if (statement && (c == '\n' || c == '\r')) {
-        return !arrow_follows(lexer);
-    }
-    if (statement && c == '=') {
-        lexer->advance(lexer, false);
+    if (c == '=') {
+        advance(lexer);
         return lexer->lookahead == '=' || lexer->lookahead == '~';
+    }
+    if (is_line_break(c)) {
+        return !arrow_follows(lexer, no_close_ahead);
     }
     return true;
 }
@@ -741,6 +968,7 @@ static bool first_argument_follows(
         if (names) {
             return name_may_be_argument(argument, argument_len, next)
                 && name_argument_rest(lexer, statement, !parenthesized,
+                                      is_declaring_word(argument, argument_len),
                                       no_close_ahead);
         }
         if (lexer->lookahead != '[') {
@@ -771,7 +999,7 @@ static bool parenthesized_command_follows(
         || !is_identifier_start(lexer->lookahead)) {
         return false;
     }
-    bool capitalized = is_capital(lexer->lookahead);
+    bool upper = is_upper_letter(lexer->lookahead);
     char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
     if (is_value_keyword(word, len, lexer->lookahead)) {
@@ -785,59 +1013,29 @@ static bool parenthesized_command_follows(
         return false;
     }
     bool names = accesses ? path_takes_names(last_name, ends_in_new)
-        : !may_name_type(word, len, capitalized);
+        : !may_name_type(word, len, upper);
     return first_argument_follows(lexer, false, names, false, no_close_ahead);
 }
 
-// After a name argument, at the `(` that follows it (`foo bar(x)`):
-// whether the parentheses hold the arguments of a call of that name, which
-// is then all of the first argument, as in Groovy (`foo(bar(x))`). They do
-// not when they hold a parenthesis-free call (`foo bar(baz 1)`, Groovy's
-// `foo.bar(baz(1))`) or typed parameters (`foo bar(int a) { }`, a method
-// declaration here, which Groovy rejects): a type, as `may_name_type` reads
-// it, with type arguments and dimensions on the line, then a name; or an
-// annotation, `final` or `def` first. Only the start of the parenthesis is
-// read.
-static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
-    lexer->advance(lexer, false);
-    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
-        || lexer->lookahead == '@') {
-        return false;
-    }
-    if (!is_identifier_start(lexer->lookahead)) {
-        return true;
-    }
-    bool capitalized = is_capital(lexer->lookahead);
-    char word[sizeof "synchronized"];
-    unsigned len = read_word(lexer, word, sizeof word);
-    if (word_is(word, len, "final") || word_is(word, len, "def")) {
-        return false;
-    }
-    if (is_value_keyword(word, len, lexer->lookahead)) {
-        return true;
-    }
-    bool accesses = is_member_access_start(lexer->lookahead);
-    int32_t last_name = 0;
-    bool nested = false;
-    bool ends_in_new = false;
-    if (!read_member_accesses(lexer, &last_name, &nested, &ends_in_new)) {
-        return true;
-    }
-    if (accesses ? path_takes_names(last_name, ends_in_new)
-                 : !may_name_type(word, len, capitalized)) {
-        return !first_argument_follows(lexer, false, true, false,
-                                       no_close_ahead);
-    }
-    // Type arguments and dimensions, bounded by the line, then a name.
+// After a type in parentheses, which `may_name_type` or a dotted name with
+// an upper-case last name starts: whether its type arguments, dimensions
+// and varargs dots, then a name, follow, which makes the parentheses a
+// parameter list. Groovy's trivia may come between, line breaks included,
+// as inside parentheses. Counts the items it reads in `items`.
+static bool parameter_name_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool no_close_ahead
+) {
     unsigned depth = 0;
-    for (;;) {
-        if (!skip_same_line_space(lexer, false)) {
-            return true;
+    for (; *items < NAME_ARGUMENT_LOOKAHEAD_ITEMS; (*items)++) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
         }
         int32_t c = lexer->lookahead;
         if (is_identifier_start(c)) {
             if (depth == 0) {
-                return false;
+                return true;
             }
             read_word(lexer, NULL, 0);
             continue;
@@ -848,10 +1046,82 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
             depth--;
         } else if (c != '[' && c != ']' && c != '?' && c != '.'
                    && (depth == 0 || (c != ',' && c != '&'))) {
+            return false;
+        }
+        advance(lexer);
+    }
+    return false;
+}
+
+// After a name argument, at the `(` that follows it (`foo bar(x)`):
+// whether the parentheses hold the arguments of a call of that name, which
+// is then all of the first argument, as in Groovy (`foo(bar(x))`). They do
+// not when they hold a parenthesis-free call (`foo bar(baz 1)`, Groovy's
+// `foo.bar(baz(1))`, also `bar(println` then `List)` on the next line, as
+// Groovy's lexer drops line breaks there) or parameters
+// (`foo bar(int a) { }`, `foo bar(a, String... b) { }`, a method
+// declaration here, which Groovy rejects): an element that is a type, as
+// `may_name_type` reads it, followed by a name, or that starts with an
+// annotation, `final` or `def`. The elements are read up to the first one
+// that is neither a parameter nor a lone name, within the budget of
+// `NAME_ARGUMENT_LOOKAHEAD_ITEMS`; at its end they are arguments.
+static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
+    unsigned items = 0;
+    for (bool first = true; items < NAME_ARGUMENT_LOOKAHEAD_ITEMS;
+         first = false, items++) {
+        advance(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+            || lexer->lookahead == '@') {
+            return false;
+        }
+        if (!is_identifier_start(lexer->lookahead)) {
             return true;
         }
-        lexer->advance(lexer, false);
+        bool upper = is_upper_letter(lexer->lookahead);
+        char word[sizeof "synchronized"];
+        unsigned len = read_word(lexer, word, sizeof word);
+        if (word_is(word, len, "final") || word_is(word, len, "def")) {
+            return false;
+        }
+        if (is_value_keyword(word, len, lexer->lookahead)) {
+            return true;
+        }
+        bool accesses = is_member_access_start(lexer->lookahead);
+        int32_t last_name = 0;
+        bool nested = false;
+        bool ends_in_new = false;
+        bool read = read_member_accesses(lexer, &last_name, &nested,
+                                         &ends_in_new);
+        // `String... a`: the accesses stop at the second dot.
+        bool varargs = !read && lexer->lookahead == '.';
+        if (!read && !varargs) {
+            return true;
+        }
+        bool type = accesses && last_name != 0
+            ? !path_takes_names(last_name, ends_in_new)
+            : may_name_type(word, len, upper);
+        if (type) {
+            return !parameter_name_follows(lexer, &items, no_close_ahead);
+        }
+        if (varargs) {
+            return true;
+        }
+        if (first && first_argument_follows(lexer, false, true, false,
+                                            no_close_ahead)) {
+            return false;
+        }
+        if (!skip_same_line_space(lexer, false)) {
+            return true;
+        }
+        if (is_line_break(lexer->lookahead)) {
+            return !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+                || !is_identifier_start(lexer->lookahead);
+        }
+        if (lexer->lookahead != ',') {
+            return true;
+        }
     }
+    return true;
 }
 
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
@@ -890,6 +1160,7 @@ static bool scan_value_start(
         return true;
     }
     bool capitalized = is_capital(lexer->lookahead);
+    bool upper = is_upper_letter(lexer->lookahead);
     char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
     if (is_value_keyword(word, len, lexer->lookahead)) {
@@ -915,28 +1186,12 @@ static bool scan_value_start(
         return true;
     }
     bool names = accesses ? path_takes_names(last_name, ends_in_new)
-        : !may_name_type(word, len, capitalized);
+        : !may_name_type(word, len, upper);
     if (!first_argument_follows(lexer, true, names, false, no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
     return true;
-}
-
-static inline void advance(TSLexer *lexer) {
-    lexer->advance(lexer, false);
-}
-
-static inline bool is_whitespace(int32_t c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
-
-static inline bool is_inline_space(int32_t c) {
-    return c == ' ' || c == '\t';
-}
-
-static inline bool is_line_break(int32_t c) {
-    return c == '\n' || c == '\r';
 }
 
 // Whether the string that starts here is the name of a method declared
@@ -1645,7 +1900,8 @@ static bool statement_argument_follows(
     }
     return !key_colon_follows(lexer, word, len)
         && name_may_be_argument(word, len, next)
-        && name_argument_rest(lexer, true, false, no_close_ahead);
+        && name_argument_rest(lexer, true, false, is_declaring_word(word, len),
+                              no_close_ahead);
 }
 
 // SPECIFICATION.md §6.14 — decides at the first name of a statement,
@@ -1677,6 +1933,7 @@ static bool scan_statement_start(
 ) {
     lexer->mark_end(lexer);
     bool capitalized = is_capital(lexer->lookahead);
+    bool upper = is_upper_letter(lexer->lookahead);
     char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
     if (word_is(word, len, "record") && valid_symbols[RECORD_KEYWORD]) {
@@ -1735,7 +1992,7 @@ static bool scan_statement_start(
     // no name either: whether that token is valid depends on the token
     // before it (`in` and `as` follow an expression), which an incremental
     // reparse need not restore, so the reading would too.
-    bool names = !may_name_type(word, len, capitalized)
+    bool names = !may_name_type(word, len, upper)
         && !is_contextual_word(word, len);
     if (!statement_argument_follows(lexer, names, no_close_ahead)) {
         return false;
