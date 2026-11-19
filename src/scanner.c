@@ -2376,103 +2376,306 @@ static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
     return arrow_follows(lexer, no_close_ahead) && named;
 }
 
+// Reads a string from its quote: one that closes on its line, where a `\`
+// before the line break continues it, as in Groovy, or a triple-quoted one,
+// which may span lines. Returns false at the end of input, or at a line
+// break, before the close.
+static bool skip_string(TSLexer *lexer) {
+    int32_t quote = lexer->lookahead;
+    advance(lexer);
+    bool triple = false;
+    if (lexer->lookahead == quote) {
+        advance(lexer);
+        if (lexer->lookahead != quote) {
+            return true;
+        }
+        advance(lexer);
+        triple = true;
+    }
+    unsigned closing = 0;
+    for (;;) {
+        if (lexer->eof(lexer) || (!triple && is_line_break(lexer->lookahead))) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        advance(lexer);
+        if (c == '\\') {
+            if (lexer->lookahead == '\r') {
+                advance(lexer);
+            }
+            if (lexer->eof(lexer)) {
+                return false;
+            }
+            advance(lexer);
+            closing = 0;
+        } else if (c != quote) {
+            closing = 0;
+        } else if (!triple || ++closing == 3) {
+            return true;
+        }
+    }
+}
+
 // SPECIFICATION.md §6.18 — at a `(` that starts a line after an expression,
 // where a statement may start: whether the parentheses can open that
 // statement, which Groovy reads there as its lexer ends the one before at
-// the line break. They cannot when they are empty, when an element is a
-// spread (`*a`) or a named argument (`a: 1`), when a `,` follows them, or
-// when they hold a `,` with no bracket open, unless they hold only names
-// and `=` follows them (`(a, b) = l`, a multi-assignment) or the first
-// element is a parenthesis-free call (`(foo 1, 2)`: a name that is no value
-// keyword, any member accesses, and on its line a name other than `in`, `as`
-// and `instanceof`, a number or a string). Groovy rejects such a line; Java,
+// the line break. They cannot, and stay the arguments of a call of that
+// expression as they were before, when they are empty, when an element is
+// a spread (`*a`) or a named argument (a key of any kind and `:`), when a
+// `,` or `else` follows them, or when they hold a `,` with no bracket or
+// type arguments open, unless they hold only names and `=` follows them
+// (`(a, b) = l`, a multi-assignment) or the first element is a
+// parenthesis-free call (`(foo 1, 2)`: a name that is no value keyword,
+// any member accesses, and on its line a name other than `in`, `as` and
+// `instanceof`, a number or a string). Groovy rejects such a line; Java,
 // which much Groovy code is written like, reads a call (`foo` followed by
-// `(a, b);`), and so does the grammar, as before. When `->` follows them,
-// Groovy appends the lambda to the expression (`pathElement`'s
-// `nls closureOrLambdaExpression`), and they are the arguments here as
-// before. The elements are read as Groovy's tokens within the budget of
-// the lambda look-ahead. At its end, and at a `/` or a dollar-slashy string
-// that opens an element, whose end the look-ahead does not look for, the
-// parentheses open the statement. The token is the `(` alone.
+// `(a, b);`). Before `->` Groovy appends the lambda to the expression
+// (`pathElement`'s `nls closureOrLambdaExpression`), so they stay the
+// arguments there too. A `<` right after a capitalized name opens type
+// arguments (`(data as Map<String, Object>)`, `(Map<K, V>) m`), whose
+// commas are no element's; at anything type arguments do not hold, the
+// `<` was an operator after all, and the commas count.
+//
+// The elements are read as Groovy's tokens within the budget of the lambda
+// look-ahead. Where the reading cannot go on (the end of the budget or the
+// input, a string or a comment that does not close, a `/` or a
+// dollar-slashy string that opens an element, a bracket that does not
+// match), the parentheses are judged by what was read as if they closed
+// there: a statement unless a `,` came, and then a call's arguments unless
+// the first element is a parenthesis-free call. That is the reading the
+// rest would most often confirm, and it keeps an unfinished line, as while
+// typing `(a, b`, read the way it is once closed. The token is the `(`.
 static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
     advance(lexer);
     lexer->mark_end(lexer);
     unsigned items = 0;
+    // Every element so far is one name; a `,` with nothing open came; the
+    // first element is a parenthesis-free call.
     bool names = true;
     bool comma = false;
     bool command = false;
+    bool known = true;
     for (;;) {
-        if (!spend_lambda_item(&items)
-            || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
-            return true;
-        }
-        if (lexer->lookahead == ')') {
-            if (!comma) {
+        unsigned depth = 0;
+        unsigned angles = 0;
+        bool angle_comma = false;
+        unsigned questions = 0;
+        unsigned tokens = 0;
+        bool one_name = false;
+        // The first element may be a call's receiver: a name, then member
+        // accesses written without spaces. `access` is set while an access
+        // waits for its name.
+        bool receiver = !comma;
+        bool access = false;
+        int32_t end = 0;
+        while (end == 0) {
+            bool slash = false;
+            if (!spend_lambda_item(&items)
+                || !skip_header_trivia(lexer, true, no_close_ahead, NULL,
+                                       tokens > 0 ? &slash : NULL)
+                || lexer->eof(lexer)) {
+                known = false;
+                break;
+            }
+            int32_t c = lexer->lookahead;
+            if (angles > 0
+                && (slash || !(is_identifier_start(c) || c == '.' || c == ','
+                               || c == '?' || c == '&' || c == '['
+                               || c == ']' || c == '<' || c == '>'))) {
+                angles = 0;
+                if (angle_comma) {
+                    comma = true;
+                    names = false;
+                    if (!command) {
+                        return false;
+                    }
+                }
+            }
+            if ((c == ')' || c == ',') && depth == 0 && angles == 0) {
+                end = c;
+                if (c == ',') {
+                    advance(lexer);
+                }
+                break;
+            }
+            bool first = tokens == 0;
+            tokens++;
+            if (!first) {
+                one_name = false;
+            }
+            bool was_access = access;
+            access = false;
+            if (slash) {
+                receiver = false;
+                continue;
+            }
+            if (c == ',') {
+                advance(lexer);
+                if (angles > 0) {
+                    angle_comma = true;
+                }
+                continue;
+            }
+            if (c == '(' || c == '[' || c == '{') {
+                advance(lexer);
+                receiver = false;
+                depth++;
+                continue;
+            }
+            if (c == ')' || c == ']' || c == '}') {
+                if (depth == 0) {
+                    known = false;
+                    break;
+                }
+                advance(lexer);
+                depth--;
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                if (!skip_string(lexer)) {
+                    known = false;
+                    break;
+                }
+                receiver = false;
+                continue;
+            }
+            if (c == '*' && first) {
                 return false;
             }
-            names = false;
-            break;
-        }
-        if (lexer->lookahead == '*') {
-            return false;
-        }
-        if (is_identifier_start(lexer->lookahead)) {
+            if (c == '.' || c == '?' || c == '*') {
+                advance(lexer);
+                bool dot = c == '.';
+                if (c == '.') {
+                    if (lexer->lookahead == '&' || lexer->lookahead == '@') {
+                        advance(lexer);
+                    }
+                } else if (c == '?') {
+                    if (lexer->lookahead == '?') {
+                        advance(lexer);
+                    }
+                    dot = lexer->lookahead == '.';
+                    if (dot) {
+                        advance(lexer);
+                    } else if (lexer->lookahead == ':') {
+                        advance(lexer);
+                    } else if (lexer->lookahead == '[') {
+                        advance(lexer);
+                        depth++;
+                    } else if (depth == 0 && angles == 0) {
+                        questions++;
+                    }
+                } else {
+                    dot = lexer->lookahead == '.';
+                    if (dot) {
+                        advance(lexer);
+                    }
+                }
+                access = dot && receiver && was_access
+                    && is_identifier_start(lexer->lookahead);
+                receiver = access;
+                continue;
+            }
+            if (c == ':') {
+                advance(lexer);
+                receiver = false;
+                if (lexer->lookahead == ':') {
+                    advance(lexer);
+                } else if (depth == 0 && angles == 0 && !command) {
+                    if (questions == 0) {
+                        return false;
+                    }
+                    questions--;
+                }
+                continue;
+            }
+            if (c == '>') {
+                advance(lexer);
+                receiver = false;
+                if (angles > 0 && --angles == 0) {
+                    angle_comma = false;
+                }
+                continue;
+            }
+            if (!is_identifier_char(c)) {
+                advance(lexer);
+                receiver = false;
+                continue;
+            }
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
             if (word_is(word, len, "$") && lexer->lookahead == '/') {
-                return true;
+                known = false;
+                break;
             }
-            bool receiver = !comma
-                && !is_value_keyword(word, len, lexer->lookahead);
-            bool bare = !is_member_access_start(lexer->lookahead);
-            if (!bare) {
-                names = false;
-                int32_t last_name = word[0];
-                bool nested = false;
-                bool ends_in_new = false;
-                receiver = receiver
-                    && read_member_accesses(lexer, &last_name, &nested,
-                                            &ends_in_new);
+            bool name = is_identifier_start(c);
+            if (first) {
+                one_name = name;
+            }
+            if (lexer->lookahead == '<' && (angles > 0 || is_capital(c))) {
+                advance(lexer);
+                angles++;
+                receiver = false;
+                continue;
+            }
+            receiver = receiver && name && (first || was_access)
+                && !(first && is_value_keyword(word, len, lexer->lookahead));
+            if (!receiver) {
+                continue;
+            }
+            if (is_member_access_start(lexer->lookahead)) {
+                access = true;
+                continue;
+            }
+            receiver = false;
+            if (!is_inline_space(lexer->lookahead)
+                && lexer->lookahead != '\\') {
+                continue;
             }
             if (!skip_same_line_space(lexer, false)) {
-                return true;
+                known = false;
+                break;
             }
-            int32_t c = lexer->lookahead;
-            if (c == ':' && bare && !command) {
-                advance(lexer);
-                if (lexer->lookahead != ':') {
-                    return false;
-                }
-            } else if (receiver && is_identifier_start(c)) {
-                char next_word[sizeof "instanceof"];
-                unsigned next_len =
-                    read_word(lexer, next_word, sizeof next_word);
-                names = false;
-                command = !word_is(next_word, next_len, "in")
-                    && !word_is(next_word, next_len, "as")
-                    && !word_is(next_word, next_len, "instanceof");
-            } else if (receiver && is_literal_start(c)) {
+            int32_t next = lexer->lookahead;
+            if (is_identifier_start(next)) {
+                char argument[sizeof "instanceof"];
+                unsigned argument_len =
+                    read_word(lexer, argument, sizeof argument);
+                tokens++;
+                one_name = false;
+                command = !word_is(argument, argument_len, "in")
+                    && !word_is(argument, argument_len, "as")
+                    && !word_is(argument, argument_len, "instanceof");
+            } else if (is_literal_start(next)) {
                 command = true;
             }
         }
-        if (lexer->lookahead != ',' && lexer->lookahead != ')') {
-            names = false;
-            if (!skip_lambda_tokens(lexer, &items, true, no_close_ahead)) {
-                return true;
+        if (!known) {
+            if (angles > 0 && angle_comma) {
+                comma = true;
+                names = false;
             }
+            return !comma || command;
         }
-        if (lexer->lookahead == ')') {
+        if (!one_name) {
+            names = false;
+        }
+        if (end == ')') {
+            if (tokens == 0 && !comma) {
+                return false;
+            }
             break;
         }
         comma = true;
-        advance(lexer);
+        if (!names && !command) {
+            return false;
+        }
     }
     if (comma && !names && !command) {
         return false;
     }
     advance(lexer);
     if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
-        return true;
+        return !comma || command;
     }
     int32_t next = lexer->lookahead;
     if (next == ',') {
@@ -2481,6 +2684,11 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
     if (next == '-') {
         advance(lexer);
         if (lexer->lookahead == '>') {
+            return false;
+        }
+    } else if (is_identifier_start(next)) {
+        char word[sizeof "else"];
+        if (word_is(word, read_word(lexer, word, sizeof word), "else")) {
             return false;
         }
     }

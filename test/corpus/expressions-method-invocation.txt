@@ -215,6 +215,19 @@ x = y
 ($/a, b/$)
 x = y
 (a) - 1
+def d = load()
+(data as Map<String, Object>).each { it }
+foo()
+(Map<K, V>) m
+x = y
+("""a
+b""")
+x = y
+(a ? [k: 1] : b)
+foo()
+(Map<String[], Object>) m
+x = y
+(a) / 2
 
 ---
 
@@ -283,7 +296,128 @@ x = y
     (parenthesized_type_cast
       type: (type_identifier)
       value: (unary_expression
-        operand: (number_literal)))))
+        operand: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (cast_expression
+            value: (identifier)
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)
+                (type_identifier)))))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (type_identifier)))
+      value: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (string_literal
+        (string_fragment))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (ternary_expression
+        condition: (identifier)
+        consequence: (map_literal
+          (map_entry
+            key: (identifier)
+            value: (number_literal)))
+        alternative: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (array_type
+            (type_identifier))
+          (type_identifier)))
+      value: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (parenthesized_expression
+        (identifier))
+      right: (number_literal))))
+
+==================
+A long expression in parentheses on the next line opens a statement
+==================
+
+foo
+(bar(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, a100, a101, a102, a103, a104, a105, a106, a107, a108, a109, a110, a111, a112, a113, a114, a115, a116, a117, a118, a119, a120, a121, a122, a123, a124, a125, a126, a127, a128, a129))
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier) (identifier)
+          (identifier) (identifier) (identifier) (identifier)
+          (identifier))))))
 
 ==================
 A parenthesis on the line after an expression in a block, a closure or a method opens the next statement
@@ -494,6 +628,38 @@ foo
 (a.b, c) = l
 foo
 (a, b,) = l
+foo
+('k': 1)
+foo
+("$k": 1)
+foo
+(1: 2)
+foo
+((k): 1)
+foo
+(a, *b)
+foo
+(a, b) == l
+foo
+(a in b, c)
+foo
+(a ? b : c, d)
+foo
+(a, """x
+y""")
+foo
+(a, "x\
+y")
+foo
+(a, $/x/$)
+foo
+(A<b, c)
+foo
+("""x
+""", a)
+foo
+("x\
+y", a)
 
 ---
 
@@ -502,8 +668,7 @@ foo
     (method_invocation
       function: (identifier)
       arguments: (argument_list
-        (identifier)
-        (identifier))))
+        (identifier) (identifier))))
   (expression_statement
     (method_invocation
       function: (identifier)
@@ -559,9 +724,221 @@ foo
       left: (method_invocation
         function: (identifier)
         arguments: (argument_list
-          (identifier)
-          (identifier)))
-      right: (identifier))))
+          (identifier) (identifier)))
+      right: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (string_literal
+            (gstring_dollar_interpolation
+              value: (identifier)))
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (number_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (parenthesized_expression
+            (identifier))
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (binary_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier) (identifier)))
+      right: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (membership_expression
+          element: (identifier)
+          collection: (identifier))
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (ternary_expression
+          condition: (identifier)
+          consequence: (identifier)
+          alternative: (identifier))
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (identifier)
+          right: (identifier))
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (string_literal
+          (string_fragment))
+        (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (string_literal
+          (string_fragment))
+        (identifier)))))
+
+==================
+A long argument list on the next line stays the call's arguments, which Groovy rejects
+==================
+
+foo
+(a.b, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36, c37, c38, c39, c40, c41, c42, c43, c44, c45, c46, c47, c48, c49, c50, c51, c52, c53, c54, c55, c56, c57, c58, c59, c60, c61, c62, c63, c64, c65, c66, c67, c68, c69, c70, c71, c72, c73, c74, c75, c76, c77, c78, c79, c80, c81, c82, c83, c84, c85, c86, c87, c88, c89, c90, c91, c92, c93, c94, c95, c96, c97, c98, c99, c100, c101, c102, c103, c104, c105, c106, c107, c108, c109, c110, c111, c112, c113, c114, c115, c116, c117, c118, c119, c120, c121, c122, c123, c124, c125, c126, c127, c128, c129)
+foo
+(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27, d28, d29, d30, d31, d32, d33, d34, d35, d36, d37, d38, d39, d40, d41, d42, d43, d44, d45, d46, d47, d48, d49, d50, d51, d52, d53, d54, d55, d56, d57, d58, d59, d60, d61, d62, d63, d64, d65, d66, d67, d68, d69, d70, d71, d72, d73, d74, d75, d76, d77, d78, d79, d80, d81, d82, d83, d84, d85, d86, d87, d88, d89, d90, d91, d92, d93, d94, d95, d96, d97, d98, d99, d100, d101, d102, d103, d104, d105, d106, d107, d108, d109, d110, d111, d112, d113, d114, d115, d116, d117, d118, d119, d120, d121, d122, d123, d124, d125, d126, d127, d128, d129)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (field_access
+          object: (identifier)
+          field: (identifier))
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)
+        (identifier) (identifier) (identifier) (identifier) (identifier)))))
+
+==================
+An else after a call's arguments on the next line keeps the if, which Groovy rejects
+==================
+
+if (x) foo
+(1) else bar
+if (x) foo
+(1)
+else bar
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (number_literal))))
+    alternative: (expression_statement
+      (identifier)))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (number_literal))))
+    alternative: (expression_statement
+      (identifier))))
 
 ==================
 A parenthesis-free call in parentheses on the next line opens a statement
@@ -569,6 +946,8 @@ A parenthesis-free call in parentheses on the next line opens a statement
 
 foo
 (bar 1, 2)
+foo
+(obj.m 1, 2)
 foo
 (sh script: 'x', returnStdout: true).trim()
 
@@ -581,6 +960,16 @@ foo
     (parenthesized_expression
       (command_chain
         receiver: (identifier)
+        argument: (number_literal)
+        argument: (number_literal))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
         argument: (number_literal)
         argument: (number_literal))))
   (expression_statement
