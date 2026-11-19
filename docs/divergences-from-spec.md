@@ -1453,9 +1453,9 @@ continue it: a name, `!`, `~`, a literal, `new`. A statement tries
 `localVariableDeclaration` first unless
 `SemanticPredicates.isInvalidLocalVariableDeclaration` turns it down,
 which it does when the first name (for a dotted name, the last) is
-neither a primitive type nor a modifier, starts with no capital letter
-and is followed by neither `<` nor `[`, and no `=` follows the name
-after it. So `foo bar` is `foo(bar)`, while `Foo bar`, `int x`,
+neither a primitive type nor a modifier, starts with no upper-case
+letter (`Character.isUpperCase`) and is followed by neither `<` nor `[`,
+and no `=` follows the name after it, comments hidden. So `foo bar` is `foo(bar)`, while `Foo bar`, `int x`,
 `foo.Bar x` and `foo bar = 1` declare. The predicate is the same in
 Groovy 3, 4, 5 and 6; 6.0 adds a check for annotated loops only.
 
@@ -1465,7 +1465,10 @@ the receiver (spec §6.14), with no change to the grammar: after
 `_command_value_start` the first argument is any expression. A
 receiver that may name a type takes no name argument in a value either,
 and a few forms where Groovy reads something else are turned down
-(spec §5.5 items 3 and 4). STATE_COUNT, LARGE_STATE_COUNT and
+(spec §5.5 items 3 and 4). The look-ahead reads each list after the
+name (a closure's parameters, a parenthesis's elements) for at most 256
+items, so malformed input that restarts a statement at every element
+stays linear (spec §6.14). STATE_COUNT, LARGE_STATE_COUNT and
 `parser.c` are unchanged; files whose trees do not change parse with
 0.1% more instructions.
 
@@ -1481,24 +1484,36 @@ The Groovy column was observed by running Groovy 3.
 | `def r = foo bar`, `x = foo bar`, `def y = a.b c`, `(foo bar)`, `println(foo bar)`, `"${foo bar}"`, `if (foo bar) { }` | a call | `command_chain`; before, the value `foo` and the statement `bar`, or an `ERROR` |
 | `foo -1`, `foo [1]`, `foo *x`, `foo (1)`, `foo in xs`, `foo as T`, `foo instanceof T`, `foo ? a : b`, `foo++` | the operator goes on with `foo` | the same, as before |
 | `Foo bar`, `int x`, `void x`, `foo.Bar x` | a declaration with no value | two statements, as before (#6 above) |
-| `foo bar = 1`, `foo.bar baz = 1` | a declaration | the same, as before |
+| `Été x`, `Ωmega x`, `Жук x` | a declaration with no value | two statements, as before: a capital of Latin-1, Greek or Cyrillic counts as upper case; one of another script reads as lower case, and such a receiver takes a name argument |
+| `foo bar = 1`, `foo.bar baz = 1`, `myType x /* c */ = compute()`, `foo bar /* c` then `*/ = 1` | a declaration | the same, as before: comments after the name are trivia |
+| `foo a /* c */ b`, `println x // c` | `foo(a).b`; a call | the call `foo a`, the comment and `b`; the call and the comment |
+| `foo bar =~ x` | `foo(bar =~ x)` | the same; before, the declaration of `bar` with the value `~x` |
+| `foo bar` then `= 1` on the next line; `a.b.c x` then `y = 1` | `foo(bar = 1)`; `a.b.c(x)`, then an assignment | the same; before, a declaration across the line break |
 | `def x = Foo bar`, `(Foo bar)` | `Foo(bar)` | the value `Foo` and the statement `bar`, and an `ERROR`, as before: the receiver may name a type |
-| `in x`, `as x` where a statement starts | `in(x)`, `as(x)` | two statements, as before: `var`, `yield`, `in` and `as` take no name argument as receivers |
+| `in x`, `as x` where a statement starts | `in(x)`, `as(x)` | two statements, as before: `var`, `yield`, `in` and `as` take no name argument as receivers where a statement starts |
+| `def x = in y`, `(in y)` | `in(y)` | `command_chain`; before, the value `in` and `y`, and an `ERROR` |
+| `record x`, `trait x`, `sealed x` where a statement starts | `record(x)`, … | two statements, as before: the scanner decides each word's keyword there |
 | `foo bar` then `baz` on the next line, `foo /* c */ bar` | a call, then `baz`; a call | the call and `baz`; two statements and the comment, as before (spec §6.14) |
 | `if (x) foo bar else baz qux` | an `if` with an `else` | the same; before, the `if` and four statements |
 | `then: thrown IllegalStateException`, `{ foo bar }` | a call | `command_chain` |
 | `foo bar() { }`, `foo bar(a) { }`, `task copy(type: Copy) { }` | `foo(bar({ }))` | the same; before, a `method_declaration` with return type `foo`, or two statements for the last |
-| `foo bar(int a) { }`, `foo bar(String a, b) { }`, `foo bar(final a) { }` | rejected | a `method_declaration`, as before |
-| `{ foo a -> a }`, `{ foo a, b -> a }`, `{ foo a` then `-> a }` on the next line | closure parameters, the first of type `foo` | the same, as before |
-| `{ foo a, final` then `b -> a }` on the next line | closure parameters | `ERROR`: the look-ahead for `->` stays on the line after a word |
+| `foo bar(int a) { }`, `foo bar(String a, b) { }`, `foo bar(final a) { }`, `foo bar(a, int b) { }`, `foo bar(String... a) { }`, `foo bar(int` then `a) { }`, `foo bar(Map<K, List<V>> a, int b) { }` | rejected | a `method_declaration`, as before |
+| `foo bar(baz qux)` with no body | `foo.bar(baz(qux))` | `foo`, then the call `bar((baz qux))`; before, a `method_declaration` with no body |
+| `bar sh(println` then `List)` on the next line | `bar.sh(println(List))` | a `method_declaration` with no body, as before |
+| `{ foo a -> a }`, `{ foo a, b -> a }`, `{ foo a` then `-> a }` on the next line, `{ foo a, b = 1 -> a }`, `{ foo a, @A(x) b -> a }`, `{ foo a, b /* c */ -> a }`, `{ foo a, b // c` then `-> a }`, `{ foo a, final` then `b -> a }`, `{ foo a, Map<K, V> b -> a }` | closure parameters, the first of type `foo` | the same, as before |
+| `{ foo a, b0, b1, …, b127 -> a }`, 128 or more names after a lowercase-typed first parameter | closure parameters | `ERROR`: the look-ahead for `->` reads 256 items (a comma and a name are two), then answers that no parameters follow; 127 names parse |
+| `{ foo a, b = '->' }`, `{ foo a, b = { x -> x } }` | a call with two arguments | the same: strings are read whole, and an `->` inside brackets ends no list |
 | `foo a bar`, `a b c d`, `foo bar baz qux` | `foo(a).bar`, `a(b).c(d)`, `foo(bar).baz(qux)` | the calls `foo a` and the statement `bar`, the calls `a b` and `c d` (spec §5.5 item 4); before, one statement per name |
 | `foo bar 1`, `foo bar baz: 1`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
-| `foo bar x = 1` | `foo.bar(x = 1)` | `foo` and the declaration `bar x = 1`, as before (spec §5.5 item 4) |
+| `foo bar x = 1`, `foo bar baz(int a) { }`, `foo bar true` | `foo.bar(x = 1)`, `foo(bar).baz(…)`, `foo(bar).true` | `foo` and the declaration, the method or the call after it, as before (spec §5.5 item 4) |
+| `foo var x`, `foo var x, y`, `foo yield x`, `foo record x`, `obj.m var x` | `foo(var).x`, `foo.var(x, y)`, … | the receiver, then `var x` (`var x, y`, `yield x`, …), as before: after a name argument that starts declarations, any name leaves the input as it was |
+| `def x = foo bar baz`, `class C { def r = a b c }` | `foo(bar).baz`, a field `a(b).c` | `def x = foo` and the call `bar baz`; the field `r` and a field `c` of type `b`, as before: in a value a further name is a continuation |
+| `foo xs[0] 1`, `foo x.y 1` | `foo(xs[0]).1`, `foo(x.y).1` | the call `foo xs[0]` and `1`; `foo` and the call `x.y 1`, as before: the look-ahead does not read past a subscript |
 | `foo bar` then `(1)` or `-1` on the next line | a call, then the expression | one call with the argument `bar(1)` or `bar - 1` (§3); before, `foo` and `bar(1)` or `bar - 1` |
 | `foo bar` then `{ }` on the next line | `foo(bar({ }))` | the same; before, `foo` and the chain `bar { }` |
 | `return foo bar`, `throw foo bar`, `assert foo bar` | rejected | the statement with `foo`, then `bar`, as before |
 | `foo class`, `foo def`, `foo default` | rejected | the same as before |
-| `foo var`, `foo yield`, `foo record`, `foo super` | a call | `command_chain` |
+| `foo var`, `foo yield`, `foo record`, `foo super`, `foo pipeline { }` | a call | `command_chain`; before, two statements, and `foo` and a `pipeline_statement` for the last |
 | `obj.m $/x/$`, `def x = foo $/a/$` | a call | `command_chain`, as `$` starts a name to the scanner; before, the receiver and the string |
 | `this.new Inner()`, `x.new Inner()` | a creation | the access `x.new` and the call `Inner()`, as before (#23 above) |
 | `foo true + 1`, `foo 1 + 2` | `foo(true + 1)`, `foo(1 + 2)` | the call `foo true` (`foo 1`) and `+ 1` (`+ 2`), as before: a literal first argument of a statement is matched by the grammar's own form, which is no whole expression |
@@ -1507,11 +1522,11 @@ The `foo bar` then `(1)` row is the general reading of a line that
 starts with what continues an expression (#3 above), which a name
 argument now takes as well. The rows with "before" changed trees that
 had no `ERROR`; spec §6.14 lists the kinds and how each was checked.
-Of 235,000 fuzzed inputs, 106 that had no `ERROR` have one, and Groovy 3
-rejects all but ten: five where a line after a name argument continues
-it, two closure parameter lists with a line break after a modifier or a
-comment inside a parameter, and three with a contextual word as the name
-argument before more (spec §6.14).
+Of 235,000 fuzzed inputs, 101 that had no `ERROR` have one, and Groovy 3
+rejects all but 14: six where a `(` on the line after a name argument
+continues it, four where a method header with no return type follows a
+name argument on the next line, two with a generic type as the name
+argument and two of keywords Groovy reads as chains (spec §6.14).
 
 **Action**: the chain continuation (spec §5.5 item 4) would make the
 chain forms one call; measured, it grows the parse table by about 30%

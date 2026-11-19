@@ -708,24 +708,29 @@ The resolution we adopt:
    Groovy tells such a call from a declaration with
    `SemanticPredicates.isInvalidLocalVariableDeclaration`, the same from
    Groovy 3 to 6: a statement is tried as a declaration first when its
-   first name, or for a dotted name its last, starts with a capital
+   first name, or for a dotted name its last, starts with an upper-case
    letter, is a primitive type name or a modifier, or is followed by `<`
-   or `[`, or when `=` follows the name after it. The scanner applies
-   that rule before the receiver (§6.14), so `String s`, `int x`,
-   `foo.Bar x` and `foo bar = 1` are no calls, while `foo Bar`,
-   `foo.bar baz` and `foo bar == 1` are. A receiver that may name a type
+   or `[`, or when `=` follows the name after it, comments hidden. The
+   scanner applies that rule before the receiver (§6.14), so `String s`,
+   `int x`, `foo.Bar x`, `Été x`, `foo bar = 1` and
+   `myType x /* c */ = compute()` are no calls, while `foo Bar`,
+   `foo.bar baz` and `foo bar == 1` are. It tells upper case by
+   `A` to `Z` and the capitals of Latin-1, Greek and Cyrillic; a capital
+   of another script reads as lower case. A receiver that may name a type
    takes no name in a value either: `def x = Foo bar` is `def x = Foo`
    followed by `bar`, where Groovy calls `Foo(bar)`, so that
-   `Point(int x)` and `foo(String a)` hold no call. A name is no first
-   argument when the receiver is `var`, `yield`, `in` or `as` (§6.16); when
-   it is a keyword Groovy reserves (`if (c) foo else bar`), `in` or `as`,
-   which go on with the receiver as operators; when `->`, also on a
-   later line, or names and commas that end in `->` follow it, which
-   makes closure parameters, the first of type `foo` (`{ foo a, b -> }`);
-   and when it
-   names a method whose parentheses hold typed parameters
-   (`foo bar(int a) { }` stays a method, which Groovy rejects). With
-   untyped parameters or none it is a call (`foo bar(a) { }`,
+   `Point(int x)` and `foo(String a)` hold no call. Where a statement
+   starts, `var`, `yield`, `in` and `as` take no name argument as
+   receivers (`in x` is two statements, Groovy's `in(x)`, §6.16); in a
+   value they do (`def x = in y`, `(in y)`). A name is no first argument
+   when it is a keyword Groovy reserves (`if (c) foo else bar`), `in` or
+   `as`, which go on with the receiver as operators; when `->` follows
+   it, also on a later line or after comments, or a list that ends in
+   `->` (`{ foo a, @A b = 1 -> }`), which makes closure parameters, the
+   first of type `foo`; and when it names a method whose parentheses
+   hold parameters (`foo bar(int a) { }`, `foo bar(a, String... b) { }`
+   and `foo bar(int` then `a) { }` stay methods, which Groovy rejects).
+   With untyped parameters or none it is a call (`foo bar(a) { }`,
    `task copy(type: Copy) { }`), as in Groovy, which takes no lowercase
    return type. An operator after the receiver goes on with it, as
    below (item 5): `foo -1`, `foo [1]`, `foo *x`, `foo (1)`,
@@ -784,9 +789,18 @@ The resolution we adopt:
    `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))` and
    `foo(x.y).a` (observed with Groovy 3). So is a name and `=` after the
    name: `foo bar x = 1` is `foo` and the declaration `bar x = 1`, where
-   Groovy reads `foo.bar(x = 1)`. Taking the name would leave the rest a
-   statement that is often no statement (`foo bar 1, 2`,
-   `foo bar x = 1, y = 2`).
+   Groovy reads `foo.bar(x = 1)`; a name before parentheses that hold
+   parameters or a parenthesis-free call (`foo bar baz(int a) { }` is
+   `foo` and a method); a `bar sh(println` then `List)` on the next line
+   (`bar` and the method `sh`, Groovy's `bar.sh(println(List))`); and any
+   name after `var`, `yield`, `record`, `trait` or `sealed`, which start
+   declarations and statements (`foo var x, y` is `foo` and `var x, y`,
+   Groovy's `foo.var(x, y)`). In a value any name after the name argument
+   is such a continuation: `def x = foo bar baz` is `def x = foo` and the
+   call `bar baz`, and a field's `def r = a b c` stays a field `r` and a
+   field `c` of type `b` in a class body. Taking the name would leave the
+   rest a statement that is often no statement (`foo bar 1, 2`,
+   `foo bar x = 1, y = 2`), or no member of a class body.
 5. **Conflicts** with `binary_expression` (where `a - b` could be
    "call `a` with `-b`") are resolved by giving `binary_expression`
    higher precedence: a command chain *only* matches when the token
@@ -1745,31 +1759,47 @@ other than a call in parentheses, as COMMAND_VALUE_START reads them
 after the `(`.
 A receiver that takes a name argument: one name that is no primitive
 type name (boolean, byte, char, double, float, int, long, short), not
-`void` and does not start with `A` to `Z`; or a name with member
-accesses whose last name does not start with `A` to `Z` and is not
-`new` (`x.new Inner()` creates). This is Apache's
+`void` and does not start with an upper-case letter (`A` to `Z`, or a
+capital of Latin-1, Greek or Cyrillic); or a name with member accesses
+whose last name does not start with one and is not `new`
+(`x.new Inner()` creates). Where a statement starts, also not `var`,
+`yield`, `in` or `as`. This is Apache's
 isInvalidLocalVariableDeclaration on the spelling (a modifier is a
 keyword here, and `<` or `[` after the receiver starts no argument).
 A name argument: after spaces, tabs and line escapes, on the line:
   - `!` that is not `!=`, nor `!in` before whitespace or a bracket,
     nor `!instanceof` before whitespace; or `~`; or
   - a name that is no value keyword, not `in` and not `as`, then, after
-    any member accesses or a `[` directly after it, on the line none of:
-    a first argument as above other than a call in parentheses (a
-    literal, `true`, `false`, `null`, a key, a creation or an array
-    type value), or a name and `=` that is not `==` or `=~` (each
-    Groovy's chain continuation, §5.5 item 4); `(` that
-    holds, after Groovy's trivia, a call in parentheses' receiver and
-    first argument, `@`, `final`, `def`, or a receiver that may not take
-    a name argument followed, after type arguments and dimensions on
-    the line, by a name (typed parameters); `->`; and, in a statement
-    (COMMAND_PATH_START and COMMAND_STATEMENT_START), `=` that is not
-    `==` or `=~` (a declaration), a line break and, after whitespace,
-    `->`, or `,` followed by names, member accesses, type punctuation
-    and commas, a line break allowed after each comma and before the
-    `->`, that end in `->` (closure parameters).
-  Inside the parentheses that a call in parentheses or typed parameters
-  are read from, a `(` after the name is not read into.
+    any member accesses or a `[` directly after it, and after spaces,
+    block comments (which may span lines) and a line comment, none of:
+      - a literal, or a name that starts a chain continuation (§5.5
+        item 4): `true`, `false`, `null`, a key, a creation, an array
+        type value, a name and `=` that is not `==` or `=~`, a name
+        before `(` that holds parameters or a call in parentheses as
+        below; any name after `var`, `yield`, `record`, `trait` or
+        `sealed`; and in a value any name other than `in`, `as` and
+        `instanceof`;
+      - `(` that holds, after Groovy's trivia, a call in parentheses'
+        receiver and first argument, or a name followed after a line
+        break by another, or parameters: an element that starts with
+        `@`, `final` or `def`, or a receiver that may not take a name
+        argument followed, after type arguments, dimensions, varargs
+        dots and trivia, by a name; the elements are read up to the
+        first that is neither a parameter nor a lone name;
+      - `->`;
+      - and, in a statement (COMMAND_PATH_START and
+        COMMAND_STATEMENT_START), `=` that is not `==` or `=~` (a
+        declaration), or `->` after a line break and trivia, or `,` and
+        then Groovy's tokens up to `->` (closure parameters): with
+        brackets counted, strings and comments read whole, and a line
+        break ending the list unless a comma, a modifier, an operator or
+        an open bracket comes before it or `->` after it.
+  Each list is read for at most 256 items (a word, a number, a string, a
+  comment, a line break or a punctuation character); at the end of the
+  budget the answer is no parameters, and a list read to the budget
+  after a lowercase-typed first closure parameter is a call's arguments.
+  Inside the parentheses that a call in parentheses or parameters are
+  read from, a `(` after the name is not read into.
 A creation: the word `new`, then, after Groovy's trivia (whitespace,
 line breaks, line escapes and comments), a name. The key `new:` is
 not one.
@@ -1929,11 +1959,26 @@ A name as the first argument (§5.5 item 3) needs no change to the
 grammar: after each of the three tokens the grammar takes any
 expression as the first argument. The scanner emits them before more
 receivers, by Apache's rule on the spelling, read off the receiver, the
-name after it and what follows that name on its line. It reads at most
-one word past the name argument and one parenthesis deep, as above, and
-a list of names after a comma once, up to its first other token, so the
-look-ahead stays linear. `var`, `yield`, `in` and `as` take no name
-argument as receivers: whether their own tokens are valid depends on the
+name after it and what follows that name. After the name the look-ahead
+reads at most one more word, one parenthesis deep, as above, and two
+lists: the elements of a parenthesis after the name (typed parameters)
+and, after a comma in a statement, a closure's parameters up to `->`.
+Malformed input can restart a statement at each element of a long list
+(`{ bar a,` then `bar b,` and so on with no `->`), and each restart reads
+ahead from where it starts; without a bound that made the parse
+quadratic (a list of 4,000 such elements took 71 times the
+instructions it took before, four times more with each doubling, and
+229 KB took 4.3 s for 18 ms before). Each list is therefore
+read for at most 256 items, so each part of the input is read by at
+most that many restarts and the parse stays linear (the same list now
+takes a constant 7 times the instructions it took before, 0.1 s for the
+229 KB; `bindings/rust/tests/name_argument_cost.rs` compares the bytes
+the parser asks for at two sizes). Whitespace and comments before `->`
+are read once per call, and no statement can start inside them. A
+closure parameter list after a lowercase-typed first parameter that is
+longer than the budget is read as a call's arguments, an `ERROR`.
+`var`, `yield`, `in` and `as` take no name argument as receivers where a
+statement starts: whether their own tokens are valid depends on the
 token before them (`in` and `as` follow an expression), which an
 incremental reparse need not restore, so the reading would depend on it
 too. `def x = Foo bar`, `x.new Inner()` and `foo bar(int a) { }` are
@@ -1981,20 +2026,34 @@ where Groovy reads one (observed with Groovy 3):
 - A dollar-slashy string after a receiver (`obj.m $/x/$`,
   `def x = foo $/a/$`) is a first argument, as the scanner reads `$` as
   a name: before, the receiver and the string.
+- A name argument and an operator that started a declaration's value
+  before: `foo bar =~ x` was the declaration of `bar` with the value
+  `~x`, and is `foo(bar =~ x)`.
+- A name argument and a line that starts with `=` or a name and `=`:
+  `foo bar` then `= 1`, and `a.b.c x` then `y = 1`, were declarations
+  across the line break (`foo bar = 1`, `x y = 1`), and are
+  `foo(bar = 1)`, and `a.b.c(x)` then `y = 1`.
+- `pipeline` as a name argument: `foo pipeline { }` was `foo` and a
+  `pipeline_statement`, and is `foo(pipeline({ }))`.
 
 Every such change was checked mechanically on the cases a fuzzer found:
-of 18,331 trees without an `ERROR` that changed among 235,000 inputs,
+of 15,904 trees without an `ERROR` that changed among 235,000 inputs,
 putting a line break between each new call's receiver and its first
-argument gives the old tree for 17,356; 929 have a line escape or a
-comment there, which keep the call, and the other 46 have nothing
+argument gives the old tree for 15,048; 816 have a line escape or a
+comment there, which keep the call, and the other 40 have nothing
 between the two to break (`foo!x`, `foo~x`) or a dollar-slashy string.
-106 inputs went from no `ERROR` to one; Groovy 3 rejects all but ten:
-five in which a line after a name argument continues it (a `(`, or an
-`in` on a later line, above), two closure parameter lists with a line
-break after a modifier or a comment inside a parameter
-(`{ foo a, final` then `x -> }`), and three in which a contextual word
-is the name argument before more (`foo record x<T>() { }`,
-`task var` then `default \` and `var`).
+101 inputs went from no `ERROR` to one; Groovy 3 rejects all but 14:
+six in which a `(` on the line after a name argument continues it, as
+above (`println var` then `(int a) { }`), four in which a method header
+with no return type follows a name argument on the next line
+(`foo bar` then `x(Map<K, V> a, int b) { }`), two with a generic type
+as the name argument (`foo List<String> x(y` then `Z)`), and two made of
+keywords and names Groovy reads as chains (`task var` then
+`default \` and `var`).
+A generator of closure parameter lists after a lowercase-typed first
+parameter (with defaults, annotations, comments and line breaks; 5,673
+inputs) finds none that this grammar reads with fewer parameters than
+the grammar before.
 
 A string after a receiver whose last name is capitalized, followed by
 `(`, is the name of a method: Groovy declares `foo` in
@@ -2018,8 +2077,12 @@ after a name as division. Known differences from Groovy:
   the state of §6.6.
 - A name after a receiver that may name a type (`def x = Foo bar`,
   `(Foo bar)`), and after `var`, `yield`, `in` or `as` as receivers
-  (`in x`), is not taken; Groovy calls `Foo(bar)` and `in(x)`. Nor are
-  the chain forms of §5.5 item 4 (`foo a bar`, `foo bar 1`).
+  where a statement starts (`in x`), is not taken; Groovy calls
+  `Foo(bar)` and `in(x)`. Nor are the chain forms of §5.5 item 4
+  (`foo a bar`, `foo bar 1`). A comment between the receiver and the
+  name argument stops the look-ahead as above (`foo /* c */ bar` is two
+  statements and the comment); after the name argument comments are
+  trivia (`myType x /* c */ = 1` declares `x`).
 - `def x = foo .5`, Groovy's `foo(0.5)`, is an `ERROR`: `.5` is not a
   number in this grammar at all.
 - The first positional argument is an expression, and like every
@@ -2257,9 +2320,10 @@ Known residuals, each an `ERROR` as before:
 
 `println var` and `println yield` are calls, as `println x` is
 (§5.5 item 3); `println in` and `println as` are two statements, as the
-words go on with the receiver as operators. As a receiver, none of the
-four takes a name argument (§6.14): `in x` is two statements, where
-Groovy calls `in(x)`.
+words go on with the receiver as operators. As a receiver where a
+statement starts, none of the four takes a name argument (§6.14):
+`in x` is two statements, where Groovy calls `in(x)`. In a value they
+do: `def x = in y` and `(in y)` are calls, as in Groovy.
 
 Four kinds of tree change for input that parsed without an `ERROR`,
 found by fuzzing the grammar before against this one and checked
