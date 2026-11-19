@@ -56,7 +56,10 @@ The default branch is **`main`**.
   only where Apache's isInvalidLocalVariableDeclaration makes the
   statement no declaration (`foo bar`, not `String s`), a subscript `[`
   on the same line as the
-  expression before it (§6.9), the start of an array type that is a
+  expression before it (§6.9), a `(` that opens a line after an
+  expression where a statement may start and the parentheses can open
+  one, so that it opens that statement rather than a call's arguments
+  (§6.18), the start of an array type that is a
   value (`String[].class`), which needs `[]` after the name (§6.15),
   a `)` with something after it on its
   line, which ranks a cast (§6.11), the `!in` operator, which

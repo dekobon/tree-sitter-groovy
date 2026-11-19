@@ -994,14 +994,25 @@ scanner branches are avoided):
 - **Line escape**: a `\` directly before a line break (`\n` or `\r\n`)
   is whitespace, as in Apache's lexer (`WS : ([ \t]+ | LineEscape+)`).
   It is a second pattern in `extras`, and the scanner's same-line
-  tokens (§6.7–§6.9) skip it as they skip spaces and tabs, so the next
-  line continues the current one: `x \` followed by `[0]` is a
-  subscript, and `foo \` followed by `a: 1` is a named-argument call.
+  tokens (§6.7–§6.9, §6.18) skip it as they skip spaces and tabs, so
+  the next line continues the current one: `x \` followed by `[0]` is
+  a subscript, and `foo \` followed by `a: 1` is a named-argument call.
   A `\` anywhere else outside a string is an `ERROR`. Two cases differ
   from Apache. A `\` before a lone `\r` is an `ERROR` when more input
   follows the `\r`. At the very end of the file a `\`, alone or with a
   `\r` after it, is skipped with no `ERROR`, because the lexer has
   already taken it as the start of the pattern.
+- **A `(` that opens a line** after an expression opens the next
+  statement where one may start, as Apache's `arguments` takes no line
+  break before it: `foo` followed by `(1)` is two statements, and so is
+  `foo()` followed by `(a, b) = [1, 2]`. The scanner emits such a `(` as
+  a token of its own, which a call's arguments do not take (§6.18).
+  Inside parentheses and brackets, where no statement may start, the
+  `(` still calls, as Groovy's lexer drops line breaks there. Every
+  other token on the next line binds as it would on the line: a `{` is
+  a trailing closure, as in Groovy, and an operator continues the
+  expression, also `-`, `+`, `++`, `--`, `**` and `?[`, where Groovy
+  ends the statement (`docs/divergences-from-spec.md` §3).
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, ';'))`) and member list
   (`repeat(choice($._class_member, $.block, ';'))` in `class_body`
@@ -1251,8 +1262,9 @@ slashy opener, the three comment tokens, the contextual `record`
 (§6.8), the start of such a call that is a value, a statement
 with a dotted receiver or a statement whose first argument is a `new`
 or an array type (§6.14), the
-same-line subscript opener (§6.9), the start of an array type that is
-a value (§6.15), the `)` of a cast
+same-line subscript opener (§6.9), a `(` that opens a line after an
+expression where it may open a statement (§6.18), the start of an
+array type that is a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), the start of a lambda (§6.17),
 `STRING_BODY` (§6.10) and
@@ -1291,6 +1303,7 @@ enum TokenType {
   COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
   COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new` or an array type
   SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  STATEMENT_PAREN,        // §6.18 — `(` that opens a line after an expression and opens a statement
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
@@ -1593,19 +1606,19 @@ Known limitations:
   argument is a full expression, and expressions do not stop at a newline,
   so a next line that starts with something that can continue an expression
   joins the last argument, even a literal one. `foo 1, 2` followed by a
-  line reading `(a)` parses as the call `2(a)`. The same happens when the
-  next line starts with `{` (a trailing closure), `-` or `+` (a binary
+  line reading `-x` parses as the subtraction `2 - x`. The same happens
+  when the next line starts with `{` (a trailing closure), `+` (a binary
   operator), `++` or `--` (a postfix update: `foo 1, 2` followed by `++x`
   parses as `2++` and then `x`), `in`, `as` or `instanceof`. A next line
-  that starts with `[` is not affected: a `[` after a newline never
-  subscripts (§6.9), so `foo 1, 2` followed by `[a].each { }` is two
-  statements. A chain whose one argument is positional (`foo 'a'` then
-  `(a)`) is not affected either, because that argument is not a full
-  expression; in a value it is one, and joins (§6.14). The value of a
-  named argument is one, so it joins even as
-  the only argument: `foo a: 1` followed by `(b)` has the value `1(b)`.
-  Expressions outside command chains already behave this way:
-  `def x = 'b'` followed by `(a)` is a call on `'b'`.
+  that starts with `[` or `(` is not affected: a `[` after a newline never
+  subscripts (§6.9) and such a `(` opens the next statement (§6.18), so
+  `foo 1, 2` followed by `[a].each { }` or by `(a)` is two statements. A
+  chain whose one argument is positional (`foo 'a'` then `-a`) is not
+  affected either, because that argument is not a full expression; in a
+  value it is one, and joins (§6.14). The value of a named argument is
+  one, so it joins even as the only argument: `foo a: 1` followed by `-b`
+  has the value `1 - b`. Expressions outside command chains already
+  behave this way: `def x = 'b'` followed by `-a` is a subtraction.
 - A dangling comma takes the first token of the next statement. `foo a: 1,`
   followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
   chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The
@@ -1948,9 +1961,8 @@ of the input is read a bounded number of times. `println(bar(foo 1))`
 is therefore an `ERROR`, while `(bar(foo 1))` and `def x = bar(foo 1)`
 are calls, as the outer parenthesis there needs no look-ahead. A `(`
 on the line after the receiver is never a first argument, so
-`println` followed by `(foo 1)` on the next line is a call of
-`println` with the `ERROR` `foo 1` in its arguments, as before; Groovy
-reads two statements.
+`println` followed by `(foo 1)` on the next line is two statements, as
+in Groovy: that `(` opens the next one (§6.18).
 
 The look-ahead reads the first name inside the parentheses of each call
 that starts a statement or a value or follows a dotted receiver, where
@@ -2127,10 +2139,10 @@ where Groovy reads one (observed with Groovy 3):
   receiver as the value, then the argument as a statement.
 - The argument absorbs what continues it, as any first argument does:
   `foo bar { }`, also with the `{` on the next line, is
-  `foo(bar({ }))`, and `println x` followed by `(1..3).each { }` on the
-  next line passes `x(1..3).each { }` (Groovy ends the statement at the
-  line break); before, `foo` and the chain `bar { }`, or `println` and
-  `x(1..3).each { }`.
+  `foo(bar({ }))`; before, `foo` and the chain `bar { }`. `println x`
+  followed by `(1..3).each { }` on the next line passed
+  `x(1..3).each { }` as well, until a `(` that opens a line where a
+  statement may start opened that statement (§6.18), as in Groovy.
 - A script method with a lowercase return type and untyped parameters
   or none, with a body (`foo bar() { }`, `task build(a) { }`), was a
   `method_declaration` and is the call `foo(bar() { })`, as in Groovy.
@@ -2198,17 +2210,18 @@ after a name as division. Known differences from Groovy:
   number in this grammar at all.
 - The first positional argument is an expression, and like every
   expression it continues onto a next line that can continue it. A
-  next line that starts with `(` makes a call: `def x = foo 1` followed
-  by `(c)` passes `1(c)`, and `foo bar` followed by `(1)` passes
-  `bar(1)`. One that starts with `-`, `+`, `++` or `--`
+  next line that starts with `-`, `+`, `++` or `--`
   makes a binary or postfix expression: `x.y 1` followed by `-1`
   passes `1 - 1`, and `x.y 2` followed by `++i` passes `2++` and leaves
   `i`. Groovy ends the statement at the line break in each case
   (observed). That is the general reading of such a line
   (`docs/divergences-from-spec.md` §3), and an argument after a comma
   does the same in statement position (§6.8). Before, the receiver was
-  followed by the same expression as a statement of its own, `1(c)` or
-  `1 - 1`: only where that expression is attached changed.
+  followed by the same expression as a statement of its own, `1 - 1`:
+  only where that expression is attached changed. A next line that
+  starts with `(` opens the next statement (§6.18): `def x = foo 1`
+  followed by `(c)`, and `foo bar` followed by `(1)`, are two
+  statements, as in Groovy.
 - The receiver is read without spaces, comments or line breaks inside
   it, so `obj . m 1` and `obj` followed by `.m 1` on the next line are
   not calls; Groovy reads both as `obj.m(1)` (observed). Both read as
@@ -2607,6 +2620,151 @@ dropped: deciding `x ->` in the grammar (+3.6% states, a fifth more
 reductions on such calls), and deciding it by context to keep the
 closure readings (+8% states, as every expression state in a closure
 parameter's default and a case value got a copy of its own).
+
+### 6.18 STATEMENT_PAREN — implementation contract
+
+Apache's `pathElement` takes a call's `arguments` with no `nls` before
+them, unlike a closure (`nls closureOrLambdaExpression`) and the member
+accesses, and Groovy's lexer makes a line break a token outside `(…)`,
+`[…]` and `?[…]`. So a `(` that opens a line after an expression opens
+the next statement: `foo` followed by `(1)` is two statements, so is
+`foo()` followed by `(a, b) = [1, 2]`, and `println x` followed by
+`(1..3).each { }` is a call and a second statement (observed with
+Groovy 3, in a script, a method, a closure, a block, a `case` and a
+braceless `if`). Inside parentheses and brackets the `(` calls:
+`bar(foo` followed by `(1))`, `[foo` followed by `(1)]`. A line escape
+joins the lines (§5.10), and so does a block comment that spans the
+line break (`foo /* a` followed by `b */ (1)`), which Groovy's lexer
+drops with its line breaks. A newline is whitespace here, so the
+grammar alone took that `(` as the arguments of a call on either line.
+
+A call's arguments take only the in-grammar `(`. The rules that may
+open a statement with one, a parenthesized expression, a cast and a
+multi-assignment without `def` (`statementParen` in `grammar.js`), take
+STATEMENT_PAREN as well, which the scanner emits only where such a `(`
+opens the next statement.
+
+```text
+Emit STATEMENT_PAREN for a `(` when NOT_IN is valid (an expression ends
+here) and STATEMENT_PAREN is, and:
+  - a line break comes before the `(`: spaces, tabs and line escapes
+    are skipped, and a `(` on the line is turned down at once; and
+  - the parentheses can open a statement. They cannot when they are
+    empty (`()`), when an element is a spread (`*a`), when an element is
+    a named argument (a name and `:` that is not `::`, other than an
+    argument of the call below), when `,` or `->` follows them, or when
+    they hold a `,` with no bracket open, unless they hold only names
+    and `=` that is not `==` or `=~` follows them (`(a, b) = l`) or the
+    first element is a parenthesis-free call: a name that is no value
+    keyword (§6.14), its member accesses, and on its line a name other
+    than `in`, `as` and `instanceof`, a number or a string
+    (`(foo 1, 2)`, `(sh script: 'x', returnStdout: true)`). The
+    elements are read as Groovy's tokens, brackets counted, strings
+    that close on their line and comments read whole, within
+    LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256) items (§6.17); at the end of
+    the budget, and at a `/` or a dollar-slashy string that opens an
+    element, the parentheses can open a statement.
+The token is the `(` alone. On any other input return false; the
+in-grammar lexer then reads the `(` of a call's arguments. It is not
+emitted during error recovery.
+```
+
+STATEMENT_PAREN is valid after an expression exactly where a statement
+may start, as only rules that open a statement take it. Inside
+parentheses and brackets no statement may start, so the `(` on a later
+line is a call's arguments there, as in Groovy, and the scanner needs no
+stack of brackets for it. That also holds where Groovy keeps the line
+break but no statement may start here: the `(` continues the expression
+in a class body (`def x = foo` followed by `(1)`) and in a ternary's
+middle (`a ? foo` followed by `(1) : 2`), both of which Groovy rejects,
+and in an interpolation (`"${foo` followed by `(1)}"`), which Groovy
+reads as a closure of two statements, which an interpolation here does
+not hold (§5.5 item 1). The arguments of an enum constant, a creation
+and an annotation, a method's parameters and the `(` after `if`,
+`while`, `catch` and the like keep the in-grammar `(`, and may follow a
+line break as before; Groovy allows that for a creation and an
+annotation only.
+
+Groovy rejects a line whose parentheses cannot open a statement:
+`foo` followed by `(a, b);`, `(a: 1)` or `(x), y`. Java, which much
+Groovy code is written like, reads a call, and so did the grammar
+before. Read as statements, they turned 72 of 24,548 Java files without
+an `ERROR` into files with one (`return GetInstance.getInstance`
+followed by `(type, getSpiClass(type), algorithm).toArray();` on the
+next line, as the JDK wraps long calls); with the look-ahead none
+does. Before `->` Groovy
+appends the lambda to the expression (`pathElement`), which this
+grammar does not take (§5.16), so the parentheses stay the arguments
+there as well: `def c = {` then `x = y` then `(a) -> a` keeps the
+closure parameter `x = y(a)`, where Groovy reads `x = y((a) -> a)`.
+
+A comment is an extra, so after one the scanner is called past the line
+break it can no longer see: `foo` followed by `/* c */ (1)` on the next
+line is a call, where Groovy reads two statements, as for `[` (§6.9).
+
+Measured against the grammar before: STATE_COUNT and
+LARGE_STATE_COUNT unchanged (4516 and 1693), `parser.c` 8,853,428 to
+8,905,824 bytes, one external token, no conflict or precedence added.
+The parse has the same number of steps, steps with more than one stack
+version, shifts and reductions on the 264 real files and on 391 of 400
+Java files whose trees do not change, and on code made only of calls.
+Real Groovy and Gradle files take 0.2% more instructions, Java files
+0.3% to 0.4%, code
+made of calls, parentheses or names under 0.1%, code made of closures,
+conditions or class bodies 0.3%; code made of lines that start with `(`
+after an expression (`foo`, then `(a, b) = l`) takes 10% more, for
+trees that differ and the look-ahead. A token for the `(` of every
+call instead, with the line rule at the call, gave the same trees for
+valid input and was dropped: STATE_COUNT 4516 to 4552,
+LARGE_STATE_COUNT 1693 to 1721, 0.7% more instructions on real files
+and 3.8% more on code made only of calls, as an external token is a
+leaf of its own that the parser keeps on the heap, where the in-grammar
+`(` is stored inline.
+
+A closure in the parentheses holds statements, so a nest of `x` and
+`({ x` lines puts such a `(` on every line, and each reads the rest of
+the nest. The budget keeps that linear: 54 and 57 bytes asked for per
+input byte at 500 and 4,000 levels, 204 and 1,565 without it
+(`bindings/rust/tests/statement_paren_cost.rs`).
+
+An incremental reparse can differ from a parse from scratch, as in
+§6.16. Whether the `(` opens a statement decides whether the statement
+before it ends, and that node ends before the line break, so an edit
+inside the parentheses does not make the runtime parse it again. Every
+single edit of `bindings/rust/tests/incremental_reparse.rs`, a line
+break, a `,`, a parenthesis or an `=` inserted or a few bytes deleted
+anywhere in its texts, reparses as from scratch. Sequences of edits
+found by a fuzzer do not always: 88 of 96,000 edits of inputs with such
+lines, 87 of them with an `ERROR` in both trees. In the other,
+`while (c) consume()` followed by `(a, b) =l`, edited to `(a, b) ==l`,
+keeps the multi-assignment on reparse, with an `ERROR` at the second
+`=`, where a parse from scratch reads the call `consume()(a, b) == l`.
+The next edit of the statement before corrects it.
+
+Trees that change for input that parsed without an `ERROR`: a `(` that
+opens a line after an expression where a statement may start, and that
+can open one, was the arguments of a call of that expression, and opens
+the next statement. That holds for the multi-assignments of
+`docs/divergences-from-spec.md` §3, for a value's or a named argument's
+last argument (`def x = foo 1` then `(c)`, `foo a: 1` then `(b)`), and
+for a cast on the next line (`x = (a)` then `(b) y`). Groovy reads two
+statements in each (observed with Groovy 3). Of the 1,261 corpus tests
+7 change, all of them divergences that this removes; of 266 real Groovy,
+Gradle and Jenkins files 2, both a cast on the line after a call that
+had taken it as an argument; of 24,548 Java files 105, each a call whose
+one argument opens the next line, and 234 that had an `ERROR` change it
+(2 with fewer bytes in it, none with more). No file gains an `ERROR`.
+Of 237,660 inputs made from templates and from mutations of those files,
+25,897 without an `ERROR` changed: inserting `;` before the line break
+of such a `(` gives the new tree under the grammar before for 25,858,
+and the rest are inputs where that check cannot be applied mechanically
+(a `//` inside a dollar-slashy string, a line escape before the line
+break). 18 gained an `ERROR`; Groovy 3 rejects 16, and reads the other
+two as a lambda appended across the line break. An `ERROR` also appears
+where the new statement is one this grammar does not take: `foo bar`
+followed by `(List<String> a) { }` was the chain `foo(bar(…) { })`, and is
+`foo bar` and a statement with an `ERROR`, where Groovy calls
+`List<String>(a, { })` (§5.5 item 3).
 
 ---
 

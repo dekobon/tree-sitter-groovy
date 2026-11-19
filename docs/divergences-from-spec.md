@@ -16,7 +16,7 @@ reasoning here.
 | Spec section | Status | Notes |
 |---|---|---|
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. |
-| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. Multi-assignment without `def` at the start of a line continues an expression that ends the line before, as a call, and `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final`, `final var` and `var` alone (`final (int a, b) = …`, `var (a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body (`private var (a, b) = …` included). Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by annotations alone (`@A (a, b) = …`) or by modifiers other than `final` where a statement starts (`static def (a, b) = …`). Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
+| §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final`, `final var` and `var` alone (`final (int a, b) = …`, `var (a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body (`private var (a, b) = …` included). Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by annotations alone (`@A (a, b) = …`) or by modifiers other than `final` where a statement starts (`static def (a, b) = …`). Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
@@ -46,6 +46,7 @@ reasoning here.
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new`, an array type value or a name follows the receiver on its line (a name only after a receiver that may not name a type, see #25 below), so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new`, an array type value or a name (`println x`), so `foo` followed by `new Bar()` or `bar` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A keyword Groovy reserves is no receiver of a value (`def x = return 1`); `super`, `permits`, `pipeline` and `_` are, and start a statement's call before a call in parentheses (`super(foo 1)`). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
+| §6.18 STATEMENT_PAREN | **Mostly done** | a `(` that opens a line after an expression, emitted where a statement may start and the parentheses can open one, so that it opens the next statement as in Groovy (`foo()` followed by `(a, b) = l`); a call's arguments do not take it. Inside parentheses and brackets the `(` still calls. Parentheses that cannot open a statement (`(a, b)`, `(a: 1)`, `()`) stay a call's arguments, and a block comment that opens the line hides the line break; see #3 below. |
 | §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
@@ -171,29 +172,55 @@ is the leading-operator edge case: `a\n+ b` greedily joins as
 `a + b` rather than splitting. Idiomatic Groovy keeps continuation
 operators at the end of the previous line (`a +\n  b`), so the
 case rarely appears in real code; a stricter scanner-driven
-AUTOMATIC_SEMICOLON is a v2 improvement.
+AUTOMATIC_SEMICOLON is a v2 improvement. Groovy reads `a` and the unary
+`+b` (observed on Groovy 3), and `-` behaves the same. A `++` or `--`
+that opens a line makes the line above a postfix update here: `a`
+then `++b` is `a++` and `b`, where Groovy reads `a` and `++b`. `**` and
+`?[` at the start of a line continue the expression too, where Groovy
+rejects the line. Of 24,548 Java files, 386 hold 5,593 `+` or `-` that
+open a line after an expression outside brackets, mostly in string
+concatenations, which splitting would turn into unary operators; the
+266 real Groovy files hold none, and neither set a line-start `++` or
+`--` after an expression.
 
 The other is a `{` that opens the next line: it joins the previous
 expression where the §6.4 contract as written would end the
 statement. After a call that is Apache's reading too; after
 `new T(...)` it is not (see §11 below).
 
-A `(` that opens the next line joins the previous expression as a
-call's arguments. Apache's `arguments` has no `nls` before it, so
-outside brackets Groovy ends the statement. The multi-assignment
-without `def` (#94) is the form this hits, with no `ERROR`:
+A `(` that opens the next line after an expression opens the next
+statement where one may start, as Apache's `arguments` has no `nls`
+before it: `foo()` followed by `(a, b) = [1, 2]` is a call and a
+multi-assignment, so are the swap `def b = 2` followed by
+`(a, b) = [b, a]` and two multi-assignments on consecutive lines, and
+`println x` followed by `(1..3).each { }` is a call and a second
+statement (observed on Groovy 3). The scanner emits that `(` as
+`_statement_paren` (spec §6.18), which a call's arguments do not take.
+Where no statement may start, inside parentheses and brackets, the `(`
+still continues the expression, as Groovy's lexer drops line breaks
+there (`bar(foo` followed by `(1))`). These differences remain:
 
-- Two on consecutive lines, `(a, b) = [1, 2]` then
-  `(c, d) = [3, 4]`, are one statement here,
-  `(a, b) = ([1, 2](c, d) = [3, 4])`. Before #94 that input had an
-  `ERROR`.
-- After a statement that ends in an expression, the `(` calls that
-  expression and the call is assigned, as before #94: `foo()` then
-  `(a, b) = [1, 2]` assigns `foo()(a, b)`, and the swap `def b = 2`
-  then `(a, b) = [b, a]` assigns `2(a, b)`.
-
-Groovy reads two statements in each case (observed on Groovy 3). A
-`;` at the end of the previous statement avoids it.
+- Parentheses that cannot open a statement are a call's arguments, as
+  before: empty ones, ones that hold a spread or a named argument, ones
+  that a `,` or `->` follows, and ones with a `,` inside that hold
+  neither a multi-assignment's names nor a parenthesis-free call
+  (`foo` followed by `(a, b);`, as Java code is often written). Groovy
+  rejects each such line, except before `->`, where it appends the
+  lambda to the expression, which this grammar does not take (spec
+  §5.16).
+- A block comment that opens the `(` line hides the line break, as for
+  `[` (spec §6.9): `foo` followed by `/* c */ (1)` is a call.
+- Where no statement may start but Groovy's lexer does not drop the
+  line break, the `(` continues the expression: in a class body and in
+  a ternary's middle (`def x = foo` then `(1)`, `a ? foo` then
+  `(1) : 2`), which Groovy rejects, and in an interpolation
+  (`"${foo` then `(1)}"`), which Groovy reads as a closure of two
+  statements.
+- An enum constant's arguments, a method's parameters and the `(`
+  after `if`, `while`, `catch` and the like may still follow a line
+  break, where Groovy rejects one (a script method's parameters on the
+  next line are two calls in Groovy). A creation's and an annotation's
+  arguments may follow one in Groovy too.
 
 The opposite also happens, one line read as two statements. After
 `def f`, a `(` may open a parameter list or the next statement, and
@@ -788,7 +815,7 @@ line, below every other complete reading when it is not.
 | `foo((String)` then `x)` | cast | cast: nothing else parses |
 | `foo((a)` then `- b)`, or `+ b)` | cast of `-b` | subtraction `(a) - b` |
 | `foo((a)` then `(b))` | cast of `(b)` | call `(a)(b)`, as at v0.5.0 |
-| `x = (a)` then `(b) y` | `x = a`, then the cast `(b) y` | one assignment, `(a)` cast of `(b) y`, as at v0.5.0 |
+| `x = (a)` then `(b) y` | `x = a`, then the cast `(b) y` | the same: the `(` opens the next statement (spec §6.18); before that, one assignment, `(a)` cast of `(b) y` |
 
 At v0.5.0 the two readings were unranked and the stack order decided:
 `x = (a)` followed by `foo()` was a cast of the call.
@@ -979,7 +1006,7 @@ The Groovy column was observed by running Groovy 3.
 | `true ? x = foo 1, b : 3` | the chain takes `b`, the ternary the `: 3` | `ERROR`: `b : 3` reads as a named argument |
 | `def x = c ? y = foo a : 2` | `c ? (y = foo(a)) : 2` | `ERROR` over the whole ternary: the scanner takes `a :` as a key, so the call takes the ternary's `: 2`; before, a local `ERROR` at `a` |
 | `def x = foo /* c */ 1` | a call | `def x = foo`, the comment and `1`, as before |
-| `def x = foo 1` then `(c)` on the next line | two statements | the argument is `1(c)` (§3); before, `def x = foo` then `1(c)` |
+| `def x = foo 1` then `(c)` on the next line | two statements | two statements: the `(` opens the next (spec §6.18); before that, the argument was `1(c)` |
 | `def x = foo bar`, `def x = foo $/a/$` | `foo(bar)`, `foo('a')` | `command_chain` value (#25 below); before, `def x = foo` then the argument |
 | `def x = foo .5` | `foo(0.5)` | an `ERROR`, as before (spec §6.14) |
 | `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
@@ -1291,7 +1318,7 @@ The Groovy column was observed by running Groovy 3.
 | `foo` then `new Foo()` on the next line, also with `/* c */` opening that line | two statements | two statements, as before |
 | `foo \` then `new Foo()` on the next line (a line escape), `foo new` then `Foo()` on the next line, `foo new /* c */ Foo()` | a call | a call |
 | `foo /* c */ new Foo()` | a call | `foo`, the comment and the creation, as before (spec §6.14) |
-| `foo new Foo()` then `(c)` on the next line | a call, then `c` | the argument is `new Foo()(c)` (§3); before, `foo`, then `new Foo()(c)` |
+| `foo new Foo()` then `(c)` on the next line | a call, then `c` | the same: the `(` opens the next statement (spec §6.18); before that, the argument was `new Foo()(c)` |
 | `foo new Foo()` then `{ }` on the next line | `foo(new Foo().call({ }))` | `{ }` is the creation's anonymous class body (§11); before, the body of the creation as a statement of its own |
 | `if (x) foo new Foo() else bar new Bar()` | an `if` with an `else`, each branch a call | the same; before, the `if`, the creation, and `else` and `bar` read as names |
 | `foo 1 bar new Baz()`, `foo bar new Baz()`, `foo new Foo() bar 1` | a chain: `foo(1).bar(new Baz())`, `foo.bar(new Baz())`, `foo(new Foo()).bar(1)` | two calls, or the statement `foo` and a call (spec §5.5 item 4); before, `bar` and the creation were statements of their own |
@@ -1383,7 +1410,7 @@ The Groovy column was observed by running Groovy 3.
 | `(int 1)`, `(String 'x')` | calls of the methods `int` and `String` | the same |
 | `(foo` then `1)` on the next line | a call: inside parentheses Groovy's lexer drops line breaks | an `ERROR`, as before (spec §6.9) |
 | `(foo /* c */ 1)` | a call | an `ERROR`, as before (spec §6.14) |
-| `foo` then `(bar 1)` on the next line | `foo`, then the call | an `ERROR`, as before: a `(` on the next line continues the expression (§3) |
+| `foo` then `(bar 1)` on the next line | `foo`, then the call | the same: the `(` opens the next statement (spec §6.18); before that, an `ERROR` |
 | `(foo 1) 2` | `foo(1).call(2)` | the parenthesis, then `2`: a receiver is a name (spec §5.5 item 2); before, an `ERROR` |
 | `(return 1)`, `if (throw new Foo()) { }` | rejected | an `ERROR`: a keyword Groovy reserves is no receiver of a value (spec §6.14) |
 | `def x = return 1`, `x = class 'a'`, `v.w += if 1` | rejected | the declaration or assignment with the keyword as a name, then the argument as a statement; before, a call of a method named `return` (`class`, `if`). An argument that is no statement makes an `ERROR` (`x = throw 1, 2`) |
@@ -1429,7 +1456,7 @@ steps with more than one stack version are unchanged.
 | `println(bar(foo 1))` | a call | an `ERROR`, as before: the look-ahead stops at the second parenthesis |
 | `assertEquals(3, foo 1)`, `bar(a, foo 1)`, `a + bar(foo 1)`, `[bar(foo 1)]` | rejected | an `ERROR`, as before |
 | `return bar(foo 1)` | rejected | `return bar`, then `(foo 1)`, as `return foo 1` is `return foo` and `1`; before, an `ERROR` |
-| `println` then `(foo 1)` on the next line | `println`, then the call | an `ERROR`, as before: a `(` on the next line is a call (§3) |
+| `println` then `(foo 1)` on the next line | `println`, then the call | the same: the `(` opens the next statement (spec §6.18); before that, an `ERROR` |
 | `foo(1).bar(baz 2)` | a call | an `ERROR`, as before: a receiver is made of names (spec §5.5 item 2) |
 | `bar(foo 1) 2` | `bar(foo(1)).2` | the call, then `2` (spec §5.5 item 4); before, an `ERROR` |
 | `foo bar(baz 1)`, `println foo(bar 1)`, `void foo(bar 1) { }`, `String foo(bar 1) { }` | the chain goes on: `foo.bar(baz(1))`, `println.foo(bar(1))`, `void.foo(bar(1, { }))` | the first name as a statement, then the call: `foo`, then `bar((baz 1))`; `void`, then `foo((bar 1) { })` (spec §5.5 item 4); before, an `ERROR` |
@@ -1519,7 +1546,7 @@ The Groovy column was observed by running Groovy 3.
 | `foo var x`, `foo var x, y`, `foo yield x`, `foo record x`, `obj.m var x` | `foo(var).x`, `foo.var(x, y)`, … | the receiver, then `var x` (`var x, y`, `yield x`, …), as before: after a name argument that starts declarations, any name leaves the input as it was |
 | `def x = foo bar baz`, `class C { def r = a b c }` | `foo(bar).baz`, a field `a(b).c` | `def x = foo` and the call `bar baz`; the field `r` and a field `c` of type `b`, as before: in a value a further name is a continuation |
 | `foo xs[0] 1`, `foo x.y 1` | `foo(xs[0]).1`, `foo(x.y).1` | the call `foo xs[0]` and `1`; `foo` and the call `x.y 1`, as before: the look-ahead does not read past a subscript |
-| `foo bar` then `(1)` or `-1` on the next line | a call, then the expression | one call with the argument `bar(1)` or `bar - 1` (§3); before, `foo` and `bar(1)` or `bar - 1` |
+| `foo bar` then `(1)` or `-1` on the next line | a call, then the expression | with `(1)` the same, as the `(` opens the next statement (spec §6.18); with `-1` one call with the argument `bar - 1` (§3); before, `foo` and `bar(1)` or `bar - 1` |
 | `foo bar` then `{ }` on the next line | `foo(bar({ }))` | the same; before, `foo` and the chain `bar { }` |
 | `return foo bar`, `throw foo bar`, `assert foo bar` | rejected | the statement with `foo`, then `bar`, as before |
 | `foo class`, `foo def`, `foo default` | rejected | the same as before |
@@ -1528,7 +1555,7 @@ The Groovy column was observed by running Groovy 3.
 | `this.new Inner()`, `x.new Inner()` | a creation | the access `x.new` and the call `Inner()`, as before (#23 above) |
 | `foo true + 1`, `foo 1 + 2` | `foo(true + 1)`, `foo(1 + 2)` | the call `foo true` (`foo 1`) and `+ 1` (`+ 2`), as before: a literal first argument of a statement is matched by the grammar's own form, which is no whole expression |
 
-The `foo bar` then `(1)` row is the general reading of a line that
+The `foo bar` then `-1` row is the general reading of a line that
 starts with what continues an expression (#3 above), which a name
 argument now takes as well. The rows with "before" changed trees that
 had no `ERROR`; spec §6.14 lists the kinds and how each was checked.
