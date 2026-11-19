@@ -39,6 +39,10 @@ path = "bindings/rust/tests/unterminated_comment_cost.rs"
 name = "scanner_keywords"
 path = "bindings/rust/tests/scanner_keywords.rs"
 
+[[test]]
+name = "name_argument_cost"
+path = "bindings/rust/tests/name_argument_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 
