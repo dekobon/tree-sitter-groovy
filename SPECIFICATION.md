@@ -1174,6 +1174,23 @@ no block does (`x -> { y -> y }`). `x -> { a = b -> c }` is a block
 that assigns a lambda, not a closure with the parameter `a`. A line
 break may come before and after the `->` (`NL* ARROW NL*`).
 
+The braces are the whole body only where nothing after the `}`
+continues an expression; otherwise they are a closure that starts the
+body, which takes what follows: `x -> { y -> y }()`, `x -> { y -> y }[0]`,
+`x -> { y -> y } { z }`, `x -> { } + 1` and `(x) -> { y -> y }.call()`
+call, subscript, pass a closure to and add to the closure (observed
+with Groovy 3). A lambda in parentheses is a `primary`, so after a block
+the lambda itself goes on: `(x) -> { foo() }.call()` calls the lambda.
+A lambda without parentheses cannot, so there a block that something
+continues is a closure: `x -> { foo() }.call()` calls the closure. After
+a line break where a statement may start, `.`, `?.`, `::`, `*`, `?:` and
+the other operators Apache takes after `nls` continue the body, and `(`,
+`[`, `{`, `+`, `-` and a slashy string start the next statement:
+`x -> { foo() }` followed by `+ 1` on the next line is a lambda and the
+statement `+1`. Inside parentheses and brackets Groovy's lexer drops the
+line break, so `foo(x -> { y -> y }` followed by `+ 1)` adds. The scanner
+decides it after the `}` (`LAMBDA_BODY_END`, §6.19).
+
 The node is `lambda_expression` with the fields `parameters` and
 `body`, as in tree-sitter-java. The parameters in parentheses reuse
 `formal_parameters`, whose `formal_parameter` already takes Groovy's
@@ -1237,11 +1254,22 @@ closure parameter's default or a case value (`{ p = a = b -> c }`,
 (`{ a = (var b) -> c }`) are read as lambdas instead; see
 `docs/divergences-from-spec.md` §26.
 
-Read differently from Groovy (observed with Groovy 3): a closure or a
-block as the whole body when an operator follows it, `a -> { } + 1`
-(the body ends at the block) and `(x) -> { y -> y }.call()` (the
-access applies to the lambda; without parentheses around the parameter
-the closure takes it, `foo(x -> { y -> y }.call())`). A block in a
+Read differently from Groovy (observed with Groovy 3): a lambda without
+parentheses as an assignment's value, which Groovy's assignment is
+continued past (`(v = a -> { foo() }) == 1`): here the closure takes the
+operator, `v = a -> ({ foo() } == 1)`, as in a declaration. A lambda in
+parentheses whose block starts with what is also a closure's parameter
+(`(a) -> { b = (c) -> { } }.call()`, `(x) -> { def g = y -> y }.call()`),
+which Groovy reads as a block and continues the lambda: the operator
+makes it the closure with the parameter `b` and takes the closure, as a
+closure reading holds a lambda less than the block's, and a weight on
+the lambda's block that outranked it would also make
+`def c = { a = (b) -> { }.call() }` assign a lambda. After a line break,
+`{`, `as` and `in` continue a closure body in Groovy and start a
+statement after a block there; here `{` ends the body and `as` and `in`
+continue it. After a line break `+` and `-` start a statement in
+Groovy, also after a lambda in parentheses, which here they apply to,
+as to any expression before a line break. A block in a
 lambda's body that holds a lambda whose body is a closure,
 `x -> { a = b -> { p -> p } }`, and so any nest that ends in one, is
 the closure with the parameter `a`: such a block has no weight of its
@@ -1284,6 +1312,7 @@ expression where it may open a statement (§6.18), the start of an
 array type that is a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), the start of a lambda (§6.17),
+the end of a lambda's brace body (§6.19),
 `STRING_BODY` (§6.10) and
 `TYPE_START` (§6.15), which are never emitted and only mark a string
 body and where a type may start, and
@@ -1326,6 +1355,7 @@ enum TokenType {
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   LAMBDA_START,           // §6.17 — empty; before the `(` of a lambda's parameters
   BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses
+  LAMBDA_BODY_END,        // §6.19 — empty; after the `}` of a lambda's brace body that nothing continues
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
@@ -1456,6 +1486,10 @@ token, listed in `extras` because a comment may start anywhere. The
 runtime accepts an empty extra token only when the state changed with
 it, which holds exactly once per parse path. The state is empty while
 the bit is unset and one byte once it is set.
+
+The same marker carries a second bit, set after the `}` of a lambda's
+brace body when the scan read past the start of the next token (§6.19).
+The state is then one byte holding both bits.
 
 An edit does not leave the bit stale. The marker read to the end of
 input, so after any edit behind it the runtime lexes it again, and a
@@ -2832,6 +2866,119 @@ appears where the new statement is one this grammar does not take:
 `foo bar` followed by `(List<String> a) { }` was the chain
 `foo(bar(…) { })`, and is `foo bar` and a statement with an `ERROR`,
 where Groovy calls `List<String>(a, { })` (§5.5 item 3).
+
+### 6.19 LAMBDA_BODY_END — implementation contract
+
+A lambda's body is a brace body only where nothing after the `}`
+continues an expression (§5.16): `x -> { y -> y }` is a closure body and
+`x -> { y -> y }()` a call of that closure. The grammar cannot see that
+at the `}`: a closure as the whole body ranks below a block that holds
+lambdas (`DEMOTED_LAMBDA_WEIGHT`), and a static precedence on it, which
+kept a closure that an expression went on with from carrying no weight,
+also kept the expression from going on. `x -> { y -> y }()` was an
+`ERROR`, `x -> { y -> y } { z }` two statements and
+`x -> { y -> y }[0]` a lambda and a list. The scanner decides it after
+the `}` instead, with an empty token that the brace bodies take: a
+closure and the block of a lambda without parentheses need it, the
+block of a lambda in parentheses may take it, and without it the braces
+are a closure that starts the body.
+
+```text
+Emit LAMBDA_BODY_END, empty, at the `}` that may end a lambda's brace
+body, before the trivia after it, unless an expression continues there.
+Read after the `}`: spaces, tabs, line escapes, line breaks and up to
+LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256) comments, then
+  - on the line of the `}`, or after a line break where no statement may
+    start (STATEMENT_PAREN not valid, inside parentheses and brackets):
+    any operator, `(`, `{`, `::`, `instanceof`, `!=`, `!in` and
+    `!instanceof` as the scanner and the grammar read them, `as` or `in`
+    that open a type or an expression (§6.16), and on the line of the `}`
+    a `[` where SUBSCRIPT_OPEN is valid (§6.9) continue it;
+  - after a line break where a statement may start: the same but `(`,
+    `[` and `{`, and `+` and `-` only as `+=` and `-=`, which Groovy's
+    grammar does not take after `nls` and which may start a statement;
+  - a `/` that opens a slashy string where a statement may start ends
+    the body, as Groovy reads a statement; any other `/` continues it.
+Anything else ends the body: `)`, `]`, `}`, `,`, `;`, `:` other than
+`::`, a word, a literal, the end of the input, a `/*` that does not
+close (or one the §6.6 bit says cannot), and more than 256 comments.
+Where it continues, the scan returns false and the in-grammar lexer
+reads the operator, unless the scan read past the start of the next
+token: a comment came first, or the next token is `as` or `in`, which
+the scanner emits. Then it emits UNTERMINATED_COMMENT (§6.6), empty,
+with a second state bit set, and the next call, at the same position and
+in the same state, reads that token without deciding again and clears
+the bit. `!in` and the `[` of a subscript, which the scan has just read,
+it emits itself. Neither token is emitted during error recovery.
+At a `}` with a comment after it on its line, in any state, read as far
+as above with every token valid and return false.
+```
+
+The token ends at the `}`, so the lambda keeps its range, and a comment
+after the `}` stays outside the lambda whatever follows it, which the
+second bit makes possible: a token that ends at the `}` cannot be one
+that ends after the comment, and deciding after the comment would put a
+comment before the token, and so in the lambda. The rules after a line
+break follow Groovy's `nls`, where Groovy and the grammar both continue
+the operators it lists after it (`x` then `.y` on the next line), and
+where Groovy starts a statement, the grammar's other rules for those
+characters read one too: a `(` that opens a line (§6.18), a `[` on a
+later line (§6.9). A `{`, `as` and `in` on the next line continue a
+closure in Groovy and start a statement after a block, which the scanner
+cannot tell apart; `{` ends the body and `as` and `in` continue it, the
+readings of the grammar before. A lambda in parentheses whose block an
+operator follows keeps its block when the braces are a closure as well
+(`(x) -> { foo() }.call()`): the block's static precedence settles that
+reduction. Where the braces differ as a block and a closure
+(`(a) -> { b = (c) -> { } }.call()`), the weights do, and the closure,
+which holds a lambda less, wins (§5.16).
+
+The decision ends the lambda, so a node that ends at the `}` depends on
+what follows it. Where the scan returns false, the runtime counts what it
+read against the token after the `}`, not the `}`, so a reparse may reuse
+the closure as the expression it was and take the next token in a state
+where LAMBDA_BODY_END is not valid. That corrects itself where the token
+does not fit, as the parser breaks the closure down and lexes there
+again, except after a comment, which it takes as an extra first: the
+decision then falls after the comment and puts it in the lambda. So at
+every `}` that a comment follows on its line the scanner reads as far as
+the decision would and returns false, and the `}` itself carries the
+read. Reading so past every `}` cost 0.6% more instructions on real
+files, for the one case left: a comment on the line after the `}`,
+before an operator that an edit removes, ends up in the lambda on
+reparse.
+`bindings/rust/tests/incremental_reparse.rs` pins it.
+
+Measured against the grammar before: STATE_COUNT 4516 to 4576,
+LARGE_STATE_COUNT 1693 to 1742, `parser.c` 8,904,584 to 9,155,395 bytes,
+one external token and no conflict added. A token of its own for the
+marker added 180 KB to `parser.c`, as an extra is valid in every state.
+Real Groovy and Gradle files take 0.3% more instructions, Java files
+0.2%, code made of closures, conditions, calls or parentheses 0.2% to
+0.5%, code made of lambdas 1%, and code made of lambdas with brace bodies
+and operators after them 3%. No tree of the corpus, the 266 real files
+or the 24,548 Java files without an `ERROR` changes; the corpus test
+`enum E<T> { A }`, an `ERROR` either way, recovers into a closure
+statement instead of keeping its `enum_declaration`, and 4 Java files
+recover differently with as many bytes in an `ERROR`. Of 61,246
+template inputs of lambdas with brace bodies in contexts, 2,470 without
+an `ERROR` change, of which Groovy 3 accepts 1,721 and reads 1,456 the
+new way and 90 the old way; of 60,319 mutations of the corpus and
+probes, 1,449 change, of which Groovy accepts 1,322 and reads 1,139 the
+new way and 50 the old way. The old way is the two divergences of §5.16:
+a lambda as an assignment's value that an operator follows, and a block
+of a lambda in parentheses that also reads as a closure with a
+parameter. One mutation gains an `ERROR`, `def v = a -> { foo() }[]`,
+an empty subscript, which the grammar takes nowhere. Over 240,000
+sequences of four edits of the §6.18 texts, 96,000 of lambda-rich texts
+edited around the `}` and 5,488 that type or delete an operator after a
+lambda's body one character at a time, the reparses that differ from a
+parse from scratch went from 135, 49 and 0 to 135, 43 and 0, all of the
+lambda ones in trees with an `ERROR`. The scan reads the trivia, at most
+256 comments and one word or a few characters, and a comment's scan
+reads only what follows it: 2.0 and 1.1 bytes asked for per input byte
+for 500 and 4,000 comments between a lambda's body and an operator, 251
+and 2,001 without the bound (`bindings/rust/tests/lambda_body_end_cost.rs`).
 
 ---
 

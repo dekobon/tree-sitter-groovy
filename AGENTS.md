@@ -63,12 +63,16 @@ The default branch is **`main`**.
   value (`String[].class`), which needs `[]` after the name (§6.15),
   a `)` with something after it on its
   line, which ranks a cast (§6.11), the `!in` operator, which
-  needs whitespace or a bracket after it (§6.12), and the start of a
+  needs whitespace or a bracket after it (§6.12), the start of a
   lambda, before its parameters in parentheses or its one name, when
-  `->` follows (§6.17). Inside a string body
-  it emits nothing (§6.10). Its only state is one bit, "no `*/` from
-  here on", carried by an empty hidden token at the first unterminated
-  `/*` (§6.6). GString interpolation, automatic semicolons and label
+  `->` follows (§6.17), and an empty token after the `}` of a lambda's
+  brace body that no expression continues, which ends the body there
+  (§6.19). Inside a string body
+  it emits nothing (§6.10). Its state is two bits, "no `*/` from
+  here on" and "the body goes on past the token that follows", carried
+  by an empty hidden token emitted at the first unterminated `/*` (§6.6)
+  and after such a `}` that a comment, `as` or `in` follows (§6.19).
+  GString interpolation, automatic semicolons and label
   colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does

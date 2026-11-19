@@ -1630,12 +1630,26 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `{ a = (var b) -> c }`, `case (var a) -> 1` | the default or value `var(b)` | the lambda `(var b) -> c` assigned to `a`; an `ERROR` for the case: the scanner reads `var` before a name as the keyword (spec §6.16) |
 | `case (A) -> (b) -> b`, `{ a = (b) -> (d) -> e }` | the value `(A)` and the body `(b) -> b`; the default `(b)` and the body `(d) -> e` | the same; before, an `ERROR` |
 | `def c = { v = (A<B> a) -> a }`, `{ v = (String[] a) -> a }`, `{ a = (int a) -> 1 }` | the parameter `v` (`a`) with the default `A<B>(a)`, `String[](a)` or `int(a)`, a call | `v = …` assigned the lambda; before, an `ERROR`: those parentheses are no expression here |
-| `def v = a -> { } + 1` | the body `{ } + 1` | the body `{ }`, and `+ 1` a statement of its own; before, an `ERROR` |
-| `def v = (x) -> { y -> y }.call()`, `foo((x) -> { y -> y } + 1)` | the body `{ y -> y }.call()` and `{ y -> y } + 1` | the lambda called, and the lambda added; before, an `ERROR`. Without parentheses the body takes it (`foo(x -> { y -> y } + 1)`) |
+| `def v = a -> { y -> y }()`, `a -> { y -> y }[0]`, `a -> { y -> y } { z }`, `a -> { } + 1`, `(x) -> { y -> y }.call()`, `foo((x) -> { y -> y } + 1)`, `(x) -> { y -> y }` then `.call()` on the next line | the closure that starts the body called, subscripted, given a closure, added | the same (spec §6.19); before, an `ERROR`, two statements, a lambda and a list, a block and `+ 1` as a statement, and the lambda called or added |
+| `def v = (x) -> { foo() }.call()`, `x -> { foo() }` then `+ 1` or `(1)` on the next line | the lambda called; a lambda and a statement | the same, as before |
+| `v = a -> { foo() } == 1`, `v = a -> { } + 1`, `v += a -> { foo() }` then `!= x` on the next line | the assignment compared or added: Groovy continues an assignment past a lambda without parentheses | the closure that starts the body compared or added, as in a declaration (`def v = a -> { foo() } == 1`); before, the same for the first, a block and the statement `+1` for the second, and the assignment compared for the third, as Groovy reads it |
+| `def v = (a) -> { b = (c) -> { } }.call()`, `(x) -> { T t = (u) -> v }.call()` | the lambda's block, then the lambda called | the closure with the parameter `b` (`t`) called in the body; before, the block. The closure reading holds a lambda less; a weight on the lambda's block that outranked it also made `def c = { a = (b) -> { }.call() }` assign a lambda (spec §5.16) |
+| `def v = a -> { y -> y }` then `{ z }` on the next line; `def v = a -> { foo() }` then `as T` or `in l` on the next line | the closure given `{ z }`; the block and a statement `as(T)` or `in(l)` | the lambda and a closure statement; the closure cast or tested, as before. Groovy's reading depends on whether the braces parse as a block, which the scanner does not know |
 | `(y.y) if (z) { a() } else { b() }` on one line | rejected | the parenthesized expression and the `if` statement; **before, the cast of a call named `if`** and a call named `else` (a BREAKING class below) |
 
 Four kinds of trees that had no `ERROR` changed. No input from the
 corpus, the 266 real files or the 24,548 Java files is among them:
+
+- **A lambda's brace body that something continues** (the rows from
+  `def v = a -> { y -> y }()` above): the scanner ends the body at the
+  `}` only where no expression goes on (spec §6.19). Of 61,246 template
+  inputs, 2,470 without an `ERROR` changed; Groovy 3 accepts 1,721 and
+  reads 1,456 of them the new way and 90 the old way, the assignments and
+  the blocks of lambdas in parentheses in the rows above. Of 60,319
+  mutations of the corpus and lambda probes, 1,449 changed: 1,139 of the
+  1,322 Groovy accepts the new way and 50 the old way. One mutation gained
+  an `ERROR`, `def v = a -> { foo() }[]`, an empty subscript, which no
+  expression takes here.
 
 - **A brace body that holds a lambda** (`if (x) { a = b -> c }` and
   the other bodies in the table). Before lambdas the block reading
