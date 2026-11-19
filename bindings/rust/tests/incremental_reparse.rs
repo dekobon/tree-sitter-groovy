@@ -17,12 +17,13 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// parenthesis-free calls (§6.14), as values and as statements with a
 /// dotted receiver, whose start token depends on the receiver and on
 /// what follows it on its line, so an edit there must lex it again. The
-/// last two hold a cast whose `)` an unterminated comment follows, where a
+/// last five hold a cast whose `)` an unterminated comment follows, where a
 /// cast and a parenthesized expression are both possible at the `/*`: the
 /// look-ahead for a lambda (§6.17) reads from the `(` through the comment,
-/// so inserting `*/` makes the runtime lex the `(` again. The one before
-/// them holds lambdas, whose start tokens depend on the `->` after the
-/// parentheses or the name, also across a line break or a comment.
+/// for a name, a primitive and a dotted type alike, so inserting `*/` makes
+/// the runtime lex the `(` again. The one before them holds lambdas, whose
+/// start tokens depend on the `->` after the parentheses or the name, also
+/// across a line break or a comment.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -42,6 +43,9 @@ const TEXTS: &[&str] = &[
     "def f = (a, b) -> a\nfoo(x -> x, (y)\n-> y)\ndef c = { a = (b) -> c }\ng = x /* c */ -> x\n",
     "x = (a)/* n\nc",
     "foo((String)/* why\narg)",
+    "x = (int)/* n\nc",
+    "x = (a.b.C)/* n\nc",
+    "foo((a.B)/* why\narg)",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.

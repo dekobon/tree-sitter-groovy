@@ -2236,12 +2236,14 @@ static bool skip_lambda_tokens(
 // default value after `=`. Apart from the name being last, it does not check
 // the order: what it takes and `formal_parameter` does not is an `ERROR`
 // either way. Returns false where no parameter can be, as at the operator of
-// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where no
-// name ends it (`(String[])`, `(a.b)`, `(int)`, `(final)`) or a keyword is
-// in it (`(if)`).
+// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
+// keyword is in it (`(if)`). Where no name ends it (`(String[])`, `(a.b)`,
+// `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
+// types, and the caller reads on past the `)` all the same.
 static bool lambda_parameter_follows(
     TSLexer *lexer,
     unsigned *items,
+    bool *named_parameter,
     bool no_close_ahead
 ) {
     for (;;) {
@@ -2319,8 +2321,11 @@ static bool lambda_parameter_follows(
             return false;
         }
     }
-    if (!named || angles > 0) {
+    if (angles > 0) {
         return false;
+    }
+    if (!named) {
+        *named_parameter = false;
     }
     if (lexer->lookahead != '=') {
         return true;
@@ -2336,15 +2341,23 @@ static bool lambda_parameter_follows(
 // what the parentheses hold reads as parameters (`lambda_parameter_follows`)
 // and `->` follows the `)`, after Groovy's trivia, line breaks included
 // (Apache `NL* ARROW`). The `(` is not consumed when this is called.
+//
+// A cast's type without a name (`(int)`, `(a.b.C)`) is read through the `)`
+// and the trivia after it as well, and turned down only then. The runtime
+// counts what the scanner read against the `(`, so an edit in that trivia,
+// such as closing a comment that did not close (§6.6), makes it lex the `(`
+// again, as it does after `(String)`.
 static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
     unsigned items = 0;
+    bool named = true;
     advance(lexer);
     if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
         return false;
     }
     if (lexer->lookahead != ')') {
         for (;;) {
-            if (!lambda_parameter_follows(lexer, &items, no_close_ahead)) {
+            if (!lambda_parameter_follows(lexer, &items, &named,
+                                          no_close_ahead)) {
                 return false;
             }
             if (lexer->lookahead == ')') {
@@ -2357,7 +2370,7 @@ static bool lambda_parameters_follow(TSLexer *lexer, bool no_close_ahead) {
         }
     }
     advance(lexer);
-    return arrow_follows(lexer, no_close_ahead);
+    return arrow_follows(lexer, no_close_ahead) && named;
 }
 
 void *tree_sitter_groovy_external_scanner_create(void) {
