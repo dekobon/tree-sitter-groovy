@@ -50,9 +50,11 @@ The default branch is **`main`**.
   declaration or an assignment, or in parentheses or an
   interpolation), a statement whose receiver has a member access
   (`obj.method 1`), or a statement whose first argument is a `new`, an
-  array type or such a call in parentheses (`foo new Bar()`,
-  `println(foo 1)`), each of which needs its first argument on the
-  receiver's line (§6.14), a subscript `[`
+  array type, such a call in parentheses or a name (`foo new Bar()`,
+  `println(foo 1)`, `println x`), each of which needs its first
+  argument on the receiver's line (§6.14); a name is a first argument
+  only where Apache's isInvalidLocalVariableDeclaration makes the
+  statement no declaration (`foo bar`, not `String s`), a subscript `[`
   on the same line as the
   expression before it (§6.9), the start of an array type that is a
   value (`String[].class`), which needs `[]` after the name (§6.15),
