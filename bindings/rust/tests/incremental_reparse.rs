@@ -11,6 +11,10 @@
 //! A `(` that opens a line after an expression (§6.18) opens a statement
 //! by what the parentheses hold, so edits there must make the statement
 //! before it parse again, also after a reparse that reused it.
+//!
+//! A lambda's brace body ends at its `}` only where no expression goes on
+//! after it (§6.19), so edits after the `}` must make the lambda parse
+//! again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -32,6 +36,9 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// the line break before it, by whether a statement may start there and by
 /// what the parentheses hold, so inserting or deleting a line break, a `,`
 /// or an `=` there must lex the `(` again and parse the line above anew.
+///
+/// The last text holds lambdas whose brace bodies a call, a comment and
+/// an operator follow (§6.19).
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -60,6 +67,7 @@ const TEXTS: &[&str] = &[
     "while (c) go()\n(a, b) = l\n",
     "foo\n(a, b)\nfoo()\n()\n",
     "println x\n(1..3).each { }\n",
+    "def v = a -> { y -> y }.x()\nfoo(b -> { } /* c */, (c) -> { z } + 1)\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
@@ -222,6 +230,143 @@ fn reparse_after_edit_sequence_matches_parse_from_scratch() {
             current = edited;
         }
     }
+}
+
+/// Texts with a lambda whose body is in braces (§6.19), each with a sequence
+/// of edits after the `}`: inserting and removing a call, a subscript, an
+/// operator, a closure argument or a line break, and removing a call after
+/// a comment one character at a time. Each first edit makes the reparse
+/// reuse the lambda's body as the expression it was or as the whole body,
+/// and the next one must end the body there again or continue it.
+const LAMBDA_BODY_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "def v = a -> { y -> y }\nfoo()\n",
+        &[(23, 0, ".call()"), (23, 7, "")],
+    ),
+    (
+        "def v = a -> { y -> y }\nfoo()\n",
+        &[(23, 0, "()"), (23, 2, "")],
+    ),
+    (
+        "def v = a -> { y -> y }\nfoo()\n",
+        &[(23, 0, "[0]"), (23, 3, "")],
+    ),
+    (
+        "def v = a -> { y -> y }\nfoo()\n",
+        &[(23, 0, " + 1"), (23, 4, "")],
+    ),
+    (
+        "def v = a -> { y -> y }\nfoo()\n",
+        &[(23, 0, " { z }"), (23, 6, "")],
+    ),
+    (
+        "def v = a -> { foo() }\nbar()\n",
+        &[
+            (22, 0, " + 1"),
+            (22, 4, ""),
+            (22, 0, ".call()"),
+            (22, 7, ""),
+        ],
+    ),
+    (
+        "def v = (a) -> { y -> y }\nbar()\n",
+        &[(25, 0, ".call()"), (26, 0, "\n"), (26, 1, ""), (25, 7, "")],
+    ),
+    ("foo(a -> { y -> y })\n", &[(19, 0, "\n+ 1"), (19, 4, "")]),
+    (
+        "def v = a -> { y -> y } /* c */ .x()\n",
+        &[(35, 1, ""), (34, 1, ""), (33, 1, ""), (32, 1, "")],
+    ),
+    (
+        "def v = a -> { y -> y } // c\n.x()\n",
+        &[(32, 1, ""), (31, 1, ""), (30, 1, ""), (29, 1, "")],
+    ),
+];
+
+/// Applies `edits` to `text` one after another, reparsing with the tree
+/// before each, and returns the last text with its reparse and its parse
+/// from scratch. Every reparse but the last must equal the parse from
+/// scratch.
+fn reparse_sequence(parser: &mut Parser, text: &str, edits: &[Edit]) -> (String, Tree, Tree) {
+    let mut current = text.to_owned();
+    let mut tree = parser.parse(&current, None).expect("parse original");
+    let mut fresh = parser.parse(&current, None).expect("parse original");
+    for (step, &(start, removed, insertion)) in edits.iter().enumerate() {
+        if step > 0 {
+            assert_eq!(
+                dumped(&tree),
+                dumped(&fresh),
+                "before edit {step} of {text:?}: {current:?}",
+            );
+        }
+        let old_end = start + removed;
+        let mut edited = String::with_capacity(current.len() + insertion.len());
+        edited.push_str(&current[..start]);
+        edited.push_str(insertion);
+        edited.push_str(&current[old_end..]);
+        let new_end = start + insertion.len();
+        tree.edit(&InputEdit {
+            start_byte: start,
+            old_end_byte: old_end,
+            new_end_byte: new_end,
+            start_position: point_at(&current, start),
+            old_end_position: point_at(&current, old_end),
+            new_end_position: point_at(&edited, new_end),
+        });
+        tree = parser
+            .parse(&edited, Some(&tree))
+            .expect("incremental parse");
+        fresh = parser.parse(&edited, None).expect("fresh parse");
+        current = edited;
+    }
+    (current, tree, fresh)
+}
+
+#[test]
+fn reparse_after_lambda_body_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in LAMBDA_BODY_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
+/// A known limitation (`SPECIFICATION.md` §6.19): the scanner reads past a
+/// `}` up to the token after it only where a comment follows on the `}`'s
+/// line. A closure that the parse continued as an expression past a comment
+/// on the next line is reused as that expression, so the reparse takes the
+/// comment before it decides that the body ends, and the comment lands in
+/// the lambda. This test pins the difference. If it fails, the two parses
+/// agree again: remove the limitation from §6.19 and move the text to
+/// `LAMBDA_BODY_EDIT_SEQUENCES`.
+#[test]
+fn a_comment_on_the_line_after_a_lambda_body_moves_into_it_on_reparse() {
+    const TEXT: &str = "def v = a -> { y -> y }\n// c\n.x()\nbar()\n";
+    /// The `.x()` after the comment, removed from its end.
+    const EDITS: &[Edit] = &[(32, 1, ""), (31, 1, ""), (30, 1, ""), (29, 1, "")];
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse_sequence(&mut parser, TEXT, EDITS);
+    assert_eq!(edited, "def v = a -> { y -> y }\n// c\n\nbar()\n");
+    assert!(!incremental.root_node().has_error());
+    assert!(!fresh.root_node().has_error());
+
+    let lambda_end = |tree: &Tree| {
+        let declaration = tree.root_node().named_child(0);
+        let declarator = declaration.and_then(|d| d.named_child(0));
+        let value = declarator.and_then(|d| d.child_by_field_name("value"));
+        value.map(|v| v.end_byte())
+    };
+    assert_eq!(lambda_end(&fresh), Some(23));
+    assert_ne!(
+        lambda_end(&incremental),
+        Some(23),
+        "the reparse now matches the parse from scratch",
+    );
 }
 
 /// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a
