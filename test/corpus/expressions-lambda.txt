@@ -1124,3 +1124,330 @@ foo (x) -> x
   (ERROR)
   (expression_statement
     (identifier)))
+
+==================
+Lambda body: a block holding a declaration of a lambda is no closure
+==================
+
+list.forEach(x -> {
+  Consumer<String> c = s -> foo(s)
+  c.accept(x)
+})
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (identifier)
+          body: (block
+            (local_variable_declaration
+              type: (generic_type
+                base: (type_identifier)
+                arguments: (type_arguments
+                  (type_identifier)))
+              name: (identifier)
+              value: (lambda_expression
+                parameters: (identifier)
+                body: (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list
+                    (identifier)))))
+            (expression_statement
+              (method_invocation
+                function: (field_access
+                  object: (identifier)
+                  field: (identifier))
+                arguments: (argument_list
+                  (identifier))))))))))
+
+==================
+Lambda body: a block holding an assignment of a lambda is no closure
+==================
+
+def f = (x) -> { b = (t) -> 1 }
+def g = x -> { a = b -> c }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (lambda_expression
+                parameters: (formal_parameters
+                  (formal_parameter
+                    name: (identifier)))
+                body: (number_literal))))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (lambda_expression
+                parameters: (identifier)
+                body: (identifier)))))))))
+
+==================
+Body of if and else: a block holding a lambda is no closure
+==================
+
+if (x) { def g = t -> 1 }
+if (x) { a = (b) -> c } else { a = b -> c }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (number_literal))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier)))))
+    alternative: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (identifier)))))))
+
+==================
+Body of a loop: a block holding a lambda is no closure
+==================
+
+for (i in xs) { a = b -> c }
+for (;;) { a = (b) -> c }
+while (x) { String a = b -> c }
+do { a = b -> c } while (x)
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))))
+  (for_statement
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier))))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        value: (lambda_expression
+          parameters: (identifier)
+          body: (identifier)))))
+  (do_while_statement
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (identifier)))))
+    condition: (identifier)))
+
+==================
+Body of an arrow case: a block holding a lambda is no closure
+==================
+
+def v = switch (k) { case 1 -> { a = b -> c } default -> { a = (b) -> c } }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (number_literal)
+            body: (block
+              (expression_statement
+                (assignment_expression
+                  left: (identifier)
+                  right: (lambda_expression
+                    parameters: (identifier)
+                    body: (identifier))))))
+          (switch_default
+            body: (block
+              (expression_statement
+                (assignment_expression
+                  left: (identifier)
+                  right: (lambda_expression
+                    parameters: (formal_parameters
+                      (formal_parameter
+                        name: (identifier)))
+                    body: (identifier)))))))))))
+
+==================
+Closure parameter whose default is in parentheses, before a block
+==================
+
+def c = { a = (b) -> { } }
+def l = (b) -> { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (identifier))))
+        (expression_statement
+          (closure)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))
+
+==================
+A brace that opens a statement or a labeled statement is a closure, also before a lambda
+==================
+
+{ a = b -> c }
+lbl: { a = (b) -> c }
+switch (v) { case 1: { a = b -> c } }
+def l = b -> c
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          name: (identifier)
+          default: (identifier)))
+      (expression_statement
+        (identifier))))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (identifier))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)
+                  default: (identifier)))
+              (expression_statement
+                (identifier))))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier)))))
+
+==================
+Closure parameter in parentheses before a lambda body
+==================
+
+def c = { a = (b) -> (d) -> e }
+def v = switch (k) { case (A) -> (b) -> b }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (identifier))))
+        (expression_statement
+          (lambda_expression
+            parameters: (formal_parameters
+              (formal_parameter
+                name: (identifier)))
+            body: (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (parenthesized_expression
+              (identifier))
+            body: (expression_statement
+              (lambda_expression
+                parameters: (formal_parameters
+                  (formal_parameter
+                    name: (identifier)))
+                body: (identifier)))))))))

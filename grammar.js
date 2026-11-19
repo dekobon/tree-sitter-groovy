@@ -107,13 +107,37 @@ const CAST_WEIGHT = 1;
 
 /*
  * The dynamic precedence of a lambda. A closure parameter's default may
- * end where a lambda's parameters do: `{ a = (b) -> c }` is a closure with
- * the parameter `a` in Groovy, and also a closure whose body assigns `a`
- * the lambda `(b) -> c`. The weight must outweigh what else the second
- * reading may hold and the first not: a typed local and a cast, as in
- * `{ String a = (T) (b, c) -> d }`, where the first reading calls `(T)`.
+ * end where a lambda's parameters do: `def c = { a = (b) -> c }` is a
+ * closure with the parameter `a` in Groovy, and also a closure whose body
+ * assigns `a` the lambda `(b) -> c`. The weight must outweigh what else the
+ * second reading may hold and the first not: a typed local and a cast, as
+ * in `{ String a = (T) (b, c) -> d }`, where the first reading calls `(T)`.
  */
 const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
+
+/*
+ * The dynamic precedence of a block that is the body of `if`, `else`, a
+ * loop or an arrow case, where Groovy tries a block before a closure
+ * (Apache `statement` lists `block` first). `if (x) { a = b -> c }` is a
+ * block that assigns a lambda, and also a closure with the parameter `a`;
+ * the block must outweigh the lambda in it.
+ */
+const BODY_BLOCK_WEIGHT = -LAMBDA_WEIGHT + 1;
+
+/*
+ * The dynamic precedence of a lambda whose body is a closure or a
+ * parenthesized expression, either of which another reading of the same
+ * tokens holds otherwise. A lambda's body is a block before a closure
+ * (Apache `lambdaBody`), so `x -> { a = b -> c }` must rank its block,
+ * which holds a lambda, above the closure with the parameter `a`. And a
+ * parenthesized expression is a lambda's whole body only before a `->`
+ * that the lambda cannot take: `{ a = (b) -> (d) -> e }` is the parameter
+ * `a = (b)` and the body `(d) -> e` in Groovy, which tries the
+ * parenthesized expression first, and also the parameter
+ * `a = (b) -> (d)` and the body `e`. The weight is below a lambda that
+ * holds one more lambda.
+ */
+const DEMOTED_LAMBDA_WEIGHT = 2 * LAMBDA_WEIGHT - 1;
 
 /*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
@@ -495,15 +519,28 @@ function enhancedExpression($) {
 
 /**
  * The body of a lambda, Apache's `lambdaBody`: a block, or an expression
- * or a parenthesis-free call. `() -> { }` holds a block: `block` outranks
- * a closure. A lambda without parentheses is no body, so `a -> b -> c` is
- * an error in Groovy and here; `a -> (b) -> c` is not.
+ * or a parenthesis-free call. A `{` opens a block wherever one parses, as
+ * Apache tries the block first: `() -> { }` and `x -> { a = b -> c }` hold
+ * blocks, `x -> { y -> y }` a closure. A closure and a parenthesized
+ * expression are also alternatives of their own, ranked low
+ * (DEMOTED_LAMBDA_WEIGHT); the static precedence makes the parser reduce
+ * them here rather than as an expression, which would carry no weight.
+ * A lambda without parentheses is no body, so `a -> b -> c` is an error in
+ * Groovy and here; `a -> (b) -> c` is not.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The body rule.
  */
 function lambdaBody($) {
-  return choice($.block, statementExpression($));
+  return choice(
+    $.block,
+    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, $.closure)),
+    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, alias(
+      $._lambda_parenthesized_expression,
+      $.parenthesized_expression,
+    ))),
+    statementExpression($),
+  );
 }
 
 /**
@@ -772,6 +809,9 @@ module.exports = grammar({
     // and a name before a `,` is an element or a parameter. The `->`
     // decides; an initializer holds none.
     [$._expression, $.closure_parameter],
+    // §5.16 — `{ a = b -> c }`: the closure parameter `a = b`, or a closure
+    // or a block whose statement assigns `a` a lambda. See `_bare_lambda_name`.
+    [$._bare_lambda_name, $._bare_lambda_expression],
     // An untyped default, `{ a = 1 -> }` vs. `{ a = 1 }`, needs no
     // entry: see `expression_statement`.
     //
@@ -1021,11 +1061,11 @@ module.exports = grammar({
       '(',
       field('condition', $._statement_expression),
       ')',
-      field('consequence', choice($.block, $._statement)),
+      field('consequence', choice(prec.dynamic(BODY_BLOCK_WEIGHT, $.block), $._statement)),
       optional(';'),
       optional(seq(
         'else',
-        field('alternative', choice($.block, $._statement)),
+        field('alternative', choice($._body_block, $._statement)),
       )),
     )),
 
@@ -1035,7 +1075,7 @@ module.exports = grammar({
       '(',
       field('condition', $._statement_expression),
       ')',
-      field('body', choice($.block, $._statement)),
+      field('body', choice($._body_block, $._statement)),
     ),
 
     // §4 — C-style for. init / condition / update slots all
@@ -1059,7 +1099,7 @@ module.exports = grammar({
       ';',
       optional(field('update', $._expression)),
       ')',
-      field('body', choice($.block, $._statement)),
+      field('body', choice($._body_block, $._statement)),
     ),
 
     // §4 — do-while. Body is required; condition follows the body.
@@ -1068,7 +1108,7 @@ module.exports = grammar({
     // form); without it the `;` errors since `while` is required next.
     do_while_statement: $ => seq(
       'do',
-      field('body', choice($.block, $._statement)),
+      field('body', choice($._body_block, $._statement)),
       optional(';'),
       'while',
       '(',
@@ -2051,7 +2091,7 @@ module.exports = grammar({
       choice(alias($._in_keyword, 'in'), ':'),
       field('value', $._expression),
       ')',
-      field('body', choice($.block, $._statement)),
+      field('body', choice($._body_block, $._statement)),
     ),
 
     // A statement that is `name = value` keeps the name unreduced.
@@ -2171,7 +2211,7 @@ module.exports = grammar({
       'case',
       field('value', $._expression),
       '->',
-      field('body', choice($.block, $._statement)),
+      field('body', choice($._body_block, $._statement)),
       optional(';'),
     ),
 
@@ -2179,7 +2219,7 @@ module.exports = grammar({
       'default',
       choice(
         seq(':', repeat(choice($._statement, ';'))),
-        seq('->', field('body', choice($.block, $._statement)), optional(';')),
+        seq('->', field('body', choice($._body_block, $._statement)), optional(';')),
       ),
     )),
 
@@ -2924,9 +2964,22 @@ module.exports = grammar({
     // opens. At the start of a closure the default and the value of a
     // declaration or an assignment share their tokens (`{ a = b -> c }`,
     // `{ String a = b -> c }`), and the scanner reads only the name and the
-    // `->`. Groovy reads the parameter; reducing this rule outranks the
-    // lambda's `->`.
-    _bare_lambda_name: $ => seq($._bare_lambda_start, $.identifier),
+    // `->`. Where a value is a closure, Groovy reads the parameter; where a
+    // block is possible too, the body of `if` (`if (x) { a = b -> c }`), it
+    // reads a block that assigns a lambda. A static decision would hold in
+    // both, as the states are shared, so the precedence ties with the
+    // lambda's and the `[_bare_lambda_name, _bare_lambda_expression]`
+    // conflict keeps both readings for the weights to rank.
+    _bare_lambda_name: $ => prec(PREC.LAMBDA, seq($._bare_lambda_start, $.identifier)),
+
+    // A block as the body of `else`, a loop or an arrow case, ranked above a
+    // closure (BODY_BLOCK_WEIGHT). A rule of its own costs every such body a
+    // reduction; the weight inline in the six loop and case rules took about
+    // 50 more states, and inline in `else` it was lost, as a production takes
+    // the largest of the weights in it, not their sum, and the `if` before it
+    // has one. The consequence of `if` takes it inline. Aliased to itself so
+    // that the reduction, and the weight, is kept.
+    _body_block: $ => prec.dynamic(BODY_BLOCK_WEIGHT, alias($.block, $.block)),
 
     // A parenthesized expression after `_lambda_start`, aliased to
     // `parenthesized_expression`. The scanner reads only the parentheses
