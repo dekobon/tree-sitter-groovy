@@ -2591,13 +2591,17 @@ static bool scan_statement_start(
     // §6.21 — a declaration's type, by Apache's isInvalidLocalVariableDeclaration
     // on the spelling: a dotted name, which is decided apart, a name that type
     // arguments or dimensions follow, or a capitalized or a primitive type
-    // name that a name follows.
+    // name that a name follows. `this` starts no type, as Groovy's
+    // `classOrInterfaceType` takes no keyword: `this.Foo x` is the call
+    // `this.Foo(x)` (`super` is a keyword above).
+    bool type_word = !word_is(word, len, "this");
     if (lexer->lookahead == '.') {
-        return scan_dotted_statement_start(lexer, valid_symbols, capitalized,
+        return type_word
+            && scan_dotted_statement_start(lexer, valid_symbols, capitalized,
                                            upper, wants_array, type_may_start,
                                            no_close_ahead);
     }
-    if (lexer->lookahead == '<') {
+    if (lexer->lookahead == '<' && type_word) {
         lexer->result_symbol = DECLARATION_START;
         return valid_symbols[DECLARATION_START]
             && generic_declaration_follows(lexer, in_for_header(valid_symbols),
@@ -2607,10 +2611,11 @@ static bool scan_statement_start(
         return false;
     }
     if (lexer->lookahead == '[') {
-        return scan_dimensions_start(
-            lexer, valid_symbols,
-            wants_array && (capitalized || is_primitive_type(word, len)),
-            type_may_start, no_close_ahead);
+        return type_word
+            && scan_dimensions_start(
+                lexer, valid_symbols,
+                wants_array && (capitalized || is_primitive_type(word, len)),
+                type_may_start, no_close_ahead);
     }
     if ((upper || is_primitive_type(word, len))
         && is_identifier_start(lexer->lookahead)) {
