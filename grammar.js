@@ -828,11 +828,18 @@ module.exports = grammar({
     [$._expression, $.qualified_type],
 
     // §3.2.2 — `_cast_type` overlaps `_type` on identifier / array /
-    // generic alternatives; only the dotted path diverges. The
-    // companion three-way conflict pulls in `_dotted_type` so the
-    // dotted shape can win the trailing `.identifier` from the
-    // surrounding `field_access` reduction.
+    // generic alternatives; only the dotted path diverges.
     [$._cast_type, $._type],
+    // After `x as java` a `.` continues the type (`_dotted_type`, or the
+    // `qualified_type` of an array or generic type), or ends it, so that
+    // `.util` is a field access on `x as java`. Both readings parse to the
+    // end of the name and nothing in the grammar ranks them: tree-sitter's
+    // last resort keeps the type, Groovy's reading, only because
+    // `cast_expression` and `instanceof_expression` are defined before
+    // `field_access` or because the type's stack is the older one. The
+    // qualified-type tests in operators-as-cast.txt and
+    // operators-instanceof.txt fail when that changes. See
+    // docs/divergences-from-spec.md §5 for why no weight ranks them.
     [$._cast_type, $._dotted_type, $.qualified_type],
 
     // §4 — `for ( identifier …` could continue as a for_statement
