@@ -98,8 +98,19 @@ fn lists_before_an_unterminated_triple_quoted_string_are_read_a_bounded_number_o
     assert_linear(|n| format!("{{ {},\n'''\n{}", elements(n, ",\n"), "x\n".repeat(n)));
 }
 
+/// Typed elements among lowercase-typed ones (`{ bar a, int b, … }` with no
+/// `->`) are read within the budget as well (measured: 40 and 41 bytes per
+/// byte; 259 and 2,045 without it). After a name argument, a run of typed
+/// parameters (`foo bar(int a, int b, …`) ends the look-ahead at its first.
 #[test]
 fn typed_parameter_runs_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| {
+        let elements = (0..n)
+            .map(|i| format!("bar a{i}, int b{i}"))
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!("{{ {elements},\n}}\n")
+    });
     assert_linear(|n| {
         let params = (0..n)
             .map(|i| format!("int a{i}"))

@@ -73,6 +73,15 @@ fn nested_closures_in_parentheses_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}{}\n", "x\n({ x\n".repeat(n), "})".repeat(n)));
 }
 
+/// Where no expression ends, as at the start of a closure's statements, the
+/// `(` of a line is read as far as where one does (`read_parentheses_extent`
+/// in `src/scanner.c`), within the same budget (measured: 82 and 89 bytes
+/// per byte; 257 and 2,007 without it).
+#[test]
+fn nested_parentheses_where_a_statement_starts_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{}{}\n", "({\n".repeat(n), "})".repeat(n)));
+}
+
 #[test]
 fn unclosed_lists_on_many_lines_are_read_a_bounded_number_of_times() {
     assert_linear(|n| "x\n(a, b,\n".repeat(n));
