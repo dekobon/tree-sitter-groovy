@@ -221,3 +221,34 @@ x as foo.bar + 1
           (type_identifier)
           (type_identifier)))
       right: (number_literal))))
+
+==================
+as with a dotted type breaks a tie with a cast of the name as
+==================
+
+def v = (x) as a.b.c y
+y = 1
+f(1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (cast_expression
+        value: (parenthesized_expression
+          (identifier))
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)))))
