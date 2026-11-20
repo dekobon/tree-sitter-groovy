@@ -98,3 +98,25 @@ yield: bar()
       (method_invocation
         function: (identifier)
         arguments: (argument_list)))))
+
+==================
+Labeled block
+==================
+
+lbl: { a }
+lbl:
+{ b }
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (block
+      (expression_statement
+        (identifier))))
+  (labeled_statement
+    label: (identifier)
+    statement: (block
+      (expression_statement
+        (identifier)))))

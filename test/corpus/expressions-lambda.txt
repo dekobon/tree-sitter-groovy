@@ -1428,6 +1428,92 @@ def l = b -> c
         body: (identifier)))))
 
 ==================
+Statement block: lambdas nested in blocks that open statements are no closure parameters
+==================
+
+{ a = b -> { c = d -> e } }
+def m() {
+    { a = (b) -> { } }
+}
+
+---
+
+(source_file
+  (block
+    (expression_statement
+      (assignment_expression
+        left: (identifier)
+        right: (lambda_expression
+          parameters: (identifier)
+          body: (block
+            (expression_statement
+              (assignment_expression
+                left: (identifier)
+                right: (lambda_expression
+                  parameters: (identifier)
+                  body: (identifier)))))))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (block
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (lambda_expression
+              parameters: (formal_parameters
+                (formal_parameter
+                  name: (identifier)))
+              body: (block))))))))
+
+==================
+Closure parameter before a block that opens a statement and a line that starts with an operator
+==================
+
+def c = { a = a -> { foo() }
++ 1 }
+xs.each { v = a -> { foo() }
++ 1 }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (identifier)))
+        (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (expression_statement
+          (unary_expression
+            operand: (number_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (identifier)))
+        (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (expression_statement
+          (unary_expression
+            operand: (number_literal)))))))
+
+==================
 Closure parameter in parentheses before a lambda body
 ==================
 

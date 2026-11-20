@@ -268,3 +268,41 @@ switch (x) {
         (switch_default
           (expression_statement
             (number_literal)))))))
+
+==================
+Blocks in colon cases
+==================
+
+switch (v) {
+case 1: { a }; break
+case 2:
+    { b }
+    { c }
+default: { d }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (block
+            (expression_statement
+              (identifier)))
+          (break_statement))
+        (switch_case
+          value: (number_literal)
+          (block
+            (expression_statement
+              (identifier)))
+          (block
+            (expression_statement
+              (identifier))))
+        (switch_default
+          (block
+            (expression_statement
+              (identifier))))))))

@@ -90,6 +90,263 @@ def c = { a; b; c }
         (expression_statement (identifier))))))
 
 ==================
+A brace that opens a statement is a block
+==================
+
+{ }
+{ a }
+{ it }
+{ a: 1 }
+{ int x = 1; x }
+{ { b } }
+def m() {
+    { a }
+}
+foo {
+    { a }
+}
+
+---
+
+(source_file
+  (block)
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (labeled_statement
+      label: (identifier)
+      statement: (expression_statement
+        (number_literal))))
+  (block
+    (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    (expression_statement
+      (identifier)))
+  (block
+    (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (block
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (block
+        (expression_statement
+          (identifier))))))
+
+==================
+A brace that opens a statement is a closure where an expression continues it
+==================
+
+{ a }();
+{ a }.call();
+{ a } as Runnable;
+{ a } + 1;
+{ a }[0];
+{ a } { b };
+{ a }
+.call();
+{ a }
+* 2;
+{ a -> };
+{ -> 1 };
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (closure
+        (expression_statement
+          (identifier)))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (closure
+          (expression_statement
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (cast_expression
+      value: (closure
+        (expression_statement
+          (identifier)))
+      type: (type_identifier)))
+  (expression_statement
+    (binary_expression
+      left: (closure
+        (expression_statement
+          (identifier)))
+      right: (number_literal)))
+  (expression_statement
+    (subscript_expression
+      object: (closure
+        (expression_statement
+          (identifier)))
+      index: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (closure
+        (expression_statement
+          (identifier)))
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (closure
+          (expression_statement
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (binary_expression
+      left: (closure
+        (expression_statement
+          (identifier)))
+      right: (number_literal)))
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          name: (identifier)))))
+  (expression_statement
+    (closure
+      (closure_parameters)
+      (expression_statement
+        (number_literal)))))
+
+==================
+A block that opens a statement before a line that starts a statement
+==================
+
+{ a }
+(1);
+{ a }
+{ b };
+{ a }
+[0];
+{ a }
++ 1;
+{ a }; foo();
+{ a } // c
+
+---
+
+(source_file
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (list_literal
+      (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block
+    (expression_statement
+      (identifier)))
+  (line_comment))
+
+==================
+A brace on the line after an expression is its trailing closure, after a semicolon a block
+==================
+
+foo()
+{ a }
+foo
+{ b }
+x = 1
+{ c }
+foo(); { d }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (number_literal)
+        closure: (closure
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block
+    (expression_statement
+      (identifier))))
+
+==================
+A block that opens a statement before a block comment that does not close
+==================
+
+{ foo() } /* c
+
+---
+
+(source_file
+  (block
+    (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (ERROR)
+  (expression_statement
+    (identifier)))
+
+==================
 Closure as list element
 ==================
 
