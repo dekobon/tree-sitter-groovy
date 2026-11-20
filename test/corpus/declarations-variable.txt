@@ -823,6 +823,140 @@ Multi-assignment without def with comments between its names
       value: (identifier))))
 
 ==================
+Multi-assignment without def with other identifier characters in its names
+==================
+
+(a, $b, _c, é) = l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (identifier))))
+
+==================
+Multi-assignment without def with form feeds and vertical tabs between its names
+==================
+
+(a,b) = l;
+(a, b) = l;
+(a, b)= l;
+(a,b) = l;
+(a, b) = l;
+(a, b)= l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier))))
+
+==================
+Multi-assignment without def and a method head with more names than the scanner reads ahead
+==================
+
+(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) = l
+def f(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) { }
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))
+
+==================
 Multi-assignment without def in a method, a closure and an if branch
 ==================
 
@@ -1216,6 +1350,59 @@ Multi-assignment with a compound operator is not accepted
 (a, b) += x
 
 ---
+
+==================
+An unfinished list of names in a closure keeps the closure (error recovery)
+==================
+
+list.each {
+  (a, b,
+}
+println 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (ERROR
+          (identifier)
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
+
+==================
+A compound operator after a list of names in a closure keeps the multi-assignment (error recovery)
+==================
+
+list.each {
+  (a, b) +=
+}
+println 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (multi_assignment_expression
+            name: (identifier)
+            name: (identifier)
+            (ERROR)
+            value: (MISSING identifier))))))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
 
 ==================
 Typed local variable declaration
