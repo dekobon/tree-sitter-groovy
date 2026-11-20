@@ -1328,7 +1328,20 @@ a hundred lambdas (`DEMOTED_LAMBDA_WEIGHT`), one whose whole body is a
 parenthesized expression one step below a lambda
 (`PARENTHESIZED_BODY_WEIGHT`), and a block in the body of `if`, `else`,
 a loop or an arrow case outweighs a lambda whose body is a closure
-(`BODY_BLOCK_WEIGHT`). A block where Groovy tries a block first and that
+(`BODY_BLOCK_WEIGHT`). The consequence of `if`, that block
+(`_body_block`) or a statement, is a rule of its own
+(`_if_consequence`), so that its two readings, a block and a closure,
+reduce to one symbol at its `}`, where they merge and the weight
+decides; the other bodies end their statement, which is reduced there.
+Inline in `if_statement` they were ranked only where the statement was
+reduced, at the end of an `else if` chain: every link kept both
+readings alive, a chain that ended the input took time far above
+linear in its length, and in a method a chain whose blocks each start
+with the assignment of a lambda lost a link's block to the closure from
+twelve links on, as the runtime keeps a few stack versions only
+(`bindings/rust/tests/if_chain_cost.rs`). The rule costs every `if` a
+reduction, about 1% more instructions on code made of `if` statements.
+A block where Groovy tries a block first and that
 ends what it opens, a lambda's brace body and a `{` that opens a
 statement (§6.22), outweighs the lambda in it by one step
 (`STATEMENT_BLOCK_WEIGHT`), and a lambda's block adds that step to the

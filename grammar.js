@@ -1302,7 +1302,7 @@ module.exports = grammar({
       '(',
       field('condition', $._statement_expression),
       ')',
-      field('consequence', choice(weighted(BODY_BLOCK_WEIGHT, $.block), $._statement)),
+      field('consequence', $._if_consequence),
       optional(';'),
       optional(seq(
         'else',
@@ -3325,9 +3325,19 @@ module.exports = grammar({
     // reduction; the weight inline in the six loop and case rules took about
     // 50 more states, and inline in `else` it was lost, as a production takes
     // the largest of the weights in it, not their sum, and the `if` before it
-    // has one. The consequence of `if` takes it inline. Aliased to itself so
-    // that the reduction, and the weight, is kept.
+    // has one. Aliased to itself so that the reduction, and the weight, is
+    // kept.
     _body_block: $ => weighted(BODY_BLOCK_WEIGHT, alias($.block, $.block)),
+
+    // The consequence of `if`, as a rule of its own: its two readings, a
+    // block and a closure (`{ a = (b) -> c }`), must reduce to one symbol at
+    // its `}`, where the runtime merges them and the weight decides. Inline in
+    // `if_statement` they were ranked only when that statement was reduced,
+    // which in an `else if` chain is at the chain's end: every link kept both
+    // readings alive, the parse took time far above linear in the length of
+    // the chain, and past the runtime's limit on stack versions the block
+    // reading of a link was dropped for the closure.
+    _if_consequence: $ => choice($._body_block, $._statement),
 
     // A parenthesized expression after `_lambda_start`, aliased to
     // `parenthesized_expression`. The scanner reads only the parentheses

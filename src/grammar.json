@@ -1505,21 +1505,8 @@
             "type": "FIELD",
             "name": "consequence",
             "content": {
-              "type": "CHOICE",
-              "members": [
-                {
-                  "type": "PREC_DYNAMIC",
-                  "value": 604,
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "block"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_statement"
-                }
-              ]
+              "type": "SYMBOL",
+              "name": "_if_consequence"
             }
           },
           {
@@ -11550,6 +11537,19 @@
         "named": true,
         "value": "block"
       }
+    },
+    "_if_consequence": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_body_block"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_statement"
+        }
+      ]
     },
     "_lambda_parenthesized_expression": {
       "type": "SEQ",
