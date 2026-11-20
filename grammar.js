@@ -24,6 +24,8 @@
  *     name, that `->` follows
  *   - The first comma of a multi-assignment, which it turns down where
  *     the parentheses go on as a method's parameters
+ *   - The start of a typed declaration without an initializer
+ *     (`String s`), which a line break after the name may end
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
  */
@@ -829,6 +831,12 @@ module.exports = grammar({
     // `def f(a, b)` to the token after the `)`. Listed last but for the
     // sentinel, so that it renumbers no symbol before it.
     $._multi_assignment_comma,
+    // §6.21 — empty token before the type of a typed local declaration whose
+    // first declarator has no initializer (`String s`, `int a, b`), emitted
+    // when the declaration ends on the name's line or a list of names
+    // follows. Listed last but for the sentinel, so that it renumbers no
+    // symbol before it.
+    $._declaration_start,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -929,6 +937,9 @@ module.exports = grammar({
     // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
+    // `{ final String a, b -> }` vs. `{ final String a, b }`, the same fork
+    // after a blank final's name.
+    [$.local_variable_declaration, $.closure_parameter],
     // `{ @A _ x -> }`, a parameter of type `_`, vs. `{ @A _` as the
     // declaration of the placeholder followed by a statement `x`.
     [$._placeholder_declarator, $.closure_parameter],
@@ -1249,22 +1260,28 @@ module.exports = grammar({
     // a trailing expression onto `return` / `throw` / `assert`;
     // explicit `;` or statement boundary is recommended in source.
     // A statement may follow a bare `return`, `break` or `continue`, so
-    // the scanner offers `_command_statement_start` before a name there
-    // (§6.14). Taking it here keeps `return foo new Foo()` the return of
-    // `foo` followed by the creation, as `return foo 1` is; `prec.right`
-    // prefers the shift, as it does for the name itself.
+    // the scanner offers `_command_statement_start` and
+    // `_declaration_start` before a name there (§6.14, §6.21). Taking them
+    // here keeps `return foo new Foo()` the return of `foo` followed by the
+    // creation, as `return foo 1` is, and `return String s` the return of
+    // `String` followed by `s`; `prec.right` prefers the shift, as it does
+    // for the name itself. Ending the statement at a token that only the
+    // scanner's look-ahead decides would make its extent depend on text
+    // past its own tokens, which a reparse that reuses it does not read
+    // again.
     return_statement: $ => prec.right(seq(
       'return',
       optional(choice(
         $._expression,
         seq($._command_statement_start, $.identifier),
+        seq($._declaration_start, $._expression),
       )),
     )),
 
     break_statement: $ => prec.right(seq(
       'break',
       optional(seq(
-        optional($._command_statement_start),
+        optional(choice($._command_statement_start, $._declaration_start)),
         field('label', $.identifier),
       )),
     )),
@@ -1272,7 +1289,7 @@ module.exports = grammar({
     continue_statement: $ => prec.right(seq(
       'continue',
       optional(seq(
-        optional($._command_statement_start),
+        optional(choice($._command_statement_start, $._declaration_start)),
         field('label', $.identifier),
       )),
     )),
@@ -1953,16 +1970,24 @@ module.exports = grammar({
     ),
 
     // §4 / §5.12 — `def x = …`, `var x = …`, and `Type x = …`.
-    // The typed form requires every declarator to carry an
-    // `= value` initializer; bare `Type x` without initializer
-    // would conflict with method_invocation `Type(x)` and is
-    // disallowed in v1. Multiple declarators per statement
-    // (`def a = 1, b = 2`) are supported in all three forms.
-    // `final` is the only modifier accepted here.
-    // `final x = 1` with no type or `def` is the modifier-only form;
-    // the variable is dynamically typed, as with `def`. `final` also
-    // allows the typed form without an initializer (`final String
-    // name`, a blank final), with a single declarator.
+    // Multiple declarators per statement (`def a = 1, b = 2`) are
+    // supported in all three forms. `final` is the only modifier
+    // accepted here. `final x = 1` with no type or `def` is the
+    // modifier-only form; the variable is dynamically typed, as with
+    // `def`. `final` also allows the typed form without an initializer
+    // (`final String name`, a blank final). After the first declarator
+    // of a typed form any may go without one (`String a = 1, b`).
+    //
+    // A typed form whose first declarator has no initializer
+    // (`String s`, `int i;`, `List<String> a, b = []`) opens with
+    // `_declaration_start`, which the scanner emits before the type
+    // only when it reads such a declaration (§6.21), where a statement
+    // starts, after its annotations and as a `for` init. Its tokens are
+    // also `String` followed by the statement `s`, and a line break
+    // after the type or the name ends the statement in Groovy, which
+    // only the scanner sees. Apart from this form only `return`, `break`
+    // and `continue` take the token (see return_statement), so the form
+    // needs no weight.
     //
     // The typed forms carry a dynamic precedence because their tokens
     // also parse another way: `String s = 'a'` as the expression
@@ -1980,7 +2005,9 @@ module.exports = grammar({
     //   reads `x` as the type and that identifier as the name. `y = 2`
     //   becomes `final x y = 2`, the same resolution modifier-only
     //   fields get (`static x` then `y = 1`), and `String s = 'a'`
-    //   becomes `final x String` followed by `s = 'a'`.
+    //   becomes `final x String` followed by `s = 'a'`. A declaration
+    //   without an initializer on that line is one of its own:
+    //   `final x` then `String s` declares `x` and `s`.
     // - `final String name` followed by a line reading `foo() { }` is
     //   `final String` followed by the method `name foo() { }`. A
     //   method with a body outranks the blank form, so that
@@ -2004,7 +2031,7 @@ module.exports = grammar({
         optional('final'),
         field('type', $._type),
         $._initialized_declarator,
-        repeat(seq(',', $._initialized_declarator)),
+        repeat(seq(',', $._typed_declarator)),
       )),
       seq(
         repeat($.annotation),
@@ -2021,12 +2048,28 @@ module.exports = grammar({
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
+        repeat(seq(',', $._typed_declarator)),
       )),
       weighted(2, seq(
         repeat1($.annotation),
         alias($._placeholder_declarator, $.variable_declarator),
       )),
+      seq(
+        repeat($.annotation),
+        $._declaration_start,
+        field('type', $._type),
+        $._typed_declarator,
+        repeat(seq(',', $._typed_declarator)),
+      ),
     )),
+
+    // A declarator of a typed form, with or without an initializer. The
+    // name and the value are fields of the declaration, as in
+    // `_initialized_declarator`.
+    _typed_declarator: $ => seq(
+      field('name', $.identifier),
+      optional(seq('=', field('value', enhancedStatementExpression($)))),
+    ),
 
     // `@Library('shared') _`, the Jenkins idiom: an annotation needs a
     // declaration to stand on, and `_` is the name used for it. Apache

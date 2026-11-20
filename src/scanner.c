@@ -31,7 +31,10 @@
 // continues, and LAMBDA_BODY_REREAD, an empty token no rule takes, which
 // hands such a `}` back to the parser when it reused the body whole;
 // §6.20 MULTI_ASSIGNMENT_COMMA, the first `,` of `(a, b) = …`, emitted
-// unless the parentheses go on as a method's parameters.
+// unless the parentheses go on as a method's parameters; and §6.21
+// DECLARATION_START, an empty token before the type of a typed declaration
+// whose first name has no initializer (`String s`, `int a, b`), which the
+// statement's first name decides with COMMAND_STATEMENT_START.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
@@ -43,8 +46,8 @@
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
-// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA and the
-// STRING_BODY check are suppressed.
+// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA,
+// DECLARATION_START and the STRING_BODY check are suppressed.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -86,6 +89,7 @@ enum TokenType {
     LAMBDA_BODY_END,
     LAMBDA_BODY_REREAD,
     MULTI_ASSIGNMENT_COMMA,
+    DECLARATION_START,
     ERROR_SENTINEL,
 };
 
@@ -809,7 +813,8 @@ static bool skip_comment_body(TSLexer *lexer) {
 // a modifier, an operator or an open bracket comes before it, or `->` after
 // it: a call's last argument ends at it (`foo a, b` then the next
 // statement). `;`, a closing bracket with none open and the end of the
-// budget, `budget` items, end the look-ahead with no `->`.
+// budget, `budget` items, end the look-ahead with no `->`. §6.21 reads the
+// same after the `=` of a later declared name (`{ String a, b = 1 -> }`).
 static bool parameters_follow(
     TSLexer *lexer,
     unsigned budget,
@@ -2040,6 +2045,438 @@ static bool statement_argument_follows(
                               no_close_ahead);
 }
 
+// SPECIFICATION.md §6.21 — whether a word that `read_word` returned cannot
+// name a declared variable: Apache's `variableDeclaratorId` is the
+// `identifier` of a lambda's one parameter, so the words are those of
+// `is_reserved_bare_lambda_name` (`this`, `super`, `int`, `new`); `String this`
+// is Groovy's call `String(this)`.
+static bool is_reserved_variable_name(const char *word, unsigned len) {
+    return is_reserved_bare_lambda_name(word, len);
+}
+
+// SPECIFICATION.md §6.21 — the most the look-ahead of a declaration without
+// an initializer reads, in items: a name of its list, a word, a bracket or
+// another character of its type arguments, and of a later name's default
+// the items `parameters_follow` counts. That default is read to the `->`
+// that would make the list closure parameters, so in a nest of closures
+// that open with such a list (`{ T a, b = { T a, b = { …`), and on lines of
+// a broken one, each declaration reads the rest of the nest; with the bound
+// each reads at most this many items, and the parse stays linear. Type
+// arguments or a list of names longer than this are read as before, the
+// type followed by its names as statements; a default that runs past the
+// budget is a declaration's, not a closure parameter's.
+static const unsigned DECLARATION_LOOKAHEAD_ITEMS = 256;
+
+// Skips what the grammar's extras skip on a line: spaces, tabs, line
+// escapes, form feeds and vertical tabs, and with `comments` block comments
+// as well, which may span lines, as Groovy's lexer hides a line break inside
+// one. Returns false at a `\` that starts no line escape and at a block
+// comment that does not close (§6.6). With `comments`, a `/` that opens no
+// block comment is consumed and sets `*slash`; the next character is then
+// the lookahead.
+static bool skip_line_extras(
+    TSLexer *lexer,
+    bool comments,
+    bool no_close_ahead,
+    bool *slash
+) {
+    for (;;) {
+        if (comments
+            ? !skip_header_trivia(lexer, false, no_close_ahead, NULL, slash)
+            : !skip_same_line_space(lexer, false)) {
+            return false;
+        }
+        if ((slash != NULL && *slash)
+            || (lexer->lookahead != '\f' && lexer->lookahead != '\v')) {
+            return true;
+        }
+        advance(lexer);
+    }
+}
+
+// The same across lines: Groovy's trivia (whitespace, line breaks, line
+// escapes and comments) and the form feeds and vertical tabs of the
+// grammar's extras. A `/` that opens no comment is consumed and sets
+// `*slash`.
+static bool skip_extras(TSLexer *lexer, bool no_close_ahead, bool *slash) {
+    for (;;) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, slash)) {
+            return false;
+        }
+        if (*slash || (lexer->lookahead != '\f' && lexer->lookahead != '\v')) {
+            return true;
+        }
+        advance(lexer);
+    }
+}
+
+// Reads type arguments from their `<` to the matching `>` on the line: names
+// (`extends` and `super` among them), `,`, `?`, `.`, `[`, `]` and nested
+// `<` `>`, with spaces between, as `type_arguments` in grammar.js takes them.
+// Counts what it reads in `*items`. Returns false on anything else, at a line
+// break and at the end of the budget.
+static bool skip_type_arguments(TSLexer *lexer, unsigned *items) {
+    unsigned depth = 0;
+    for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
+        if (!skip_line_extras(lexer, false, false, NULL)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (is_identifier_start(c)) {
+            read_word(lexer, NULL, 0);
+            continue;
+        }
+        if (c == '<') {
+            depth++;
+        } else if (c == '>') {
+            if (depth == 0) {
+                return false;
+            }
+            depth--;
+            if (depth == 0) {
+                advance(lexer);
+                return true;
+            }
+        } else if (c != ',' && c != '?' && c != '.' && c != '[' && c != ']') {
+            return false;
+        }
+        advance(lexer);
+    }
+    return false;
+}
+
+// Consumes the dimensions of an array type from the first `[`, as
+// `array_dimensions_follow` reads them where a type may start: `[`, Groovy's
+// trivia, `]`, and each further `[` on the line of the `]` before it.
+// Returns false at a `[` that `]` does not follow.
+static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
+    do {
+        advance(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+            || lexer->lookahead != ']') {
+            return false;
+        }
+        advance(lexer);
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+    } while (lexer->lookahead == '[');
+    return true;
+}
+
+// After a declared name, a line break and Groovy's trivia, at the first
+// character of the next line, which `slash` says is the one after a `/` that
+// opens no comment: whether the line goes on with the statement, as Groovy
+// reads it, rather than starting the next one. Groovy ends a declaration at
+// the line break where a statement can follow, and reads the line before as
+// a call otherwise (`String s` then `.trim()` is `String(s.trim())`), which
+// is left as before: the type and the name as statements. A line goes on
+// when it starts with what no statement starts with: an operator other than
+// `+`, `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `==`, `=~`, `<`, `-=`,
+// `/=`, the `->` of closure parameters), `instanceof`, `in` or `as`
+// (`for (String s` then `in xs)`), `:`, `,` or a closing bracket. A `/` that
+// opens no comment starts a slashy string there, as Groovy's lexer reads it.
+// So does `(` when the parentheses hold parameters (`call_arguments_follow`):
+// `Tab x` then `(int x) { }` stays the method `x`, where Groovy reads the
+// declaration and the call `int(x, { })`, which has no reading here.
+static bool next_line_continues(
+    TSLexer *lexer,
+    bool slash,
+    bool no_close_ahead
+) {
+    int32_t c = lexer->lookahead;
+    if (slash) {
+        return c == '=';
+    }
+    if (lexer->eof(lexer)) {
+        return false;
+    }
+    switch (c) {
+        case '.':
+        case '?':
+        case '*':
+        case '%':
+        case '^':
+        case '|':
+        case '&':
+        case '<':
+        case '>':
+        case ':':
+        case ',':
+        case ')':
+        case ']':
+        case '=':
+            return true;
+        case '!':
+            return !negation_follows(lexer);
+        case '+':
+        case '-':
+            advance(lexer);
+            return lexer->lookahead == '='
+                || (c == '-' && lexer->lookahead == '>');
+        case '(':
+            return !call_arguments_follow(lexer, no_close_ahead);
+        default:
+            break;
+    }
+    if (!is_identifier_start(c)) {
+        return false;
+    }
+    char word[sizeof "instanceof"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    return word_is(word, len, "in") || word_is(word, len, "as")
+        || word_is(word, len, "instanceof");
+}
+
+// After the first declared name of a typed declaration and the spaces after
+// it (`String s`): whether the declaration has no initializer there, which
+// the typed form with one does not take. It ends on the line, past spaces
+// and block comments, at `;`, `}`, `else`, the end of input or a line comment,
+// or at a line break where the next line does not go on with it
+// (`next_line_continues`). Or a list of names follows, each after a `,` and
+// Groovy's trivia (`String a, b`), which ends there as well or at the `=` of
+// a later name's initializer, on its line or the next (`String a, b = 1`),
+// unless `->` ends the list (`{ String a, b = 1 -> }`), which makes closure
+// parameters (`parameters_follow`). `=` after the first name, on its line or
+// the next, is the typed form with an initializer (`String s = 1`), and `->`,
+// `(`, a name or anything else on the line is no declaration without one.
+static bool declaration_end_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool no_close_ahead
+) {
+    bool first = true;
+    for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
+        bool slash = false;
+        if (!skip_line_extras(lexer, true, no_close_ahead, &slash)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (slash) {
+            if (c != '/') {
+                return false;
+            }
+            while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
+                advance(lexer);
+            }
+            c = lexer->lookahead;
+        }
+        if (lexer->eof(lexer) || c == ';' || c == '}') {
+            return true;
+        }
+        if (is_line_break(c)) {
+            slash = false;
+            if (!skip_extras(lexer, no_close_ahead, &slash)) {
+                return false;
+            }
+            if (slash || lexer->lookahead != '=') {
+                return !next_line_continues(lexer, slash, no_close_ahead);
+            }
+            c = '=';
+        }
+        if (c == '=') {
+            if (first) {
+                return false;
+            }
+            advance(lexer);
+            return lexer->lookahead != '=' && lexer->lookahead != '~'
+                && !parameters_follow(lexer,
+                                      DECLARATION_LOOKAHEAD_ITEMS - *items,
+                                      no_close_ahead);
+        }
+        if (is_identifier_start(c)) {
+            char word[sizeof "else"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            return word_is(word, len, "else");
+        }
+        if (c != ',') {
+            return false;
+        }
+        advance(lexer);
+        slash = false;
+        if (!skip_extras(lexer, no_close_ahead, &slash) || slash
+            || !is_identifier_start(lexer->lookahead)) {
+            return false;
+        }
+        char name[sizeof "synchronized"];
+        unsigned len = read_word(lexer, name, sizeof name);
+        if (is_reserved_variable_name(name, len)) {
+            return false;
+        }
+        first = false;
+    }
+    return false;
+}
+
+// After the type of a declaration: whether, after spaces, tabs and line
+// escapes, a name follows on the line, no keyword Groovy reserves, and then
+// the end of a declaration without an initializer
+// (`declaration_end_follows`). Between the type and the name nothing else is
+// skipped, as between a receiver and a name argument (§6.14).
+static bool declared_name_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool no_close_ahead
+) {
+    if (!skip_same_line_space(lexer, false)
+        || !is_identifier_start(lexer->lookahead)) {
+        return false;
+    }
+    char name[sizeof "synchronized"];
+    unsigned len = read_word(lexer, name, sizeof name);
+    return !is_reserved_variable_name(name, len)
+        && declaration_end_follows(lexer, items, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.21 — after the first name of a statement and type
+// arguments directly after it (`List<String> xs`, `foo<T> x`), which
+// Apache's isInvalidLocalVariableDeclaration takes for a declaration's type
+// whatever its spelling: the arguments, any dimensions and a declared name
+// with no initializer.
+static bool generic_declaration_follows(TSLexer *lexer, bool no_close_ahead) {
+    unsigned items = 0;
+    if (!skip_type_arguments(lexer, &items)
+        || !skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '[' && !read_dimensions(lexer, no_close_ahead)) {
+        return false;
+    }
+    return declared_name_follows(lexer, &items, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.15, §6.21 — after the first name of a statement or its
+// dotted path, at the `[` of dimensions (`String[] xs`, `String[].class`):
+// with `element`, the name may be the element type of an array type value,
+// which a member access or `::` follows (ARRAY_VALUE_START); otherwise a
+// declared name with no initializer may follow, whatever the name's
+// spelling (`foo[] x`), as Apache's isInvalidLocalVariableDeclaration takes
+// `[` after it for a type (DECLARATION_START). Where no type may start, the
+// array type value is decided after the first `]`, as
+// `array_dimensions_follow` does, and there is no declaration.
+static bool scan_dimensions_start(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool element,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    lexer->result_symbol = ARRAY_VALUE_START;
+    if (!type_may_start) {
+        return element
+            && array_dimensions_follow(lexer, false, no_close_ahead);
+    }
+    if (!read_dimensions(lexer, no_close_ahead)) {
+        return false;
+    }
+    int32_t c = lexer->lookahead;
+    if (c == '.' || c == ':') {
+        advance(lexer);
+        return element
+            && (c == ':' ? lexer->lookahead == ':'
+                : lexer->lookahead == '&'
+                    || is_identifier_start(lexer->lookahead));
+    }
+    unsigned items = 0;
+    lexer->result_symbol = DECLARATION_START;
+    return valid_symbols[DECLARATION_START]
+        && declared_name_follows(lexer, &items, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.14, §6.15, §6.21 — at a `.` after the first name of a
+// statement: a dotted name, read to its last name with no space. Its last
+// name capitalized, or type arguments or dimensions after it, make it the
+// type of a declaration when a declared name with no initializer follows
+// (`foo.Bar q`, `java.util.List<String> l`), as Apache's
+// isInvalidLocalVariableDeclaration reads it. When every name is
+// capitalized it may be the element type of an array type value
+// (`Map.Entry[].class`). A dotted receiver of a call is decided after the
+// first name (COMMAND_PATH_START), so this returns false for one.
+// `capitalized` and `upper` describe the first name.
+static bool scan_dotted_statement_start(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool capitalized,
+    bool upper,
+    bool wants_array,
+    bool type_may_start,
+    bool no_close_ahead
+) {
+    bool nested = capitalized;
+    bool last_upper = upper;
+    while (lexer->lookahead == '.') {
+        advance(lexer);
+        if (!is_identifier_start(lexer->lookahead)) {
+            return false;
+        }
+        last_upper = is_upper_letter(lexer->lookahead);
+        nested = nested && is_capital(lexer->lookahead);
+        read_word(lexer, NULL, 0);
+    }
+    if (lexer->lookahead == '<') {
+        lexer->result_symbol = DECLARATION_START;
+        return valid_symbols[DECLARATION_START]
+            && generic_declaration_follows(lexer, no_close_ahead);
+    }
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '[') {
+        return scan_dimensions_start(lexer, valid_symbols,
+                                     wants_array && nested, type_may_start,
+                                     no_close_ahead);
+    }
+    unsigned items = 0;
+    lexer->result_symbol = DECLARATION_START;
+    return last_upper && valid_symbols[DECLARATION_START]
+        && declared_name_follows(lexer, &items, no_close_ahead);
+}
+
+// SPECIFICATION.md §6.14, §6.21 — after the first name of a statement that
+// may name a type by Apache's isInvalidLocalVariableDeclaration, a
+// capitalized or a primitive type name, and the spaces after it, at a name:
+// a call whose first argument starts with `new` or is an array type value
+// (`Foo new Bar()`, `Foo String[].class`, COMMAND_STATEMENT_START), or a
+// declaration without an initializer (`String s`, DECLARATION_START). Such a
+// receiver takes no other name as an argument (`may_name_type`), so each
+// statement that starts with two names is a call, a declaration or neither,
+// and never both.
+static bool scan_typed_statement_start(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool no_close_ahead
+) {
+    bool capitalized = is_capital(lexer->lookahead);
+    char name[sizeof "synchronized"];
+    unsigned len = read_word(lexer, name, sizeof name);
+    if (word_is(name, len, "new")) {
+        lexer->result_symbol = COMMAND_STATEMENT_START;
+        return valid_symbols[COMMAND_STATEMENT_START]
+            && creation_follows(lexer, no_close_ahead);
+    }
+    bool keyword = is_reserved_variable_name(name, len);
+    if (lexer->lookahead == '.') {
+        // `read_element_type_name`, from the end of the name.
+        lexer->result_symbol = COMMAND_STATEMENT_START;
+        return capitalized && valid_symbols[COMMAND_STATEMENT_START]
+            && read_nested_type_names(lexer)
+            && array_dimensions_follow(lexer, true, no_close_ahead);
+    }
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '[') {
+        lexer->result_symbol = COMMAND_STATEMENT_START;
+        return (capitalized || is_primitive_type(name, len))
+            && valid_symbols[COMMAND_STATEMENT_START]
+            && array_dimensions_follow(lexer, true, no_close_ahead);
+    }
+    unsigned items = 0;
+    lexer->result_symbol = DECLARATION_START;
+    return !keyword && valid_symbols[DECLARATION_START]
+        && declaration_end_follows(lexer, &items, no_close_ahead);
+}
+
 // SPECIFICATION.md §6.14 — decides at the first name of a statement,
 // before it, whether the statement is a parenthesis-free call whose
 // receiver is that name and whose first argument starts with `new`, is
@@ -2058,6 +2495,17 @@ static bool statement_argument_follows(
 // statement start as well. The scanner cannot read the name twice, so
 // each is decided here, as the branches of the scan function decide it
 // where no statement may start.
+//
+// §6.21 — the same name may also be the type of a declaration without an
+// initializer (DECLARATION_START), which is valid after a statement's
+// annotations and as a `for` init too, where no call may start. Both
+// tokens come from the one reading of the name below, by Apache's
+// isInvalidLocalVariableDeclaration on its spelling: a receiver that may
+// name a type takes no name argument, and only such a receiver, or a name
+// that type arguments or dimensions follow, is a declaration's type. A
+// statement that starts with two names is therefore a call, a
+// declaration or neither, in every state. Each token is emitted only where
+// it is valid; where the other one is the answer, the scan returns false.
 //
 // The caller has skipped whitespace and seen an identifier start.
 static bool scan_statement_start(
@@ -2096,7 +2544,8 @@ static bool scan_statement_start(
     // a constructor calls, as `this(foo 1)` does. Before `new` or an array
     // type value they stay the name and then the argument.
     if (is_grammar_keyword(word, len)) {
-        if (is_value_keyword(word, len, lexer->lookahead)
+        if (!valid_symbols[COMMAND_STATEMENT_START]
+            || is_value_keyword(word, len, lexer->lookahead)
             || !skip_same_line_space(lexer, false) || lexer->lookahead != '('
             || !parenthesized_command_follows(lexer, no_close_ahead)) {
             return false;
@@ -2104,25 +2553,32 @@ static bool scan_statement_start(
         lexer->result_symbol = COMMAND_STATEMENT_START;
         return true;
     }
+    // §6.21 — a declaration's type, by Apache's isInvalidLocalVariableDeclaration
+    // on the spelling: a dotted name, which is decided apart, a name that type
+    // arguments or dimensions follow, or a capitalized or a primitive type
+    // name that a name follows.
     if (lexer->lookahead == '.') {
-        // A dotted receiver is decided after the first name.
-        if (!wants_array || !capitalized || !read_nested_type_names(lexer)
-            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
-            return false;
-        }
-        lexer->result_symbol = ARRAY_VALUE_START;
-        return true;
+        return scan_dotted_statement_start(lexer, valid_symbols, capitalized,
+                                           upper, wants_array, type_may_start,
+                                           no_close_ahead);
+    }
+    if (lexer->lookahead == '<') {
+        lexer->result_symbol = DECLARATION_START;
+        return valid_symbols[DECLARATION_START]
+            && generic_declaration_follows(lexer, no_close_ahead);
     }
     if (!skip_same_line_space(lexer, false)) {
         return false;
     }
     if (lexer->lookahead == '[') {
-        if (!wants_array || (!capitalized && !is_primitive_type(word, len))
-            || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
-            return false;
-        }
-        lexer->result_symbol = ARRAY_VALUE_START;
-        return true;
+        return scan_dimensions_start(
+            lexer, valid_symbols,
+            wants_array && (capitalized || is_primitive_type(word, len)),
+            type_may_start, no_close_ahead);
+    }
+    if ((upper || is_primitive_type(word, len))
+        && is_identifier_start(lexer->lookahead)) {
+        return scan_typed_statement_start(lexer, valid_symbols, no_close_ahead);
     }
     // `var`, `yield`, `in` or `as` whose own token was not valid here takes
     // no name either: whether that token is valid depends on the token
@@ -2130,7 +2586,8 @@ static bool scan_statement_start(
     // reparse need not restore, so the reading would too.
     bool names = !may_name_type(word, len, upper)
         && !is_contextual_word(word, len);
-    if (!statement_argument_follows(lexer, names, no_close_ahead)) {
+    if (!valid_symbols[COMMAND_STATEMENT_START]
+        || !statement_argument_follows(lexer, names, no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_STATEMENT_START;
@@ -3446,7 +3903,10 @@ bool tree_sitter_groovy_external_scanner_scan(
     bool wants_sealed = valid_symbols[SEALED_KEYWORD];
     bool wants_value_start = valid_symbols[COMMAND_VALUE_START]
         && !valid_symbols[ERROR_SENTINEL];
-    bool wants_statement_start = valid_symbols[COMMAND_STATEMENT_START]
+    // §6.21 — DECLARATION_START is valid where a statement may start and
+    // after its annotations, and the same first name decides it.
+    bool wants_statement_start = (valid_symbols[COMMAND_STATEMENT_START]
+                                  || valid_symbols[DECLARATION_START])
         && !valid_symbols[ERROR_SENTINEL];
     bool wants_cast_close = valid_symbols[CAST_CLOSE]
         && !valid_symbols[ERROR_SENTINEL];
