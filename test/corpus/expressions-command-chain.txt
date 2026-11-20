@@ -6514,6 +6514,47 @@ println msg, "${path.join(" -> ")}"
               (string_fragment))))))))
 
 ==================
+Named argument with a block comment before its colon
+==================
+
+foo a /* c */ : 1
+def v = foo a /* c */ : 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      (block_comment)
+      value: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          (block_comment)
+          value: (number_literal))))))
+
+==================
+Method reference as a name argument
+==================
+
+foo a :: b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_reference_expression
+      target: (identifier)
+      name: (identifier))))
+
+==================
 A dollar-slashy string is a first argument after a receiver that may name a type
 ==================
 

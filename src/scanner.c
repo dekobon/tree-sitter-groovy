@@ -640,6 +640,22 @@ static bool scan_command_named_key(
         lexer->result_symbol = COMMAND_NAMED_KEY;
         return true;
     }
+    // Groovy's lexer hides a block comment that something follows on its
+    // line, so the name is a key past one (`foo a /* c */ : 1` is
+    // `foo(a: 1)`), even one that spans lines. `key_colon_follows` stops at
+    // the comment, and the look-aheads that read a name argument
+    // (`name_argument_rest`) take the `:` after it for the end of the
+    // argument, so the call is open here. At a `/` no array type follows.
+    // The `/` after a lone `$` opens a dollar-slashy string, whose body is
+    // no comment (`println $/*.txt/$`).
+    if (lexer->lookahead == '/' && !opens_dollar_slashy(word, len, lexer)) {
+        if (!skip_header_trivia(lexer, false, no_close_ahead, NULL, NULL)
+            || !key_colon_follows(lexer, word, len)) {
+            return false;
+        }
+        lexer->result_symbol = COMMAND_NAMED_KEY;
+        return true;
+    }
     if (wants_array && lexer->lookahead == '['
         && (capitalized || is_primitive_type(word, len))
         && array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {

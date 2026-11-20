@@ -579,6 +579,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `tree-sitter highlight` and other tools that read the file load the
   injections; v0.6.0 left them out. `locals.scm` stays unlisted, as
   `tree-sitter tags` rejects its `@local.definition.var` captures.
+- A block comment between the key of a parenthesis-free call's named
+  argument and its `:` is trivia, as Groovy's lexer hides it:
+  `foo a /* c */ : 1` is the call `foo(a: 1)`, also when the comment
+  spans lines; v0.6.0 read the statement `foo` and the label `a: 1`
+  (`SPECIFICATION.md` §6.8).
 
 ## [0.6.0] - 2026-11-12
 

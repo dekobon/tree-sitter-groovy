@@ -1809,11 +1809,15 @@ error recovery (`ERROR_SENTINEL` valid). The token is empty: it says
 that a key starts here, and the in-grammar lexer then reads the key as
 an ordinary `identifier`. The scanner skips spaces, tabs and line
 escapes (§5.10) but not newlines, marks the token end, then looks ahead
-over a name and the same whitespace for a single `:` (a following
-second `:` means a method reference, so no emit). `case` and `default`
+over a name, the same whitespace and block comments, which may span
+lines as Groovy's lexer hides them (`foo a /* c */ : 1` is
+`foo(a: 1)`), for a single `:` (a following second `:` means a method
+reference, so no emit). `case` and `default`
 are rejected so a switch label after a statement on the same line stays
 a label. A key spelled `var`, `yield`, `in` or `as` is CONTEXTUAL_KEY
-instead, a token that spans the word (§6.16).
+instead, a token that spans the word (§6.16), and takes no comment
+before its `:`: `foo in /* c */ : 1` is the statement `foo` and the
+label `in: 1`, where Groovy reads `foo(in: 1)`.
 
 The scanner has no Unicode tables, so its look-ahead counts every
 non-ASCII code point as part of the name. That is wider than §5.2, and
