@@ -1230,7 +1230,10 @@ lexer and from Groovy 6.0.0's reading of a cast of `as` or `in`:
   a cast. Here the cast stands there when no other reading parses
   (`foo((String)` followed by `x)`), and loses when the later line can
   also continue the expression (`foo((a)` followed by `- b)` is a
-  subtraction); see `docs/divergences-from-spec.md` §15.
+  subtraction); see `docs/divergences-from-spec.md` §15. Where the
+  later line opens with `(` and no bracket holds both lines, the
+  scanner ends that reading at the `)` unless the type is an array or
+  generic type, which no expression is (§6.11).
 
 Without the two weights the readings were unranked and the result
 depended on the surrounding code.
@@ -2031,6 +2034,74 @@ runs past the end of the line after `as` or `in` counts as no operand,
 so `return (x) in /*` then `*/ y` on the next line casts the name `in`,
 where Groovy, which drops the comment, tests `(x)`. The token is
 aliased to `)`. It is not emitted during error recovery.
+
+The scan emits RELATIONAL_CLOSE as well for a `)` that ends its line
+before a line that opens with `(`, where no bracket holds both lines:
+
+```text
+Emit RELATIONAL_CLOSE for a `)` when TYPE_ONLY_CLOSE is not valid and,
+after the trivia above, the line ends (a line break, the end of the
+input or a line comment), and after the rest of the line, spaces, tabs
+and line breaks, the next line opens with `(`, unless, read from that
+`(` on Groovy's tokens for at most
+ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS (256) characters,
+  - a `)` or `]` with no bracket open comes before a `}` with none
+    open: brackets around both lines, inside which Groovy drops the
+    line break; or
+  - `->` follows the first parentheses (`(Foo)` then `(x) -> x`).
+The tokens are read as the other look-aheads read them: strings whole
+(a triple-quoted one across lines, a `${…}` with the strings in it, a
+dollar-slashy one), a slashy string where an operand may start, and
+comments as trivia. The end of the input, the bound, and a string or a
+comment that does not close within it end the read with no bracket
+found.
+```
+
+Where a line break ends a statement that `(` opens the next statement
+or a call's arguments (§6.18), and Groovy reads no cast across the
+line break. The cast whose operand is on a later line ranks below
+every other reading (§5.15) and lost there, but kept alive it was
+reduced again at every such line: since §6.18 opened a statement at
+each such `(`, a run of lines like `(x)`, `(a.b)` or `(a) = (b)` took
+time quadratic in its length, 2.1 s for 4,000 lines of `(x)`, where
+v0.6.0 took 12 ms. The token ends that reading at the `)`, as at a
+relational operator. An array or generic type is no expression, so the
+cast of one is the only reading of its parentheses: that later-line
+cast is an alternative of its own in `parenthesized_type_cast`, with
+TYPE_ONLY_CLOSE, which is never emitted, valid before its `)`, and the
+scan keeps it (`(List<String>)` then `(x)` is still a cast, where
+Groovy reads two statements; `docs/divergences-from-spec.md` §15).
+
+The scanner has no stack of brackets, so inside `(…)` and `[…]` it
+reads on for the bracket that closes them, and the cast stays
+(`foo((Foo)` then `(Bar) y)`, `foo((Foo)` then `(Bar) ')')`). A bracket
+beyond the bound goes unseen, and the cast inside it is turned down:
+`foo((Foo)` then `(Bar) y, '…')`, with the call's `)` more than 256
+characters on, is an `ERROR` where Groovy casts. Counted on characters
+instead of tokens, a bracket in a string or a comment had kept a cast
+alive or turned a valid one down. The read runs from every `)` that
+ends a line before such a `(`, so in a run of short lines each
+character is read from the `)` of each line up to 256 characters
+before it: 65 to 67 bytes asked for per input byte at 1,000, 4,000 and
+16,000 lines of `(x)`, flat, where the parse before asked for 7;
+those runs take 3, 12 and 45 ms. Code with few lines that open with `(` reads as
+before: the 24,548 Java files take as long. The cost test is
+`bindings/rust/tests/next_line_cast_cost.rs`, which counts the
+reductions per line.
+
+Measured against the grammar before: STATE_COUNT 4,648 to 4,656,
+LARGE_STATE_COUNT unchanged (1,788), one external token
+(`_type_only_close`), one hidden rule (`_cast_name_type`) and one
+conflict added. No tree changes on the corpus, on 266 real Groovy,
+Gradle and Jenkins files, on 24,548 Java files and on 4,000 inputs
+generated from statement templates; of 6,048 inputs made of a
+parenthesized line, a line break and parentheses, 75 change, each a
+ternary (`a ? (x)` then `(y) + 1 : b`) that Groovy 3 rejects, and of
+40,000 random token soups 369, each with an `ERROR` before and after.
+Runs of lines whose cast's operand would be on
+a next line that does not open with `(` stay quadratic, as at v0.6.0:
+`x.y = z * (w)` (2.0 s for 4,000 lines) and
+`this.total = base + (int) (offset)` (4.1 s).
 
 ### 6.12 NOT_IN — implementation contract
 
@@ -3233,6 +3304,16 @@ A closure in the parentheses holds statements, so a nest of `x` and
 the nest. The budget keeps that linear: 54 and 57 bytes asked for per
 input byte at 500 and 4,000 levels, 204 and 1,565 without it
 (`bindings/rust/tests/statement_paren_cost.rs`).
+
+The 10% above was measured on lines that open with `(` after a name
+(`foo`, then `(a, b) = l`). On lines that each hold parentheses alone
+(`(x)`, `(a.b)`, `(a) = (b)`) the `)` of every line may also close a
+cast of the next line, the reading ranked last (§5.15); with this `(`
+opening a statement, that reading stayed alive and was reduced again
+at every line, in time quadratic in the length of the run: 2.1 s for
+4,000 lines of `(x)`. The `)` before such a `(` now closes no cast
+where no bracket holds both lines (§6.11), and those runs are linear
+again (12 ms).
 
 Whether the `(` opens a statement decides whether the statement before
 it ends, and it depends on what the parentheses hold. That statement

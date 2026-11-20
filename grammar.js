@@ -935,6 +935,11 @@ module.exports = grammar({
     // a parameter list, from a typed local's lambda value elsewhere. Listed
     // last but for the sentinel, so that it renumbers no symbol before it.
     $._closure_parameters_start,
+    // §6.11 — never emitted: valid before the `)` of a cast whose operand
+    // is on a later line and whose type is an array or generic type, which
+    // no expression is, so that the scanner keeps that cast. Listed last
+    // but for the sentinel, so that it renumbers no symbol before it.
+    $._type_only_close,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -959,6 +964,8 @@ module.exports = grammar({
     // (parenthesized_type_cast). Tree-sitter explores both via
     // this conflict; the `)` plus the next token disambiguates.
     [$._expression, $._type],
+    // The same for the type of a cast whose operand is on a later line.
+    [$._expression, $._cast_name_type],
 
     // §4 — `a.b.c` could be a field_access chain (expression
     // context) or a qualified_type (type context). Same family
@@ -2764,12 +2771,34 @@ module.exports = grammar({
         alias($._cast_close, ')'),
         field('value', $._expression),
       ))),
+      // The cast whose operand is on a later line, in two alternatives by
+      // its type. A name or a dotted name may be an expression too, and the
+      // scanner turns that cast down with `_relational_close` where its `)`
+      // ends a line before a line that opens with `(` and no bracket holds
+      // both lines (§6.11): that `(` opens the next statement, and the cast,
+      // kept alive across it, was reduced again at every such line. An
+      // array or generic type is no expression, and its cast is the only
+      // reading of the parentheses: `_type_only_close`, which the scanner
+      // never emits, is valid before its `)` and keeps that cast.
       weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),
-        field('type', $._type),
+        field('type', $._cast_name_type),
         ')',
         field('value', $._expression),
       ))),
+      weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+        statementParen($),
+        field('type', choice($.array_type, $.generic_type)),
+        choice(')', $._type_only_close),
+        field('value', $._expression),
+      ))),
+    ),
+
+    // The type of a cast whose operand is on a later line, where the
+    // parentheses may hold an expression instead.
+    _cast_name_type: $ => choice(
+      alias($.identifier, $.type_identifier),
+      $.qualified_type,
     ),
 
     // §4 — `_type`. Supports unqualified type identifiers,

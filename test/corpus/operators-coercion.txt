@@ -388,3 +388,205 @@ foo((a)
           left: (parenthesized_expression
             (identifier))
           right: (identifier))))))
+
+==================
+Lines that open with parentheses after a parenthesized name are statements of their own
+==================
+
+(Foo)
+(x)
+(a.b)
+(x + ')')
+(y) = (z)
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (parenthesized_expression
+      (binary_expression
+        left: (identifier)
+        right: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (parenthesized_expression
+        (identifier))
+      right: (parenthesized_expression
+        (identifier)))))
+
+==================
+A cast inside a call keeps its operand in parentheses on the next line
+==================
+
+def r = foo((List<String>)
+  (x))
+def s = foo((Foo)
+  (Bar) y)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (parenthesized_type_cast
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            value: (parenthesized_expression
+              (identifier)))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (parenthesized_type_cast
+            type: (type_identifier)
+            value: (parenthesized_type_cast
+              type: (type_identifier)
+              value: (identifier))))))))
+
+==================
+Brackets in strings and comments after a cast's operand on the next line are not counted
+==================
+
+foo((Foo)
+  (Bar) '(')
+foo((Foo)
+  (Bar) "${')'}")
+foo((Foo)
+  (Bar) """(""")
+foo((Foo)
+  (Bar) ~/a(b/)
+foo((Foo)
+  (Bar) $/a(b/$)
+foo((Foo)
+  (Bar) /* ( */ y)
+foo((Foo)
+  (Bar) y // (
+)
+def r = [(Foo)
+  (Bar) '[']
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (gstring_brace_interpolation
+                value: (string_literal))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (string_fragment)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (unary_expression
+              operand: (string_literal
+                (string_fragment))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (string_fragment)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            (block_comment)
+            value: (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier)))
+        (line_comment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal)))))))
+
+==================
+A cast inside a call whose closing parenthesis is more than 256 characters on is turned down (known divergence)
+==================
+
+foo((Foo)
+  (Bar) y, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (method_invocation
+          function: (parenthesized_expression
+            (identifier))
+          arguments: (argument_list
+            (identifier)))
+        (ERROR
+          (identifier))
+        (string_literal)))))

@@ -334,7 +334,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   several arguments (`foo` then `(a, b);`) keep their tree. A block
   comment that opens the `(` line hides the line break, so `foo` then
   `/* c */ (1)` is a call. A new external token, `_statement_paren`,
-  carries that `(` (`SPECIFICATION.md` §6.18).
+  carries that `(` (`SPECIFICATION.md` §6.18). A `)` that ends its line
+  before such a `(` closes no cast unless a `)` or `]` after the `(`,
+  within 256 characters, closes brackets around both lines, so runs of
+  lines like `(x)` or `(a) = (b)` parse in linear time (12 ms for 4,000
+  lines of `(x)`, where the cast kept alive took 2.1 s). Past the bound
+  a cast inside a call is an `ERROR`: `foo((Foo)` then `(Bar) y, '…')`
+  with the call's `)` more than 256 characters on. The cast of an array
+  or generic type stays (`(List<String>)` then `(x)`); a new external
+  token, `_type_only_close`, which is never emitted, marks it
+  (`SPECIFICATION.md` §6.11, `docs/divergences-from-spec.md` §15).
 - **BREAKING:** after `as`, `instanceof` and `!instanceof` a dotted
   name with array dimensions or type arguments is one type (see Fixed),
   which changes trees for input that parsed without an `ERROR` at

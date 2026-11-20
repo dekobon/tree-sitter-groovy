@@ -25,7 +25,9 @@
 // §6.11 CAST_CLOSE, a `)` with
 // something after it on its line, and RELATIONAL_CLOSE, one before a
 // relational operator that Groovy applies to the parentheses (`(x)
-// instanceof Foo`); §3.2.2 CAST_TYPE_ARGUMENTS_OPEN, the `<` of a cast
+// instanceof Foo`) or one that ends its line before a line that opens with
+// `(` where no bracket holds both lines, neither of which closes a cast;
+// §3.2.2 CAST_TYPE_ARGUMENTS_OPEN, the `<` of a cast
 // type's type arguments where they close; §6.12 NOT_IN, the `!in`
 // operator; §6.17 LAMBDA_START and BARE_LAMBDA_START, empty tokens
 // before a lambda's parameters in parentheses and before its one name
@@ -44,10 +46,11 @@
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
 // that follows.
-// STRING_BODY (§6.10), TYPE_START (§6.15) and CLOSURE_PARAMETERS_START
-// (§6.21) are never emitted; they are valid only inside a string body,
-// where the scanner emits nothing, where a type may start and where
-// closure parameters may start. ERROR_SENTINEL is never emitted either;
+// STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
+// (§6.21) and TYPE_ONLY_CLOSE (§6.11) are never emitted; they are valid
+// only inside a string body, where the scanner emits nothing, where a type
+// may start, where closure parameters may start and before the `)` of a
+// cast of an array or generic type whose operand is on a later line. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
@@ -78,7 +81,8 @@
 //     `skip_header_trivia`, `skip_argument_trivia`, `skip_same_line_trivia`,
 //     `skip_line_extras`, `skip_extras`, `skip_multi_assignment_trivia`),
 //     tokens with brackets counted (`parameters_follow`, `skip_lambda_tokens`,
-//     `parentheses_open_statement`, `read_parentheses_extent`), strings
+//     `parentheses_open_statement`, `read_parentheses_extent`,
+//     `next_line_paren_ends_cast`), strings
 //     (`skip_string`, `skip_dollar_slashy_string`, `method_name_follows`)
 //     and block comments
 //     (`skip_comment_body`, and loops in `skip_header_trivia` and the scan
@@ -127,6 +131,7 @@ enum TokenType {
     RELATIONAL_CLOSE,
     CAST_TYPE_ARGUMENTS_OPEN,
     CLOSURE_PARAMETERS_START,
+    TYPE_ONLY_CLOSE,
     ERROR_SENTINEL,
 };
 
@@ -3223,6 +3228,184 @@ static ParenClose read_relational_operator(TSLexer *lexer) {
     }
 }
 
+// A view of a lexer whose input ends `left` characters on. The readers above
+// stop at the end of their input, and answer there as for text that ends too
+// soon: a string that does not close, a bracket that is never matched. Through
+// the view each stops at its bound as well, so a look-ahead made of them reads
+// no further than a fixed number of characters, whatever it reads. Nothing is
+// emitted through the view: its `mark_end` and `log` are never called and do
+// nothing.
+typedef struct {
+    // First, so that a pointer to the view is a pointer to its lexer.
+    TSLexer lexer;
+    TSLexer *input;
+    unsigned left;
+} BoundedLexer;
+
+static void bounded_advance(TSLexer *lexer, bool skip) {
+    BoundedLexer *view = (BoundedLexer *)lexer;
+    if (view->left == 0) {
+        return;
+    }
+    view->left--;
+    view->input->advance(view->input, skip);
+    view->lexer.lookahead = view->left == 0 ? 0 : view->input->lookahead;
+}
+
+static void bounded_mark_end(TSLexer *lexer) {
+    (void)lexer;
+}
+
+static uint32_t bounded_get_column(TSLexer *lexer) {
+    BoundedLexer *view = (BoundedLexer *)lexer;
+    return view->input->get_column(view->input);
+}
+
+static bool bounded_is_at_included_range_start(const TSLexer *lexer) {
+    const BoundedLexer *view = (const BoundedLexer *)lexer;
+    return view->input->is_at_included_range_start(view->input);
+}
+
+static bool bounded_eof(const TSLexer *lexer) {
+    const BoundedLexer *view = (const BoundedLexer *)lexer;
+    return view->left == 0 || view->input->eof(view->input);
+}
+
+static void bounded_log(const TSLexer *lexer, const char *format, ...) {
+    (void)lexer;
+    (void)format;
+}
+
+static BoundedLexer bounded_lexer(TSLexer *input, unsigned characters) {
+    BoundedLexer view = {
+        .lexer = {
+            .lookahead = characters == 0 ? 0 : input->lookahead,
+            .result_symbol = 0,
+            .advance = bounded_advance,
+            .mark_end = bounded_mark_end,
+            .get_column = bounded_get_column,
+            .is_at_included_range_start = bounded_is_at_included_range_start,
+            .eof = bounded_eof,
+            .log = bounded_log,
+        },
+        .input = input,
+        .left = characters,
+    };
+    return view;
+}
+
+// SPECIFICATION.md §6.11 — the most characters, from the `(` that opens the
+// line after a cast's `)`, that `next_line_paren_ends_cast` reads for the `)`
+// or `]` of brackets around both lines. The read runs at every `)` that ends
+// a line before such a `(`, so in a run of short parenthesized lines each
+// character is read once from each `)` up to this many characters before it.
+// A bracket further on goes unseen, and the cast is turned down as where a
+// statement may start (`docs/divergences-from-spec.md` §15); a call's
+// arguments that a cast wraps onto the next line close within a line or two.
+static const unsigned ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS = 256;
+
+// SPECIFICATION.md §6.11 — at a `)` with nothing after it on its line (the
+// lexer is at the line break, the end of the input or the second `/` of a
+// line comment): whether it closes no cast, because the next line with
+// anything on it opens with `(` and no bracket holds both lines.
+//
+// Where a line break ends a statement, that `(` opens the next statement or
+// a call's arguments (§6.18), and Groovy reads no cast across the line break:
+// `castParExpression castOperandExpression` has no `nls`. The cast, ranked
+// last, lost there, but kept alive it was reduced again at every such line,
+// in time quadratic in the length of a run of parenthesized lines. Inside
+// `(…)` and `[…]` Groovy drops the line break and reads the cast
+// (`foo((Foo)` then `(x))`). The scanner has no stack of brackets, so it
+// reads on from the `(` for a `)` or `]` with none open, which closes
+// brackets around both lines: where one comes before a `}` with none open,
+// which closes a block, and within ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS,
+// the cast stays. It stays too where `->` follows the first parentheses, as
+// only the cast takes that lambda (`(Foo)` then `(x) -> x`).
+//
+// The brackets are counted on Groovy's tokens, read as the other look-aheads
+// read them: strings whole (`skip_string`, a triple-quoted one across lines
+// and a `${…}` with the strings in it, and `skip_dollar_slashy_string`), a
+// slashy string where an operand may start (`slashy_body_follows`), and
+// comments as trivia (`skip_header_trivia`). Those after the `(` are read
+// through a BoundedLexer, so the bound holds whatever they read; a string or
+// a comment that does not close within it ends the read as the bound does.
+static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
+    while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
+        advance(lexer);
+    }
+    while (!lexer->eof(lexer) && is_whitespace(lexer->lookahead)) {
+        advance(lexer);
+    }
+    if (lexer->lookahead != '(') {
+        return false;
+    }
+    BoundedLexer view =
+        bounded_lexer(lexer, ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS);
+    TSLexer *input = &view.lexer;
+    unsigned depth = 0;
+    bool first_closed = false;
+    // Whether an operand may start here, as in `parentheses_open_statement`:
+    // a `/` there opens a slashy string.
+    bool operand = true;
+    for (;;) {
+        bool slash = false;
+        if (!skip_header_trivia(input, true, no_close_ahead, NULL, &slash)
+            || input->eof(input)) {
+            return true;
+        }
+        if (slash) {
+            if (operand && input->lookahead != '=') {
+                if (!slashy_body_follows(input)) {
+                    return true;
+                }
+                advance(input);
+                operand = false;
+            } else {
+                operand = true;
+            }
+            continue;
+        }
+        int32_t c = input->lookahead;
+        operand = !is_identifier_char(c) && c != '\'' && c != '"'
+            && c != ')' && c != ']' && c != '}' && c != '.';
+        if (c == '\'' || c == '"') {
+            if (!skip_string(input)) {
+                return true;
+            }
+            continue;
+        }
+        if (is_identifier_char(c)) {
+            if (read_dollar_slashy_open(input)
+                && !skip_dollar_slashy_string(input, NULL)) {
+                return true;
+            }
+            continue;
+        }
+        advance(input);
+        if (c == '(' || c == '[' || c == '{') {
+            depth++;
+        } else if (c == ')' || c == ']' || c == '}') {
+            if (depth == 0) {
+                return c == '}';
+            }
+            depth--;
+            if (depth == 0 && !first_closed) {
+                first_closed = true;
+                if (!skip_same_line_space(input, false)) {
+                    return true;
+                }
+                if (input->lookahead == '-') {
+                    advance(input);
+                    if (input->lookahead == '>') {
+                        return false;
+                    }
+                    operand = true;
+                }
+            }
+        }
+    }
+}
+
 // SPECIFICATION.md §6.11 — what follows a `)` on its line. The `)` is
 // already consumed when this is called.
 // `castParExpression castOperandExpression` in GroovyParser.g4 has no
@@ -4992,6 +5175,18 @@ bool tree_sitter_groovy_external_scanner_scan(
         advance(lexer);
         switch (read_paren_close(lexer)) {
             case PLAIN_CLOSE:
+                // A `)` that ends its line before a line that opens with
+                // `(`, with no bracket around both, closes no cast
+                // (`next_line_paren_ends_cast`), and that reading ends
+                // here. TYPE_ONLY_CLOSE, never emitted, is valid after an
+                // array or generic type, which is no expression: the cast
+                // of one is the only reading of its parentheses, and stays
+                // (`(List<String>)` then `(x)`).
+                if (!valid_symbols[TYPE_ONLY_CLOSE]
+                    && next_line_paren_ends_cast(lexer, no_close_ahead)) {
+                    lexer->result_symbol = RELATIONAL_CLOSE;
+                    return true;
+                }
                 return false;
             case OPERAND_CLOSE:
                 // §6.17 — a `(` after the `)` opens a lambda where the `)`
