@@ -278,3 +278,173 @@ y = 1
     (assignment_expression
       left: (identifier)
       right: (number_literal))))
+
+==================
+as cast to a qualified array type
+==================
+
+x as a.b.C[]
+y = x as a.B[][]
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (array_type
+        (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (array_type
+          (array_type
+            (qualified_type
+              (type_identifier)
+              (type_identifier))))))))
+
+==================
+as cast to a qualified generic type
+==================
+
+x as java.util.Map<String, List<Integer>>
+y = x as a.b.C<D<E>, ?>
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier)
+          (generic_type
+            base: (type_identifier)
+            arguments: (type_arguments
+              (type_identifier)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            (wildcard)))))))
+
+==================
+as cast to an array of a qualified generic type
+==================
+
+x as a.b.C<D>[]
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (array_type
+        (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier)))))))
+
+==================
+as cast to a qualified type before an index or a comparison
+==================
+
+x as a.b[0]
+x as a.B < c
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      index: (number_literal)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier))))
+
+==================
+as cast to a generic type with a dotted base before an operator
+==================
+
+x as Map.Entry<C> + x
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier))))
+      right: (identifier))))
+
+==================
+as cast to a generic type with a dotted base on the last line but one
+==================
+
+x //
+f() as a.b.C<T>
+y = 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (line_comment)
+  (expression_statement
+    (cast_expression
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))

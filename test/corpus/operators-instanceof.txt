@@ -238,3 +238,58 @@ y as a.B<C> instanceof c.D
       type: (qualified_type
         (type_identifier)
         (type_identifier)))))
+
+==================
+instanceof with a qualified array type
+==================
+
+if ((o != null) && (o instanceof JTextComponent.KeyBinding[])) { }
+
+---
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (parenthesized_expression
+        (binary_expression
+          left: (identifier)
+          right: (null_literal)))
+      right: (parenthesized_expression
+        (instanceof_expression
+          value: (identifier)
+          type: (array_type
+            (qualified_type
+              (type_identifier)
+              (type_identifier))))))
+    consequence: (block)))
+
+==================
+instanceof and not-instanceof with qualified generic types
+==================
+
+x instanceof a.B<?>
+x !instanceof java.util.List<String>[]
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (wildcard)))))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (array_type
+        (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier)))))))
