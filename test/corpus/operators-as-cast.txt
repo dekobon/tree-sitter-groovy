@@ -223,7 +223,7 @@ x as foo.bar + 1
       right: (number_literal))))
 
 ==================
-as with a dotted type breaks a tie with a cast of the name as
+as with a dotted type after parentheses is a coercion, before a typed local
 ==================
 
 def v = (x) as a.b.c y
@@ -448,3 +448,64 @@ y = 1
     (assignment_expression
       left: (identifier)
       right: (number_literal))))
+
+==================
+as after parentheses is a coercion of the parentheses
+==================
+
+return (x) as Foo
+(x) as Foo
+return (a.b) as java.util.List<String>
+
+---
+
+(source_file
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      type: (type_identifier)))
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (field_access
+          object: (identifier)
+          field: (identifier)))
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier))))))
+
+==================
+as after parentheses at the end of a line or before new is a cast of the name
+==================
+
+(x) as
+Foo
+(Foo) as new Bar()
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
