@@ -2382,6 +2382,114 @@ def d = { a = (String b) -> (d) -> e }
         (expression_statement
           (identifier))))))
 
+==================
+Body block: eleven lambdas nested in blocks read as closures (divergence 26)
+==================
+
+if (x) { a1 = b1 -> { a2 = b2 -> { a3 = b3 -> { a4 = b4 -> { a5 = b5 -> { a6 = b6 -> { a7 = b7 -> { a8 = b8 -> { a9 = b9 -> { a10 = b10 -> { z = w -> c } } } } } } } } } } }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)
+                  default: (identifier)))
+              (expression_statement
+                (closure
+                  (closure_parameters
+                    (closure_parameter
+                      name: (identifier)
+                      default: (identifier)))
+                  (expression_statement
+                    (closure
+                      (closure_parameters
+                        (closure_parameter
+                          name: (identifier)
+                          default: (identifier)))
+                      (expression_statement
+                        (closure
+                          (closure_parameters
+                            (closure_parameter
+                              name: (identifier)
+                              default: (identifier)))
+                          (expression_statement
+                            (closure
+                              (closure_parameters
+                                (closure_parameter
+                                  name: (identifier)
+                                  default: (identifier)))
+                              (expression_statement
+                                (closure
+                                  (closure_parameters
+                                    (closure_parameter
+                                      name: (identifier)
+                                      default: (identifier)))
+                                  (expression_statement
+                                    (closure
+                                      (closure_parameters
+                                        (closure_parameter
+                                          name: (identifier)
+                                          default: (identifier)))
+                                      (expression_statement
+                                        (closure
+                                          (closure_parameters
+                                            (closure_parameter
+                                              name: (identifier)
+                                              default: (identifier)))
+                                          (expression_statement
+                                            (closure
+                                              (closure_parameters
+                                                (closure_parameter
+                                                  name: (identifier)
+                                                  default: (identifier)))
+                                              (expression_statement
+                                                (closure
+                                                  (closure_parameters
+                                                    (closure_parameter
+                                                      name: (identifier)
+                                                      default: (identifier)))
+                                                  (expression_statement
+                                                    (identifier)))))))))))))))))))))))))))
+
+==================
+Body block: nested lambdas that end in a closure read as closures (divergence 26)
+==================
+
+if (x) { a = b -> { c = d -> { p -> p } } }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (lambda_expression
+            parameters: (identifier)
+            body: (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)
+                  default: (identifier)))
+              (expression_statement
+                (closure
+                  (closure_parameters
+                    (closure_parameter
+                      name: (identifier)))
+                  (expression_statement
+                    (identifier)))))))))))
 
 ==================
 Lambda body before an instance initializer or a generic method on the next line
@@ -2461,6 +2569,7 @@ def v = a -> { foo() }
     body: (block
       (expression_statement
         (identifier)))))
+
 ==================
 Lambda body before eight comments and a call goes on, before nine it ends
 ==================
