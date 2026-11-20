@@ -1641,9 +1641,10 @@ module.exports = grammar({
     // `def f(a) { }` as a variable `f` followed by the cast
     // `(a) { }`. Without a weight, a comment before the method made
     // the split win. The weight is above the blank final local's
-    // (`final Type name`, see local_variable_declaration):
+    // (`final Type name`, see local_variable_declaration), but
     // `final String f(a) { }` is also that local followed by the cast
-    // `(a) { }`.
+    // `(a) { }`, whose weight makes up the difference: the two tie, and
+    // tree-sitter's last resort keeps the method.
     //
     // A method without a body carries a negative one. Its tokens are
     // also `x` followed by the call `foo()`, and outside a class body
