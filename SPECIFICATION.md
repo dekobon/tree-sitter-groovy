@@ -264,8 +264,9 @@ Notes on the corrected ordering versus v1 of this spec:
   instanceof_expression fields. A dotted name there is one type,
   whatever the case of its parts (`x as a.b.c`), as Apache's
   `qualifiedClassName` takes every name and dot before the last
-  name. The same tokens also parse as field accesses on `x as a`;
-  `docs/divergences-from-spec.md` §5 says how the type is chosen.
+  name. The same tokens also parse as field accesses on `x as a`,
+  which a weight on the type ranks below it
+  (`DOTTED_CAST_TYPE_WEIGHT`, `docs/divergences-from-spec.md` §5).
 
 ### 3.2 Operator → node kind map
 
@@ -1112,9 +1113,9 @@ Conflicts with C++ `::`-scoped names are not relevant in Groovy.
 
 ```js
 parenthesized_type_cast: $ => choice(
-  prec.dynamic(1, prec.right(PREC.UNARY, seq(
+  weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
     '(', $._type, alias($._cast_close, ')'), $._expression))),
-  prec.dynamic(-1, prec.right(PREC.UNARY, seq(
+  weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
     '(', $._type, ')', $._expression))))
 ```
 
@@ -1260,7 +1261,9 @@ more than an expression, Groovy's default is a lambda that ends at the
 parenthesized expression, and so it is here:
 `{ T a = (b, c) -> (d) -> e }` and `{ T a = (U) (b, c) -> (d) -> e }`
 have the parameter `a` with the default `(b, c) -> (d)`, cast in the
-second, and the body `e`. A `{` that opens a statement, a labeled
+second, and the body `e`. In the second the weights tie, as the cast's
+step makes up the parenthesized body's, and tree-sitter's last resort
+keeps that reading. A `{` that opens a statement, a labeled
 statement or a colon case's statement is a closure here, where Groovy
 reads a block (`{ foo() }` at the start of a statement,
 `docs/divergences-from-spec.md` §26), so there `{ a = b -> c }` keeps
@@ -1297,8 +1300,8 @@ Groovy reads as the closure with the parameter `a` minus one, as no
 block takes the `-`, is a block and the statement `-1`. With three
 arrows, `{ T a = (U) (b, c) -> (d) -> (e) -> f }`, the default
 `(b, c) -> (d)` before the body `(e) -> f`, Groovy's reading, weighs as
-much as the default `(b, c) -> (d) -> (e)` before the body `f`, and the
-parser keeps the second. `{ a = (String b) -> (d) -> e }` has the
+much as the default `(b, c) -> (d) -> (e)` before the body `f`, and
+tree-sitter's last resort keeps the second. `{ a = (String b) -> (d) -> e }` has the
 default `(String b) -> (d)` and the body `e`: Groovy's default is
 `(String b)`, a call of `String` in parentheses, which the grammar does
 not read (§6.14). And a nest of more than ten lambdas reads the closures

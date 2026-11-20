@@ -285,32 +285,33 @@ positions: generics (`List<String>`), array dimensions
   That precedence acts after the first dot only. At the first dot
   the `[_cast_type, _dotted_type, qualified_type]` conflict keeps
   both readings: the type, and `x as java` followed by field
-  accesses. Both parse to the end of the name, and nothing in the
-  grammar ranks them. Tree-sitter's last resort picks the type,
-  which is Groovy's reading for any name, lowercase included
-  (`x as a.b.c`, after Apache's `qualifiedClassName`): where the two
-  trees meet in a node it compares their symbol numbers, and
-  `cast_expression` and `instanceof_expression` are defined before
-  `field_access`; where they meet as two equal links between the
-  same two stack nodes it keeps the older stack, which is the one
-  that shifted the dot. Defining `field_access` first, or keeping
-  the unit reduction to `_expression` above it, turns every
-  qualified type there into field accesses; the qualified-type
-  tests in `operators-as-cast.txt` and `operators-instanceof.txt`
-  fail when it does.
+  accesses. Both parse to the end of the name. Groovy reads the
+  type for any name, lowercase included (`x as a.b.c`, after
+  Apache's `qualifiedClassName`), and `DOTTED_CAST_TYPE_WEIGHT` on
+  `_dotted_type` ranks it first. Before the weight nothing ranked
+  them and tree-sitter's last resort decided: by the order of the
+  rule definitions where the two trees met in a node, and by the
+  age of the parse stacks where they met as two links between the
+  same stack nodes. Defining `field_access` before
+  `cast_expression` turned every such type into field accesses.
 
-  A weight does not replace that tie-break without changing other
-  trees. Any dynamic precedence on the type reading also counts
-  against readings that hold no cast of those tokens. With one
-  step it ties `CAST_WEIGHT`: `(x) instanceof a.b` reads the cast
-  of a name `instanceof` (`instanceof` is not reserved) and the
-  statement `a.b`, and with the weight it reads the `instanceof`
-  test. Below one step of every other weight (all of them doubled)
-  it still decides ties that the last resort decides today, such as
-  a cast against a typed local whose type and name are on two lines.
-  Taking the dot statically for the type ends the fork, and turns
-  the inputs on which only the field accesses parse (`x as a."b"`,
-  `x as a.new`) into `ERROR`s.
+  The weight is half a step: every other weight is a number of
+  steps of `WEIGHT_UNIT` (`weighted` in `grammar.js`), so it decides
+  only between readings that the steps leave tied, as long as they
+  differ in fewer than `WEIGHT_UNIT` dotted cast types. A whole step
+  would tie `CAST_WEIGHT`: `(x) instanceof a.b` also reads the cast
+  of a name `instanceof` (`instanceof` is not reserved) followed by
+  the statement `a.b`, which wins by `CAST_WEIGHT`. Ties it does
+  decide were decided by the last resort before. One clean tree in
+  1.12 million fuzz inputs changed so, and none in the corpus, the
+  Groovy files or 20,910 Java files: `def v = (x) as a.b.c y`, then
+  `y = 1` and `f(1)`, reads `(x) as a.b.c` and a typed local
+  `y y = 1` where it read the cast `(x)` of the name `as`, the call
+  `a.b.c y` and an assignment (`operators-as-cast.txt`). Groovy 3
+  reads neither, but `def v = ((x) as)(a.b.c).y` and `y = 1`.
+  Taking the dot statically for the type would end the fork, but
+  turn the inputs on which only the field accesses parse
+  (`x as a."b"`, `x as a.new`) into `ERROR`s.
 
   Not supported after `as`, `instanceof` and `!instanceof`: array
   dimensions after a dotted name (`x instanceof a.B[]` is an
@@ -329,9 +330,8 @@ positions: generics (`List<String>`), array dimensions
   base name without intervening whitespace — preserving `a < b` as
   a binary comparison.
 
-**Action**: a rule in place of the last resort needs one of the
-trade-offs above. `x as (java.util.Map)` is no way around it: it
-reads `x` and a call of `as`, as in Groovy 3.
+**Action**: none for the readings above. `x as (java.util.Map)`
+is no cast: it reads `x` and a call of `as`, as in Groovy 3.
 
 ---
 
@@ -367,11 +367,13 @@ same reason: `String f() { }` also parses as the expression `String`
 followed by the call `f() { }`, and `def f(a) { }` as a variable `f`
 followed by the cast `(a) { }`. Here too the reverse case loses: a
 bare `x` followed by `foo() { }` on the next line is the method
-`x foo() { }`. The method's weight is above the blank final's, because
+`x foo() { }`. The method's weight is above the blank final's:
 `final String f(a) { }` is also `final String f` followed by the cast
-`(a) { }`. That costs the blank final one case: `final String name`
-followed by `foo() { }` on the next line is `final String` followed by
-the method `name foo() { }`.
+`(a) { }`. With the cast's weight that reading weighs as much as the
+method, and tree-sitter's last resort keeps the method by comparing
+symbol numbers. The weight costs the blank final one case:
+`final String name` followed by `foo() { }` on the next line is
+`final String` followed by the method `name foo() { }`.
 
 In a class body the weights rank a typed field above a method with a
 body, and give a field with modifiers only a negative weight. Without
@@ -401,7 +403,8 @@ Before the compact constructor the split died at `I {`. With it, the
 split won whenever the header had `extends` or `implements`, and once
 the constructor had its weight, with neither (§17).
 
-The dynamic precedences of class members:
+The weights of class members, in steps (`WEIGHT_UNIT` each as a
+dynamic precedence):
 
 | Member | Weight |
 |---|---|
@@ -1172,10 +1175,10 @@ between a field's name and a type comes before, the reading that takes
 `default` as a name survives. `private String y` followed by
 `default void b() { }` is also `private String`, a field `y default`
 and the method `void b() { }`; the method weights decide it,
-4 + 3 against −1 + 4 + 3. With a modifier-only field between them
+4 + 3 steps against −1 + 4 + 3. With a modifier-only field between them
 (`private String y`, `static count`, then `default void b() { }`) the
 split `private String`, `y static`, `count default`, `void b() { }`
-weighs 10 against 6 and wins. That is the weakness of modifier-only
+weighs 10 steps against 6 and wins. That is the weakness of modifier-only
 fields that §6 describes: `private String y`, `static count` and
 `void b() { }` on three lines split the same way before this rule, as
 a field `count void` and a constructor `b`.
@@ -1657,8 +1660,8 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `f(x -> { Consumer<String> c = s -> foo(s); c.accept(x) })`, `(x) -> { b = (t) -> 1 }` | a block that holds the lambda | the same |
 | `if (x) { a = b -> { p -> p } }`, `while (x) { cb = v -> { -> v } }`, `if (x) { a = b -> { c = d -> e } }`, `f(x -> { a = b -> { c = d -> e } })` | blocks that hold the lambdas | the same, for nests of up to ten lambdas, each in the block of the one before (`LAMBDA_NESTING_DEPTH`); **before, the closure with the parameter `a`** where such a block held a lambda whose body is a closure or two lambdas, or a lambda's block two lambdas |
 | `x -> { a = b -> { p -> p } }`, `if (x) { a = b -> { c = d -> { p -> p } } }`, a nest of more than ten lambdas | blocks that hold the lambdas | the closure with the parameter `a` (`c`), as before: a block in a lambda's body has no weight of its own, and one that outweighed the lambda in it would make `def c = { a = (b) -> { } }` a closure that assigns `a` a lambda |
-| `{ T a = (U) (b, c) -> (d) -> e }`, `{ T a = (b, c) -> (d) -> e }` | the default `(U)` cast of the lambda `(b, c) -> (d)`, or that lambda, and the body `e` | the same: a parenthesized expression as a lambda's whole body weighs one step below a lambda (`PARENTHESIZED_BODY_WEIGHT`), below the reading of `{ a = (b) -> (d) -> e }` that Groovy has (a row below) and above a typed local that holds two lambdas; before, the default `(U)` called with `b` and `c` and the body `(d) -> e`, and no parameter and a body that declares `a` |
-| `{ T a = (U) (b, c) -> (d) -> (e) -> f }` | the default `(U)` cast of `(b, c) -> (d)` and the body `(e) -> f` | the default `(U)` cast of `(b, c) -> (d) -> (e)` and the body `f`: the two readings weigh the same, and the parser keeps this one; before, the default `(U)` called with `b` and `c` and the body `(d) -> (e) -> f` |
+| `{ T a = (U) (b, c) -> (d) -> e }`, `{ T a = (b, c) -> (d) -> e }` | the default `(U)` cast of the lambda `(b, c) -> (d)`, or that lambda, and the body `e` | the same: a parenthesized expression as a lambda's whole body weighs one step below a lambda (`PARENTHESIZED_BODY_WEIGHT`), below the reading of `{ a = (b) -> (d) -> e }` that Groovy has (a row below) and above a typed local that holds two lambdas. With the cast the weights do not decide: its step makes up the parenthesized body's, so the default `(U)` called with `b` and `c` and the body `(d) -> e` weighs the same, and tree-sitter's last resort keeps the cast by comparing symbol numbers; before, the default `(U)` called with `b` and `c` and the body `(d) -> e`, and no parameter and a body that declares `a` |
+| `{ T a = (U) (b, c) -> (d) -> (e) -> f }` | the default `(U)` cast of `(b, c) -> (d)` and the body `(e) -> f` | the default `(U)` cast of `(b, c) -> (d) -> (e)` and the body `f`: the two readings weigh the same, and tree-sitter's last resort keeps this one; before, the default `(U)` called with `b` and `c` and the body `(d) -> (e) -> f` |
 | `{ a = (String b) -> (d) -> e }` | the default `String(b)`, a call, and the body `(d) -> e` | the default `(String b) -> (d)` and the body `e`: `String b` in parentheses is no call here (spec §6.14); before, no parameter and a body that assigns `a` the lambda |
 | `{ a = b -> c }` that opens a statement, `lbl: { a = (b) -> c }`, `case 1: { a = b -> c }` | a block that holds the lambda | the closure parameter `a`, as before: such a `{` is a closure here (the next row) |
 | `{ foo() }` that opens a statement, a labeled statement or a colon case's statement | a block | a closure, as before lambdas |
