@@ -342,6 +342,10 @@ static bool array_dimensions_follow(
     bool no_close_ahead
 );
 static bool is_contextual_word(const char *word, unsigned len);
+static inline bool contextual_word_may_start(
+    int32_t c,
+    const bool *valid_symbols
+);
 static bool slashy_body_follows(TSLexer *lexer);
 static bool skip_string(TSLexer *lexer);
 static bool scan_contextual_word(
@@ -1184,9 +1188,13 @@ static bool bare_lambda_arrow_follows(
 // ARRAY_VALUE_START, valid at the same place (`foo(String[].class)`), is
 // decided here too. A name that cannot be a parameter's is checked only
 // once the arrow is found, so that the other names cost no comparison.
+// So is a keyword of §6.16 whose token is valid at the same place (`var`
+// in an enum's first constant's arguments, which are also a constructor's
+// parameters): only the whole word tells `var` from `v -> v`.
 // The caller has skipped whitespace and seen an identifier start.
 static bool scan_bare_lambda_start(
     TSLexer *lexer,
+    const bool *valid_symbols,
     bool wants_array,
     bool type_may_start,
     bool no_close_ahead
@@ -1194,6 +1202,12 @@ static bool scan_bare_lambda_start(
     bool capitalized = is_capital(lexer->lookahead);
     char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
+    if (is_contextual_word(word, len)
+        && contextual_word_may_start(word[0], valid_symbols)) {
+        lexer->mark_end(lexer);
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
+    }
     if (lexer->lookahead != '.' && lexer->lookahead != '[') {
         if (!skip_same_line_space(lexer, false)) {
             return false;
@@ -1234,11 +1248,13 @@ static bool scan_bare_lambda_start(
 // §6.15 — the same name may start an array type that is a value
 // (`def c = String[].class`), and ARRAY_VALUE_START, which sits at the
 // same place, is decided here too: the two need different things after
-// the names, `[` and an argument.
+// the names, `[` and an argument. So is a keyword of §6.16 whose token is
+// valid at the same place, once the whole word is read.
 //
 // The caller has skipped whitespace and seen an identifier start.
 static bool scan_value_start(
     TSLexer *lexer,
+    const bool *valid_symbols,
     bool wants_command,
     bool wants_bare_lambda,
     bool wants_array,
@@ -1248,8 +1264,8 @@ static bool scan_value_start(
     lexer->mark_end(lexer);
     if (!wants_command) {
         if (wants_bare_lambda) {
-            return scan_bare_lambda_start(lexer, wants_array, type_may_start,
-                                          no_close_ahead);
+            return scan_bare_lambda_start(lexer, valid_symbols, wants_array,
+                                          type_may_start, no_close_ahead);
         }
         if (!read_element_type_name(lexer)
             || !array_dimensions_follow(lexer, type_may_start, no_close_ahead)) {
@@ -1262,6 +1278,12 @@ static bool scan_value_start(
     bool upper = is_upper_letter(lexer->lookahead);
     char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
+    if (is_contextual_word(word, len)
+        && contextual_word_may_start(word[0], valid_symbols)) {
+        lexer->mark_end(lexer);
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
+    }
     if (is_value_keyword(word, len, lexer->lookahead)) {
         return false;
     }
@@ -4264,8 +4286,13 @@ bool tree_sitter_groovy_external_scanner_scan(
     // §6.16 — `var`, `yield`, `in` and `as`. `int` is the one element
     // type name (§6.15) that shares a first letter with them, and it may
     // start a statement where `in` may follow the one before, so it is
-    // decided here too; the array token is empty and ends here.
-    if (contextual_word_may_start(lexer->lookahead, valid_symbols)) {
+    // decided here too; the array token is empty and ends here. Where a
+    // value or a bare lambda may start as well, any name may, and the words
+    // are decided in `scan_value_start` once the whole name is read: a name
+    // that only starts like one of them (`v -> v`, `value 1`) is not turned
+    // down after its first letters.
+    if (contextual_word_may_start(lexer->lookahead, valid_symbols)
+        && !wants_value_start && !wants_bare_lambda) {
         lexer->mark_end(lexer);
         const char *word = read_contextual_word(lexer);
         if (word == NULL) {
@@ -4288,8 +4315,9 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (((wants_value_start || wants_bare_lambda)
          && is_identifier_start(lexer->lookahead))
         || (wants_array && is_element_type_start(lexer->lookahead))) {
-        return scan_value_start(lexer, wants_value_start, wants_bare_lambda,
-                                wants_array, type_may_start, no_close_ahead);
+        return scan_value_start(lexer, valid_symbols, wants_value_start,
+                                wants_bare_lambda, wants_array, type_may_start,
+                                no_close_ahead);
     }
     if (lexer->lookahead == '!' && wants_not_in) {
         // SPECIFICATION.md §6.12 — `!in` is an operator only before

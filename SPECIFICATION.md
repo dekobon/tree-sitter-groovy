@@ -2589,6 +2589,21 @@ input return false; the in-grammar lexer then reads the word as
 `identifier`.
 ```
 
+The scanner tells the words from other names by their first letters,
+so that `if`, `it` or `apply` after a statement costs a character or
+two. Where COMMAND_VALUE_START (§6.14) or BARE_LAMBDA_START (§6.17) is
+valid too, any name may start there, and it reads the whole name
+first, as those tokens need, and decides the word only when the name
+is exactly one of them. That place is an enum's first constant's
+arguments, which are also a constructor's parameters (`A(var x) { }`),
+and the parentheses after LAMBDA_START: `enum E { A(v -> v) }` and
+`A(value -> value)` are lambdas, where a name that started like `var`
+was turned down at its first letters and stayed a name, an `ERROR`
+before `->`. `enum E { A(var -> var) }` is still one: the keyword's
+token ends at the word, which the scanner marks before it reads on to
+what follows, and the lambda's token is empty before the word, so one
+scan cannot offer both; `var` is decided as the keyword there.
+
 The grammar binds the tokens as `alias($._var_keyword, 'var')` and so
 on, so the anonymous nodes, `node-types.json` and the query captures
 are those of the literals, which are gone: no grammar literal spells

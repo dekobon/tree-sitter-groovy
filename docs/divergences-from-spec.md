@@ -1478,6 +1478,8 @@ and later is read off `GroovyParser.g4`.
 | `var = 2`, `var.foo()`, `var[0]`, `var++`, `var()`, `return var`, `yield.foo()`, `yield = 1`, `yield()`, `yield++` | names | `ERROR` | names |
 | `foo()` then `in.read()` on the next line; `x = 1` then `in = 2` | two statements | `ERROR` | two statements |
 | `{ var -> var }`, `{ yield -> yield }`, `var: foo()`, `yield: foo()` | names, labels | `ERROR` | names, labels |
+| `enum E { A(v -> v) }`, `A(val -> val)`, `A(value -> value)` as an enum's first constant | lambdas | `ERROR` | lambdas |
+| `enum E { A(var -> var) }` | a lambda with the parameter `var` | `ERROR` | `ERROR`: the arguments are also a constructor's parameters (`A(var x) { }`), where `var` is decided as the keyword before the arrow is seen; the keyword ends at the word, the lambda's empty token before it, and the scanner cannot mark both once the spaces after the word are read |
 | `void var() { }`, `int as(int x) { x }` where a statement starts | methods | `ERROR` | methods |
 | `for (String in : xs)` | a loop over `in` | `ERROR` | a loop over `in` |
 | `for (var x in xs)`, `for (var x : xs)` | loops | `ERROR` | loops |
