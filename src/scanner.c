@@ -44,9 +44,10 @@
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
 // that follows.
-// STRING_BODY (§6.10) and TYPE_START (§6.15) are never emitted; they
-// are valid only inside a string body, where the scanner emits nothing,
-// and where a type may start. ERROR_SENTINEL is never emitted either;
+// STRING_BODY (§6.10), TYPE_START (§6.15) and CLOSURE_PARAMETERS_START
+// (§6.21) are never emitted; they are valid only inside a string body,
+// where the scanner emits nothing, where a type may start and where
+// closure parameters may start. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
@@ -99,6 +100,7 @@ enum TokenType {
     STATEMENT_BLOCK_END,
     RELATIONAL_CLOSE,
     CAST_TYPE_ARGUMENTS_OPEN,
+    CLOSURE_PARAMETERS_START,
     ERROR_SENTINEL,
 };
 
@@ -2276,13 +2278,16 @@ static bool next_line_continues(
 // does not go on with it (`next_line_continues`). Or a list of names follows,
 // each after a `,` and Groovy's trivia (`String a, b`), which ends there as
 // well. Or the `=` of a name's initializer follows, on its line or the next
-// (`String s = 1`, `String a, b = 1`), unless `->` ends the list
-// (`{ String a = 1 -> }`), which makes closure parameters
-// (`parameters_follow`); the parser then reads the initializer. `->`, `(`, a
-// name or anything else on the line is no declaration.
+// (`String s = 1`, `String a, b = 1`), unless closure parameters may start
+// here (CLOSURE_PARAMETERS_START valid) and `->` ends the list
+// (`{ String a = 1 -> }`), which makes them closure parameters
+// (`parameters_follow`); the parser then reads the initializer. Elsewhere a
+// `->` there is a lambda's in the initializer (`final a` then
+// `String b = x -> y`). `->`, `(`, a name or anything else on the line is no
+// declaration.
 //
-// In a `for` header (`header`) Groovy's lexer drops line breaks, so they end
-// nothing there: past Groovy's trivia only `;` ends the declaration
+// In a `for` header (`in_for_header`) Groovy's lexer drops line breaks, so
+// they end nothing there: past Groovy's trivia only `;` ends the declaration
 // (`for (int i` then `; i < n; i++)`), and `,` and `=` go on with it, while
 // `:` and `in` make the loop variable of a for-in loop, and any other text
 // is no declaration. A header that is still being typed (`for (int i` then
@@ -2291,9 +2296,10 @@ static bool next_line_continues(
 static bool declaration_end_follows(
     TSLexer *lexer,
     unsigned *items,
-    bool header,
+    const bool *valid_symbols,
     bool no_close_ahead
 ) {
+    bool header = in_for_header(valid_symbols);
     for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
         bool slash = false;
         if (header) {
@@ -2336,9 +2342,10 @@ static bool declaration_end_follows(
         if (c == '=') {
             advance(lexer);
             return lexer->lookahead != '='
-                && !parameters_follow(lexer,
-                                      DECLARATION_LOOKAHEAD_ITEMS - *items,
-                                      no_close_ahead);
+                && !(valid_symbols[CLOSURE_PARAMETERS_START]
+                     && parameters_follow(lexer,
+                                          DECLARATION_LOOKAHEAD_ITEMS - *items,
+                                          no_close_ahead));
         }
         if (is_identifier_start(c)) {
             char word[sizeof "else"];
@@ -2366,12 +2373,12 @@ static bool declaration_end_follows(
 // After the type of a declaration: whether, after spaces, tabs and line
 // escapes, a name follows on the line, no keyword Groovy reserves, and then
 // the end of a declaration or its initializer (`declaration_end_follows`,
-// which `header` passes to). Between the type and the name nothing else is
-// skipped, as between a receiver and a name argument (§6.14).
+// which `valid_symbols` passes to). Between the type and the name nothing
+// else is skipped, as between a receiver and a name argument (§6.14).
 static bool declared_name_follows(
     TSLexer *lexer,
     unsigned *items,
-    bool header,
+    const bool *valid_symbols,
     bool no_close_ahead
 ) {
     if (!skip_same_line_space(lexer, false)
@@ -2381,7 +2388,7 @@ static bool declared_name_follows(
     char name[sizeof "synchronized"];
     unsigned len = read_word(lexer, name, sizeof name);
     return !is_reserved_variable_name(name, len)
-        && declaration_end_follows(lexer, items, header, no_close_ahead);
+        && declaration_end_follows(lexer, items, valid_symbols, no_close_ahead);
 }
 
 // SPECIFICATION.md §6.21 — after the first name of a statement and type
@@ -2391,7 +2398,7 @@ static bool declared_name_follows(
 // with no initializer.
 static bool generic_declaration_follows(
     TSLexer *lexer,
-    bool header,
+    const bool *valid_symbols,
     bool no_close_ahead
 ) {
     unsigned items = 0;
@@ -2402,7 +2409,7 @@ static bool generic_declaration_follows(
     if (lexer->lookahead == '[' && !read_dimensions(lexer, no_close_ahead)) {
         return false;
     }
-    return declared_name_follows(lexer, &items, header, no_close_ahead);
+    return declared_name_follows(lexer, &items, valid_symbols, no_close_ahead);
 }
 
 // SPECIFICATION.md §6.15, §6.21 — after the first name of a statement or its
@@ -2440,7 +2447,7 @@ static bool scan_dimensions_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return valid_symbols[DECLARATION_START]
-        && declared_name_follows(lexer, &items, in_for_header(valid_symbols),
+        && declared_name_follows(lexer, &items, valid_symbols,
                                  no_close_ahead);
 }
 
@@ -2477,7 +2484,7 @@ static bool scan_dotted_statement_start(
     if (lexer->lookahead == '<') {
         lexer->result_symbol = DECLARATION_START;
         return valid_symbols[DECLARATION_START]
-            && generic_declaration_follows(lexer, in_for_header(valid_symbols),
+            && generic_declaration_follows(lexer, valid_symbols,
                                            no_close_ahead);
     }
     if (!skip_same_line_space(lexer, false)) {
@@ -2491,7 +2498,7 @@ static bool scan_dotted_statement_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return last_upper && valid_symbols[DECLARATION_START]
-        && declared_name_follows(lexer, &items, in_for_header(valid_symbols),
+        && declared_name_follows(lexer, &items, valid_symbols,
                                  no_close_ahead);
 }
 
@@ -2537,7 +2544,7 @@ static bool scan_typed_statement_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return !keyword && valid_symbols[DECLARATION_START]
-        && declaration_end_follows(lexer, &items, in_for_header(valid_symbols),
+        && declaration_end_follows(lexer, &items, valid_symbols,
                                    no_close_ahead);
 }
 
@@ -2633,7 +2640,7 @@ static bool scan_statement_start(
     if (lexer->lookahead == '<' && type_word) {
         lexer->result_symbol = DECLARATION_START;
         return valid_symbols[DECLARATION_START]
-            && generic_declaration_follows(lexer, in_for_header(valid_symbols),
+            && generic_declaration_follows(lexer, valid_symbols,
                                            no_close_ahead);
     }
     if (!skip_same_line_space(lexer, false)) {

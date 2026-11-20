@@ -1433,9 +1433,10 @@ unterminated block comment (§6.6), the start of a lambda (§6.17),
 the end of a lambda's brace body (§6.19), the first comma of a
 multi-assignment (§6.20), the start of a typed declaration without an
 initializer (§6.21), the end of a block that opens a statement (§6.22),
-`STRING_BODY` (§6.10) and
-`TYPE_START` (§6.15), which are never emitted and only mark a string
-body and where a type may start,
+`STRING_BODY` (§6.10),
+`TYPE_START` (§6.15) and `CLOSURE_PARAMETERS_START` (§6.21), which are
+never emitted and only mark a string body, where a type may start and
+where closure parameters may start,
 `LAMBDA_BODY_REREAD` (§6.19, §6.22), which no rule references and which
 makes the parser lex the `}` of a lambda's body or a statement's block
 again, and
@@ -1488,6 +1489,7 @@ enum TokenType {
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
+  CLOSURE_PARAMETERS_START, // §6.21 — never emitted; valid only where closure parameters may start
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -3445,7 +3447,8 @@ type follows by Apache's rule on the spelling, and then a declared name:
     (below); or `,`, Groovy's trivia (line breaks included) and a further
     name as above, for the whole list; or, after any name of the list, on
     its line or the next, the `=` of an initializer (not `==`), unless
-    what follows it to `->` reads as closure parameters
+    closure parameters may start here (CLOSURE_PARAMETERS_START valid)
+    and what follows it to `->` reads as closure parameters
     (`parameters_follow`, §6.14: `{ String a = 1 -> }`).
   - In a `for` init, where Groovy's lexer drops line breaks, the trivia
     after a name include line breaks, and only `;` and `=` end the scan
@@ -3602,6 +3605,23 @@ with no `ERROR`. The two of those added are the reparse of a `return`
 after `(a) { }` that the grammar before this section has too (`(a) { }`,
 `return`, then `x` typed on the next line), and two of the grammar before
 are gone; every other one has an `ERROR` both ways.
+
+Closure parameters may start only after the `{` of a closure, and only
+there may a `->` after an initializer's `=` end them. Elsewhere it is a
+lambda's in the value: `final a` then `String b = x -> y`,
+`Runnable r = () -> { foo() }` or `Comparator c = (x, y) -> 0` on the
+next line is the blank final and a declaration, as Groovy reads it. The
+scanner learns where closure parameters may start from
+CLOSURE_PARAMETERS_START, an external token that is never emitted and
+is valid only there: `closure_parameters` takes it in an alternative
+that never matches, as `_type` takes TYPE_START (§6.15). Before it the
+look-ahead turned the token down after `final a` as well, and the blank
+final `final a String` followed by the assignment `b = x -> y` (a weight
+of 2 steps) outweighed the blank final `final a` and the typed local
+(1 step), as both readings hold the lambda's weight; every other value
+was decided by the token. The marker added one state, one external
+token and one external scanner state, and changed no tree of the
+corpus, the real, Java and fuzzed sets other than such declarations.
 
 Measured against the grammar before: STATE_COUNT 4600 to 4637,
 LARGE_STATE_COUNT 1754 to 1773, `parser.c` 9,208,781 to 9,328,518 bytes,

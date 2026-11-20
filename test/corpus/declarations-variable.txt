@@ -1754,6 +1754,87 @@ String b = 'y'
     value: (string_literal)))
 
 ==================
+Untyped blank final before a typed local whose value is a lambda is two declarations
+==================
+
+final a
+Runnable r = () -> { foo() }
+final b
+Comparator c = (x, y) -> 0
+final d
+String e = x -> y
+final f
+String[] g = x -> y
+xs.each {
+    final h
+    String i = x -> y
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters)
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier))
+        (formal_parameter
+          name: (identifier)))
+      body: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)))
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (identifier)))))))
+
+==================
 Annotated local declarations in a script
 ==================
 

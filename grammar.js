@@ -785,9 +785,9 @@ module.exports = grammar({
   // last here and in the scanner's `TokenType` enum, and the two
   // orders must match. No rule references `_lambda_body_reread` either:
   // the scanner emits it where no rule takes it (§6.19, §6.22). The scanner
-  // never emits `_string_body` or `_type_start`: a string body and a type
-  // reference them so that the scanner can tell it is inside one or where
-  // one may start.
+  // never emits `_string_body`, `_type_start` or `_closure_parameters_start`:
+  // a string body, a type and closure parameters reference them so that the
+  // scanner can tell it is inside one or where one may start.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -924,6 +924,11 @@ module.exports = grammar({
     // cast with `c`. Listed last but for the sentinel, so that it renumbers
     // no symbol before it.
     $._cast_type_arguments_open,
+    // §6.21 — never emitted: valid where closure parameters may start, so
+    // that the scanner can tell `{ String a = b -> c }`, whose `->` may end
+    // a parameter list, from a typed local's lambda value elsewhere. Listed
+    // last but for the sentinel, so that it renumbers no symbol before it.
+    $._closure_parameters_start,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2091,8 +2096,9 @@ module.exports = grammar({
     //   reads `x` as the type and that identifier as the name. `y = 2`
     //   becomes `final x y = 2`, the same resolution modifier-only
     //   fields get (`static x` then `y = 1`). A typed declaration on that
-    //   line is one of its own: `final x` then `String s` or
-    //   `String s = 'a'` declares `x` and `s`.
+    //   line is one of its own: `final x` then `String s`,
+    //   `String s = 'a'` or `String s = y -> z` declares `x` and `s`, as
+    //   the scanner emits `_declaration_start` there (§6.21).
     // - `final String name` followed by a line reading `foo() { }` is
     //   `final String` followed by the method `name foo() { }`. A
     //   method with a body outranks the blank form, so that
@@ -3237,9 +3243,16 @@ module.exports = grammar({
     ),
 
     closure_parameters: $ => seq(
-      optional(seq(
-        $.closure_parameter,
-        repeat(seq(',', $.closure_parameter)),
+      optional(choice(
+        seq(
+          $.closure_parameter,
+          repeat(seq(',', $.closure_parameter)),
+        ),
+        // §6.21 — never matches, as the scanner never emits
+        // `_closure_parameters_start`. It makes the token valid where
+        // closure parameters may start, the one place `String a = b -> c`
+        // may be a parameter rather than a declaration.
+        $._closure_parameters_start,
       )),
       '->',
     ),

@@ -548,9 +548,11 @@ changed the result. The cost is the reverse case: a bare `x` followed by
 `y = 1` on the next line is the declaration `x y = 1`, and `String`
 followed by `s = 1` the declaration `String s = 1`, where Groovy reads
 two statements. A declaration with a type and a name on the line after
-`final a` is one of its own: `final a` followed by `String b` or
-`String b = 'y'` declares `a` and `b`, as Groovy does (it was
-`final a String` followed by `b = 'y'`).
+`final a` is one of its own: `final a` followed by `String b`,
+`String b = 'y'` or `String b = x -> y` declares `a` and `b`, as Groovy
+does (it was `final a String` followed by `b = 'y'`, and until the
+scanner learned where closure parameters may start, spec §6.21, by
+`b = x -> y` with a lambda for a value).
 
 A method declaration with a body carries a dynamic precedence for the
 same reason: `String f() { }` also parses as the expression `String`
@@ -1982,7 +1984,7 @@ The Groovy column was observed by running Groovy 3.
 | `return` then `String s` on the next line | `return`, then the declaration | `return String` and `s`, as before: `return`, `break` and `continue` take the token |
 | `return String s`; `return java.util.List<String> s` | rejected; `return` with comparisons | `return String` and `s`; `return` with comparisons, as before |
 | `foo() String s`, `x = 1 Foo bar`, `move left By steps`, `Foo T name` | `foo().String(s)`, `x = 1(Foo).bar`, `move(left).By(steps)`, `Foo(T).name` | the statement and the declaration; before, three statements, or `move left` and two |
-| `final x` then `String s` or `String s = 'a'` | two declarations | the same; before, the blank final `final x String` and `s` or `s = 'a'` |
+| `final x` then `String s` or `String s = 'a'`; `String s = y -> z`, `Runnable r = () -> { }` | two declarations | the same; before, the blank final `final x String` and `s` or `s = 'a'`; a lambda value kept that reading until the scanner told closure parameters apart (spec §6.21) |
 | `if (c) Foo f` then `as T` then `else { }` | `Foo(f as T)` in the `if`, as the declaration does not parse there | the declaration, `as`, `T` and the call `else { }`; before, `Foo`, the cast and the call |
 | `def String s` | a declaration of `s` with the type `String` | the declaration of `String` and the statement `s`, as before |
 | `@A foo bar` | a declaration | an `ERROR`, as before: after annotations a lowercase type needs `<` or `[` |
