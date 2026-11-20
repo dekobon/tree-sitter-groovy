@@ -1011,6 +1011,73 @@ def w = """cost "$5" """
         (string_fragment)))))
 
 ==================
+An interpolation without its closing brace in a field's value keeps the class (error recovery)
+==================
+
+class C {
+    String a = "${x"
+    String b = 'b'
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (gstring_brace_interpolation
+              value: (identifier)
+              (MISSING "}")))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal))))))
+
+==================
+An interpolation without its closing brace in a string argument keeps the call (error recovery)
+==================
+
+sh "make ${version"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)
+      (gstring_brace_interpolation
+        value: (identifier)
+        (MISSING "}")))))
+
+==================
+A string argument of a call that is a value goes on in an interpolation across lines
+==================
+
+def v = foo "a ${
+  b
+}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal
+          (string_fragment)
+          (gstring_brace_interpolation
+            value: (identifier)))))))
+
+==================
 A name that is a dollar before a comment reads as a dollar-slashy string (known divergence)
 ==================
 

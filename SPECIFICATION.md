@@ -2143,7 +2143,11 @@ Emit COMMAND_VALUE_START, empty, where a value may start, when:
   - the name is not a value keyword, as below; and
   - any member accesses follow it, as below; and
   - the first argument follows, as below, a name argument included
-    when the receiver takes one.
+    when the receiver takes one; a quoted string only when it closes on
+    its line: its closing quote, a second quote right after the opening one
+    (an empty string or a triple quote) or, in a double-quoted string,
+    a `${` comes before the line break, a `\` taking the character
+    after it, a line break included.
 The token ends before the name.
 
 Emit COMMAND_PATH_START, empty, directly after the first name of a
@@ -2499,6 +2503,16 @@ triple-quoted or not, to its close on the line. A dollar-slashy string
 there is read to its `/$` (§5.7), and one without an interpolation names
 the method as well: `java.util.List $/foo/$() { }` declares `foo` and
 `obj.Bar $/$a/$() { }` calls, as in Groovy.
+
+A quoted string is the first argument of a value only where it closes
+on its line, or opens a triple quote or an interpolation, which may
+span lines (`def v = foo "a ${` followed by `b` and `}"` is a call).
+One that does not is still being typed, and as an argument it
+committed the parser to a call whose string never closes: in
+`String a = "${x"`, an interpolation that still lacks its `}`, the
+closing quote of the string around it opened the argument of a call
+`x "…`, and the `ERROR` took the class or the file around it, where the
+name alone leaves one `MISSING` `}`.
 
 A slashy string is not a first argument, as in Groovy, which reads `/`
 after a name as division. Known differences from Groovy:

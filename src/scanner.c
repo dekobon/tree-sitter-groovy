@@ -1390,6 +1390,44 @@ static bool scan_bare_lambda_start(
     return true;
 }
 
+// SPECIFICATION.md §6.14 — whether the quoted string that starts here, the
+// first argument of a call that is a value, closes on its line. One that
+// does not is still being typed, and taking it for an argument commits the
+// parser to a call whose string never closes: in `"${x"`, an interpolation
+// that still lacks its `}`, the closing quote of the string around it opened
+// the argument, and the `ERROR` took the class or the file around it, where
+// the name alone leaves one missing `}`. A triple quote, which may span
+// lines, counts as closing, and so does a `${` in a double-quoted string,
+// whose interpolation may; a `\` takes the character after it, a line break
+// included (§5.10). Reads no further than the line.
+static bool string_closes_on_line(TSLexer *lexer) {
+    int32_t quote = lexer->lookahead;
+    advance(lexer);
+    if (lexer->lookahead == quote) {
+        // An empty string, or the start of a triple quote.
+        return true;
+    }
+    for (;;) {
+        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        advance(lexer);
+        if (c == '\\') {
+            if (lexer->lookahead == '\r') {
+                advance(lexer);
+            }
+            if (lexer->eof(lexer)) {
+                return false;
+            }
+            advance(lexer);
+        } else if (c == quote
+                   || (quote == '"' && c == '$' && lexer->lookahead == '{')) {
+            return true;
+        }
+    }
+}
+
 // SPECIFICATION.md §6.14 — decides that a parenthesis-free call starts
 // here as a value: of a declarator or an assignment
 // (`def out = sh script: 'make'`, `def r = obj.method 1`), or in
@@ -1482,7 +1520,12 @@ static bool scan_value_start(
     }
     bool names = accesses ? path_takes_names(last_name, ends_in_new)
         : !may_name_type(word, len, upper);
-    if (!first_argument_follows(lexer, true, names, false, no_close_ahead)) {
+    // A string is a first argument (`first_argument_follows`), but here only
+    // one that closes on its line.
+    bool string = lexer->lookahead == '"' || lexer->lookahead == '\'';
+    if (string ? !string_closes_on_line(lexer)
+               : !first_argument_follows(lexer, true, names, false,
+                                         no_close_ahead)) {
         return false;
     }
     lexer->result_symbol = COMMAND_VALUE_START;
