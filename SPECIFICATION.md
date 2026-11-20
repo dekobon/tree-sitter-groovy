@@ -2869,15 +2869,19 @@ on reparse, where a parse from scratch reads `foo(c, d) == [3, 4]`.
 
 One limitation remains. The runtime reuses a node, and checks whether a
 reused node must be broken down, only while a single stack version
-exists, and a typed declaration keeps two alive to its end, so the
-statement after it is reused at the fork although it no longer ends
-there. In `String s = "a"` then `println x` then `(a)`, inserting `,`
-before the `)` makes the parentheses `x`'s arguments, and the reparse
-reads the first line as `String` and `s = "a"`, where a parse from
-scratch reads a `local_variable_declaration`. It needs a reused
-statement that starts with something other than a plain name;
-`bindings/rust/tests/incremental_reparse.rs` pins it. Over 240,000
-random sequences of four edits of inputs with such lines, 22 end in a
+exists, and a typed declaration after `final` keeps two alive to its
+end, so the statement after it is reused at the fork although it no
+longer ends there. In `final String s = "a"` then `println x` then
+`(a)`, inserting `,` before the `)` makes the parentheses `x`'s
+arguments, and the reparse reads the first line as `final String` and
+`s = "a"`, where a parse from scratch reads a
+`local_variable_declaration`. It needs a reused statement that starts
+with something other than a plain name;
+`bindings/rust/tests/incremental_reparse.rs` pins it. Without `final`
+the scanner opens the declaration with DECLARATION_START (§6.21), which
+then does not fork, and `String s = "a"` in the same place reparses as
+a parse from scratch reads it. The counts below are from before that.
+Over 240,000 random sequences of four edits of inputs with such lines, 22 end in a
 reparse that differs from the parse from scratch under the grammar
 before, 1,697 without the rule above and 135 with it, each of which a
 single edit reproduces. Of 1,200 sequences that type such a line one
@@ -3215,7 +3219,8 @@ the same 2.6 and 2.1 for lists that a `{` or a second name ends, which took
 
 Groovy takes a typed local declaration without an initializer:
 `String s`, `int i;`, `List<String> xs`, `foo.Bar q`, `String a, b = 1`.
-Its tokens are also the expression `String` followed by the statement `s`,
+Its tokens are also the expression `String` followed by the statement `s`
+(and those of `String s = 'a'` the expression and the assignment),
 and Groovy ends the statement at a line break after the type (`String`
 then `s` on the next line is two statements) and, where a statement may
 follow, after the name. A newline is whitespace here (§5.10), so the
@@ -3229,17 +3234,18 @@ statement's receiver, and from the same reading of its first name.
 Emit DECLARATION_START, empty, before the type of a statement, where the
 token is valid (where a statement starts, after its annotations, and as
 a `for` init), when, after whitespace, line breaks and line escapes, a
-type follows by Apache's rule on the spelling, and then a declared name
-with no initializer:
+type follows by Apache's rule on the spelling, and then a declared name:
   - the type is a name that starts with an upper-case letter (as §6.14
     tells upper case) or is a primitive type name, then on its line a
     name; or any name or dotted name (names joined by `.` with no space)
     that type arguments follow directly (`<`, then names, `,`, `?`, `.`,
-    `[`, `]` and spaces on the line, to the matching `>`), then any
+    `[`, `]` and spaces on the line, to the matching `>`, where a `<`
+    directly follows a name: `Foo<<Baz>> x` is shifts), then any
     dimensions; or any name or dotted name that dimensions follow on its
     line (`[`, Groovy's trivia, `]`, and each further `[` on the line of
     the `]` before it); or a dotted name whose last name starts with an
-    upper-case letter;
+    upper-case letter; a dotted name whose first name is `this` is none
+    (`this.Foo x` is Groovy's call `this.Foo(x)`);
   - between the type and the name only spaces, tabs and line escapes; the
     name is none that names no variable in Groovy: a keyword Groovy
     reserves, a primitive type name, `void`, `this` or `super`;
@@ -3249,25 +3255,31 @@ with no initializer:
     line comment and then a line break as below, or a line break, past
     Groovy's trivia, before a line that does not go on with the statement
     (below); or `,`, Groovy's trivia (line breaks included) and a further
-    name as above, for the whole list, which may also end at the `=` (not
-    `==` or `=~`) of a later name, on its line or the next, unless what
-    follows it to `->` reads as closure parameters (`parameters_follow`,
-    §6.14: `{ String a, b = 1 -> }`);
-  - `=` after the first name, on its line or the next, is no such
-    declaration: the typed form with an initializer takes it.
+    name as above, for the whole list; or, after any name of the list, on
+    its line or the next, the `=` of an initializer (not `==`), unless
+    what follows it to `->` reads as closure parameters
+    (`parameters_follow`, §6.14: `{ String a = 1 -> }`).
+  - In a `for` init, where Groovy's lexer drops line breaks, the trivia
+    after a name include line breaks, and only `;` and `=` end the scan
+    with a declaration: `,` goes on with the list, and anything else is
+    no declaration (`for (String s : xs)` and `for (String s in xs)` are
+    loops).
 A line goes on with the statement, as Groovy reads it, when it starts
 with what no statement starts with: `.`, `?`, `*`, `%`, `^`, `|`, `&`,
-`<`, `>`, `:`, `,`, `)`, `]`, `==`, `=~`, `!=`, `!in` or `!instanceof`
-before what makes them operators (§6.12), `+=`, `-=`, `->`, `/=`, the
-words `in`, `as` and `instanceof`, and `(` when the parentheses hold
-parameters (`call_arguments_follow`, §6.14: `Foo f` then `(int a) { }`).
-A `/` that opens no comment there starts a slashy string.
-The type arguments, the names of the list and the default of a later name
-are read for at most DECLARATION_LOOKAHEAD_ITEMS (256) items: past them
-there is no declaration, and a default read to the end of the budget is
-no closure parameter's. The in-grammar lexer reads the type and the
-names. On any other input return false. Not emitted during error
-recovery.
+`<`, `>`, `:`, `,`, `)`, `]`, `==`, `!=`, `!in` or `!instanceof` before
+what makes them operators (§6.12), `+=`, `-=`, `->`, `/=`, the word
+`instanceof`, a `/` that opens no comment and no slashy string (the
+string needs a closing `/` on the line, `slashy_body_follows`:
+`Foo foo` then `/ 2` is Groovy's `Foo(foo / 2)`), and `(` when the
+parentheses hold parameters (`call_arguments_follow`, §6.14: `Foo f`
+then `(int a) { }`). A line that starts with `in` or `as` starts the next
+statement, as in Groovy (`InputStream in` then `in.close()`).
+The type arguments, the names of the list and the value after an `=` are
+read for at most DECLARATION_LOOKAHEAD_ITEMS (256) items: past them there
+is no declaration, and a value read to the end of the budget is no
+closure parameter's default. The in-grammar lexer reads the type, the
+names and the values. On any other input return false. Not emitted during
+error recovery.
 ```
 
 COMMAND_STATEMENT_START takes a name argument only after a receiver that
@@ -3281,14 +3293,19 @@ state; `Foo new Bar()` and `Foo String[].class` stay calls (§5.5 item 3).
 
 The grammar takes the token in one form of `local_variable_declaration`:
 annotations, the token, the type, then declarators that each may have an
-initializer (`String a, b = 1`), with the node and fields of the typed
-form with initializers. That form, and the blank final (`final String a,
-b`), now take declarators without an initializer after their first
+initializer (`String a, b = 1`, `String s = 'a'`), with the node and
+fields of the typed form with initializers. That form, which still takes
+a declaration after modifiers (`final String s = 'a'`) and where the
+token is not emitted, and the blank final (`final String a, b`), now
+take declarators without an initializer after their first
 (`String a = 1, b`). Nothing else competes for the token, so the form has
-no weight. `return`, `break` and `continue` take the token before their
-operand or label, as they take COMMAND_STATEMENT_START, so `return` then
-`String s` on the next line is the return of `String` followed by `s`, as
-before; Groovy reads `return` and the declaration. A statement that ends
+no weight. As the token opens the typed form with an initializer as well,
+the declaration and the two statements no longer fork at its type; the
+fork is left after `final` and other modifiers. `return`, `break` and
+`continue` take the token before their operand or label, as they take
+COMMAND_STATEMENT_START, so `return` then `String s` on the next line is
+the return of `String` followed by `s`, as before; Groovy reads `return`
+and the declaration. A statement that ends
 at a token only this look-ahead decides has an extent that depends on text
 past its own tokens, which a reparse that reuses the statement does not
 read again: with the token ending the `return`, `(a) { }`, `return`,
@@ -3297,13 +3314,16 @@ read again: with the token ending the `return`, `(a) { }`, `return`,
 a parse from scratch reads `return xString` and `s`
 (`bindings/rust/tests/incremental_reparse.rs` holds the text).
 
-In a `for` header Groovy's lexer drops line breaks, but what may follow a
-declared name there reads the same across one: `;` ends it
-(`for (int i; i < n; i++)`), and `:` and `in` go on with it
-(`for (String s` then `: xs)`). Positions where a type may start
-(TYPE_START) include every one where the token is valid, so the array
-type value (§6.15) is decided in the same branch: `String[] arr` is a
-declaration and `String[].class` a value.
+In a `for` header Groovy's lexer drops line breaks, so the scan reads
+across them there: `;` ends the declaration (`for (int i` then
+`; i < n; i++)`), and `:` and `in` make it no declaration, which leaves
+the loop to the grammar (`for (String s` then `in xs)`). A header still
+being typed (`for (int i` then the next statement) emits nothing, so
+error recovery keeps the statements around it, as before the token
+(`test/corpus/statements-for.txt` pins it). Positions where a type may
+start (TYPE_START) include every one where the token is valid, so the
+array type value (§6.15) is decided in the same branch: `String[] arr` is
+a declaration and `String[].class` a value.
 
 Trees that change for input that parsed without an `ERROR` are the
 declarations themselves, each a `local_variable_declaration` where the
@@ -3314,79 +3334,99 @@ comparison (`java.util.List<String> l`, `Foo.Bar<T> a`) or, across the
 line break, other readings of the name and the next line: `String s`
 then `{ }` was `String` and the call `s { }`, `String s` then `/x/` the
 call `s /x/`, `String s` then `(a) { }` the method `s`, `String s` then
-`+ 1` the sum `s + 1`, `InputStream in` then `foo()` the test
-`InputStream in foo()`, and `final x` then `String s` the blank final
-`final x String` followed by `s`. Each is the reading of Groovy 3, which
-was checked by the declarations of the changed lines: on every new
-declaration in the 1,970 Java files of 24,548 that changed to a tree with
-no `ERROR` (4,215 names, all agree; Groovy rejects 250 of the files), on
-2,370 of the 2,613 changed fuzzed inputs with no `ERROR` before or after
-that Groovy accepts (the grammar before agreed on 214), and on the
-corpus. The rest are two kinds of
-input where Groovy reads something this grammar has no reading for: a
-second statement on the line of a first (`foo() String s` is `foo()` and
-the declaration, Groovy's `foo().String(s)`; also after a line escape),
-and a declaration that Groovy reads otherwise only because what follows
-it does not parse (`do Foo in` then `x while (c)`). `return` then a
-declaration on the same line is `return` and the declaration where Groovy
-rejects `return String s` and reads `return java.util.List<String> s` as
-comparisons. A statement after `Type name` on the same line, and a type
+`+ 1` the sum `s + 1`, `String s` then `in xs` or `as T` the test
+`s in xs` or the cast `s as T` (now the declaration and then `in` and
+`xs`, or `as` and `T`, as statements, where Groovy calls `in(xs)` and
+`as(T)`), `InputStream in` then `foo()` the test `InputStream in foo()`,
+and `final x` then `String s` or `String s = 'a'` the blank final
+`final x String` followed by `s` or `s = 'a'`. Each declaration is one
+of Groovy 3, which was checked by the declarations of the changed lines:
+on every new declaration in the 1,971 Java files of 24,548 that changed
+to a tree with no `ERROR` (4,216 names, all agree; Groovy rejects 250 of
+the files), on 2,547 of the 2,817 changed fuzzed inputs with no `ERROR`
+before or after that Groovy accepts (the grammar before agreed on 229),
+and on the corpus. The rest are two kinds of input where Groovy reads
+something this grammar has no reading for: a second statement on the
+line of a first, which may now be a declaration where Groovy goes on with
+the first (`foo() String s` is `foo()` and the declaration, Groovy's
+`foo().String(s)`; `move left By steps` is the call `move left` and the
+declaration `By steps`, where it was three statements, Groovy's
+`move(left).By(steps)`; `Foo T name` is `Foo` and the declaration; also
+after a line escape), and a declaration that Groovy reads otherwise only
+because what follows it does not parse (`do Foo in` then `x while (c)`;
+`if (c) Foo f` then `as T` then `else { }`, Groovy's `Foo(f as T)` in the
+`if`). `return String s` stays `return String` and `s`, which Groovy
+rejects, and `return java.util.List<String> s` stays comparisons, as
+Groovy reads it. A statement after `Type name` on the same line, a type
 with a space before `<` (`a < b > c`, `List <String> xs`, Groovy's
-declarations), are read as before.
+declarations), shifts (`Foo<<Baz>> result`), a path from `this`
+(`this.Foo x`, Groovy's `this.Foo(x)`) and `=~` after a name
+(`Foo f =~ /x/`, the declaration of `f` with the value `~/x/`, Groovy's
+`Foo(f =~ /x/)`) are read as before.
 
 Not taken, each read as before: a comment or a form feed between the type
 and the name (`String /* c */ s`, which Groovy declares), annotations
 before a lowercase type with no `<` or `[` (`@A foo bar`, Groovy's
 declaration), type arguments that span lines, a name after the type on
-the next line (`String` then `s`, two statements in Groovy too), and a
+the next line (`String` then `s`, two statements in Groovy too), a
 declaration whose next line goes on with it (`String s` then `.trim()` is
 `String` and `s.trim()`, Groovy's `String(s.trim())`; `String s` then
-`* 2`). Modifiers other than `final` before the type (`static String s`)
-stay an `ERROR` (§4). In an interpolation no statement is taken, so
-`"${String s}"` stays an `ERROR`.
+`* 2`; `Foo foo` then `/ 2`; `String s` then `/= 2 // c`, where Groovy
+reads the slashy string `/= 2 /`, which this scanner does not start with
+`=`), and a resource without an initializer (`try (String s) { }`, an
+`ERROR`, which Groovy declares). Modifiers other than `final` before the
+type (`static String s`) stay an `ERROR` (§4). In an interpolation no
+statement is taken, so `"${String s}"` stays an `ERROR`.
 
 Of 394,000 fuzzed inputs made from templates of types, names, separators
 and what may follow them in 70 contexts and from mutations of the corpus,
 the real files and the Java files, 137 went from no `ERROR` to one, and
-Groovy 3 rejects all but 12: three where a closure on the next line is
+Groovy 3 rejects all but 10: three where a closure on the next line is
 followed by a `,` (`Integer _` then `{ }, b`, Groovy's call
-`Integer(_({ }), b)`), six where Groovy reads `in` after a declared name
-as the operator because the declaration does not parse in a `do` body or
-a `for` header (`do long in` then `[1] while (c)`), and three where the
-declaration is right and the line after it is one this grammar has no
-statement for (`foo<T>` then `it`, `foo()` then `-> x`). Error recovery
-changed in one test of the corpus: `enum E<T> { A }` lost its
+`Integer(_({ }), b)`), four where Groovy reads `in` after a declared name
+as the operator because the declaration does not parse in a `do` body
+(`do long in` then `[1] while (c)`), and three where the declaration is
+right and the line after it is one this grammar has no statement for
+(`foo<T>` then `it`, `foo()` then `-> x`, `++i` then `List< x`). Error
+recovery changed in one test of the corpus: `enum E<T> { A }` lost its
 `enum_declaration` again (§6.20), as the in-grammar lexer, whose states
 the grammar's change regrouped, reads its `<` as the one a statement may
-start with.
+start with. `String s =` at the end of the input is the declaration of
+`s` and an `ERROR` of the `=`, where it was a declaration with a
+`MISSING` value, as the token now opens it. A `for`
+header still being typed keeps the statements around it (above).
 
-The look-ahead reads 41 and 43 bytes per input byte for a nest of 500 and
-4,000 closures that open with `T a, b =` and 50 and 51 for as many broken
-lines of such lists, which took 254 and 2,004, and 501 and 4,001, with no
-bound (`bindings/rust/tests/declaration_start_cost.rs`). Over 123,840
-edits that type and delete declarations one character at a time between
-18 kinds of text before and 8 after, no reparse differs from a parse from
-scratch, as before; over
-720,000 random edits of texts with declarations the reparses that differ
-went from 48 to 59, 5 and 7 of them with no `ERROR`. The two added
-without an `ERROR` are the reparse of a `return` after `(a) { }` that the
-grammar before this section has too (`(a) { }`, `return`, then `x` typed
-on the next line); every other one has an `ERROR` both ways.
+The look-ahead reads, per input byte, 41 and 43 bytes for a nest of 500
+and 4,000 closures that open with `T a, b =`, 45 and 46 for as many
+unclosed, 50 and 51 for as many broken lines of such lists and 60 and 64
+for a nest of `Closure c = {`, where the grammar before read 1.5 to 3.2;
+with no bound it took 254 and 2,004, 251 and 2,001, 501 and 4,001, and
+254 and 2,004 (`bindings/rust/tests/declaration_start_cost.rs`). The
+value after an `=` is read to its end, or to the budget, as a closure
+parameter's default may hold a closure (`{ Closure a = { 1 } -> a() }`
+is Groovy's closure with one parameter), so no read is cut short. On the
+real files the parser reads 1.77 bytes per byte, 1.75 before. Over
+123,840 edits that type and delete declarations one character at a time
+between 18 kinds of text before and 8 after, no reparse differs from a
+parse from scratch, as before; over 720,000 random edits of texts with
+declarations the reparses that differ went from 48 to 53, 5 and 5 of them
+with no `ERROR`. The two of those added are the reparse of a `return`
+after `(a) { }` that the grammar before this section has too (`(a) { }`,
+`return`, then `x` typed on the next line), and two of the grammar before
+are gone; every other one has an `ERROR` both ways.
 
 Measured against the grammar before: STATE_COUNT 4600 to 4637,
 LARGE_STATE_COUNT 1754 to 1773, `parser.c` 9,208,781 to 9,328,518 bytes,
 one external token and one conflict
 (`[local_variable_declaration, closure_parameter]`, the fork of
 `{ final String a, b -> }` against `{ final String a, b }`) added. The
-266 real Groovy, Gradle and Jenkins files take 0.31% more instructions,
-the 265 whose trees do not change 0.20%; 400 Java files 0.20% fewer, the
-332 of them whose trees do not change 0.64% more. A file of typed
+266 real Groovy, Gradle and Jenkins files take 0.31% fewer instructions,
+the 265 whose trees do not change 0.25% fewer; 400 Java files 3.6% fewer,
+the 331 of them whose trees do not change 2.2% fewer. A file of typed
 declarations without an initializer in method bodies takes 81% fewer (it
 had an `ERROR` in every method), one of typed declarations with an
-initializer 3.4% more, as the scanner now reads the name and the `=` and
-reads type arguments whole, statements with a dotted name 1.2% more, and
-calls and names 0.6% and 0.8% more. The grammar's change alone costs no
-measurable instruction on real files and 0.25% on Java files.
+initializer 31% fewer, as they no longer fork at the type, statements
+with a dotted name 1.2% more, and calls and names 0.6% and 0.8% more.
 
 ---
 

@@ -166,7 +166,10 @@ These are documented in detail in
   (`@A foo bar`) and a type with a space before `<` (`List <String> x`)
   are not declarations here, and a declaration followed by a line that
   starts with an operator (`String s` then `.trim()`) reads as two
-  statements, where Groovy reads a call.
+  statements, where Groovy reads a call. A type and a name after another
+  statement on its line declare (`move left By steps` is the call
+  `move left` and the declaration `By steps`), where Groovy goes on with
+  the call (`move(left).By(steps)`).
 - **Leading-operator line continuation** -- `a\n+ b` greedily joins
   as `a + b` rather than splitting into two statements. Idiomatic
   Groovy places continuation operators at the end of the previous

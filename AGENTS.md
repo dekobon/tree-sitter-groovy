@@ -70,11 +70,12 @@ The default branch is **`main`**.
   (§6.19), the first `,` of `(a, b) = …`, turned down where the
   parentheses go on as a method's parameters, which ends the reading of
   `def f(a, b) { }` as `def f` and a multi-assignment there (§6.20), and
-  an empty token before the type of a typed declaration without an
-  initializer (`String s`, `int a, b`), emitted when the declaration
-  ends on its line or the next line does not go on with it, which the
-  same reading of a statement's first name decides by Apache's
-  isInvalidLocalVariableDeclaration, so `foo bar` stays a call (§6.21).
+  an empty token before the type of a typed local declaration
+  (`String s`, `int a, b`, `String s = 'a'`), emitted when the
+  declaration ends on its line, the next line does not go on with it,
+  or an initializer follows, which the same reading of a statement's
+  first name decides by Apache's isInvalidLocalVariableDeclaration, so
+  `foo bar` stays a call (§6.21).
   Inside a string body
   it emits nothing (§6.10). Its state is two bits, "no `*/` from
   here on" and "the body goes on past the token that follows", carried

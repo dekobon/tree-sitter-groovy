@@ -49,7 +49,7 @@ reasoning here.
 | §6.18 STATEMENT_PAREN | **Mostly done** | a `(` that opens a line after an expression, emitted where a statement may start and the parentheses can open one, so that it opens the next statement as in Groovy (`foo()` followed by `(a, b) = l`); a call's arguments do not take it. Inside parentheses and brackets the `(` still calls. Parentheses that cannot open a statement (`(a, b)`, `(a: 1)`, `()`) stay a call's arguments, and a block comment that opens the line hides the line break; see #3 below. |
 | §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
-| §6.21 DECLARATION_START | **Mostly done** | an empty token before the type of a statement that is a typed declaration without an initializer by Apache's `isInvalidLocalVariableDeclaration` (`String s`, `foo.Bar q`, `foo<T> x`, `int a, b`), emitted where a statement starts, after annotations and as a `for` init, when the declaration ends on the line or the next line does not go on with it. Decided from the same reading of the first name as `_command_statement_start`, so `foo bar` stays a call. See #27 below. |
+| §6.21 DECLARATION_START | **Mostly done** | an empty token before the type of a statement that is a typed declaration by Apache's `isInvalidLocalVariableDeclaration` (`String s`, `foo.Bar q`, `foo<T> x`, `int a, b`, `String s = 'a'`), emitted where a statement starts, after annotations and as a `for` init, when the declaration ends on the line, the next line does not go on with it, or an initializer follows. Decided from the same reading of the first name as `_command_statement_start`, so `foo bar` stays a call. See #27 below. |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | every node kind has a capture. |
@@ -406,14 +406,18 @@ scanner decides it (spec §6.21; see #27 below).
 
 Because a newline is whitespace (#3), the tokens of a typed
 declaration also parse as two statements: `String s = 'a'` as the
-expression `String` followed by `s = 'a'`. The typed forms carry a
-dynamic precedence, so the declaration wins whenever both parse;
-without it a comment before the declaration changed the result. The
-cost is the reverse case: a bare `x` followed by `y = 1` on the next
-line is the declaration `x y = 1`, and `final a` followed by
-`String b = 'y'` is `final a String` followed by `b = 'y'`. A
-declaration without an initializer on that line is one of its own:
-`final a` followed by `String b` declares `a` and `b`.
+expression `String` followed by `s = 'a'`. Where a statement starts, the
+scanner's token opens the declaration (spec §6.21), so the two readings
+no longer fork at its type. After modifiers, and where the token is not
+emitted, the typed forms carry a dynamic precedence, so the declaration
+wins whenever both parse; without it a comment before the declaration
+changed the result. The cost is the reverse case: a bare `x` followed by
+`y = 1` on the next line is the declaration `x y = 1`, and `String`
+followed by `s = 1` the declaration `String s = 1`, where Groovy reads
+two statements. A declaration with a type and a name on the line after
+`final a` is one of its own: `final a` followed by `String b` or
+`String b = 'y'` declares `a` and `b`, as Groovy does (it was
+`final a String` followed by `b = 'y'`).
 
 A method declaration with a body carries a dynamic precedence for the
 same reason: `String f() { }` also parses as the expression `String`
@@ -479,12 +483,9 @@ Groovy rejects in a script, parses as `String` followed by `foo()`
 with no `ERROR`. In a class body nothing competes with the method, so
 abstract and interface methods are unaffected.
 
-**Action**: the scanner's token could open the typed form with an
-initializer as well where a statement starts, which would end the fork
-between the declaration and the two statements at the type: measured,
-real files take 0.3% fewer instructions and Java files 3.7% fewer, but
-`final a` followed by `String b = 'y'` becomes two declarations and
-error recovery changes, so it is left for an item of its own.
+**Action**: none for the declarations the token opens. The reverse
+case would need the token to read the line before (`x` then `y = 1`),
+which it does not.
 
 ---
 
@@ -1817,9 +1818,9 @@ is read as a command expression (`String s` then `.trim()` is
 `String(s.trim())`).
 
 **Current implementation**: the scanner emits an empty token before the
-type when a declared name with no initializer follows by the same rule
-and the declaration ends on its line, or the next line does not go on
-with it, or a list of names follows (spec §6.21). The token opens a form
+type when a declared name follows by the same rule and the declaration
+ends on its line, or the next line does not go on with it, or a list of
+names or an initializer follows (spec §6.21). The token opens a form
 of `local_variable_declaration` with the fields of the typed form with
 an initializer: one `type`, a `name` per variable, and a `value` after
 the name it belongs to. The same reading of the statement's first name
@@ -1841,9 +1842,12 @@ The Groovy column was observed by running Groovy 3.
 | `String s` then `(a) { }` | the declaration and a cast | the same; before, the method `s` |
 | `Foo f` then `(int a) { }` | the declaration and the call `int(a, { })` | the method `f`, as before: parameters on the next line go on with the name |
 | `String s` then `= 1` | a declaration with the value | the same, as before |
-| `String s` then `.trim()`, `?.x()`, `* 2`, `== 1` or `instanceof T` | `String(s.trim())`, … | `String` and `s.trim()`, …, as before |
-| `String s` then `in xs` or `as T` | the declaration and `in(xs)`, `as(T)` | `String` and `s in xs`, `s as T`, as before: `in` goes on with the name in a `for` header |
-| `InputStream in` then `open()` | the declaration and a call | the same; before, `InputStream in open()` |
+| `String s` then `.trim()`, `?.x()`, `* 2`, `== 1`, `instanceof T` or `/ 2` | `String(s.trim())`, … | `String` and `s.trim()`, …, as before |
+| `String s` then `/= 2 // c` | the declaration and the slashy string `/= 2 /` divided by `c` | `String` and `s /= 2`, as before: the scanner starts no slashy string with `=` |
+| `String s` then `in xs` or `as T` | the declaration and `in(xs)`, `as(T)` | the declaration and then `in` and `xs`, or `as` and `T`, as statements; before, `String` and `s in xs`, `s as T` |
+| `InputStream in` then `open()` or `in.close()` | the declaration and a call | the same; before, `InputStream in open()` and `InputStream in in.close()` |
+| `Foo<<Baz>> result`, `this.Foo x` | `(Foo << Baz) >> result`, `this.Foo(x)` | the same; the field access and the name, as before |
+| `Foo f =~ /x/` | `Foo(f =~ /x/)` | the declaration of `f` with the value `~/x/`, as before |
 | `String /* c */ s` | a declaration | two statements and the comment, as before |
 | `{ String a, b -> }`, `{ String a, b = 1 -> }`, `{ String a` then `-> }`, `{ String a, b -> }` with `b` on the next line | closure parameters | the same, as before |
 | `{ String a, b }`, `{ String a = 1, b }` | declarations | the same; before, closure parameters with a missing `->` |
@@ -1851,10 +1855,12 @@ The Groovy column was observed by running Groovy 3.
 | `for (String s : xs)`, `for (String s` then `: xs)`, `for (String s in xs)` | a for-in loop | the same, as before |
 | `return` then `String s` on the next line | `return`, then the declaration | `return String` and `s`, as before: `return`, `break` and `continue` take the token |
 | `return String s`; `return java.util.List<String> s` | rejected; `return` with comparisons | `return String` and `s`; `return` with comparisons, as before |
-| `foo() String s`, `x = 1 Foo bar` | `foo().String(s)`, `x = 1(Foo).bar` | the statement and the declaration; before, three statements |
-| `final x` then `String s` | two declarations | the same; before, the blank final `final x String` and `s` |
+| `foo() String s`, `x = 1 Foo bar`, `move left By steps`, `Foo T name` | `foo().String(s)`, `x = 1(Foo).bar`, `move(left).By(steps)`, `Foo(T).name` | the statement and the declaration; before, three statements, or `move left` and two |
+| `final x` then `String s` or `String s = 'a'` | two declarations | the same; before, the blank final `final x String` and `s` or `s = 'a'` |
+| `if (c) Foo f` then `as T` then `else { }` | `Foo(f as T)` in the `if`, as the declaration does not parse there | the declaration, `as`, `T` and the call `else { }`; before, `Foo`, the cast and the call |
 | `def String s` | a declaration of `s` with the type `String` | the declaration of `String` and the statement `s`, as before |
 | `@A foo bar` | a declaration | an `ERROR`, as before: after annotations a lowercase type needs `<` or `[` |
+| `try (String s) { }` | a resource declaration | an `ERROR`, as before |
 | `static String s`, `private String s` | a declaration | an `ERROR`, as before |
 | `"${String s}"` | a closure that declares `s`, called | an `ERROR`, as before |
 | `class C { String s; int a, b }` | fields | `field_declaration`s, as before |
@@ -1866,11 +1872,12 @@ The Groovy column was observed by running Groovy 3.
 The rows with "before" changed trees that had no `ERROR`; spec §6.21 lists
 the kinds and how each was checked. Where Groovy declares only because the
 rest parses (the `Integer _` and `do` rows), this grammar has no such
-fallback, and of 394,000 fuzzed inputs 12 that Groovy accepts went from
+fallback, and of 394,000 fuzzed inputs 10 that Groovy accepts went from
 no `ERROR` to one (spec §6.21).
 
 **Action**: the forms Groovy takes that stay as before need the
 statement after another on its line to continue it (#25 above), comments
 and form feeds between a type and its name, a lowercase type after
-annotations, and type arguments across lines or after a space, each of
-which the scanner could read at more cost.
+annotations, a resource without an initializer, and type arguments
+across lines or after a space, each of which the scanner could read at
+more cost.
