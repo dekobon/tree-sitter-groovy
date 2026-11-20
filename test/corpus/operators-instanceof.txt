@@ -188,3 +188,53 @@ def v = x instanceof a.b.c
           (type_identifier)
           (type_identifier)
           (type_identifier))))))
+
+==================
+instanceof with a dotted type after a cast of the name as
+==================
+
+(x) as instanceof x.a
+x = T
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (identifier))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+instanceof with a dotted type after a cast to a generic type
+==================
+
+x //
+y as a.B<C> instanceof c.D
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (line_comment)
+  (expression_statement
+    (instanceof_expression
+      value: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier))))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)))))

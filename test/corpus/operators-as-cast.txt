@@ -252,3 +252,29 @@ f(1)
       function: (identifier)
       arguments: (argument_list
         (number_literal)))))
+
+==================
+as with a dotted type on the last line but one is a cast, not a method head
+==================
+
+x
+f() as a.B
+y = 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (cast_expression
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
