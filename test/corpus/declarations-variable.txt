@@ -2925,6 +2925,40 @@ this.Foo<T> x
       right: (identifier))))
 
 ==================
+A dotted name that starts with super is no type of a typed local
+==================
+
+super.Foo x
+super.foo.Bar x
+super.Foo<T> x
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (field_access
+          object: (identifier)
+          field: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+==================
 Shifts after a name start no typed local
 ==================
 
