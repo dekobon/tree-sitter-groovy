@@ -80,6 +80,11 @@ if (o instanceof JTextComponent.KeyBinding[]) { }
 //               ^ type
 //                              ^ type
 
+if (o instanceof java.util.Map.Entry<K, V>[]) { }
+//                             ^ type
+//                                   ^ type
+//                                      ^ type
+
 def maps = x as a.b.Map<K, V>[]
 //              ^ type
 //                  ^ type
