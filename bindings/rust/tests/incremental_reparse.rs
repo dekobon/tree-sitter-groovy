@@ -23,6 +23,10 @@
 //! A `{` that opens a statement is a block where no expression goes on after
 //! its `}` (§6.22), so edits after the `}` must make the statement parse
 //! again.
+//!
+//! A `)` before a relational operator that Groovy applies to the
+//! parentheses closes no cast (§6.11), which the scanner decides from the
+//! word after it, so edits there must lex the `)` again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -180,18 +184,20 @@ fn reparse(
     (edited, incremental, fresh)
 }
 
-#[test]
-fn reparse_after_edit_matches_parse_from_scratch() {
+/// Applies every edit of each text, at every offset, that removes one of
+/// `REMOVED_LENGTHS` bytes and inserts one of `insertions`, and requires
+/// each reparse to equal the parse of the edited text from scratch.
+fn assert_every_edit_reparses(texts: &[&str], insertions: &[&str]) {
     let mut parser = parser();
     let mut cases = 0_usize;
-    for text in TEXTS {
+    for text in texts {
         for start in 0..=text.len() {
             for &removed in REMOVED_LENGTHS {
                 let old_end = start + removed;
                 if old_end > text.len() {
                     continue;
                 }
-                for insertion in INSERTIONS {
+                for insertion in insertions {
                     if removed == 0 && insertion.is_empty() {
                         continue;
                     }
@@ -208,6 +214,33 @@ fn reparse_after_edit_matches_parse_from_scratch() {
         }
     }
     assert!(cases > 0, "no edit was tried");
+}
+
+#[test]
+fn reparse_after_edit_matches_parse_from_scratch() {
+    assert_every_edit_reparses(TEXTS, INSERTIONS);
+}
+
+/// Texts with a `)` before a relational operator (§6.11), which closes a
+/// parenthesized expression and no cast, and with names that start like
+/// one (`(x) inside`) or that the operator's operand cannot start
+/// (`(Foo) in.read()`), where it may close a cast, before a line a method
+/// could start and a typed local. The scanner reads the word after the `)`,
+/// and after `as` and `in` the spaces and the first character after them,
+/// so an edit there must lex the `)` again.
+const RELATIONAL_CLOSE_TEXTS: &[&str] = &[
+    "return (x) instanceof Foo\nbar() { }\n",
+    "def v = (a.b) in y\n(Foo) in.read()\n",
+    "(x) as Foo\n(x) !in y\nout[i] = (float) in[i]\n",
+    "(x) !instanceof T\n(x) as\nFoo y = 1\n(x) inside\n",
+];
+
+/// Replacement texts for an edit of `RELATIONAL_CLOSE_TEXTS`.
+const RELATIONAL_CLOSE_INSERTIONS: &[&str] = &["", "x", " ", "!", ".", "(", ")", "\n", "s", "n"];
+
+#[test]
+fn reparse_after_relational_close_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(RELATIONAL_CLOSE_TEXTS, RELATIONAL_CLOSE_INSERTIONS);
 }
 
 /// An edit: the offset, the number of bytes removed there, and the text
