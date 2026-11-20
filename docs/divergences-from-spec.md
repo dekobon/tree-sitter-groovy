@@ -237,9 +237,10 @@ whitespace here, so nothing requires one between those statements:
 `def f(a, b) = [1, 2]`, on one line or with the `=` on the next, and
 `@A def f(a, b) = …` parse with no `ERROR` as a declaration of `f`
 followed by a multi-assignment. Groovy rejects them. The scanner ends the
-second reading at the first `,` unless names, `)` and `=` follow it
-(spec §6.20), so it costs a method's head no more parse steps than
-before multi-assignments.
+second reading at the first `,` where the parentheses go on as a
+method's parameters, before a `{` or `throws` (spec §6.20), so it costs a
+method's head with a body no more parse steps than before
+multi-assignments.
 
 ---
 
