@@ -15,17 +15,23 @@
  *     only before a declaration so each word stays an identifier
  *     everywhere else, and `var`, `yield`, `in` and `as`, emitted only
  *     before what each declares, opens or takes
- *   - Five decisions that depend on what shares a line: the key of
- *     a named argument in a parenthesis-free call, the start of such
- *     a call that is a value, a subscript `[`, an array type that is a
- *     value (`String[].class`), and the `)` of a cast
+ *   - Decisions that depend on what shares a line: the key of a named
+ *     argument in a parenthesis-free call, the start of such a call
+ *     that is a value, a statement with a dotted receiver or a
+ *     statement whose first argument is a `new`, an array type, a name
+ *     or such a call in parentheses, a subscript `[`, an array type
+ *     that is a value (`String[].class`), the `)` of a cast and the `)`
+ *     before a relational operator Groovy applies to the parentheses
+ *   - A `(` that opens a line after an expression and opens the next
+ *     statement, and the `<` of a cast type's type arguments where they
+ *     close
  *   - The `!in` operator, which depends on the character after it
  *   - The start of a lambda: the parameters in parentheses, or the one
  *     name, that `->` follows
  *   - The first comma of a multi-assignment, which it turns down where
  *     the parentheses go on as a method's parameters
- *   - The start of a typed declaration without an initializer
- *     (`String s`), which a line break after the name may end
+ *   - The start of a typed local declaration (`String s`,
+ *     `String s = 'a'`), which a line break after the name may end
  *   - The end of a lambda's brace body and of a block that opens a
  *     statement, at a `}` that no expression continues
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
@@ -1107,15 +1113,18 @@ module.exports = grammar({
     ),
 
     // §5.5 — command_chain is the parenthesis-free method-call
-    // form (`println 'hello'`, `events 'a', 'b', 'c'`). v1 is
-    // intentionally conservative: receiver is a bare identifier
-    // and the first argument is restricted to literal-shaped
-    // expressions, closures and named arguments (no risk of
-    // mis-parsing `foo bar` as a command call on a bare identifier).
-    // After a comma an argument is a named argument or any
-    // expression: Apache's `argumentListElement` without spread
-    // arguments (`foo 'a', *args` is an ERROR). Chained
-    // `foo bar baz` lands later. Closes a subset of murtaza64 #5.
+    // form (`println 'hello'`, `events 'a', 'b', 'c'`). This rule is the
+    // statement whose receiver is one name and whose first argument is
+    // a literal, a closure or a named argument, which no other statement
+    // starts with, so it needs no scanner token. The other forms are
+    // aliased to it: a dotted receiver, and a first argument that is a
+    // `new`, an array type, a name or such a call in parentheses, in
+    // `_path_command_chain`, and a call that is a value in
+    // `_value_command_chain`. After a comma an argument is a named
+    // argument or any expression: Apache's `argumentListElement` without
+    // spread arguments (`foo 'a', *args` is an ERROR). The continuations
+    // of a chain (`foo a bar`) are not taken. Closes a subset of
+    // murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
       field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
@@ -1126,8 +1135,9 @@ module.exports = grammar({
     // assignment (`def out = sh script: 'make', returnStdout: true`),
     // aliased to `command_chain`. A newline is whitespace, so the call
     // opens with `_command_value_start`, which the scanner emits only
-    // when a literal, a `name:`, `new` or an array type value follows the
-    // receiver on its line.
+    // when a literal, a `name:`, `new`, an array type value or such a call
+    // in parentheses follows the receiver on its line, or a name, `!` or
+    // `~` after a receiver that may not name a type (§6.14).
     // Without it `def x = foo` followed by `1` on the next line would be
     // one call. A positional first argument is a whole expression, as in
     // Apache (`def x = foo 'a' + b`); the token makes it start with one
@@ -1165,11 +1175,13 @@ module.exports = grammar({
     // reduction.
     //
     // A statement whose receiver is one name and whose first argument
-    // starts with `new` or is an array type (`foo new Bar()`,
-    // `foo String[].class`) opens with `_command_statement_start`. The
+    // starts with `new`, is an array type, a name or such a call in
+    // parentheses (`foo new Bar()`, `foo String[].class`, `println x`,
+    // `println(foo 1)`) opens with `_command_statement_start`. The
     // grammar cannot read it from the name alone: `foo` followed by
-    // `new Bar()` on the next line is two statements, and the scanner
-    // decides before the name, where no comment can hide that line break.
+    // `new Bar()` or `x` on the next line is two statements, and the
+    // scanner decides before the name, where no comment can hide that line
+    // break.
     _path_command_chain: $ => seq(
       choice(
         field('receiver', $._statement_command_path),

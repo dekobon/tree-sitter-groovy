@@ -1423,16 +1423,18 @@ slashy opener, the three comment tokens, the contextual `record`
 `yield`, `in` and `as` keywords and the key a contextual word makes
 (§6.16), the named-argument key of a parenthesis-free call
 (§6.8), the start of such a call that is a value, a statement
-with a dotted receiver or a statement whose first argument is a `new`
-or an array type (§6.14), the
+with a dotted receiver or a statement whose first argument is a `new`,
+an array type, a name or such a call in parentheses (§6.14), the
 same-line subscript opener (§6.9), a `(` that opens a line after an
 expression where it may open a statement (§6.18), the start of an
-array type that is a value (§6.15), the `)` of a cast
-(§6.11), the `!in` operator (§6.12), the empty marker of an
+array type that is a value (§6.15), the `)` of a cast and the `)`
+before a relational operator that Groovy applies to the parentheses
+(§6.11), the `<` of a cast type's type arguments where they close
+(§3.2.2), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), the start of a lambda (§6.17),
 the end of a lambda's brace body (§6.19), the first comma of a
-multi-assignment (§6.20), the start of a typed declaration without an
-initializer (§6.21), the end of a block that opens a statement (§6.22),
+multi-assignment (§6.20), the start of a typed local declaration
+(§6.21), the end of a block that opens a statement (§6.22),
 `STRING_BODY` (§6.10),
 `TYPE_START` (§6.15) and `CLOSURE_PARAMETERS_START` (§6.21), which are
 never emitted and only mark a string body, where a type may start and
@@ -1471,8 +1473,8 @@ enum TokenType {
   CONTEXTUAL_KEY,         // §6.16 — `var`, `yield`, `in` or `as` as such a key, the word itself
   COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
   COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
-  COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new` or an array type
-  SUBSCRIPT_OPEN,         // §5.10 — `[` on the same line as the token before it
+  COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new`, an array type, a name or such a call in parentheses
+  SUBSCRIPT_OPEN,         // §6.9 — `[` on the same line as the token before it
   STATEMENT_PAREN,        // §6.18 — `(` that opens a line after an expression and opens a statement
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
@@ -1484,7 +1486,7 @@ enum TokenType {
   LAMBDA_BODY_END,        // §6.19 — empty; after the `}` of a lambda's brace body that nothing continues
   LAMBDA_BODY_REREAD,     // §6.19 — empty, in no rule; after a block shifted whole that something continues
   MULTI_ASSIGNMENT_COMMA, // §6.20 — the first `,` of `(a, b) = …`, unless the parentheses go on as a method's parameters
-  DECLARATION_START,      // §6.21 — empty; before the type of a typed declaration whose first name has no initializer
+  DECLARATION_START,      // §6.21 — empty; before the type of a typed local declaration (`String s`, `int a, b`, `String s = 'a'`)
   STATEMENT_BLOCK_END,    // §6.22 — empty; after the `}` of a block that opens a statement and that nothing continues
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
@@ -3125,9 +3127,16 @@ longer ends there. In `final String s = "a"` then `println x` then
 `(a)`, inserting `,` before the `)` makes the parentheses `x`'s
 arguments, and the reparse reads the first line as `final String` and
 `s = "a"`, where a parse from scratch reads a
-`local_variable_declaration`. It needs a reused statement that starts
-with something other than a plain name;
-`bindings/rust/tests/incremental_reparse.rs` pins it. Without `final`
+`local_variable_declaration`; `bindings/rust/tests/incremental_reparse.rs`
+pins it. The class is wider than that one example: the reused statement
+may be any call with one name argument (`foo bar` then `(a, b)` does
+the same), the edit may make the parentheses `(a, b)`, and the
+declaration may have annotations or an array type
+(`@A final String s = "a"`, `final String[] s = []`). Of the shapes
+tried, a primitive, generic or dotted type (`final int i = 0`,
+`final List<String> s = []`, `final a.B s = 1`), a reused statement
+with two name arguments or a dotted receiver (`foo bar baz`,
+`x.y z`) and one that is a name alone do not reproduce it. Without `final`
 the scanner opens the declaration with DECLARATION_START (§6.21), which
 then does not fork, and `String s = "a"` in the same place reparses as
 a parse from scratch reads it. The counts below are from before that.

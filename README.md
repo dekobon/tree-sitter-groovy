@@ -37,10 +37,12 @@ The full design is in [`SPECIFICATION.md`](SPECIFICATION.md).
 
 ## Status
 
-Fully functional Groovy 2.x--4.x parser with complete operator
-coverage, GString interpolation, generics, closures, command chains,
-and six language bindings. See [Known limitations](#known-limitations)
-for deferred items.
+Targets the Groovy 6.x grammar; code written for earlier versions
+parses where its syntax is a subset of it. Complete operator coverage,
+GString interpolation, generics, closures, lambdas, command chains,
+and six language bindings. The syntax Groovy 5 and 6 added is covered
+in part only: `async`, `await`, `defer` and `val`, for one, parse as
+names. See [Known limitations](#known-limitations) for deferred items.
 
 ## Operator coverage
 

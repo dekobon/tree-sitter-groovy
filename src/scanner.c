@@ -49,12 +49,16 @@
 // where the scanner emits nothing, where a type may start and where
 // closure parameters may start. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
-// COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
+// COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, CAST_TYPE_ARGUMENTS_OPEN,
 // NOT_IN, LAMBDA_START, BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
 // MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END and the
-// STRING_BODY check are suppressed.
+// STRING_BODY check are suppressed. The keywords `record`, `trait`,
+// `sealed`, `var`, `yield`, `in` and `as` are still decided there, by the
+// same look-aheads, as are the comments, UNTERMINATED_COMMENT and
+// SLASHY_STRING_START. The order in which the scan function tries the
+// decisions is described above it.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -4076,6 +4080,35 @@ void tree_sitter_groovy_external_scanner_deserialize(
     }
 }
 
+// The decisions, in the order this function tries them; the first that
+// applies returns:
+//   1. Inside a string body (STRING_BODY valid), nothing (§6.10).
+//   2. After the `}` of a lambda's brace body or of a statement's block,
+//      LAMBDA_BODY_END or STATEMENT_BLOCK_END (`scan_lambda_body_end`,
+//      §6.19, §6.22), unless the previous call set `lambda_body_continues`,
+//      which this one clears before reading on as after an expression.
+//   3. At `<` after a cast type's name, CAST_TYPE_ARGUMENTS_OPEN (§3.2.2).
+//   4. At a member access after a statement's first name,
+//      COMMAND_PATH_START (§6.14).
+//   5. Past spaces, tabs and line escapes only: SUBSCRIPT_OPEN at `[`
+//      (§6.9); a `(` on the line where STATEMENT_PAREN is valid turned down
+//      (§6.18); at a name, COMMAND_NAMED_KEY or CONTEXTUAL_KEY (§6.8,
+//      §6.16).
+//   6. Past whitespace and line breaks, at a name: a statement's first name
+//      (`scan_statement_start`: COMMAND_STATEMENT_START, DECLARATION_START
+//      and the keywords and array type value that name may be); else
+//      `record`, `trait`, `sealed` or `short[]` (§6.7, §6.13, §6.15); else
+//      `var`, `yield`, `in`, `as` or `int[]` where no value and no bare
+//      lambda may start (§6.16); else COMMAND_VALUE_START,
+//      BARE_LAMBDA_START or ARRAY_VALUE_START (`scan_value_start`, which
+//      decides the §6.16 words there).
+//   7. `!in`, NOT_IN (§6.12); `)`, CAST_CLOSE or RELATIONAL_CLOSE (§6.11).
+//   8. `(`: STATEMENT_PAREN where an expression ends (§6.18), LAMBDA_START
+//      where none does (§6.17), which also reads the extent of §6.18.
+//   9. `}` where STATEMENT_PAREN is valid: the extent of §6.19, no token.
+//  10. Any other character but `/`: MULTI_ASSIGNMENT_COMMA (§6.20).
+//  11. `/`: a line, block or Groovydoc comment, UNTERMINATED_COMMENT, `/=`
+//      turned down, or SLASHY_STRING_START (§6.6, §6.2).
 bool tree_sitter_groovy_external_scanner_scan(
     void *payload,
     TSLexer *lexer,

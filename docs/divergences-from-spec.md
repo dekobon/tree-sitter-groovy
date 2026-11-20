@@ -18,7 +18,7 @@ reasoning here.
 | §3 Operators (matrix) | **Done** | Every operator in §3.2 has its named node kind. The type after `as`, `instanceof` and `!instanceof` takes a whole dotted name with array dimensions and type arguments (`x as java.util.List<String>`); its `<` opens type arguments only where they close (CAST_TYPE_ARGUMENTS_OPEN, spec §3.2.2), and a quoted name or `new` after one of its dots is an `ERROR` (see #5 below). |
 | §4 Statements / decls | **Mostly done** | class / trait / interface / enum / record / sealed / @interface / method / the `default` modifier on methods and type declarations (see #20 below) / constructor / a record's compact constructor (see #17 below) / field / static_initializer / instance initializer / nested class, interface, trait, enum, record and @interface / multi-assignment with and without `def` / pipeline / try-with-resources / multi-catch / arrow switch / yield / labeled / `synchronized` statement. `def f(a, b) = …` is accepted (see #3 below). A multi-assignment declaration takes typed names, `final`, `final var` and `var` alone (`final (int a, b) = …`, `var (a, b) = …`), the Groovy 6 rest binding and keyed pairs (`def (a, *b) = …`, `def (name: n) = …`), and is accepted as a `for` init and in a type body (`private var (a, b) = …` included). Not yet supported, each an `ERROR`: a multi-assignment declaration introduced by annotations alone (`@A (a, b) = …`) or by modifiers other than `final` where a statement starts (`static def (a, b) = …`). Wider than Groovy: a keyword before a name is read as its type (`def (final a, b) = …`, `def (default a, b) = …`), a reserved word is a key (`def (class: v) = m`), more than one rest binding parses, and `foo final (a, b) = c`, like `foo def (a, b) = c`, is a statement and a declaration. |
 | §5.1 Numeric literals | **Done** | bin / oct / hex / dec, underscores, all type suffixes. |
-| §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). Groovy-5 candidates `val`/`async`/`await`/`defer` attempted but reverted: tree-sitter cannot fall back from a matched keyword literal to identifier when the keyword rule's RHS shape fails, so `async()`, `val.x()`, etc. error. See divergence #10. |
+| §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). The Groovy 6 keywords `async`, `await`, `defer` and `val` have no construct and parse as names; grammar literals for them were attempted and reverted. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
 | §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. A name, `!` or `~` is a first argument too (`println x`, `obj.m arg`, `def r = foo bar`), told from a declaration (`String s`) by Apache's rule; see #25 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), a name after a receiver that may name a type in a value (`def x = Foo bar`), the chain continuations (`foo a bar`), with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19, #23 and #25 below. |
@@ -33,7 +33,7 @@ reasoning here.
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
 | §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). A `{` that is the body of `if`, `else`, a loop, an arrow case or a lambda, or that opens a statement, is a block before a closure, as in Groovy, also when it holds a lambda (`if (x) { a = b -> c }`, `{ a = b -> c }`), and so is each block of a nest of lambdas at any depth, but for a `{` that opens a statement and holds a lambda whose body is a closure (`{ a = b -> { p -> p } }`), which is the closure with the parameter `a`. An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`; see #26 and #28 below. |
-| §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
+| §6.2 Slashy scanner | **Done** | context guards + same-line lookahead, which stops at 64 escaped slashes (spec §6.2). |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
 | §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
@@ -46,14 +46,17 @@ reasoning here.
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new`, an array type value or a name follows the receiver on its line (a name only after a receiver that may not name a type, see #25 below), so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new`, an array type value or a name (`println x`), so `foo` followed by `new Bar()` or `bar` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A keyword Groovy reserves is no receiver of a value (`def x = return 1`); `super`, `permits`, `pipeline` and `_` are, and start a statement's call before a call in parentheses (`super(foo 1)`). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
-| §6.18 STATEMENT_PAREN | **Mostly done** | a `(` that opens a line after an expression, emitted where a statement may start and the parentheses can open one, so that it opens the next statement as in Groovy (`foo()` followed by `(a, b) = l`); a call's arguments do not take it. Inside parentheses and brackets the `(` still calls. Parentheses that cannot open a statement (`(a, b)`, `(a: 1)`, `()`) stay a call's arguments, and a block comment that opens the line hides the line break; see #3 below. |
-| §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
-| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, `return` then a brace on the next line, a brace that holds a lambda whose body is a closure, and two lines of braces after a lambda where the readings differ by a step (`def c = { a = (b) -> (d) -> e` then `{ z }` twice); see #28 below. |
+| §6.16 VAR, YIELD, IN and AS keywords | **Mostly done** | `var` before a declared name or a multi-assignment's names, `yield` and `in` before an expression, `as` before a type, and such a word as a named argument's key (CONTEXTUAL_KEY); everywhere else the word is a name. `for (var in xs)`, `for (String in in xs)` and a method named `in` with a return type are `ERROR`s (see #22 below). |
+| §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
+| §6.18 STATEMENT_PAREN | **Mostly done** | a `(` that opens a line after an expression, emitted where a statement may start and the parentheses can open one, so that it opens the next statement as in Groovy (`foo()` followed by `(a, b) = l`); a call's arguments do not take it. Inside parentheses and brackets the `(` still calls. Parentheses that cannot open a statement (`(a, b)`, `(a: 1)`, `()`) stay a call's arguments, and a block comment that opens the line hides the line break; see #3 below. |
+| §6.19 LAMBDA_BODY_END | **Mostly done** | an empty token after the `}` of a lambda's brace body that no expression continues, so that braces an expression goes on with are a closure that starts the body (`def v = a -> { y -> y }()`); `_lambda_body_reread`, which no rule takes, makes a reparse decide a reused body's `}` again. The scan reads at most eight comments after the `}`, and an assignment of a lambda that an operator follows reads otherwise than Groovy (see #26 below). |
+| §6.20 MULTI_ASSIGNMENT_COMMA | **Done** | the first `,` of a multi-assignment without `def` (`(a, b) = l`), turned down where the parentheses go on as a method's parameters (`def f(a, b) { }`), reading at most 16 names, so that a script method's head parses its untyped parameters once. |
 | §6.21 DECLARATION_START | **Mostly done** | an empty token before the type of a statement that is a typed declaration by Apache's `isInvalidLocalVariableDeclaration` (`String s`, `foo.Bar q`, `foo<T> x`, `int a, b`, `String s = 'a'`), emitted where a statement starts, after annotations and as a `for` init, when the declaration ends on the line, the next line does not go on with it, or an initializer follows. Decided from the same reading of the first name as `_command_statement_start`, so `foo bar` stays a call. See #27 below. |
+| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, `return` then a brace on the next line, a brace that holds a lambda whose body is a closure, and two lines of braces after a lambda where the readings differ by a step (`def c = { a = (b) -> (d) -> e` then `{ z }` twice); see #28 below. |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
-| §9.1 highlights.scm | **Done** | every node kind has a capture. |
+| §9.1 highlights.scm | **Done** | keywords (the contextual ones included), operators, literals, comments, annotations, labels, types and the names of declarations, calls, fields and parameters have captures; structural nodes (statements, blocks, argument lists, expressions as such) have none. |
 | §9.2 injections.scm | **Done** | groovydoc → javadoc; slashy + dollar-slashy → regex; named-call DSL → sql. |
 | §9.3 locals.scm | **Done** | scopes, definitions, references. |
 | §10 Issue resolution | **Done** | all eleven listed issues closed by corresponding rules and corpus regressions. |
@@ -94,9 +97,10 @@ conflicts actually fired. Two reasons:
 
 - Several entries (`command_chain`, `_type_arguments`) were avoided
   by how those features were built: a command chain is limited to
-  statement position and to the value of a declaration or an
-  assignment, where a scanner token starts it, and a generic type
-  always carries explicit angle brackets.
+  statement position, the value of a declaration or an assignment,
+  parentheses (those of a condition included) and an interpolation,
+  where a scanner token starts it, and a generic type always carries
+  explicit angle brackets.
 - Other entries (`closure` vs `map_literal`, `trait_declaration` vs
   `class_declaration`, `label` vs `identifier`, `method_reference`
   vs `ternary`) were avoided by using `prec` and structural
@@ -688,12 +692,15 @@ slashy-string body that spans into the assertion comment.
 
 ---
 
-## 10. Groovy-5 contextual keywords (`val` / `async` / `await` / `defer`)
+## 10. Groovy 6 contextual keywords (`val` / `async` / `await` / `defer`)
 
 **Spec §5.2** lists `val`, `async`, `await`, and `defer` as
 contextual keywords — keywords in specific syntactic positions,
 identifiers elsewhere (`val` is conditionally enabled in real
-Groovy via `'val' {isValEnabled()}?`).
+Groovy via `'val' {isValEnabled()}?`). They are Groovy 6 syntax: the
+6.x grammar has `async` closures, `await`, `for await`, `defer` and
+`val` declarations, and the 5.0.x grammar none of them. Groovy 6.x is
+the grammar this one targets (spec §1.2 item 5).
 
 **Current implementation**: not exposed as keyword tokens. An
 in-session attempt added `defer_statement`, `await_expression`,
@@ -722,7 +729,7 @@ the parser layer.
    lets the lexer fall back to identifier when the keyword rule
    fails, or
 2. The grammar gains a feature flag that opts the file into
-   Groovy-5 mode (e.g. via shebang or a leading directive), at
+   Groovy 6 mode (e.g. via shebang or a leading directive), at
    which point the keyword rules can be unconditionally active, or
 3. Each word gets the treatment `record` has (spec §6.7): an
    external-scanner token emitted only when the construct's own
@@ -734,8 +741,10 @@ the parser layer.
    and `in` use.
 
 Until then, code containing `val` / `async` / `await` / `defer`
-parses with these tokens as plain identifiers, which matches the
-behaviour of Groovy 2.x–4.x compilers.
+parses with these tokens as plain identifiers, as Groovy 5 and earlier
+read them; Groovy 6 reads them as keywords where their constructs
+follow, so its `async { … }`, `await x`, `defer foo()` and
+`val x = 1` read as calls and a typed declaration here.
 
 ---
 
@@ -787,7 +796,12 @@ After a call, a name or a literal the `{` joins that expression,
 which is Apache's reading. `foo()` with `{ x }` on the next line is
 one call with a trailing closure, and so is an Allman-style
 Jenkinsfile or Gradle block (`node('linux')` with its `{ … }`
-opening the next line). In a class body the same holds after a field
+opening the next line). After a `;` or a block the `{` opens a
+statement and is a block (#28). After a parenthesis-free call with
+arguments it is a block as well (`foo 1` then `{ y }`), where Groovy
+calls the last argument with it, and after a postfix update it joins
+the expression (`x++` then `{ y }` calls `x++`), where Groovy reads a
+block. In a class body the same holds after a field
 initialiser:
 
 ```groovy
@@ -1853,7 +1867,7 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `def c = { a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }`, `{ a = (b) -> { } }`, as a value or an argument | the closure parameter `a` with a default | the same, as before |
 | `if (x) { a = b -> c }`, `else { a = (b) -> c }`, `while (x) { String a = b -> c }`, `for (…) { def g = t -> 1 }`, `do { … } while (x)`, `case 1 -> { a = b -> c }`, `default -> { … }` | a block that holds the lambda | the same; **before, the closure with the parameter `a`** (the BREAKING class below) |
 | `f(x -> { Consumer<String> c = s -> foo(s); c.accept(x) })`, `(x) -> { b = (t) -> 1 }` | a block that holds the lambda | the same |
-| `if (x) { a = b -> { p -> p } }`, `while (x) { cb = v -> { -> v } }`, `if (x) { a = b -> { c = d -> e } }`, `f(x -> { a = b -> { c = d -> e } })` | blocks that hold the lambdas | the same, for nests of any depth, each in the block of the one before (up to ten lambdas, `LAMBDA_NESTING_DEPTH`, until #28); **before, the closure with the parameter `a`** where such a block held a lambda whose body is a closure or two lambdas, or a lambda's block two lambdas |
+| `if (x) { a = b -> { p -> p } }`, `while (x) { cb = v -> { -> v } }`, `if (x) { a = b -> { c = d -> e } }`, `f(x -> { a = b -> { c = d -> e } })` | blocks that hold the lambdas | the same, for nests of any depth, each in the block of the one before (before #28, of up to ten lambdas); **before, the closure with the parameter `a`** where such a block held a lambda whose body is a closure or two lambdas, or a lambda's block two lambdas |
 | `x -> { a = b -> { p -> p } }`, `if (x) { a = b -> { c = d -> { p -> p } } }`, a nest of more than ten lambdas | blocks that hold the lambdas | the same (#28): a block that ends a lambda outweighs the lambda in it by a step; before, the closure with the parameter `a` (`c`) |
 | `{ T a = (U) (b, c) -> (d) -> e }`, `{ T a = (b, c) -> (d) -> e }` | the default `(U)` cast of the lambda `(b, c) -> (d)`, or that lambda, and the body `e` | the same: a parenthesized expression as a lambda's whole body weighs one step below a lambda (`PARENTHESIZED_BODY_WEIGHT`), below the reading of `{ a = (b) -> (d) -> e }` that Groovy has (a row below) and above a typed local that holds two lambdas. With the cast the weights do not decide: its step makes up the parenthesized body's, so the default `(U)` called with `b` and `c` and the body `(d) -> e` weighs the same, and tree-sitter's last resort keeps the cast by comparing symbol numbers; before, the default `(U)` called with `b` and `c` and the body `(d) -> e`, and no parameter and a body that declares `a` |
 | `{ T a = (U) (b, c) -> (d) -> (e) -> f }` | the default `(U)` cast of `(b, c) -> (d)` and the body `(e) -> f` | the default `(U)` cast of `(b, c) -> (d) -> (e)` and the body `f`: the two readings weigh the same, and tree-sitter's last resort keeps this one; before, the default `(U)` called with `b` and `c` and the body `(d) -> (e) -> f` |
@@ -1924,7 +1938,7 @@ corpus, the 266 real files or the 24,548 Java files is among them:
   the cast of a call named `if`, which Groovy, reserving `if`, never
   reads. 3 of 236,000 fuzzed inputs, none of them valid Groovy.
 
-Of 116,000 mutations of the corpus, real and Java inputs, the third
+Of 116,000 mutations of the corpus, real and Java inputs, the fourth
 kind accounts for the only 2 changed trees that had no `ERROR`.
 
 Two limits are known (spec §6.17). Nested lambdas whose bodies are
@@ -2011,7 +2025,7 @@ The Groovy column was observed by running Groovy 3.
 | `class C { String s; int a, b }` | fields | `field_declaration`s, as before |
 | `String f()`, `String f() { }` | rejected; a method | `String` and the call `f()`; a method, as before |
 | `Foo a, 1`, `Foo a, b()`, `String a, b c` | `Foo(a, 1)`, `Foo(a, b())`, `String(a, b).c` | an `ERROR`, as before |
-| `Integer _` then `{ }, b` | `Integer(_({ }), b)` | the declaration, the closure and an `ERROR`; before, `Integer` and the call `_ { }, b` |
+| `Integer _` then `{ }, b` | `Integer(_({ }), b)` | the declaration, a block and an `ERROR` (the closure before #28); before, `Integer` and the call `_ { }, b` |
 | `do long in` then `[1] while (c)` | a `do` loop whose body is `long in [1]` | the declaration in an `ERROR`; before, the membership test |
 
 The rows with "before" changed trees that had no `ERROR`; spec §6.21 lists
