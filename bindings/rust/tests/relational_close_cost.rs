@@ -4,8 +4,8 @@
 //! At every `)` that may close a cast's type, the scanner reads on along
 //! the line to tell a cast's operand from a relational operator that Groovy
 //! applies to the parentheses (`(x) instanceof Foo`, `(x) in y`). After
-//! `as` and `in` it reads the spaces and the first character of what
-//! follows, and no further: a line of `(x) in y && …` puts another such
+//! `as` and `in` it reads the spaces and block comments on the line and the
+//! first character of what follows, and no further: a line of `(x) in y && …` puts another such
 //! `)` before each element, and a look-ahead that read to the end of the
 //! line would read the rest of it from each one, which takes time
 //! quadratic in the length of the line. Time is not measured: the parser
@@ -88,4 +88,9 @@ fn a_line_of_instanceof_tests_after_parentheses_is_read_a_bounded_number_of_time
 #[test]
 fn a_line_of_coercions_of_parentheses_is_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}1\n", "(x) as T + (y) as  a.B + ".repeat(n)));
+}
+
+#[test]
+fn a_line_of_tests_with_comments_around_the_operator_is_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{}true\n", "(x) /* a */ in /* b */ y && ".repeat(n)));
 }

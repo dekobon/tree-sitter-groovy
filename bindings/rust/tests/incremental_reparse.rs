@@ -225,14 +225,20 @@ fn reparse_after_edit_matches_parse_from_scratch() {
 /// parenthesized expression and no cast, and with names that start like
 /// one (`(x) inside`) or that the operator's operand cannot start
 /// (`(Foo) in.read()`), where it may close a cast, before a line a method
-/// could start and a typed local. The scanner reads the word after the `)`,
-/// and after `as` and `in` the spaces and the first character after them,
-/// so an edit there must lex the `)` again.
+/// could start and a typed local, with comments before and after the
+/// operator. The scanner reads the word after the `)`, and after `as` and
+/// `in` the trivia and the first character after them, so an edit there
+/// must lex the `)` again. The last text holds casts to generic types whose
+/// type arguments close, across a line too, or do not (§3.2.2): the scanner
+/// reads them to the `>` to decide the `<`, so an edit there must lex the
+/// `<` again.
 const RELATIONAL_CLOSE_TEXTS: &[&str] = &[
     "return (x) instanceof Foo\nbar() { }\n",
     "def v = (a.b) in y\n(Foo) in.read()\n",
     "(x) as Foo\n(x) !in y\nout[i] = (float) in[i]\n",
     "(x) !instanceof T\n(x) as\nFoo y = 1\n(x) inside\n",
+    "return (x) in /* c */ y\n(x) /* d */ as T\n",
+    "x as a.B<c\ny = x as Map<K,\n V>\nz = x as List<T> y\n",
 ];
 
 /// Replacement texts for an edit of `RELATIONAL_CLOSE_TEXTS`.

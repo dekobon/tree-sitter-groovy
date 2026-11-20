@@ -12,10 +12,18 @@
 //! log grew linearly with the run while the time did not, so this test
 //! measures time: the fastest of a few parses of each run, per line, at two
 //! run lengths. The bound is generous, to stay clear of timing noise.
+//!
+//! The scanner reads the type arguments after the name of a cast's type to
+//! see whether they close (§3.2.2). Where they do not, as in a call whose
+//! arguments are `x as B<c` each, the read must stop after a fixed number of
+//! items, or it reads the rest of the line from each `<`. The second test
+//! compares the bytes the parser asks for at two lengths of such a line.
 
 use std::time::{Duration, Instant};
 
 use tree_sitter::Parser;
+
+// -- Runs of dotted generic casts, timed --------------------------------
 
 /// Lines in the shorter run; the longer one has eight times as many.
 const SHORT_RUN: usize = 1_000;
@@ -81,4 +89,62 @@ fn runs_of_dotted_generic_cast_types_are_parsed_in_linear_time() {
     for line in LINES {
         assert_linear(line);
     }
+}
+
+// -- Type arguments that do not close, by bytes read -----------------------
+
+/// Elements in the shorter line; the longer one has eight times as many.
+const SHORT_LINE: usize = 500;
+
+/// Bytes handed to the parser per call of the read callback. Small enough
+/// that a look-ahead past a few elements needs another call.
+const CHUNK_BYTES: usize = 64;
+
+/// Most the bytes served per input byte may grow from the shorter line to
+/// the longer. A bounded look-ahead keeps the two about equal (measured: 31.0
+/// and 31.9 bytes per byte); one that reads to the end of the line grows with
+/// it, eightfold here (251 and 2,001 without the bound).
+const MAX_READ_GROWTH: f64 = 1.5;
+
+/// Parses `source` and returns the bytes served to the parser per byte of
+/// input.
+fn bytes_served_per_input_byte(source: &str) -> f64 {
+    let bytes = source.as_bytes();
+    let mut parser = Parser::new();
+    parser
+        .set_language(&dekobon_tree_sitter_groovy::LANGUAGE.into())
+        .expect("load Groovy grammar");
+
+    let mut served = 0_usize;
+    let tree = parser
+        .parse_with_options(
+            &mut |offset, _| {
+                let end = bytes.len().min(offset + CHUNK_BYTES);
+                let chunk = &bytes[offset.min(end)..end];
+                served += chunk.len();
+                chunk
+            },
+            None,
+            None,
+        )
+        .expect("parse");
+    assert!(
+        !tree.root_node().has_error(),
+        "{}",
+        tree.root_node().to_sexp()
+    );
+    #[allow(clippy::cast_precision_loss, reason = "sizes far below 2^52")]
+    let ratio = served as f64 / bytes.len() as f64;
+    ratio
+}
+
+#[test]
+fn a_line_of_unclosed_cast_type_arguments_is_read_a_bounded_number_of_times() {
+    let line = |n: usize| format!("f({}1)\n", "x as B<c, ".repeat(n));
+    let short = bytes_served_per_input_byte(&line(SHORT_LINE));
+    let long = bytes_served_per_input_byte(&line(SHORT_LINE * SCALE));
+    assert!(
+        long <= short * MAX_READ_GROWTH,
+        "bytes served per input byte grew from {short:.1} to {long:.1}",
+    );
 }
