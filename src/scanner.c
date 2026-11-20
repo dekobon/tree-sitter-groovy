@@ -23,7 +23,9 @@
 // and the parentheses can open one; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
 // §6.11 CAST_CLOSE, a `)` with
-// something after it on its line; §6.12 NOT_IN, the `!in`
+// something after it on its line, and RELATIONAL_CLOSE, one before a
+// relational operator that Groovy applies to the parentheses (`(x)
+// instanceof Foo`); §6.12 NOT_IN, the `!in`
 // operator; §6.17 LAMBDA_START and BARE_LAMBDA_START, empty tokens
 // before a lambda's parameters in parentheses and before its one name
 // without them, when `->` follows; and §6.19 LAMBDA_BODY_END, an empty
@@ -47,10 +49,10 @@
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
-// ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
-// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA,
-// DECLARATION_START, STATEMENT_BLOCK_END and the STRING_BODY check are
-// suppressed.
+// ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, NOT_IN, LAMBDA_START,
+// BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
+// MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END and the
+// STRING_BODY check are suppressed.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -94,6 +96,7 @@ enum TokenType {
     MULTI_ASSIGNMENT_COMMA,
     DECLARATION_START,
     STATEMENT_BLOCK_END,
+    RELATIONAL_CLOSE,
     ERROR_SENTINEL,
 };
 
@@ -2656,8 +2659,117 @@ static bool scan_statement_start(
     return true;
 }
 
-// SPECIFICATION.md §6.11 — whether something follows a `)` on its
-// line. The `)` is already consumed when this is called.
+// The relational operators that a name can spell (§6.11).
+typedef enum {
+    NO_RELATIONAL_WORD,
+    AS_WORD,
+    IN_WORD,
+    INSTANCEOF_WORD,
+} RelationalWord;
+
+// Consumes the word that starts here for as long as it can still be `as`,
+// `in` or `instanceof`, and returns which of them it is. At most the ten
+// characters of `instanceof` and the one after them are read.
+static RelationalWord read_relational_word(TSLexer *lexer) {
+    if (lexer->lookahead == 'a') {
+        return consume_keyword(lexer, "as") ? AS_WORD : NO_RELATIONAL_WORD;
+    }
+    if (lexer->lookahead != 'i') {
+        return NO_RELATIONAL_WORD;
+    }
+    advance(lexer);
+    if (lexer->lookahead != 'n') {
+        return NO_RELATIONAL_WORD;
+    }
+    advance(lexer);
+    if (lexer->lookahead == 's') {
+        return consume_keyword(lexer, "stanceof") ? INSTANCEOF_WORD
+                                                  : NO_RELATIONAL_WORD;
+    }
+    return is_identifier_char(lexer->lookahead) ? NO_RELATIONAL_WORD
+                                                : IN_WORD;
+}
+
+// SPECIFICATION.md §6.11 — whether `as` or `in`, consumed by the caller,
+// takes what follows it on its line: a type for `as`, so a name other than
+// `new`, and for `in` a name, a number or a string. Another of the
+// operators that a name spells applies to the cast of the name instead
+// (`(x) as instanceof T`, `(x) in as T`). A `[` does not count:
+// `(byte) in[i]` casts an element of an array named `in`. Only spaces,
+// tabs and line escapes are skipped, so the read stops at the first
+// character after them, or after the word that starts there.
+static bool keyword_operand_follows(TSLexer *lexer, bool in) {
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    int32_t c = lexer->lookahead;
+    if (c == 'a' || c == 'i') {
+        return read_relational_word(lexer) == NO_RELATIONAL_WORD;
+    }
+    if (c == 'n' && !in) {
+        return !consume_keyword(lexer, "new");
+    }
+    return is_identifier_start(c)
+        || (in && ((c >= '0' && c <= '9') || c == '\'' || c == '"'));
+}
+
+// What a `)` closes, by what follows it on its line (§6.11).
+typedef enum {
+    // Nothing: a cast whose operand is on a later line ranks below a
+    // parenthesized expression.
+    PLAIN_CLOSE,
+    // A possible operand of a cast, which then outranks a parenthesized
+    // expression.
+    OPERAND_CLOSE,
+    // A relational operator that Groovy applies to the parentheses, which
+    // close no cast.
+    OPERATOR_CLOSE,
+} ParenClose;
+
+// SPECIFICATION.md §6.11 — what a `)` closes, read from the first
+// character after it on its line: OPERATOR_CLOSE before a relational
+// operator that Groovy applies to the parentheses, where a cast's operand
+// cannot start, and OPERAND_CLOSE before anything else. `instanceof`,
+// `!instanceof` and `!in` are operators wherever Groovy's lexer meets
+// them (GroovyLexer.g4 INSTANCEOF, NOT_INSTANCEOF and NOT_IN), so
+// `(x) instanceof Foo` tests `(x)` and is no cast of a name `instanceof`.
+// `as` and `in` are names too, and `(Foo) in` casts the name `in`; they
+// are the operators when what they take follows on the line, as Apache's
+// parser reads `(x) as Foo` and `(x) in y` since GROOVY-10355. A `-`, `(`,
+// `[`, `{` or `.` goes on with the name in Groovy (`(Foo) in.read()`).
+static ParenClose read_relational_operator(TSLexer *lexer) {
+    bool negated = lexer->lookahead == '!';
+    if (negated) {
+        advance(lexer);
+    }
+    RelationalWord word = read_relational_word(lexer);
+    int32_t next = lexer->lookahead;
+    switch (word) {
+        case INSTANCEOF_WORD:
+            // GroovyLexer.g4 `NOT_INSTANCEOF`, as the grammar's token.
+            return !negated || is_whitespace(next) ? OPERATOR_CLOSE
+                                                   : OPERAND_CLOSE;
+        case IN_WORD:
+            if (negated) {
+                // GroovyLexer.g4 `NOT_IN`, as in the scan of NOT_IN (§6.12).
+                return is_whitespace(next) || next == '[' || next == '('
+                        || next == '{'
+                    ? OPERATOR_CLOSE
+                    : OPERAND_CLOSE;
+            }
+            return keyword_operand_follows(lexer, true) ? OPERATOR_CLOSE
+                                                        : OPERAND_CLOSE;
+        case AS_WORD:
+            return !negated && keyword_operand_follows(lexer, false)
+                ? OPERATOR_CLOSE
+                : OPERAND_CLOSE;
+        default:
+            return OPERAND_CLOSE;
+    }
+}
+
+// SPECIFICATION.md §6.11 — what follows a `)` on its line. The `)` is
+// already consumed when this is called.
 // `castParExpression castOperandExpression` in GroovyParser.g4 has no
 // `nls` between the two, so where a line break can end a statement,
 // `x = (a)` followed by `foo()` on the next line is two statements.
@@ -2665,24 +2777,24 @@ static bool scan_statement_start(
 // because inside `(…)` and `[…]` a line break ends nothing. Spaces,
 // tabs, line escapes and block comments that close on the line may
 // come first. A line comment ends the line.
-static bool cast_operand_follows(TSLexer *lexer) {
+static ParenClose read_paren_close(TSLexer *lexer) {
     lexer->mark_end(lexer);
     for (;;) {
         if (!skip_same_line_space(lexer, false)) {
-            return true;
+            return OPERAND_CLOSE;
         }
         if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-            return false;
+            return PLAIN_CLOSE;
         }
         if (lexer->lookahead != '/') {
-            return true;
+            return read_relational_operator(lexer);
         }
         advance(lexer);
         if (lexer->lookahead == '/') {
-            return false;
+            return PLAIN_CLOSE;
         }
         if (lexer->lookahead != '*') {
-            return true;
+            return OPERAND_CLOSE;
         }
         // A block comment that closes on this line is skipped, and the
         // answer depends on what follows it. One that runs past the
@@ -2692,7 +2804,7 @@ static bool cast_operand_follows(TSLexer *lexer) {
         advance(lexer);
         for (;;) {
             if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-                return true;
+                return OPERAND_CLOSE;
             }
             if (lexer->lookahead == '*') {
                 advance(lexer);
@@ -4124,11 +4236,18 @@ bool tree_sitter_groovy_external_scanner_scan(
         // a plain `)`. A cast that closes with one ranks below a
         // parenthesized expression.
         advance(lexer);
-        if (!cast_operand_follows(lexer)) {
-            return false;
+        switch (read_paren_close(lexer)) {
+            case PLAIN_CLOSE:
+                return false;
+            case OPERAND_CLOSE:
+                lexer->result_symbol = CAST_CLOSE;
+                return true;
+            default:
+                // Also where only a cast's type takes the `)`, which no
+                // rule takes this token in: that reading ends here.
+                lexer->result_symbol = RELATIONAL_CLOSE;
+                return true;
         }
-        lexer->result_symbol = CAST_CLOSE;
-        return true;
     }
     if (lexer->lookahead == '(' && wants_statement_paren) {
         // On `false` the runtime rewinds and the in-grammar lexer reads

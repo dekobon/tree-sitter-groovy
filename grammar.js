@@ -910,6 +910,13 @@ module.exports = grammar({
     // braces are a closure there (`{ foo() }()`). Listed last but for the
     // sentinel, so that it renumbers no symbol before it.
     $._statement_block_end,
+    // §6.11 — a `)` before a relational operator that Groovy applies to the
+    // parentheses (`(x) instanceof Foo`, `(x) !in y`, `(x) as Foo`), which
+    // closes no cast. The scanner also emits it where only a cast's type
+    // takes the `)`, where no rule takes it, so that the cast reading ends
+    // there. Listed last but for the sentinel, so that it renumbers no
+    // symbol before it.
+    $._relational_close,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2708,6 +2715,11 @@ module.exports = grammar({
     // stack order decided. Inside a closure or block, `a = (int) y`
     // followed by a line that starts with a literal lost the cast
     // once #83 added its forks.
+    //
+    // A `)` before `instanceof`, `!instanceof`, `!in`, or `as` or `in`
+    // and what it takes, is `_relational_close`, which closes no cast:
+    // Groovy reads no cast of a name `instanceof` there, nor one of `as`
+    // or `in` since GROOVY-10355 (§6.11).
     parenthesized_type_cast: $ => choice(
       weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),
@@ -3349,12 +3361,14 @@ module.exports = grammar({
     // (§5.15); the parser disambiguates by what's inside the parens
     // and after them. `_cast_close` is the `)` that has something
     // after it on its line (§6.11). It closes this rule too, so that
-    // `(a) * b` and `((a))` stay open to both readings. The content may
+    // `(a) * b` and `((a))` stay open to both readings. Only this rule
+    // takes `_relational_close`, the `)` before a relational operator that
+    // Groovy applies to the parentheses (`(x) instanceof Foo`). The content may
     // be a parenthesis-free call (`(sh script: 'x').trim()`, §5.5 item 1).
     parenthesized_expression: $ => seq(
       statementParen($),
       enhancedStatementExpression($),
-      choice(')', alias($._cast_close, ')')),
+      choice(')', alias($._cast_close, ')'), alias($._relational_close, ')')),
     ),
 
     // §3.2 — single `unary_expression` node kind but two precedence

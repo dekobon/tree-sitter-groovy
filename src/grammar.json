@@ -11825,6 +11825,15 @@
               },
               "named": false,
               "value": ")"
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_relational_close"
+              },
+              "named": false,
+              "value": ")"
             }
           ]
         }
@@ -12707,6 +12716,10 @@
     {
       "type": "SYMBOL",
       "name": "_statement_block_end"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_relational_close"
     },
     {
       "type": "SYMBOL",
