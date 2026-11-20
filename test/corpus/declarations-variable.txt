@@ -785,6 +785,44 @@ Multi-assignment without def across line breaks
         (number_literal)))))
 
 ==================
+Multi-assignment without def with comments between its names
+==================
+
+(a /* c */, b) = l
+(a, // c
+  b) = l
+(a, b)
+= l
+(a, b) /* c */ = l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (block_comment)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (line_comment)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      (block_comment)
+      value: (identifier))))
+
+==================
 Multi-assignment without def in a method, a closure and an if branch
 ==================
 
@@ -925,6 +963,73 @@ def add(a, b) { a + b }
           right: (identifier))))))
 
 ==================
+Script methods with untyped parameters in other head forms are not multi-assignments
+==================
+
+def f(a, b, c, d) { }
+final g(a, b) { }
+@A def h(a, /* c */ b)
+{ }
+def k(a,
+  b) throws E { }
+def m(a, int b) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (block_comment)
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    (throws_clause
+      (type_identifier))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
 Assignment to one parenthesized name is not a multi-assignment
 ==================
 
@@ -1041,6 +1146,36 @@ def f(a, b) = [1, 2]
       value: (list_literal
         (number_literal)
         (number_literal)))))
+
+==================
+Method head followed by an equals sign after line breaks and comments reads as a declaration and a multi-assignment (divergence 3)
+==================
+
+def f(a,
+  b)
+= l
+def g(a /* c */, b) = l
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (block_comment)
+      name: (identifier)
+      value: (identifier))))
 
 ==================
 Multi-assignment without def after a call ended by a semicolon
