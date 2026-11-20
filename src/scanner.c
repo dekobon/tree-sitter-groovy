@@ -2067,6 +2067,18 @@ static bool is_reserved_variable_name(const char *word, unsigned len) {
 // budget is a declaration's, not a closure parameter's.
 static const unsigned DECLARATION_LOOKAHEAD_ITEMS = 256;
 
+// SPECIFICATION.md §6.21 — whether DECLARATION_START is decided in a `for`
+// header: the token is valid where a statement starts, after a statement's
+// annotations and as a `for` init, and only the last is a place where an
+// expression may start (ARRAY_VALUE_START) and no statement may
+// (COMMAND_STATEMENT_START). The state is the one after `for (`, in a fresh
+// parse and on reparse alike.
+static inline bool in_for_header(const bool *valid_symbols) {
+    return valid_symbols[DECLARATION_START]
+        && !valid_symbols[COMMAND_STATEMENT_START]
+        && valid_symbols[ARRAY_VALUE_START];
+}
+
 // Skips what the grammar's extras skip on a line: spaces, tabs, line
 // escapes, form feeds and vertical tabs, and with `comments` block comments
 // as well, which may span lines, as Groovy's lexer hides a line break inside
@@ -2239,18 +2251,38 @@ static bool next_line_continues(
 // (`{ String a = 1 -> }`), which makes closure parameters
 // (`parameters_follow`); the parser then reads the initializer. `->`, `(`, a
 // name or anything else on the line is no declaration.
+//
+// In a `for` header (`header`) Groovy's lexer drops line breaks, so they end
+// nothing there: past Groovy's trivia only `;` ends the declaration
+// (`for (int i` then `; i < n; i++)`), and `,` and `=` go on with it, while
+// `:` and `in` make the loop variable of a for-in loop, and any other text
+// is no declaration. A header that is still being typed (`for (int i` then
+// the next statement) is then read as before, and error recovery keeps the
+// statements around it.
 static bool declaration_end_follows(
     TSLexer *lexer,
     unsigned *items,
+    bool header,
     bool no_close_ahead
 ) {
     for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
         bool slash = false;
-        if (!skip_line_extras(lexer, true, no_close_ahead, &slash)) {
+        if (header) {
+            if (!skip_extras(lexer, no_close_ahead, &slash) || slash) {
+                return false;
+            }
+        } else if (!skip_line_extras(lexer, true, no_close_ahead, &slash)) {
             return false;
         }
         int32_t c = lexer->lookahead;
-        if (slash) {
+        if (header) {
+            if (c == ';') {
+                return true;
+            }
+            if (c != '=' && c != ',') {
+                return false;
+            }
+        } else if (slash) {
             if (c != '/') {
                 return false;
             }
@@ -2304,11 +2336,13 @@ static bool declaration_end_follows(
 
 // After the type of a declaration: whether, after spaces, tabs and line
 // escapes, a name follows on the line, no keyword Groovy reserves, and then
-// the end of a declaration or its initializer (`declaration_end_follows`). Between the type and the name nothing else is
+// the end of a declaration or its initializer (`declaration_end_follows`,
+// which `header` passes to). Between the type and the name nothing else is
 // skipped, as between a receiver and a name argument (§6.14).
 static bool declared_name_follows(
     TSLexer *lexer,
     unsigned *items,
+    bool header,
     bool no_close_ahead
 ) {
     if (!skip_same_line_space(lexer, false)
@@ -2318,7 +2352,7 @@ static bool declared_name_follows(
     char name[sizeof "synchronized"];
     unsigned len = read_word(lexer, name, sizeof name);
     return !is_reserved_variable_name(name, len)
-        && declaration_end_follows(lexer, items, no_close_ahead);
+        && declaration_end_follows(lexer, items, header, no_close_ahead);
 }
 
 // SPECIFICATION.md §6.21 — after the first name of a statement and type
@@ -2326,7 +2360,11 @@ static bool declared_name_follows(
 // Apache's isInvalidLocalVariableDeclaration takes for a declaration's type
 // whatever its spelling: the arguments, any dimensions and a declared name
 // with no initializer.
-static bool generic_declaration_follows(TSLexer *lexer, bool no_close_ahead) {
+static bool generic_declaration_follows(
+    TSLexer *lexer,
+    bool header,
+    bool no_close_ahead
+) {
     unsigned items = 0;
     if (!skip_type_arguments(lexer, &items)
         || !skip_same_line_space(lexer, false)) {
@@ -2335,7 +2373,7 @@ static bool generic_declaration_follows(TSLexer *lexer, bool no_close_ahead) {
     if (lexer->lookahead == '[' && !read_dimensions(lexer, no_close_ahead)) {
         return false;
     }
-    return declared_name_follows(lexer, &items, no_close_ahead);
+    return declared_name_follows(lexer, &items, header, no_close_ahead);
 }
 
 // SPECIFICATION.md §6.15, §6.21 — after the first name of a statement or its
@@ -2373,7 +2411,8 @@ static bool scan_dimensions_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return valid_symbols[DECLARATION_START]
-        && declared_name_follows(lexer, &items, no_close_ahead);
+        && declared_name_follows(lexer, &items, in_for_header(valid_symbols),
+                                 no_close_ahead);
 }
 
 // SPECIFICATION.md §6.14, §6.15, §6.21 — at a `.` after the first name of a
@@ -2409,7 +2448,8 @@ static bool scan_dotted_statement_start(
     if (lexer->lookahead == '<') {
         lexer->result_symbol = DECLARATION_START;
         return valid_symbols[DECLARATION_START]
-            && generic_declaration_follows(lexer, no_close_ahead);
+            && generic_declaration_follows(lexer, in_for_header(valid_symbols),
+                                           no_close_ahead);
     }
     if (!skip_same_line_space(lexer, false)) {
         return false;
@@ -2422,7 +2462,8 @@ static bool scan_dotted_statement_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return last_upper && valid_symbols[DECLARATION_START]
-        && declared_name_follows(lexer, &items, no_close_ahead);
+        && declared_name_follows(lexer, &items, in_for_header(valid_symbols),
+                                 no_close_ahead);
 }
 
 // SPECIFICATION.md §6.14, §6.21 — after the first name of a statement that
@@ -2467,7 +2508,8 @@ static bool scan_typed_statement_start(
     unsigned items = 0;
     lexer->result_symbol = DECLARATION_START;
     return !keyword && valid_symbols[DECLARATION_START]
-        && declaration_end_follows(lexer, &items, no_close_ahead);
+        && declaration_end_follows(lexer, &items, in_for_header(valid_symbols),
+                                   no_close_ahead);
 }
 
 // SPECIFICATION.md §6.14 — decides at the first name of a statement,
@@ -2558,7 +2600,8 @@ static bool scan_statement_start(
     if (lexer->lookahead == '<') {
         lexer->result_symbol = DECLARATION_START;
         return valid_symbols[DECLARATION_START]
-            && generic_declaration_follows(lexer, no_close_ahead);
+            && generic_declaration_follows(lexer, in_for_header(valid_symbols),
+                                           no_close_ahead);
     }
     if (!skip_same_line_space(lexer, false)) {
         return false;

@@ -333,3 +333,124 @@ for (final var x : xs) { }
     variable: (identifier)
     value: (identifier)
     body: (block)))
+
+==================
+Typed for init and loop variables across line breaks
+==================
+
+for (int i
+    ; i < n; i++) { }
+for (int j // note
+    ; j < n; j++) { }
+for (int a,
+    b; a < b; a++) { }
+for (String s
+    in xs) { }
+for (String t
+    : xs) { }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    (line_comment)
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+A for header still being typed keeps the method around it (error recovery)
+==================
+
+class C {
+  void m() {
+    for (int i
+    b()
+  }
+  void n() {}
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (ERROR
+            (type_identifier)
+            (identifier)
+            (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+A for header still being typed keeps the closure around it (error recovery)
+==================
+
+items.each { item ->
+  for (String s
+  println item
+}
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (ERROR
+          (type_identifier)
+          (identifier)
+          (identifier)
+          (identifier))))))
