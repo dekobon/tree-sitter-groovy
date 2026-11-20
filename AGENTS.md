@@ -67,7 +67,10 @@ The default branch is **`main`**.
   lambda, before its parameters in parentheses or its one name, when
   `->` follows (§6.17), an empty token after the `}` of a lambda's
   brace body that no expression continues, which ends the body there
-  (§6.19), the first `,` of `(a, b) = …`, turned down where the
+  (§6.19), another after the `}` of a block that opens a statement,
+  decided the same way, so that braces an expression continues
+  (`{ foo() }()`) stay a closure (§6.22), the first `,` of
+  `(a, b) = …`, turned down where the
   parentheses go on as a method's parameters, which ends the reading of
   `def f(a, b) { }` as `def f` and a multi-assignment there (§6.20), and
   an empty token before the type of a typed local declaration
@@ -81,8 +84,8 @@ The default branch is **`main`**.
   here on" and "the body goes on past the token that follows", carried
   by an empty hidden token emitted at the first unterminated `/*` (§6.6)
   and after such a `}` where the body goes on past a comment, or past
-  `as` or `in`, which the scanner reads (§6.19); the next call clears
-  the second.
+  `as` or `in`, which the scanner reads (§6.19, §6.22); the next call
+  clears the second.
   GString interpolation, automatic semicolons and label
   colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
