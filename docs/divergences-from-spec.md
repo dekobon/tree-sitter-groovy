@@ -1446,6 +1446,7 @@ parse records; the rows marked `.g4` are read off the grammar.
 | `foo default: 1`, `x = foo default: 1`, `a.b default: 1` | a call with the named argument `default` | the statement, then the label `default:`, as before (spec §6.8) |
 | `switch (x) { case 1: foo()` then `default: bar() }` on the next line, `case 1: default: c()`, and the other switch forms | the switch | the same tree as before |
 | `lbl: default void b() { }`, `if (x) default void b() { }` | rejected | a label or an `if` around a `method_declaration`; before, around the expression `default`, then a method |
+| `private String y`, `default void a() { }`, `static count` and `default void b() { }` in a class, then the `lt` of the second `default` deleted | rejected (`defau void b()`) | from scratch the field `y`, the method `a`, a field `defau` of type `count` and the method `void b() { }`; a reparse after the edit reads `private String`, a field `y default` and `void a() { }` instead, neither with an `ERROR`: the runtime checks a reused member only while one stack version exists (spec §6.18), and `static count` is reused though a name follows it now. The next edit of the word heals it; `bindings/rust/tests/incremental_reparse.rs` pins it |
 
 **Action**: none planned. Fields, constructors and local variables
 could take the modifier through rules of their own, as methods do;

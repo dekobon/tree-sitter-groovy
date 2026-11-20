@@ -504,7 +504,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   is about 30% larger.
 - A few edit sequences still reparse incrementally to a tree that
   differs from a parse from scratch; each kind is described in
-  `SPECIFICATION.md` §6.16 to §6.22 and pinned in
+  `SPECIFICATION.md` §6.16 to §6.22, or for an edit of a `default`
+  modifier after a field with modifiers only in
+  `docs/divergences-from-spec.md` §20, and pinned in
   `bindings/rust/tests/incremental_reparse.rs`.
 - `SPECIFICATION.md` targets the Groovy 6.x grammar (6.0.0 at the time
   of writing) instead of 4.x: earlier versions parse where their syntax

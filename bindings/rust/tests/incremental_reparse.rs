@@ -673,6 +673,35 @@ fn a_lambda_arrow_after_a_final_method_head_is_an_error_on_reparse() {
     );
 }
 
+/// A known limitation (`docs/divergences-from-spec.md` §20): the members
+/// before a `default` method fork, a field's name against a type, and the
+/// runtime checks a reused node only while one stack version exists
+/// (`SPECIFICATION.md` §6.18). Deleting the `lt` of the second `default`
+/// reuses the field `static count`, though a name follows it now, and the
+/// reparse reads `private String`, a field `y default` and `void a() { }`,
+/// where a parse from scratch keeps `private String y` and
+/// `default void a() { }`; neither has an `ERROR`, and the next edit of the
+/// word heals it. This test pins the difference. If it fails, the two parses
+/// agree again: remove the row from §20 and this test.
+#[test]
+fn editing_a_default_after_a_modifier_only_field_reparses_the_members_before() {
+    const TEXT: &str = "class C {\n    private String y\n    default void a() { }\n    \
+                        static count\n    default void b() { }\n}\n";
+    /// The `lt` of the second `default`.
+    const LT: std::ops::Range<usize> = 82..84;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, LT.start, LT.end, "");
+    assert!(edited.contains("\n    defau void b() { }\n"), "{edited:?}");
+    assert!(!fresh.root_node().has_error());
+    assert!(!incremental.root_node().has_error());
+    assert_ne!(
+        dumped(&incremental),
+        dumped(&fresh),
+        "the reparse now matches the parse from scratch",
+    );
+}
+
 /// A known limitation (`SPECIFICATION.md` §6.19): the scanner reads past a
 /// `}` up to the token after it only where a comment follows on the `}`'s
 /// line. A closure that the parse continued as an expression past a comment
