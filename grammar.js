@@ -71,8 +71,10 @@ const PREC = {
  * Every weight below is a number of steps, which `weighted` turns into a
  * dynamic precedence of WEIGHT_UNIT per step. Tree-sitter adds up the
  * dynamic precedences in a reading, so a dynamic precedence of less than
- * one step can rank readings that the steps leave tied without changing an
- * order that they set.
+ * one step can rank readings that the steps leave tied. It changes no order
+ * that the steps set as long as its sum differs between two readings by
+ * less than one step: for DOTTED_CAST_TYPE_WEIGHT, as long as they differ
+ * in fewer than WEIGHT_UNIT dotted cast types.
  */
 const WEIGHT_UNIT = 2;
 
@@ -132,10 +134,10 @@ const CAST_WEIGHT = 1;
  * `!instanceof`, whose tokens also read as field accesses on a cast of the
  * first name: `x as java.util.Map` and `(x as java).util.Map`. Groovy reads
  * the type (Apache's `qualifiedClassName`). It is less than one step, so it
- * ranks only readings that the weights leave tied, as long as they differ
- * in fewer than WEIGHT_UNIT dotted cast types. A whole step would tie
- * CAST_WEIGHT: `(x) instanceof a.b` also reads a cast of the name
- * `instanceof` followed by the statement `a.b`.
+ * ranks only readings that the weights leave tied (see WEIGHT_UNIT). A whole
+ * step would tie readings that a step now ranks: `(x) as a.b` also reads the
+ * cast `(x)` of the name `as`, as Groovy does, followed by `a.b`, which
+ * outweighs `(x) as a.b` by CAST_WEIGHT.
  */
 const DOTTED_CAST_TYPE_WEIGHT = 1;
 
@@ -865,9 +867,12 @@ module.exports = grammar({
     // After `x as java` a `.` continues the type (`_dotted_type`, or the
     // `qualified_type` of an array or generic type), or ends it, so that
     // `.util` is a field access on `x as java`. Both readings parse to the
-    // end of the name; DOTTED_CAST_TYPE_WEIGHT ranks the type first. Without
-    // it tree-sitter's last resort decided, by the order of the rule
-    // definitions and of the parse stacks.
+    // end of the name. DOTTED_CAST_TYPE_WEIGHT ranks `_dotted_type` first.
+    // The `qualified_type` under `array_type` and `generic_type` carries no
+    // weight, so between it and the field accesses
+    // (`x as Map.Entry<C> + x`) tree-sitter's last resort still decides, by
+    // the order of the rule definitions and of the parse stacks
+    // (docs/divergences-from-spec.md §5).
     [$._cast_type, $._dotted_type, $.qualified_type],
 
     // §4 — `for ( identifier …` could continue as a for_statement
