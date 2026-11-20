@@ -1,5 +1,6 @@
 //! Cost test for the look-ahead that decides whether a lambda's brace body
-//! ends at its `}` (`SPECIFICATION.md` §6.19).
+//! ends at its `}` (`SPECIFICATION.md` §6.19), and a block that opens a
+//! statement (§6.22), which the same look-ahead decides.
 //!
 //! After such a `}` the scanner reads the comments that follow it and the
 //! token after them. When that token continues the body, the comments are
@@ -96,6 +97,16 @@ fn lambda_bodies_with_comments_after_them_are_read_a_bounded_number_of_times() {
 }
 
 #[test]
+fn comments_before_an_operator_after_a_statement_block_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{{ y }}{}.call()\n", " /* c */".repeat(n)));
+}
+
+#[test]
+fn statement_blocks_with_comments_after_them_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| "{ y } /* c */ .x();\n{ y } /* c */\n".repeat(n));
+}
+
+#[test]
 fn interpolation_braces_before_a_comment_opener_are_read_a_bounded_number_of_times() {
     assert_linear(|n| {
         (0..n).fold(String::new(), |mut text, i| {
@@ -123,6 +134,18 @@ fn comment_runs_under_the_bound_before_an_operator_cost_a_fixed_amount() {
         assert!(
             served <= MAX_BYTES_PER_BYTE_IN_A_COMMENT_RUN,
             "runs of {run} comments: {served:.1} bytes served per input byte",
+        );
+    }
+}
+
+#[test]
+fn comment_runs_after_a_statement_block_before_an_operator_cost_a_fixed_amount() {
+    for run in [7, 255] {
+        let make = |n: usize| format!("{{ y }}{} .call();\n", " /* c */".repeat(run)).repeat(n);
+        let served = bytes_served_per_input_byte(&make(SMALL_ELEMENTS));
+        assert!(
+            served <= MAX_BYTES_PER_BYTE_IN_A_COMMENT_RUN,
+            "runs of {run} comments after a block: {served:.1} bytes served per input byte",
         );
     }
 }

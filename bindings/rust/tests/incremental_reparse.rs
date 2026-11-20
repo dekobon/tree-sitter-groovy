@@ -19,6 +19,10 @@
 //! A typed declaration without an initializer (§6.21) is decided at its
 //! type from the names, the list and the line after it, so edits there must
 //! make the statement parse again.
+//!
+//! A `{` that opens a statement is a block where no expression goes on after
+//! its `}` (§6.22), so edits after the `}` must make the statement parse
+//! again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -53,9 +57,11 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// statement that forks (`(a) { }`), whose start token depends on what
 /// follows the name on its line and the next, so an edit there must lex
 /// the type again, and the `return` must not end before the token. The
-/// last holds a typed declaration with an initializer, which the token opens
-/// too, and a `(` two lines below it, which opens a statement or a call's
-/// arguments (§6.18).
+/// one after it holds a typed declaration with an initializer, which the
+/// token opens too, and a `(` two lines below it, which opens a statement or
+/// a call's arguments (§6.18). The last two hold blocks that open statements,
+/// with a call, a comment and an operator after their `}`, on its line and
+/// the next, in a file, a method, a label and a case (§6.22).
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -93,6 +99,8 @@ const TEXTS: &[&str] = &[
     "@Field List<String> xs\nInputStream in\nopen()\n",
     "(a) { }\nreturn\nString s\nx = (a)\nString t\n.u()\n",
     "String s = \"a\"\nprintln x\n(a)\n",
+    "{ a }.x()\n{ b } /* c */ + 1;\nlbl: { c }\n(1)\n",
+    "def m() {\n  { a }\n  { b }\n  .c()\n}\nswitch (v) { case 1: { d } }\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
@@ -549,6 +557,31 @@ fn a_comment_on_the_line_after_a_lambda_body_moves_into_it_on_reparse() {
     assert_ne!(
         lambda_end(&incremental),
         Some(23),
+        "the reparse now matches the parse from scratch",
+    );
+}
+
+/// The same limitation after a labeled block that opens a statement
+/// (`SPECIFICATION.md` §6.22), whose end the scanner decides as a lambda's:
+/// the comment on the line after the `}` lands in the labeled statement. If
+/// this fails, remove the limitation from §6.22 too.
+#[test]
+fn a_comment_on_the_line_after_a_labeled_block_moves_into_it_on_reparse() {
+    const TEXT: &str = "lbl: { }\n// c\n.x()\nbar()\n";
+    /// The `.x()` after the comment, removed from its end.
+    const EDITS: &[Edit] = &[(17, 1, ""), (16, 1, ""), (15, 1, ""), (14, 1, "")];
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse_sequence(&mut parser, TEXT, EDITS);
+    assert_eq!(edited, "lbl: { }\n// c\n\nbar()\n");
+    assert!(!incremental.root_node().has_error());
+    assert!(!fresh.root_node().has_error());
+
+    let labeled_end = |tree: &Tree| tree.root_node().named_child(0).map(|n| n.end_byte());
+    assert_eq!(labeled_end(&fresh), Some(8));
+    assert_ne!(
+        labeled_end(&incremental),
+        Some(8),
         "the reparse now matches the parse from scratch",
     );
 }
