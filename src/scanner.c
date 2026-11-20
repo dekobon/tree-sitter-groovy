@@ -978,6 +978,18 @@ static bool parameters_follow(
                 }
                 continue;
             }
+            // Where an operand may start, Groovy's lexer reads a slashy
+            // string, one item, which the scan function opens where no `=`
+            // follows the `/` and the string closes on its line
+            // (`slashy_body_follows`): an `->` in it ends no list
+            // (`foo a, /->/`, `{ foo a, b = /->/ }`), and a line break after
+            // it ends the list as after any string (`foo a, /re/`).
+            if (continued && lexer->lookahead != '='
+                && slashy_body_follows(lexer)) {
+                advance(lexer);
+                continued = false;
+                continue;
+            }
             continued = true;
             continue;
         }
@@ -1254,14 +1266,22 @@ static bool parameter_name_follows(
 // `may_name_type` reads it, followed by a name, or that starts with an
 // annotation, `final` or `def`. The elements are read up to the first one
 // that is neither a parameter nor a lone name, within the budget of
-// `NAME_ARGUMENT_LOOKAHEAD_ITEMS`; at its end they are arguments.
+// `NAME_ARGUMENT_LOOKAHEAD_ITEMS`; at its end they are arguments. A `/` that
+// opens no comment is such an element: after the `(` or a `,` Groovy's lexer
+// reads it as the start of a slashy string (`foo bar(x, /re/)`).
 static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
     unsigned items = 0;
     for (bool first = true; items < NAME_ARGUMENT_LOOKAHEAD_ITEMS;
          first = false, items++) {
         advance(lexer);
-        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
-            || lexer->lookahead == '@') {
+        bool slash = false;
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)) {
+            return false;
+        }
+        if (slash) {
+            return true;
+        }
+        if (lexer->lookahead == '@') {
             return false;
         }
         if (!is_identifier_start(lexer->lookahead)) {
@@ -3169,6 +3189,13 @@ static bool skip_lambda_tokens(
     bool *in_string
 ) {
     unsigned depth = 0;
+    // Whether an operand may start here, as in `parentheses_open_statement`:
+    // a `/` there opens a slashy string, one item, which the scan function
+    // opens where no `=` follows the `/` and the string closes on its line
+    // (`slashy_body_follows`), so that its `,` and `)` end nothing
+    // (`(a = /x,y/) -> a`). One that does not close on its line ends the
+    // look-ahead.
+    bool operand = true;
     while (spend_lambda_item(items)) {
         bool slash = false;
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
@@ -3176,9 +3203,20 @@ static bool skip_lambda_tokens(
             return false;
         }
         if (slash) {
+            if (operand && lexer->lookahead != '=') {
+                if (!slashy_body_follows(lexer)) {
+                    return false;
+                }
+                advance(lexer);
+                operand = false;
+            } else {
+                operand = true;
+            }
             continue;
         }
         int32_t c = lexer->lookahead;
+        operand = !is_identifier_char(c) && c != '\'' && c != '"'
+            && c != ')' && c != ']' && c != '}' && c != '.';
         if (c == '\'' || c == '"') {
             if (!skip_string(lexer)) {
                 return false;
@@ -3556,6 +3594,11 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
         // waits for its name.
         bool receiver = !comma;
         bool access = false;
+        // Whether an operand may start here, where Groovy's lexer reads a
+        // `/` as the start of a slashy string: after an operator, an open
+        // bracket, `,`, `:` or `?`, not after a name, a number, a string or
+        // a closing bracket.
+        bool operand = true;
         int32_t end = 0;
         while (end == 0) {
             bool slash = false;
@@ -3567,6 +3610,24 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                 break;
             }
             int32_t c = lexer->lookahead;
+            // The slashy string is one token, opened as the scan function
+            // opens one: no `=` after the `/` and a closing `/` on its line
+            // (`slashy_body_follows`). Its `,` and `:` are none of the
+            // element's (`(text =~ /a, b/)`); one that does not close on its
+            // line ends the reading.
+            if (slash && operand && angles == 0 && c != '=') {
+                if (!slashy_body_follows(lexer)) {
+                    known = false;
+                    break;
+                }
+                advance(lexer);
+                tokens++;
+                one_name = false;
+                access = false;
+                receiver = false;
+                operand = false;
+                continue;
+            }
             if (angles > 0
                 && (slash || !(is_identifier_start(c) || c == '.' || c == ','
                                || c == '?' || c == '&' || c == '['
@@ -3596,8 +3657,11 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             access = false;
             if (slash) {
                 receiver = false;
+                operand = true;
                 continue;
             }
+            operand = !is_identifier_char(c) && c != '\'' && c != '"'
+                && c != ')' && c != ']' && c != '}' && c != '.';
             if (c == ',') {
                 advance(lexer);
                 if (angles > 0) {

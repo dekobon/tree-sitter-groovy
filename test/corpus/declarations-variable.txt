@@ -2486,6 +2486,31 @@ String g
       value: (closure))))
 
 ==================
+Typed declaration before a line that opens with a slashy string in parentheses
+==================
+
+Foo foo
+(/x/).each { println it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (string_literal
+            (string_fragment)))
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier))))))
+
+==================
 Typed locals without an initializer in bodies
 ==================
 

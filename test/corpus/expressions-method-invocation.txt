@@ -990,6 +990,41 @@ foo
       arguments: (argument_list))))
 
 ==================
+Parentheses on the next line whose regex holds a colon or a comma open a statement
+==================
+
+def m = foo
+(text =~ /name: (\w+)/).each { }
+(line ==~ /a,b/) ? x : y
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (regex_find_expression
+            subject: (identifier)
+            pattern: (string_literal
+              (string_fragment))))
+        field: (identifier))
+      closure: (closure)))
+  (expression_statement
+    (ternary_expression
+      condition: (parenthesized_expression
+        (regex_match_expression
+          subject: (identifier)
+          pattern: (string_literal
+            (string_fragment))))
+      consequence: (identifier)
+      alternative: (identifier))))
+
+==================
 A lambda on the line after a closure parameter's default is appended to it (known divergence)
 ==================
 

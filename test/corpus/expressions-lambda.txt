@@ -3019,6 +3019,42 @@ def v = (a) -> { y -> y } /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ /* c *
         arguments: (argument_list)))))
 
 ==================
+Lambda parameter defaults that are slashy strings holding a comma or a parenthesis
+==================
+
+def f = (a = /x,y/) -> a
+def g = (a = 1, b = /p)q/) -> a + b
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (number_literal))
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        body: (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
 Lambda parameter defaults holding brackets in dollar-slashy strings
 ==================
 

@@ -1803,6 +1803,7 @@ The Groovy column was observed by running Groovy 3.
 | `foo bar() { }`, `foo bar(a) { }`, `task copy(type: Copy) { }` | `foo(bar({ }))` | the same; before, a `method_declaration` with return type `foo`, or two statements for the last |
 | `foo bar(int a) { }`, `foo bar(String a, b) { }`, `foo bar(final a) { }`, `foo bar(a, int b) { }`, `foo bar(String... a) { }`, `foo bar(int` then `a) { }`, `foo bar(Map<K, List<V>> a, int b) { }` | rejected | a `method_declaration`, as before |
 | `foo bar(baz qux)` with no body | `foo.bar(baz(qux))` | `foo`, then the call `bar((baz qux))`; before, a `method_declaration` with no body |
+| `println replace(text, /a+/)`, `def x = foo bar(/re/)` | a call whose argument is the call | `command_chain`: a slashy string in the parentheses is no parameter; before, the receiver, or the value `foo`, and the call |
 | `bar sh(println` then `List)` on the next line | `bar.sh(println(List))` | a `method_declaration` with no body, as before |
 | `{ foo a -> a }`, `{ foo a, b -> a }`, `{ foo a` then `-> a }` on the next line, `{ foo a, b = 1 -> a }`, `{ foo a, @A(x) b -> a }`, `{ foo a, b /* c */ -> a }`, `{ foo a, b // c` then `-> a }`, `{ foo a, final` then `b -> a }`, `{ foo a, Map<K, V> b -> a }` | closure parameters, the first of type `foo` | the same, as before |
 | `{ foo a, b0, b1, …, b127 -> a }`, 128 or more names after a lowercase-typed first parameter | closure parameters | `ERROR`: the look-ahead for `->` reads 256 items (a comma and a name are two), then answers that no parameters follow; 127 names parse |

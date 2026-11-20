@@ -2221,7 +2221,8 @@ A name argument: after spaces, tabs and line escapes, on the line:
         `@`, `final` or `def`, or a receiver that may not take a name
         argument followed, after type arguments, dimensions, varargs
         dots and trivia, by a name; the elements are read up to the
-        first that is neither a parameter nor a lone name;
+        first that is neither a parameter nor a lone name, such as a `/`
+        that opens no comment, a slashy string (`foo bar(x, /re/)`);
       - `->`;
       - and, in a statement (COMMAND_PATH_START and
         COMMAND_STATEMENT_START), `=` that is not `==` or `=~` (a
