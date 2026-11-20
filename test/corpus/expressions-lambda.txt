@@ -216,6 +216,71 @@ def g = (List<String> a, Map<K, V> b, int[] c) -> a
         body: (identifier)))))
 
 ==================
+Lambda parameters whose types have bounded wildcards
+==================
+
+def f = (List<? extends Number> a, Map<String, ? super Integer> b) -> a
+list.forEach((Map.Entry<String, ? extends Number> e) -> println(e))
+def g = (List<? super Integer>) x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (wildcard
+                  (type_identifier))))
+            name: (identifier))
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)
+                (wildcard
+                  (type_identifier))))
+            name: (identifier)))
+        body: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (lambda_expression
+          parameters: (formal_parameters
+            (formal_parameter
+              type: (generic_type
+                base: (qualified_type
+                  (type_identifier)
+                  (type_identifier))
+                arguments: (type_arguments
+                  (type_identifier)
+                  (wildcard
+                    (type_identifier))))
+              name: (identifier)))
+          body: (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (identifier)))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_type_cast
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (wildcard
+              (type_identifier))))
+        value: (identifier)))))
+
+==================
 Lambda parameters on several lines, with comments
 ==================
 
@@ -3043,6 +3108,64 @@ def f = (a = "${x.join(")")}") -> a
                   arguments: (argument_list
                     (string_literal
                       (string_fragment))))))))
+        body: (identifier)))))
+
+==================
+Lambda parameter defaults whose type arguments hold a comma
+==================
+
+def f = (m = new HashMap<String, Integer>()) -> m
+def g = (a = x as Map<String, Object>, b) -> a
+def h = (a = X<b, c = d) -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (object_creation_expression
+              type: (generic_type
+                base: (type_identifier)
+                arguments: (type_arguments
+                  (type_identifier)
+                  (type_identifier)))
+              arguments: (argument_list))))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (cast_expression
+              value: (identifier)
+              type: (generic_type
+                base: (type_identifier)
+                arguments: (type_arguments
+                  (type_identifier)
+                  (type_identifier)))))
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (binary_expression
+              left: (identifier)
+              right: (identifier)))
+          (formal_parameter
+            name: (identifier)
+            default: (identifier)))
         body: (identifier)))))
 
 ==================

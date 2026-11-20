@@ -2908,7 +2908,8 @@ call's arguments), and:
     each read as: annotations, each `@`, a dotted name and arguments in
     parentheses read token by token with brackets counted; words and the
     punctuation of a type (`.`, `...`, `[`, `]`, and `<` … `>` with `,`,
-    `?` and `&` inside); a last word that may name the parameter (no
+    `?`, `&` and a wildcard's bound, `extends` or `super`, inside); a
+    last word that may name the parameter (no
     keyword of grammar.js other than `final` and `def`, `_`, `permits`
     and `pipeline`, no primitive type name and no `void`, not right after
     one `.` and not inside `<…>`); and after `=`, not `==` or `=~`, a
@@ -2944,6 +2945,19 @@ read once for all of them (`scan_value_start`,
 `scan_bare_lambda_start`), and a `-`, `/` or line break after it
 starts no first argument of a call, so a value that is no lambda there
 is no call either.
+
+In a default, a `<` right after a capitalized name with no bracket open
+opens type arguments, whose commas end no parameter, as in §6.18:
+`(m = new HashMap<String, Integer>()) -> m` and
+`(a = x as Map<String, Object>, b) -> a` are lambdas. At anything type
+arguments do not hold the `<` was an operator, and the commas read
+since are not read again: the parameters they started are read as the
+default's tokens, so `(a = X<b, c = d) -> a` is a lambda with the
+parameters `a` and `c`, as in Groovy, and `(a = X<b, int) -> a`, which
+Groovy rejects, one with a parameter named `int`. So is
+`(Foo<super> g) -> g`, which Groovy rejects too, as `super` and
+`extends` bound a wildcard in type arguments
+(`(List<? super T> l) -> l`).
 
 The look-ahead does not run after an expression, where NOT_IN is
 valid. There a `(` is a call's arguments unless the next statement

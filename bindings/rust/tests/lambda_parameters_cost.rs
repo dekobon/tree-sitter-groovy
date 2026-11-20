@@ -78,6 +78,26 @@ fn nested_lambdas_with_default_values_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("x = {}1{}\n", "(a = ".repeat(n), ") -> 1".repeat(n)));
 }
 
+/// Type arguments in a default value are read to their `>`, and a `<` that
+/// turns out to be an operator (`X<b, c = …`) is read on as the default's.
+#[test]
+fn nested_defaults_with_type_arguments_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| {
+        format!(
+            "x = {}1{}\n",
+            "(a = new M<A, B>(".repeat(n),
+            ")) -> a".repeat(n)
+        )
+    });
+    assert_linear(|n| {
+        format!(
+            "x = {}1{}\n",
+            "(a = X<b, c = ".repeat(n),
+            ") -> a".repeat(n)
+        )
+    });
+}
+
 /// The `${…}` of a double-quoted string is read as code, with the strings
 /// in it read whole, so a nest of strings in interpolations is read again
 /// from each `(` before one of its quotes. The look-ahead follows a bounded

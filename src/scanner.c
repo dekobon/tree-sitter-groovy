@@ -3354,6 +3354,13 @@ static inline bool spend_lambda_item(unsigned *items) {
 // closing bracket that does not match and the end of the budget. It sets
 // `*in_string` where it stops inside a dollar-slashy string, whose body no
 // caller may read on through as tokens.
+//
+// A `<` right after a capitalized name, with no bracket open, opens type
+// arguments (`new HashMap<String, Integer>()`, `x as Map<K, V>`), whose
+// commas end no default value, as in `parentheses_open_statement`. At
+// anything type arguments do not hold, the `<` was an operator after all
+// (`a = X<b, c = d`); the commas read since cannot be read again, and the
+// parameters they started are read as the default's tokens.
 static bool skip_lambda_tokens(
     TSLexer *lexer,
     unsigned *items,
@@ -3362,6 +3369,9 @@ static bool skip_lambda_tokens(
     bool *in_string
 ) {
     unsigned depth = 0;
+    unsigned angles = 0;
+    // Whether the last item is a capitalized name with nothing after it yet.
+    bool type_name = false;
     // Whether an operand may start here, as in `parentheses_open_statement`:
     // a `/` there opens a slashy string, one item, which the scan function
     // opens where no `=` follows the `/` and the string closes on its line
@@ -3371,9 +3381,20 @@ static bool skip_lambda_tokens(
     bool operand = true;
     while (spend_lambda_item(items)) {
         bool slash = false;
+        if (is_whitespace(lexer->lookahead) || lexer->lookahead == '\\'
+            || lexer->lookahead == '/') {
+            type_name = false;
+        }
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
             || lexer->eof(lexer)) {
             return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (angles > 0
+            && (slash || !(is_identifier_char(c) || c == ',' || c == '?'
+                           || c == '&' || c == '.' || c == '[' || c == ']'
+                           || c == '<' || c == '>'))) {
+            angles = 0;
         }
         if (slash) {
             if (operand && lexer->lookahead != '=') {
@@ -3387,7 +3408,6 @@ static bool skip_lambda_tokens(
             }
             continue;
         }
-        int32_t c = lexer->lookahead;
         operand = !is_identifier_char(c) && c != '\'' && c != '"'
             && c != ')' && c != ']' && c != '}' && c != '.';
         if (c == '\'' || c == '"') {
@@ -3397,6 +3417,7 @@ static bool skip_lambda_tokens(
             continue;
         }
         if (is_identifier_char(c)) {
+            type_name = is_capital(c);
             if (read_dollar_slashy_open(lexer)
                 && !skip_dollar_slashy_string(lexer, NULL)) {
                 *in_string = true;
@@ -3404,6 +3425,8 @@ static bool skip_lambda_tokens(
             }
             continue;
         }
+        bool after_type_name = type_name;
+        type_name = false;
         if (c == '(' || c == '[' || c == '{') {
             depth++;
         } else if (c == ')' || c == ']' || c == '}') {
@@ -3411,7 +3434,11 @@ static bool skip_lambda_tokens(
                 return c == ')';
             }
             depth--;
-        } else if (c == ',' && depth == 0 && comma) {
+        } else if (c == '<' && depth == 0 && (after_type_name || angles > 0)) {
+            angles++;
+        } else if (c == '>' && angles > 0) {
+            angles--;
+        } else if (c == ',' && depth == 0 && angles == 0 && comma) {
             return true;
         }
         advance(lexer);
@@ -3427,7 +3454,8 @@ static bool skip_lambda_tokens(
 // the order: what it takes and `formal_parameter` does not is an `ERROR`
 // either way. Returns false where no parameter can be, as at the operator of
 // `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
-// keyword is in it (`(if)`). Where no name ends it (`(String[])`, `(a.b)`,
+// keyword is in it (`(if)`) other than a wildcard's bound in type arguments
+// (`(List<? super T> l)`). Where no name ends it (`(String[])`, `(a.b)`,
 // `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
 // types, and the caller reads on past the `)` all the same. A dollar-slashy
 // string where a name may be is a literal as well (`($/a/$)`); there, and
@@ -3494,7 +3522,13 @@ static bool lambda_parameter_follows(
             }
             bool modifier = word_is(word, len, "final")
                 || word_is(word, len, "def");
-            if (!modifier && is_reserved_lambda_name(word, len)
+            // Inside `<…>` the keywords `extends` and `super` bound a
+            // wildcard (`List<? extends Number> l`), as in Apache's
+            // `typeArgument`; they name nothing, as `named` below says.
+            bool bound = angles > 0
+                && (word_is(word, len, "extends")
+                    || word_is(word, len, "super"));
+            if (!modifier && !bound && is_reserved_lambda_name(word, len)
                 && !is_primitive_type(word, len)) {
                 return false;
             }
