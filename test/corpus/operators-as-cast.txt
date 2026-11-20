@@ -509,3 +509,142 @@ Foo
     (object_creation_expression
       type: (type_identifier)
       arguments: (argument_list))))
+
+==================
+as cast type arguments that do not close are a comparison
+==================
+
+x as B<c
+x as a.B<c
+x as java.math.BigDecimal<limit
+if (v as java.lang.Integer<max && min>v) { }
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (type_identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    consequence: (block)))
+
+==================
+as cast to a dotted type before comparisons with spaces
+==================
+
+x as java.math.BigDecimal < limit
+if (v as java.lang.Integer < max && min > v) { }
+x as a.b.C < y
+return x as a.B < c > d
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    consequence: (block))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (return_statement
+    (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (identifier))))
+
+==================
+as cast type arguments across a line and a comment
+==================
+
+x as Map<String,
+  List<Integer>>
+y = x as Map</* key */ String, Integer>
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (generic_type
+            base: (type_identifier)
+            arguments: (type_arguments
+              (type_identifier)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (block_comment)
+            (type_identifier)
+            (type_identifier)))))))

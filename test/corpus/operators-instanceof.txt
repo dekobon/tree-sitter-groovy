@@ -412,3 +412,34 @@ names that start like a relational operator after parentheses are a cast operand
     (parenthesized_type_cast
       type: (type_identifier)
       value: (identifier))))
+
+==================
+relational operators after parentheses with comments around them
+==================
+
+(x) /* c */ instanceof Foo
+return (x) in /* c */ y
+return (x) /* a */ as /* b */ Foo
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      type: (type_identifier)))
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      collection: (identifier)))
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      (block_comment)
+      type: (type_identifier))))
