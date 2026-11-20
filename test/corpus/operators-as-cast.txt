@@ -648,3 +648,22 @@ y = x as Map</* key */ String, Integer>
             (block_comment)
             (type_identifier)
             (type_identifier)))))))
+
+==================
+as after parentheses at the end of a line before a dotted name is a cast of the name
+==================
+
+(x) as
+a.b
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))
