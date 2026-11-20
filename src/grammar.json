@@ -12243,6 +12243,10 @@
     },
     {
       "type": "SYMBOL",
+      "name": "_lambda_body_reread"
+    },
+    {
+      "type": "SYMBOL",
       "name": "_error_sentinel"
     }
   ],

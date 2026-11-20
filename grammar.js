@@ -671,13 +671,15 @@ module.exports = grammar({
   // Externals listed here must have a matching branch in
   // `src/scanner.c` AND be referenced by at least one rule below
   // (`_command_named_key` and `_subscript_open` included) or by
-  // `extras`. There are two exceptions. No rule references
+  // `extras`. There are three exceptions. No rule references
   // `_error_sentinel`: it exists so the scanner can detect error
   // recovery, when tree-sitter marks every external valid. It is kept
   // last here and in the scanner's `TokenType` enum, and the two
-  // orders must match. The scanner never emits `_string_body` or
-  // `_type_start`: a string body and a type reference them so that the
-  // scanner can tell it is inside one or where one may start.
+  // orders must match. No rule references `_lambda_body_reread` either:
+  // the scanner emits it where no rule takes it (§6.19). The scanner
+  // never emits `_string_body` or `_type_start`: a string body and a type
+  // reference them so that the scanner can tell it is inside one or where
+  // one may start.
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -779,6 +781,12 @@ module.exports = grammar({
     // Listed last but for the sentinel too, so that it renumbers no symbol
     // before it.
     $._lambda_body_end,
+    // §6.19 — empty, and like `_error_sentinel` taken by no rule: emitted
+    // after a lambda's block that the parser shifted whole where an
+    // expression continues the braces, so that the runtime breaks a reused
+    // block down and the `}` is decided where a parse from scratch decides
+    // it.
+    $._lambda_body_reread,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,

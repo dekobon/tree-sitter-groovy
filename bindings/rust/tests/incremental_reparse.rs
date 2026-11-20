@@ -237,7 +237,11 @@ fn reparse_after_edit_sequence_matches_parse_from_scratch() {
 /// operator, a closure argument or a line break, and removing a call after
 /// a comment one character at a time. Each first edit makes the reparse
 /// reuse the lambda's body as the expression it was or as the whole body,
-/// and the next one must end the body there again or continue it.
+/// and the next one must end the body there again or continue it. The last
+/// three rename the parameter or change the next statement, so that the
+/// reparse reuses the block of a lambda without parentheses whole, in a
+/// state where only the body's end is valid, before a comment and what
+/// starts the next statement.
 const LAMBDA_BODY_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
     (
         "def v = a -> { y -> y }\nfoo()\n",
@@ -281,6 +285,15 @@ const LAMBDA_BODY_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
         "def v = a -> { y -> y } // c\n.x()\n",
         &[(32, 1, ""), (31, 1, ""), (30, 1, ""), (29, 1, "")],
     ),
+    (
+        "def v = a -> { foo() }\n// c\n(1..3).each { }\n",
+        &[(8, 1, "ab")],
+    ),
+    (
+        "String v = a -> { foo() } // c\n(1..3).each { }\n",
+        &[(35, 1, "4")],
+    ),
+    ("def v = a -> { foo() }\n/* c */ ++i\n", &[(8, 1, "ab")]),
 ];
 
 /// Applies `edits` to `text` one after another, reparsing with the tree
