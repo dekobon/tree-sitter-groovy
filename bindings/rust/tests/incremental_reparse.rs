@@ -381,6 +381,48 @@ fn reparse_after_lambda_body_edits_matches_parse_from_scratch() {
     }
 }
 
+/// Texts with a block that opens a statement (§6.22), in a file, after a
+/// label, in a case and in a method, each with an operator, a call or a
+/// subscript typed after its `}`, on its line or the next, and deleted
+/// again: the block turns into a closure and back, so the reparse must
+/// decide the `}` again. The first sequence, whose trees both have an
+/// `ERROR`, reparses to a tree of its own where the scan in the state after
+/// a reused block takes a statement to follow, as it did before the scan
+/// handed such a `}` back as after a lambda's block (spec §6.22).
+const STATEMENT_BLOCK_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "switch (v) {\ncase 1: { a }\n(1)\n}\ndef w = 1\n",
+        &[(9, 1, "."), (33, 0, "!in ")],
+    ),
+    ("{ y }\nfoo()\n", &[(5, 0, ".call()"), (5, 7, "")]),
+    ("{ y }\nfoo()\n", &[(5, 0, "()"), (5, 2, "")]),
+    ("{ y }\nfoo()\n", &[(5, 0, " + 1"), (5, 4, "")]),
+    ("{ y }\nfoo()\n", &[(5, 0, "\n+ 1"), (5, 4, "")]),
+    ("{ y }\nfoo()\n", &[(5, 0, "\n.x()"), (5, 5, "")]),
+    ("lbl: { y }\nfoo()\n", &[(10, 0, ".call()"), (10, 7, "")]),
+    (
+        "switch (v) {\ncase 1: { y }\n}\n",
+        &[(22, 0, " as T"), (22, 5, "")],
+    ),
+    (
+        "def m() {\n  { y }\n  foo()\n}\n",
+        &[(15, 0, "[0]"), (15, 3, "")],
+    ),
+];
+
+#[test]
+fn reparse_after_statement_block_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in STATEMENT_BLOCK_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
 /// Texts with the names of a multi-assignment, or a script method's untyped
 /// parameters, in parentheses (§6.20), each with a sequence of edits after
 /// the first `,`: the method's body turned into `= l` and back, a name
