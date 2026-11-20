@@ -2166,7 +2166,8 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 
 // After a declared name, a line break and Groovy's trivia, at the first
 // character of the next line, which `slash` says is the one after a `/` that
-// opens no comment: whether the line goes on with the statement, as Groovy
+// opens no comment, and which is no `=` (the caller reads an initializer
+// there): whether the line goes on with the statement, as Groovy
 // reads it, rather than starting the next one. Groovy ends a declaration at
 // the line break where a statement can follow, and reads the line before as
 // a call otherwise (`String s` then `.trim()` is `String(s.trim())`), which
@@ -2205,7 +2206,6 @@ static bool next_line_continues(
         case ',':
         case ')':
         case ']':
-        case '=':
             return true;
         case '!':
             return !negation_follows(lexer);
