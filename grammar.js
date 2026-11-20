@@ -650,8 +650,13 @@ function lambdaBody($, bare) {
  * one does they are a closure: `{ foo() }()`, `{ foo() }.call()`,
  * `{ foo() } as Runnable` and `{ foo() }` followed by `.call()` on the next
  * line call and cast it, as in Groovy. A token of its own rather than
- * `_lambda_body_end` lets the scanner decide it the same in every state
- * after the `}`, as a statement may follow there in each.
+ * `_lambda_body_end` keeps the states after the `}` of a statement's block
+ * and of a lambda's apart. One state for both made
+ * `def c = { a = a -> { foo() }` followed by `+ 1` on the next line a lambda
+ * with a block where Groovy reads the parameter `a` and a block: the stack
+ * version split off at the block's reduction lexes again in the state after
+ * the block, where the scan, as after a reused block, hands back every `}`
+ * that a line with an operator follows, and so ends.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {(rule: RuleOrLiteral) => RuleOrLiteral} [wrap] Wraps the block,

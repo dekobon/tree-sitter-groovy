@@ -3516,20 +3516,12 @@ static bool lambda_body_continues_with(
 // as invalid the tokens that end the body where they are valid
 // (STATEMENT_PAREN, RECORD_KEYWORD) and as valid the others, which let it go
 // on, so that it ends the body only where the scan in every state after the
-// `}` would. After a block that opens a statement (§6.22, `end` is
-// STATEMENT_BLOCK_END) a statement may follow in every state after the `}`,
-// so those two are valid in every mode, and the scan decides the same in the
-// state after a shifted block as in the one after the `}`.
+// `}` would.
 static inline bool token_valid(
     const bool *valid_symbols,
     BodyEndScan mode,
-    enum TokenType end,
     enum TokenType token
 ) {
-    if (end == STATEMENT_BLOCK_END
-        && (token == STATEMENT_PAREN || token == RECORD_KEYWORD)) {
-        return true;
-    }
     switch (mode) {
         case BODY_END_READ:
             return true;
@@ -3633,7 +3625,7 @@ static bool scan_lambda_body_end(
                 return true;
             }
         } else if (lexer->lookahead == '='
-                   || !token_valid(valid_symbols, mode, end, STATEMENT_PAREN)
+                   || !token_valid(valid_symbols, mode, STATEMENT_PAREN)
                    || !slashy_body_follows(lexer)) {
             return lambda_body_continues(scanner, lexer, mode, comment);
         } else {
@@ -3643,10 +3635,10 @@ static bool scan_lambda_body_end(
         comments++;
     }
     bool statement_follows = crossed_line
-        && token_valid(valid_symbols, mode, end, STATEMENT_PAREN);
+        && token_valid(valid_symbols, mode, STATEMENT_PAREN);
     bool member_follows = statement_follows
         || (crossed_line
-            && token_valid(valid_symbols, mode, end, RECORD_KEYWORD));
+            && token_valid(valid_symbols, mode, RECORD_KEYWORD));
     int32_t c = lexer->lookahead;
     if (lexer->eof(lexer)) {
         return true;
@@ -3660,7 +3652,7 @@ static bool scan_lambda_body_end(
         // What `scan_contextual_word` decides for these words, and reads.
         bool as = word_is(word, len, "as");
         if ((as || word_is(word, len, "in"))
-            && token_valid(valid_symbols, mode, end, as ? AS_KEYWORD : IN_KEYWORD)
+            && token_valid(valid_symbols, mode, as ? AS_KEYWORD : IN_KEYWORD)
             && (as ? skip_header_trivia(lexer, true, no_close_ahead, NULL,
                                         NULL)
                          && is_identifier_start(lexer->lookahead)
@@ -3705,7 +3697,7 @@ static bool scan_lambda_body_end(
             // A `[` on a later line opens no subscript (§6.9).
             advance(lexer);
             if (crossed_line
-                || !token_valid(valid_symbols, mode, end, SUBSCRIPT_OPEN)) {
+                || !token_valid(valid_symbols, mode, SUBSCRIPT_OPEN)) {
                 return true;
             }
             return lambda_body_continues_with(scanner, lexer, mode, comment,
@@ -3724,7 +3716,7 @@ static bool scan_lambda_body_end(
                                                  comment);
                 }
                 if (word_is(word, len, "in")
-                    && token_valid(valid_symbols, mode, end, NOT_IN)
+                    && token_valid(valid_symbols, mode, NOT_IN)
                     && (is_whitespace(next) || next == '[' || next == '('
                         || next == '{')) {
                     return lambda_body_continues_with(scanner, lexer, mode,
