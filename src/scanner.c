@@ -2193,22 +2193,21 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 // After a declared name, a line break and Groovy's trivia, at the first
 // character of the next line, which `slash` says is the one after a `/` that
 // opens no comment, and which is no `=` (the caller reads an initializer
-// there): whether the line goes on with the statement, as Groovy
-// reads it, rather than starting the next one. Groovy ends a declaration at
-// the line break where a statement can follow, and reads the line before as
-// a call otherwise (`String s` then `.trim()` is `String(s.trim())`), which
-// is left as before: the type and the name as statements. A line goes on
-// when it starts with what no statement starts with: an operator other than
-// `+`, `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `==`, `=~`, `<`, `-=`,
-// `/=`, the `->` of closure parameters), `instanceof`, `in` or `as`
-// (`for (String s` then `in xs)`), `:`, `,` or a closing bracket. A `/` that
-// opens no comment starts a slashy string there, as Groovy's lexer reads it,
-// when the string closes on its line (`slashy_body_follows`); otherwise it is
-// a division that goes on with the name (`Foo foo` then `/ 2` is Groovy's
-// `Foo(foo / 2)`).
-// So does `(` when the parentheses hold parameters (`call_arguments_follow`):
-// `Tab x` then `(int x) { }` stays the method `x`, where Groovy reads the
-// declaration and the call `int(x, { })`, which has no reading here.
+// there): whether the line goes on with the statement, as Groovy reads it,
+// rather than starting the next one. Groovy ends a declaration at the line
+// break where a statement can follow, and reads the line before as a call
+// otherwise (`String s` then `.trim()` is `String(s.trim())`), which is left
+// as before: the type and the name as statements. A line goes on when it
+// starts with what no statement starts with: an operator other than `+`,
+// `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `<`, `-=`, `!=`, the `->` of
+// closure parameters), `instanceof`, `:`, `,` or a closing bracket; a `/`
+// that opens no comment unless a slashy string closes on its line, as
+// Groovy's lexer reads one there (`slashy_body_follows`; `Foo foo` then
+// `/ 2` is Groovy's `Foo(foo / 2)`); and `(` when the parentheses hold
+// parameters (`call_arguments_follow`): `Tab x` then `(int x) { }` stays the
+// method `x`, where Groovy reads the declaration and the call
+// `int(x, { })`, which has no reading here. `in` and `as` start the next
+// statement, as in Groovy (`InputStream in` then `in.close()`).
 static bool next_line_continues(
     TSLexer *lexer,
     bool slash,
@@ -2253,8 +2252,7 @@ static bool next_line_continues(
     }
     char word[sizeof "instanceof"];
     unsigned len = read_word(lexer, word, sizeof word);
-    return word_is(word, len, "in") || word_is(word, len, "as")
-        || word_is(word, len, "instanceof");
+    return word_is(word, len, "instanceof");
 }
 
 // After the first declared name of a typed declaration and the spaces after
@@ -2323,7 +2321,7 @@ static bool declaration_end_follows(
         }
         if (c == '=') {
             advance(lexer);
-            return lexer->lookahead != '=' && lexer->lookahead != '~'
+            return lexer->lookahead != '='
                 && !parameters_follow(lexer,
                                       DECLARATION_LOOKAHEAD_ITEMS - *items,
                                       no_close_ahead);

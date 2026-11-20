@@ -2977,3 +2977,41 @@ String t
     (assignment_expression
       left: (identifier)
       right: (number_literal))))
+
+==================
+A line that starts with in or as starts a statement after a typed local
+==================
+
+String s
+in xs
+InputStream in
+in.close()
+String t
+as T
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
