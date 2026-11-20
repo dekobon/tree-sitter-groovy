@@ -343,6 +343,7 @@ static bool array_dimensions_follow(
 );
 static bool is_contextual_word(const char *word, unsigned len);
 static bool slashy_body_follows(TSLexer *lexer);
+static bool skip_string(TSLexer *lexer);
 static bool scan_contextual_word(
     TSLexer *lexer,
     const char *word,
@@ -777,27 +778,6 @@ static bool arrow_follows(TSLexer *lexer, bool no_close_ahead) {
     return lexer->lookahead == '>';
 }
 
-// Reads a string that closes on its line, from its quote. Returns false at
-// a line break or the end of input before the close.
-static bool skip_quoted(TSLexer *lexer) {
-    int32_t quote = lexer->lookahead;
-    advance(lexer);
-    while (lexer->lookahead != quote) {
-        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-            return false;
-        }
-        if (lexer->lookahead == '\\') {
-            advance(lexer);
-            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-                return false;
-            }
-        }
-        advance(lexer);
-    }
-    advance(lexer);
-    return true;
-}
-
 // Reads a block comment from its `*`, the `/` before it consumed, to its
 // close. Returns false at the end of input, where it does not close.
 static bool skip_comment_body(TSLexer *lexer) {
@@ -819,7 +799,8 @@ static bool skip_comment_body(TSLexer *lexer) {
 // which makes it a closure's parameters, the first of type `foo`
 // (`{ foo a, b -> }`, `{ foo a, @A b = 1 -> }`). The elements are read as
 // Groovy's tokens, bracket depth counted, so that a default value may hold
-// anything; comments are trivia. A line break ends the list unless a comma,
+// anything; comments are trivia, and a string is one item, a triple-quoted
+// one across lines (`skip_string`). A line break ends the list unless a comma,
 // a modifier, an operator or an open bracket comes before it, or `->` after
 // it: a call's last argument ends at it (`foo a, b` then the next
 // statement). `;`, a closing bracket with none open and the end of the
@@ -870,7 +851,7 @@ static bool parameters_follow(
             continue;
         }
         if (c == '\'' || c == '"') {
-            if (!skip_quoted(lexer)) {
+            if (!skip_string(lexer)) {
                 return false;
             }
             continued = false;
@@ -2926,11 +2907,11 @@ static inline bool spend_lambda_item(unsigned *items) {
 // Reads Groovy's tokens, counting brackets, up to a `)` with no bracket
 // open, and, when `comma` is set, a `,` with none open; it leaves that
 // character. That is a parameter's default value (`comma`) or the arguments
-// of an annotation, from after their `(`. Strings that close on their line
-// and comments are items of their own, and line breaks are trivia, as inside
-// parentheses for Groovy's lexer. Returns false at the end of input, an
-// unterminated block comment, a closing bracket that does not match and the
-// end of the budget.
+// of an annotation, from after their `(`. Strings (`skip_string`, so a
+// triple-quoted one may span lines) and comments are items of their own, and
+// line breaks are trivia, as inside parentheses for Groovy's lexer. Returns
+// false at the end of input, a string or block comment that does not close, a
+// closing bracket that does not match and the end of the budget.
 static bool skip_lambda_tokens(
     TSLexer *lexer,
     unsigned *items,
@@ -2949,7 +2930,7 @@ static bool skip_lambda_tokens(
         }
         int32_t c = lexer->lookahead;
         if (c == '\'' || c == '"') {
-            if (!skip_quoted(lexer)) {
+            if (!skip_string(lexer)) {
                 return false;
             }
             continue;

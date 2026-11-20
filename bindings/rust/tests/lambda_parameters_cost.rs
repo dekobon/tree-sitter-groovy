@@ -91,6 +91,14 @@ fn long_name_lists_are_read_a_bounded_number_of_times() {
     });
 }
 
+/// A triple-quoted string is one item of the look-ahead and may span lines,
+/// so one that does not close is read to the end of input by every
+/// look-ahead that reaches it; the budget keeps those a fixed number.
+#[test]
+fn an_unterminated_triple_quoted_default_is_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("x = {}'''\n{}", "(a = ".repeat(n), "x\n".repeat(n)));
+}
+
 #[test]
 fn lambdas_on_one_line_are_read_a_bounded_number_of_times() {
     assert_linear(|n| {

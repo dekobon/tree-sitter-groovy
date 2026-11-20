@@ -962,6 +962,73 @@ xs.each { a = switch (x) { case 1 -> 2 } -> a }
           (identifier))))))
 
 ==================
+Closure parameter defaults and call arguments that are triple-quoted strings
+==================
+
+{ String a = '''x
+y''' -> a }
+c = { foo a, b = '''x
+y''' -> a }
+c = { String a = """x
+${y}""" -> a }
+xs.each { foo a, '''x' -> ''' }
+foo a, '''it's -> ok'''
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          type: (type_identifier)
+          name: (identifier)
+          default: (string_literal)))
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (string_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment)
+              (gstring_brace_interpolation
+                value: (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (string_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal)))
+
+==================
 Closure parameter list with the arrow on the next line
 ==================
 

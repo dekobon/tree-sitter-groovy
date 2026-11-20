@@ -95,6 +95,67 @@ def g = (final x) -> x
         body: (identifier)))))
 
 ==================
+Lambda parameter defaults and annotation arguments that are triple-quoted strings
+==================
+
+def f = (a = '''it's''') -> a
+def g = (a = '''x
+y''', b) -> a
+def h = (@A('''x
+y''') a) -> a
+def k = (a = """x
+${y}""") -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal))
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (string_literal)))
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment)
+              (gstring_brace_interpolation
+                value: (identifier)))))
+        body: (identifier)))))
+
+==================
 Lambda parameters with annotations, def, var, varargs, generic and array types
 ==================
 

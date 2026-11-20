@@ -90,6 +90,14 @@ fn lowercase_typed_lists_after_a_call_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("foo x, {}\n", elements(n, ",\n")));
 }
 
+/// A triple-quoted string is one item of the look-ahead and may span lines,
+/// so one that does not close is read to the end of input by every
+/// look-ahead that reaches it; the budget keeps those a fixed number.
+#[test]
+fn lists_before_an_unterminated_triple_quoted_string_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{{ {},\n'''\n{}", elements(n, ",\n"), "x\n".repeat(n)));
+}
+
 #[test]
 fn typed_parameter_runs_are_read_a_bounded_number_of_times() {
     assert_linear(|n| {

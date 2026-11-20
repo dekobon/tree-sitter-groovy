@@ -2789,7 +2789,9 @@ call's arguments), and:
     and `pipeline`, no primitive type name and no `void`, not right after
     one `.` and not inside `<…>`); and after `=`, not `==` or `=~`, a
     default value read token by token, brackets counted and strings
-    closing on their line skipped, to the `,` or `)` that ends it. A
+    skipped whole (a triple-quoted one across lines, a `\` before a
+    line break continuing a single-quoted or double-quoted one), to the
+    `,` or `)` that ends it. A
     parameter with no such name (`(int)`, `(a.b.C)`, `(String[])`) is
     read on as well, and the token is turned down after the `)`;
   - after the `)` and Groovy's trivia, `->`;
@@ -2834,6 +2836,14 @@ for 500 and 4,000 levels; with it, 70 and 74).
 `bindings/rust/tests/lambda_parameters_cost.rs` checks that, nested
 parentheses, a long list of names with no `->` and many lambdas on one
 line. A parameter list longer than the budget reads as no lambda's.
+A string is one item, so a triple-quoted one that does not close is
+read to the end of input by each look-ahead that reaches it within the
+budget: at most a fixed number of them, as many as for a string that
+does not close on a long line, so the parse stays linear (`(a =`
+repeated, then an unterminated `'''` and 9,000 lines: 93 bytes read
+per input byte whether `(a =` comes 85, 400 or 1,000 times; the same
+test checks it, and `name_argument_cost.rs` the closure parameters of
+§6.14 before such a string).
 
 The scanner reads only the shape and the `->`, and an expression may
 be followed by `->` as a closure parameter's default or a case value
