@@ -178,8 +178,18 @@ const STATEMENT_BLOCK_WEIGHT = -LAMBDA_WEIGHT + 1;
  * and a closure that starts the body (`a -> { b -> b } { c }`). It bounds
  * no nest of blocks that hold lambdas, as each such block outweighs a
  * closure (STATEMENT_BLOCK_WEIGHT).
+ *
+ * It must also outweigh the blocks that a reading gains over the braces
+ * after such a lambda: where one reading takes `{ z }` on the lines after it
+ * for closures that a call takes and the other for blocks that open
+ * statements, each block adds STATEMENT_BLOCK_WEIGHT to the second.
+ * `def c = { a = b -> { p -> p }` followed by lines of `{ z }` is the
+ * parameter `a` in Groovy, and also a lambda whose body is a closure and a
+ * block per line; at 10 eight lines made it the lambda, at 100 it takes 76.
+ * The largest weight, BODY_BLOCK_WEIGHT, is then 604 in tree-sitter's
+ * dynamic precedence, which a parse action holds in 16 bits.
  */
-const LAMBDA_NESTING_DEPTH = 10;
+const LAMBDA_NESTING_DEPTH = 100;
 
 /*
  * The weight of a lambda whose body is a closure, which another

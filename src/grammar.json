@@ -1509,7 +1509,7 @@
               "members": [
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": 64,
+                  "value": 604,
                   "content": {
                     "type": "SYMBOL",
                     "name": "block"
@@ -11162,7 +11162,7 @@
               },
               {
                 "type": "PREC_DYNAMIC",
-                "value": -62,
+                "value": -602,
                 "content": {
                   "type": "SEQ",
                   "members": [
@@ -11281,7 +11281,7 @@
               },
               {
                 "type": "PREC_DYNAMIC",
-                "value": -62,
+                "value": -602,
                 "content": {
                   "type": "SEQ",
                   "members": [
@@ -11371,7 +11371,7 @@
     },
     "_body_block": {
       "type": "PREC_DYNAMIC",
-      "value": 64,
+      "value": 604,
       "content": {
         "type": "ALIAS",
         "content": {
