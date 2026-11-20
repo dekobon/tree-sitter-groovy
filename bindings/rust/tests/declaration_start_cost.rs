@@ -2,12 +2,12 @@
 //! declaration without an initializer (`SPECIFICATION.md` §6.21).
 //!
 //! At a statement that starts with a type and a name, the scanner reads the
-//! list of names after it, and after the `=` of a later name's initializer
-//! the default up to the `->` that would make the list closure parameters
+//! list of names after it, and after the `=` of an initializer the value up
+//! to the `->` that would make the list closure parameters
 //! (`{ String a, b = 1 -> }`). In a nest of closures that each open with
-//! such a list, and on lines of a broken one, every declaration reads the
-//! rest of the nest: the look-ahead must stop after a fixed number of items,
-//! or the parse takes time quadratic in the nesting. Time is not measured:
+//! such a list or such a declaration, and on lines of a broken one, every
+//! declaration reads the rest of the nest: the look-ahead must stop after a
+//! fixed number of items, or the parse takes time quadratic in the nesting. Time is not measured:
 //! the parser reads its input through a callback here, and the test
 //! compares the bytes it asks for at two input sizes.
 
@@ -25,9 +25,11 @@ const CHUNK_BYTES: usize = 64;
 
 /// Most the bytes served per input byte may grow from the smaller input
 /// to the larger. A bounded look-ahead keeps the two about equal
-/// (measured: 41 and 43 bytes per byte for the nest of closures, 50 and 51
-/// for the broken lines); one that reads to the end of the nest grows with
-/// it, eightfold here (254 and 2,004, and 501 and 4,001, without the bound).
+/// (measured: 41 and 43 bytes per byte for the nest of lists, 45 and 46
+/// unclosed, 50 and 51 for the broken lines, 60 and 64 for the nest of
+/// declarations); one that reads to the end of the nest grows with it,
+/// eightfold here (254 and 2,004, 251 and 2,001, 501 and 4,001, and 254
+/// and 2,004 without the bound).
 const MAX_GROWTH: f64 = 1.5;
 
 /// Parses `source` and returns the bytes served to the parser per byte of
@@ -85,13 +87,6 @@ fn broken_lists_on_many_lines_are_read_a_bounded_number_of_times() {
 }
 
 #[test]
-fn long_name_lists_are_read_a_bounded_number_of_times() {
-    assert_linear(|n| {
-        let names = (0..n).map(|i| format!("a{i}")).collect::<Vec<_>>();
-        format!(
-            "String {} x\nList<{}> y\n",
-            names.join(", "),
-            names.join(", ")
-        )
-    });
+fn nested_closure_valued_declarations_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{}{}\n", "Closure c = { ".repeat(n), "}".repeat(n)));
 }
