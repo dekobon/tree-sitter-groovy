@@ -2199,15 +2199,17 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 // otherwise (`String s` then `.trim()` is `String(s.trim())`), which is left
 // as before: the type and the name as statements. A line goes on when it
 // starts with what no statement starts with: an operator other than `+`,
-// `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `<`, `-=`, `!=`, the `->` of
-// closure parameters), `instanceof`, `:`, `,` or a closing bracket; a `/`
-// that opens no comment unless a slashy string closes on its line, as
-// Groovy's lexer reads one there (`slashy_body_follows`; `Foo foo` then
-// `/ 2` is Groovy's `Foo(foo / 2)`); and `(` when the parentheses hold
-// parameters (`call_arguments_follow`): `Tab x` then `(int x) { }` stays the
-// method `x`, where Groovy reads the declaration and the call
-// `int(x, { })`, which has no reading here. `in` and `as` start the next
-// statement, as in Groovy (`InputStream in` then `in.close()`).
+// `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `<`, `-=`, `!=`, `/=`, the
+// `->` of closure parameters), `instanceof`, `:`, `,` or a closing bracket;
+// a `/` that opens no comment unless the scanner opens a slashy string
+// there, as Groovy's lexer reads one, which needs it to close on its line
+// and to start with no `=` (`slashy_body_follows`; `Foo foo` then `/ 2` is
+// Groovy's `Foo(foo / 2)`; Groovy reads `/= 2 /` as a slashy string); and
+// `(` when the parentheses hold parameters (`call_arguments_follow`):
+// `Tab x` then `(int x) { }` stays the method `x`, where Groovy reads the
+// declaration and the call `int(x, { })`, which has no reading here. `in`
+// and `as` start the next statement, as in Groovy (`InputStream in` then
+// `in.close()`).
 static bool next_line_continues(
     TSLexer *lexer,
     bool slash,
@@ -2215,7 +2217,7 @@ static bool next_line_continues(
 ) {
     int32_t c = lexer->lookahead;
     if (slash) {
-        return !slashy_body_follows(lexer);
+        return c == '=' || !slashy_body_follows(lexer);
     }
     if (lexer->eof(lexer)) {
         return false;

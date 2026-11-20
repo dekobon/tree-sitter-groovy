@@ -2955,6 +2955,8 @@ String s
 /x
 String t
 /= 2
+String u
+/= 2 // c
 
 ---
 
@@ -2976,7 +2978,14 @@ String t
   (expression_statement
     (assignment_expression
       left: (identifier)
-      right: (number_literal))))
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (line_comment))
 
 ==================
 A line that starts with in or as starts a statement after a typed local
