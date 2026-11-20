@@ -397,7 +397,7 @@ fix relative to *both* parent grammars.
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
 | Method declaration | port from murtaza64 | `def` or type, optional throws clause |
 | Method definition (with body) | port from murtaza64 | |
-| Multi-assignment | **new** | `def (a, b) = expr` is a `multi_assignment_declaration` (murtaza64 #22). `(a, b) = expr` is a `multi_assignment_expression` (#94), after Apache `#multipleAssignmentExprAlt`: two or more plain names, then `=` and no other operator, with line breaks allowed around the `=`. It is an expression, so it nests: `x = (a, b) = list`, `foo((a, b) = list)`, a `for` init, after `return`. Its names are `identifier`s rather than `variable_declarator`s, as nothing is declared. With one name, `(a) = x` is an `assignment_expression` of a parenthesized expression, as in Apache. A `(` that opens a line after an expression opens the next statement, as in Groovy (§6.18), so two multi-assignments on consecutive lines, `(a, b) = [1, 2]` then `(c, d) = [3, 4]`, are two statements, and so are the swap `def b = 2` then `(a, b) = [b, a]`. One line can be read as two statements: `def f(a, b) = [1, 2]`, which Groovy rejects, is a declaration of `f` followed by a multi-assignment. The value of either form may be a parenthesis-free call, as Apache's `statementExpression` and `variableInitializer` allow: `(a, b) = f 3` and `def (a, b) = f 3` (§5.5, #95). The declaration form follows Apache's `variableDeclaration` with `typeNamePairs`: annotations, then `def`, `final def`, `final var`, `final` alone or `var` alone (`final (a, b) = …`, `@Field def (a, b) = …`, `var (a, b) = …`). `var(a, b)` and `var (a, b).foo()` call a method named `var`, as in Groovy (observed with Groovy 3): the scanner takes `var` alone as the keyword only when names, `)` and `=` follow (§6.16). A name may have a type (`typeNamePair`): `def (int a, String b) = …`, `final (List<String> xs, b) = …`. A typed name is a `variable_declarator` with a `type` field before its `name`; an untyped name keeps the `variable_declarator` with a `name` alone. Two Groovy 6 forms are accepted, after Groovy 6's `GroovyParser.g4` and `AstBuilder`; the Groovy 3 this grammar is checked against rejects both. A rest binding, `def (a, *b) = list` or `def (h, List<Integer> *t) = list`, has its `*` in the `rest` field of its `variable_declarator`. A keyed pair, `def (name: n, age: int a) = map`, is a `variable_declarator` with a `key` field before the optional `type` and the `name`. A list holds names or keyed pairs, not both. The declaration is also a `for` init (`for (def (i, n) = [0, 5]; i < n; i++)`) and a member of a type body, Apache's `fieldDeclaration`, with the annotations and modifiers of a field and `def` or `var`, or modifiers alone (`static final def (a, b) = …`, `private var (a, b) = …`, `private (int a, b) = …`). Groovy parses the member and then drops it: it declares no field (Groovy 3 to 6). Not accepted, each an `ERROR`: annotations alone (`@A (a, b) = …`), where the `(` would open the annotation's arguments or the names; other modifiers where a statement starts (`static def (a, b) = …`), which Groovy 3 takes and ignores where it rejects `static def x = 1`; and a list that mixes names and keyed pairs. In a type body `var x = 1` is still a field of type `var`, where Groovy reads `var` as a modifier. Wider than Groovy: `def (a = 1, b) = …` parses. A keyword or `val` before a name is its type: `def (def a, b)` has the type `def`, and so do `var`, `val`, `final` and `default` in that place, where Groovy 6 reads `def`, `var` and `val` as no type and Groovy rejects `final` and `default`. A reserved word is a key (`def (class: v) = m`, `def (if: v) = m`; `new` is not), as it is a name in `def (a, if) = l`: a keyword with no action lexes as an identifier. More than one rest binding parses (`def (*a, *b) = …`), which Groovy rejects after parsing. As a line break is whitespace, `foo final (a, b) = c` and `foo def (a, b) = c` are a statement `foo` followed by a declaration, where Groovy rejects them. A line that ends in a parenthesized name, dotted name or primitive type (`def y = (x)`, `x = (b)`, `return (x)`, `(Foo.Bar)`, `(int)`) followed by a multi-assignment declaration on a later line is two statements, as in Groovy, when the declaration starts with `final` or with `var` alone, has a rest binding or keyed pairs, or is a member of a type body. Before those forms were accepted the second line was read with no `ERROR` as the operand of a cast, a call of a method named by its first word: `(x) def(h, *t) = l` (`docs/divergences-from-spec.md` §15). After a parenthesized generic type the cast reading remains: `def y = (List<String>)` then `def (a, *b) = l`, or `def (a, b) = l`, is still `(List<String>) def(a, *b) = l`, where Groovy reads two statements. |
+| Multi-assignment | **new** | `def (a, b) = expr` is a `multi_assignment_declaration` (murtaza64 #22). `(a, b) = expr` is a `multi_assignment_expression` (#94), after Apache `#multipleAssignmentExprAlt`: two or more plain names, then `=` and no other operator, with line breaks allowed around the `=`. It is an expression, so it nests: `x = (a, b) = list`, `foo((a, b) = list)`, a `for` init, after `return`. Its names are `identifier`s rather than `variable_declarator`s, as nothing is declared. With one name, `(a) = x` is an `assignment_expression` of a parenthesized expression, as in Apache. A `(` that opens a line after an expression opens the next statement, as in Groovy (§6.18), so two multi-assignments on consecutive lines, `(a, b) = [1, 2]` then `(c, d) = [3, 4]`, are two statements, and so are the swap `def b = 2` then `(a, b) = [b, a]`. One line can be read as two statements: `def f(a, b) = [1, 2]`, which Groovy rejects, is a declaration of `f` followed by a multi-assignment. That reading of a method's head ends at its first `,` unless names, `)` and `=` follow, which the scanner reads there (§6.20), so `def f(a, b) { }` takes as many parse steps as before multi-assignments. The value of either form may be a parenthesis-free call, as Apache's `statementExpression` and `variableInitializer` allow: `(a, b) = f 3` and `def (a, b) = f 3` (§5.5, #95). The declaration form follows Apache's `variableDeclaration` with `typeNamePairs`: annotations, then `def`, `final def`, `final var`, `final` alone or `var` alone (`final (a, b) = …`, `@Field def (a, b) = …`, `var (a, b) = …`). `var(a, b)` and `var (a, b).foo()` call a method named `var`, as in Groovy (observed with Groovy 3): the scanner takes `var` alone as the keyword only when names, `)` and `=` follow (§6.16). A name may have a type (`typeNamePair`): `def (int a, String b) = …`, `final (List<String> xs, b) = …`. A typed name is a `variable_declarator` with a `type` field before its `name`; an untyped name keeps the `variable_declarator` with a `name` alone. Two Groovy 6 forms are accepted, after Groovy 6's `GroovyParser.g4` and `AstBuilder`; the Groovy 3 this grammar is checked against rejects both. A rest binding, `def (a, *b) = list` or `def (h, List<Integer> *t) = list`, has its `*` in the `rest` field of its `variable_declarator`. A keyed pair, `def (name: n, age: int a) = map`, is a `variable_declarator` with a `key` field before the optional `type` and the `name`. A list holds names or keyed pairs, not both. The declaration is also a `for` init (`for (def (i, n) = [0, 5]; i < n; i++)`) and a member of a type body, Apache's `fieldDeclaration`, with the annotations and modifiers of a field and `def` or `var`, or modifiers alone (`static final def (a, b) = …`, `private var (a, b) = …`, `private (int a, b) = …`). Groovy parses the member and then drops it: it declares no field (Groovy 3 to 6). Not accepted, each an `ERROR`: annotations alone (`@A (a, b) = …`), where the `(` would open the annotation's arguments or the names; other modifiers where a statement starts (`static def (a, b) = …`), which Groovy 3 takes and ignores where it rejects `static def x = 1`; and a list that mixes names and keyed pairs. In a type body `var x = 1` is still a field of type `var`, where Groovy reads `var` as a modifier. Wider than Groovy: `def (a = 1, b) = …` parses. A keyword or `val` before a name is its type: `def (def a, b)` has the type `def`, and so do `var`, `val`, `final` and `default` in that place, where Groovy 6 reads `def`, `var` and `val` as no type and Groovy rejects `final` and `default`. A reserved word is a key (`def (class: v) = m`, `def (if: v) = m`; `new` is not), as it is a name in `def (a, if) = l`: a keyword with no action lexes as an identifier. More than one rest binding parses (`def (*a, *b) = …`), which Groovy rejects after parsing. As a line break is whitespace, `foo final (a, b) = c` and `foo def (a, b) = c` are a statement `foo` followed by a declaration, where Groovy rejects them. A line that ends in a parenthesized name, dotted name or primitive type (`def y = (x)`, `x = (b)`, `return (x)`, `(Foo.Bar)`, `(int)`) followed by a multi-assignment declaration on a later line is two statements, as in Groovy, when the declaration starts with `final` or with `var` alone, has a rest binding or keyed pairs, or is a member of a type body. Before those forms were accepted the second line was read with no `ERROR` as the operand of a cast, a call of a method named by its first word: `(x) def(h, *t) = l` (`docs/divergences-from-spec.md` §15). After a parenthesized generic type the cast reading remains: `def y = (List<String>)` then `def (a, *b) = l`, or `def (a, b) = l`, is still `(List<String>) def(a, *b) = l`, where Groovy reads two statements. |
 | Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. |
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
@@ -1330,7 +1330,8 @@ expression where it may open a statement (§6.18), the start of an
 array type that is a value (§6.15), the `)` of a cast
 (§6.11), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), the start of a lambda (§6.17),
-the end of a lambda's brace body (§6.19),
+the end of a lambda's brace body (§6.19), the rest of a
+multi-assignment's names after its first (§6.20),
 `STRING_BODY` (§6.10) and
 `TYPE_START` (§6.15), which are never emitted and only mark a string
 body and where a type may start,
@@ -1377,6 +1378,7 @@ enum TokenType {
   BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses
   LAMBDA_BODY_END,        // §6.19 — empty; after the `}` of a lambda's brace body that nothing continues
   LAMBDA_BODY_REREAD,     // §6.19 — empty, in no rule; after a block shifted whole that something continues
+  MULTI_ASSIGNMENT_REST,  // §6.20 — empty; after the first name of `(a, b) = …` when the other names, `)` and `=` follow
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
@@ -3051,6 +3053,100 @@ for lambdas each with 7 comments there, and 1.7 and 1.5 for 500 and
 the end of the input from each interpolation's `}`, 252 and 2,009 bytes
 per byte, before the read was kept to the `}` of statements
 (`bindings/rust/tests/lambda_body_end_cost.rs`).
+
+### 6.20 MULTI_ASSIGNMENT_REST — implementation contract
+
+After `def f` or `final f` where a statement may start, the `(` opens a
+method's parameters or, with `def f` a declaration of its own, the next
+statement (the `[variable_declarator, _property_name]` conflict in
+`grammar.js`). `def f` followed by `(a, b) = l` on the next line is two
+statements, and a line break is whitespace, so both readings run from the
+`(`. The second ended at the first `,` until multi-assignments without
+`def` (§4, #94) took `(a, b)` as their names: it then lived to the token
+after the `)`, and a script method's head parsed each untyped parameter
+twice, 15 parse steps for `def f(a, b) { }` where 12 had done, 23 for four
+parameters where 16 had, and 39 for eight where 24 had. The scanner
+decides at the first `,` instead, with an empty token that the
+multi-assignment needs before it.
+
+```text
+Emit MULTI_ASSIGNMENT_REST, empty, at the `,` after the first name of a
+multi-assignment without `def`, where the token is valid, when after it
+come, with Groovy's trivia (whitespace, line breaks, line escapes and
+comments) between them: a name, any number of further `,` and a name,
+`)`, and `=`. A name is a word of identifier characters, any non-ASCII
+character included; what follows the `=` is not read. Emit it also once
+LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256) names after the first have been
+read without the `)`. On anything else return false, so that the
+in-grammar lexer reads the `,`, which the multi-assignment does not take
+without the token: a word followed by another (`(a, int b)`), an
+operator, a literal or a `(` among the names, anything but `=` after the
+`)` (`{`, `throws`), the end of the input, a `/` that opens no comment
+and a `/*` that does not close (or one the §6.6 bit says cannot). Not
+emitted during error recovery.
+```
+
+The token is turned down only where the multi-assignment would have
+ended anyway, at a token no later than the one after the `)`. Names are
+read wider than the grammar's (keywords, non-ASCII characters), any `=`
+is taken, `==` and `=~` included, which the grammar then rejects as
+before, and a longer list keeps the reading. So no tree without an
+`ERROR` changes. The token is valid in the four states after the first
+name in parentheses where a multi-assignment may start, and the `,` is
+valid in none of them, so taking the token cannot end another reading
+that needs the `,`. It decides no reduction: the parser shifts it right
+after the name. A method's parameters, a call's arguments and a lambda's
+parameters read the same `,` in states where the token is not valid, as
+an ordinary `,` that reads nothing past it. The look-ahead runs at the
+first `,` of a list only and stops at the first character no list of
+names holds, a `(` included, so a byte is read by a bounded number of
+look-aheads.
+
+What remains of the fork: with typed parameters the second reading ends
+where it did, at the first parameter's name, and with a default value at
+the first `,`. With one untyped parameter it is a cast of a closure, or a
+call of `(a)` with one, and lives through the body to the token after its
+`}` (§5.15), as it did before multi-assignments; `def f(a) { x }.call()`
+and `def f(a) { a -> a }` parse with no `ERROR` only that way, and the end
+of a body is no bounded look-ahead's to read. Modifiers alone other than
+`final` (`static f(a, b) { }`) and a class body never had the fork.
+
+Measured against the grammar before this section, with 2,000 heads of
+each shape in a file: `def f(a, b) { }` takes 14% fewer instructions,
+with four parameters 26% and with eight 33%; `final f(a, b) { }`,
+`def f(a, b) throws E { }` and a `{` on the next line 13% to 14%; with a
+three-statement body 8%. Each takes as many parse steps as it did before
+multi-assignments. They are still 9% to 11% above the grammar of 0.6.0,
+as are typed parameters, `def f(int a, int b) { }`, whose steps never
+changed: about 5.7% is the growth since then that `def f() { }` shows as
+well, 2.8% the look-ahead for a lambda that reads the parameters at the
+`(` (§6.17), and 1.4% this one. Heads with one untyped parameter, typed
+parameters, a default value or modifiers alone other than `final`, and
+class bodies, are within 0.5% of before. STATE_COUNT 4576 to 4580,
+LARGE_STATE_COUNT unchanged at 1742, `parser.c` 9,155,821 to 9,157,748
+bytes, one external token and no conflict or precedence added. The parse
+has the same number of steps on the 266 real files and on 400 Java files,
+which hold no such head; they take 0.06% and 0.08% more instructions,
+about half for the token's table entries and half for the scanner's test
+of the `,`; made a flag computed with the others on every scan, that test
+doubled the total. 16 scripts with 50 such heads take 0.4% fewer. No tree of the
+corpus, the 266 real files, the 24,548 Java files or 662,756 fuzzed
+inputs without an `ERROR` changes, of 1,290,000 inputs made from
+templates of method heads, multi-assignments, casts and calls with
+closures in many contexts, and from mutations of the corpus, the real
+files and the Java files. Trees with an `ERROR` change where the reading
+now ends earlier: two `:error` tests of the corpus (`(a, b)` and
+`(a, b) += x` recover around a parenthesized `b`), 5 Java files (4 with
+fewer bytes in an `ERROR`, 1 with as many) and 104,135 fuzzed inputs
+(86,964 with fewer bytes in an `ERROR`, 10,490 with more). Over 120,000
+random one-byte edits of texts with multi-assignments and method heads,
+the reparses that differ from a parse from scratch went from 258 to 205;
+the 24 without an `ERROR` are the same before and after, most of them the
+limitation of §6.18. The look-ahead reads 3.0 and 2.2 bytes per input
+byte for a list of 500 and 4,000 names, and 4.2 and 2.4 for a method head
+with as many parameters; reading the rest of the list again at each `,`
+with no budget took 259 and 2,065
+(`bindings/rust/tests/multi_assignment_rest_cost.rs`).
 
 ---
 

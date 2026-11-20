@@ -65,9 +65,12 @@ The default branch is **`main`**.
   line, which ranks a cast (§6.11), the `!in` operator, which
   needs whitespace or a bracket after it (§6.12), the start of a
   lambda, before its parameters in parentheses or its one name, when
-  `->` follows (§6.17), and an empty token after the `}` of a lambda's
+  `->` follows (§6.17), an empty token after the `}` of a lambda's
   brace body that no expression continues, which ends the body there
-  (§6.19). Inside a string body
+  (§6.19), and an empty token after the first name of `(a, b) = …`,
+  emitted only when the other names, `)` and `=` follow, which ends the
+  reading of `def f(a, b) { }` as `def f` and a multi-assignment at the
+  first `,` (§6.20). Inside a string body
   it emits nothing (§6.10). Its state is two bits, "no `*/` from
   here on" and "the body goes on past the token that follows", carried
   by an empty hidden token emitted at the first unterminated `/*` (§6.6)
