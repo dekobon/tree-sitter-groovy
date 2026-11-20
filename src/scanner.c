@@ -47,10 +47,12 @@
 // emits it after such a `}` as well, to carry a decision past the token
 // that follows.
 // STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
-// (§6.21) and TYPE_ONLY_CLOSE (§6.11) are never emitted; they are valid
-// only inside a string body, where the scanner emits nothing, where a type
-// may start, where closure parameters may start and before the `)` of a
-// cast of an array or generic type whose operand is on a later line. ERROR_SENTINEL is never emitted either;
+// (§6.21), TYPE_ONLY_CLOSE (§6.11) and BODY_BLOCK_END (§6.17) are never
+// emitted; they are valid only inside a string body, where the scanner
+// emits nothing, where a type may start, where closure parameters may
+// start, before the `)` of a cast of an array or generic type whose operand
+// is on a later line and after the `}` of the block that is the body of
+// `if`, `else`, a loop or an arrow case. ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
@@ -132,6 +134,7 @@ enum TokenType {
     CAST_TYPE_ARGUMENTS_OPEN,
     CLOSURE_PARAMETERS_START,
     TYPE_ONLY_CLOSE,
+    BODY_BLOCK_END,
     ERROR_SENTINEL,
 };
 
@@ -4950,12 +4953,21 @@ bool tree_sitter_groovy_external_scanner_scan(
     // parentheses and brackets, where Groovy's lexer drops line breaks, it
     // is not, and the `(` on a later line opens a call's arguments there.
     bool wants_subscript = valid_symbols[SUBSCRIPT_OPEN];
+    // §6.17 — after the `}` of the block that is the body of `if`, `else`,
+    // a loop or an arrow case, NOT_IN is valid, as the braces may be a
+    // closure, but the block is the reading that its weight ranks first,
+    // and a reparse that reused the body lexes a `(` after it at a
+    // statement's start. BODY_BLOCK_END, never emitted, is valid there, and
+    // the `(` is read as at a statement's start: a lambda may open it on any
+    // line (`if (c) { a() }` then `(x) -> x`).
+    bool expression_ends = valid_symbols[NOT_IN]
+        && !valid_symbols[BODY_BLOCK_END];
     bool wants_statement_paren = valid_symbols[STATEMENT_PAREN]
-        && valid_symbols[NOT_IN] && !valid_symbols[ERROR_SENTINEL];
+        && expression_ends && !valid_symbols[ERROR_SENTINEL];
     // §6.18 — where no expression ends, the same `(` is read as far, so
     // that its token depends on the same text in both states.
     bool wants_paren_extent = valid_symbols[STATEMENT_PAREN]
-        && !valid_symbols[NOT_IN] && !valid_symbols[ERROR_SENTINEL];
+        && !expression_ends && !valid_symbols[ERROR_SENTINEL];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
     // §6.15 — TYPE_START is never emitted; it is valid where a type may
     // start, which narrows ARRAY_VALUE_START there.
@@ -5034,7 +5046,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // statement after an expression is worth (`foo()` then `(a) -> a` on the
     // next line, which Groovy also reads as a call).
     bool wants_lambda = valid_symbols[LAMBDA_START]
-        && !valid_symbols[ERROR_SENTINEL] && !valid_symbols[NOT_IN];
+        && !valid_symbols[ERROR_SENTINEL] && !expression_ends;
     bool wants_bare_lambda = valid_symbols[BARE_LAMBDA_START]
         && !valid_symbols[ERROR_SENTINEL];
     if (!wants_comment && !wants_slashy && !wants_record && !wants_trait

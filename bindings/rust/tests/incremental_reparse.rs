@@ -595,6 +595,10 @@ fn reparse_after_declaration_edits_matches_parse_from_scratch() {
 /// still make the loop. The `)` of a cast's type before
 /// `()` (§6.17): the reading that survives without `->` is a call, and an
 /// arrow typed or restored after it must still make the cast of a lambda.
+/// The `(` after the block of an `if`, `else` or loop body (§6.17): a parse
+/// from scratch lexes it where the braces may be a closure too, a reparse
+/// that reuses the statement at a statement's start, and both must read a
+/// lambda statement there, typed or edited.
 const SECOND_STATE_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
     ("y = foo as List<String\n", &[(4, 3, "bar"), (22, 0, ">")]),
     ("p as p</**/", &[(0, 0, ""), (11, 0, "r>")]),
@@ -609,6 +613,24 @@ const SECOND_STATE_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
     (
         "\ndef r = (Runnable) () -> { }\n",
         &[(23, 0, "x"), (23, 1, "")],
+    ),
+    ("if (c) { a() }\n(x) -> x\n", &[(23, 0, " "), (23, 1, "")]),
+    (
+        "while (c) { a() }\n\n",
+        &[
+            (18, 0, "("),
+            (19, 0, "x"),
+            (20, 0, ")"),
+            (21, 0, " "),
+            (22, 0, "-"),
+            (23, 0, ">"),
+            (24, 0, " "),
+            (25, 0, "x"),
+        ],
+    ),
+    (
+        "if (c) { a() } else { b() }\n(x) -> x\n",
+        &[(29, 0, "y, "), (29, 3, "")],
     ),
 ];
 

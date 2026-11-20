@@ -1475,6 +1475,163 @@ def v = switch (k) { case 1 -> { a = b -> c } default -> { a = (b) -> c } }
                     body: (identifier)))))))))))
 
 ==================
+A lambda on the line after the block of an if or an else opens a statement
+==================
+
+if (c) { a() }
+(x) -> x
+if (c) { a() } else { b() }
+(x) -> x + 1
+if (c) { a() } else if (d) { b() }
+(int x) -> { x }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    alternative: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    alternative: (if_statement
+      condition: (identifier)
+      consequence: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          type: (type_identifier)
+          name: (identifier)))
+      body: (block
+        (expression_statement
+          (identifier))))))
+
+==================
+A lambda on the line after the block of a loop opens a statement
+==================
+
+while (c) { a() }
+(x) -> x
+for (i in l) { a() }
+(a, b) -> a
+for (int i = 0; i < n; i++) { a() }
+() -> 1
+
+---
+
+(source_file
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier))
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters)
+      body: (number_literal))))
+
+==================
+A lambda after the block of an if on its line opens a statement (known divergence)
+==================
+
+if (c) { a() } (x) -> x
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier))))
+
+==================
 Closure parameter whose default is in parentheses, before a block
 ==================
 

@@ -3054,6 +3054,24 @@ statement after an expression would cost more than it is worth:
 `foo(x)` and an `ERROR`, and so does `foo()` followed by `(a) -> a` on
 the next line.
 
+One place where NOT_IN is valid is a statement's end all the same:
+after the `}` of the block that is the body of `if`, `else`, a loop or
+an arrow case, where the braces may also be a closure, the statement's
+expression, and the weight of the block ranks it first. A reparse that
+reuses the statement lexes the `(` after it at a statement's start,
+where the look-ahead runs, so `if (c) { a() }` followed by `(x) -> x`
+was an `ERROR` from scratch and a lambda statement after an edit
+elsewhere. BODY_BLOCK_END, which is never emitted, is valid after such
+a `}` (`_body_block` in `grammar.js`), and there the scanner reads the
+`(` as at a statement's start, the lambda look-ahead included, so both
+parses read the lambda statement, as Groovy does on the next line. On
+the line of the `}` too: `if (c) { a() } (x) -> x` is the `if` and a
+lambda statement, where Groovy reads one `if` statement. The token
+costs two states (STATE_COUNT 4,656 to 4,658); no tree changes for
+input that parsed without an `ERROR` (`docs/divergences-from-spec.md`
+§26), and `bindings/rust/tests/incremental_reparse.rs` pins the
+reparse.
+
 The budget keeps the parse linear. A default value may hold a `(`
 where an expression starts, which the scanner reads again, so without
 it `x = (a = (a = (a = …` was read in time quadratic in the nesting

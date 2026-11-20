@@ -150,7 +150,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `def v = a -> { y -> y }()` calls the closure and
   `def w = a -> { } + 1` adds to it inside the body, while a line break
   before a statement or a class member ends the body
-  (`SPECIFICATION.md` §6.19). A lambda is a scope, a fold and an indent
+  (`SPECIFICATION.md` §6.19). A lambda statement may follow the block of
+  an `if`, `else` or loop body (`if (c) { a() }` then `(x) -> x`), from
+  scratch as on a reparse, through `_body_block_end`, a token the scanner
+  never emits; on the block's line too, where Groovy reads one `if`
+  (`SPECIFICATION.md` §6.17). A lambda is a scope, a fold and an indent
   region, and its parameter without parentheses is a parameter
   definition and `@variable.parameter`. Still an `ERROR`: a lambda as a
   parenthesis-free call's argument (`foo (x) -> x`, `foo a: x -> x`), a

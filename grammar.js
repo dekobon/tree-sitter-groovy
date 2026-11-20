@@ -940,6 +940,12 @@ module.exports = grammar({
     // no expression is, so that the scanner keeps that cast. Listed last
     // but for the sentinel, so that it renumbers no symbol before it.
     $._type_only_close,
+    // §6.17 — never emitted: valid after the `}` of the block that is the
+    // body of `if`, `else`, a loop or an arrow case, where a `(` opens the
+    // next statement on any line, so that the scanner decides a lambda there
+    // although the braces may be a closure too. Listed last but for the
+    // sentinel, so that it renumbers no symbol before it.
+    $._body_block_end,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -3355,8 +3361,15 @@ module.exports = grammar({
     // 50 more states, and inline in `else` it was lost, as a production takes
     // the largest of the weights in it, not their sum, and the `if` before it
     // has one. Aliased to itself so that the reduction, and the weight, is
-    // kept.
-    _body_block: $ => weighted(BODY_BLOCK_WEIGHT, alias($.block, $.block)),
+    // kept. `_body_block_end`, which the scanner never emits, is valid after
+    // the `}`: there NOT_IN is valid too, as the braces may be a closure,
+    // and the token tells the scanner that a `(` there may open a lambda
+    // statement, as it does where a reparse that reused the body lexes the
+    // `(` at a statement's start (§6.17).
+    _body_block: $ => weighted(BODY_BLOCK_WEIGHT, seq(
+      alias($.block, $.block),
+      optional($._body_block_end),
+    )),
 
     // The consequence of `if`, as a rule of its own: its two readings, a
     // block and a closure (`{ a = (b) -> c }`), must reduce to one symbol at
