@@ -6284,6 +6284,28 @@ A receiver with a non-ASCII capital takes no name argument
     argument: (identifier)))
 
 ==================
+A quote inside an interpolation ends no string among name arguments
+==================
+
+println msg, "${path.join(" -> ")}"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal
+      (gstring_brace_interpolation
+        value: (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list
+            (string_literal
+              (string_fragment))))))))
+
+==================
 A dollar-slashy string is a first argument after a receiver that may name a type
 ==================
 

@@ -990,6 +990,38 @@ foo
       arguments: (argument_list))))
 
 ==================
+A string with a quote inside its interpolation in parentheses on the next line opens a statement
+==================
+
+println x
+("${xs.join(", ")}").each { println it }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (string_literal
+            (gstring_brace_interpolation
+              value: (method_invocation
+                function: (field_access
+                  object: (identifier)
+                  field: (identifier))
+                arguments: (argument_list
+                  (string_literal
+                    (string_fragment)))))))
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier))))))
+
+==================
 Parentheses on the next line whose regex holds a colon or a comma open a statement
 ==================
 

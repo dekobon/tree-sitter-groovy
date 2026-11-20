@@ -78,6 +78,18 @@ fn nested_lambdas_with_default_values_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("x = {}1{}\n", "(a = ".repeat(n), ") -> 1".repeat(n)));
 }
 
+/// The `${…}` of a double-quoted string is read as code, with the strings
+/// in it read whole, so a nest of strings in interpolations is read again
+/// from each `(` before one of its quotes. The look-ahead follows a bounded
+/// number of strings into one another (`STRING_NESTING_DEPTH` in the
+/// scanner), or a nest is read to its end from each of its levels, closed
+/// or not.
+#[test]
+fn nested_interpolated_strings_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("x = {}1\n", "(a = \"${".repeat(n)));
+    assert_linear(|n| format!("x = {}1{}\n", "(a = \"${".repeat(n), "}\") -> a".repeat(n)));
+}
+
 #[test]
 fn nested_parentheses_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("x = {}a{}\n", "(".repeat(n), ")".repeat(n)));

@@ -3019,6 +3019,33 @@ def v = (a) -> { y -> y } /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ /* c *
         arguments: (argument_list)))))
 
 ==================
+Lambda parameter whose default is a string with a quote inside its interpolation
+==================
+
+def f = (a = "${x.join(")")}") -> a
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (gstring_brace_interpolation
+                value: (method_invocation
+                  function: (field_access
+                    object: (identifier)
+                    field: (identifier))
+                  arguments: (argument_list
+                    (string_literal
+                      (string_fragment))))))))
+        body: (identifier)))))
+
+==================
 Lambda parameter defaults that are slashy strings holding a comma or a parenthesis
 ==================
 

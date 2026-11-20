@@ -3553,11 +3553,56 @@ static bool scan_multi_assignment_comma(TSLexer *lexer, bool no_close_ahead) {
     return true;
 }
 
+// The most strings, one inside the interpolation of the other, that
+// `skip_string` follows: `"${a("${b}")}"` holds two. A string nested deeper
+// is taken not to close, which ends the look-ahead that reads it. Without
+// the bound a run of `"${` that never closes would be read to the end of the
+// input from each of its quotes, in time quadratic in its length; real
+// strings nest once or twice.
+static const unsigned STRING_NESTING_DEPTH = 8;
+
+static bool skip_string_at_depth(TSLexer *lexer, unsigned depth);
+
+// Reads the `${…}` of a double-quoted string, from after its `{` to its
+// `}`: braces counted and strings read whole, as Groovy's lexer reads the
+// code of an interpolation, which may span lines. A quote in a comment or a
+// slashy string there is taken for a string's. Returns false at the end of
+// input and at a string that does not close or is nested deeper than
+// STRING_NESTING_DEPTH.
+static bool skip_interpolation(TSLexer *lexer, unsigned depth) {
+    unsigned braces = 0;
+    for (;;) {
+        if (lexer->eof(lexer)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (c == '\'' || c == '"') {
+            if (depth == STRING_NESTING_DEPTH
+                || !skip_string_at_depth(lexer, depth + 1)) {
+                return false;
+            }
+            continue;
+        }
+        advance(lexer);
+        if (c == '{') {
+            braces++;
+        } else if (c == '}') {
+            if (braces == 0) {
+                return true;
+            }
+            braces--;
+        }
+    }
+}
+
 // Reads a string from its quote: one that closes on its line, where a `\`
 // before the line break continues it, as in Groovy, or a triple-quoted one,
-// which may span lines. Returns false at the end of input, or at a line
-// break, before the close.
-static bool skip_string(TSLexer *lexer) {
+// which may span lines. The `${…}` of a double-quoted string is read as
+// code (`skip_interpolation`), so a quote, a bracket or a `,` in it is none
+// of the string's or of the list around it: `"${xs.join(", ")}"` is one
+// string. Returns false at the end of input, or at a line break, before the
+// close. `depth` counts the strings this one is nested in.
+static bool skip_string_at_depth(TSLexer *lexer, unsigned depth) {
     int32_t quote = lexer->lookahead;
     advance(lexer);
     bool triple = false;
@@ -3585,12 +3630,22 @@ static bool skip_string(TSLexer *lexer) {
             }
             advance(lexer);
             closing = 0;
+        } else if (quote == '"' && c == '$' && lexer->lookahead == '{') {
+            advance(lexer);
+            if (!skip_interpolation(lexer, depth)) {
+                return false;
+            }
+            closing = 0;
         } else if (c != quote) {
             closing = 0;
         } else if (!triple || ++closing == 3) {
             return true;
         }
     }
+}
+
+static bool skip_string(TSLexer *lexer) {
+    return skip_string_at_depth(lexer, 0);
 }
 
 // SPECIFICATION.md §6.18 — at a `(` that starts a line after an expression,
