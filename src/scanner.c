@@ -2783,9 +2783,10 @@ static ParenClose read_relational_operator(TSLexer *lexer) {
     int32_t next = lexer->lookahead;
     switch (word) {
         case INSTANCEOF_WORD:
-            // GroovyLexer.g4 `NOT_INSTANCEOF`, as the grammar's token.
-            return !negated || is_whitespace(next) ? OPERATOR_CLOSE
-                                                   : OPERAND_CLOSE;
+            // Without whitespace after it, `!instanceof` is no operator
+            // (GroovyLexer.g4 `NOT_INSTANCEOF`) but `!` and the keyword,
+            // which starts no operand either.
+            return OPERATOR_CLOSE;
         case IN_WORD:
             if (negated) {
                 // GroovyLexer.g4 `NOT_IN`, as in the scan of NOT_IN (§6.12).
