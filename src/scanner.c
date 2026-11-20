@@ -2125,20 +2125,32 @@ static bool skip_extras(TSLexer *lexer, bool no_close_ahead, bool *slash) {
 // Reads type arguments from their `<` to the matching `>` on the line: names
 // (`extends` and `super` among them), `,`, `?`, `.`, `[`, `]` and nested
 // `<` `>`, with spaces between, as `type_arguments` in grammar.js takes them.
+// A `<` opens arguments only directly after a name, the type's own included,
+// as the grammar's `<` is `token.immediate`: `Foo<<Baz>> x` is a shift.
 // Counts what it reads in `*items`. Returns false on anything else, at a line
 // break and at the end of the budget.
 static bool skip_type_arguments(TSLexer *lexer, unsigned *items) {
     unsigned depth = 0;
+    // Whether a name ends right before the lookahead.
+    bool after_name = true;
     for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
-        if (!skip_line_extras(lexer, false, false, NULL)) {
-            return false;
-        }
         int32_t c = lexer->lookahead;
+        if (is_inline_space(c) || c == '\\' || c == '\f' || c == '\v') {
+            if (!skip_line_extras(lexer, false, false, NULL)) {
+                return false;
+            }
+            after_name = false;
+            continue;
+        }
         if (is_identifier_start(c)) {
             read_word(lexer, NULL, 0);
+            after_name = true;
             continue;
         }
         if (c == '<') {
+            if (!after_name) {
+                return false;
+            }
             depth++;
         } else if (c == '>') {
             if (depth == 0) {
@@ -2153,6 +2165,7 @@ static bool skip_type_arguments(TSLexer *lexer, unsigned *items) {
             return false;
         }
         advance(lexer);
+        after_name = false;
     }
     return false;
 }

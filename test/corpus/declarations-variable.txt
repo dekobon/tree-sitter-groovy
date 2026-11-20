@@ -2923,3 +2923,24 @@ this.Foo<T> x
           field: (identifier))
         right: (identifier))
       right: (identifier))))
+
+==================
+Shifts after a name start no typed local
+==================
+
+Foo<<Baz>> result
+x<<y
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
