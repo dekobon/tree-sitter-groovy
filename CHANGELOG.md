@@ -19,11 +19,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   initializer. (#102)
 - `multi_assignment_expression` for `(a, b) = expr` without `def`,
   with a `name` field per identifier and a `value` field; it nests
-  (`x = (a, b) = list`). It was an `ERROR`. A `(` that opens a line
-  still calls the expression ending the line before, so two on
-  consecutive lines are one statement with no `ERROR` (end the first
-  with `;`), and `def f(a, b) = list`, which Groovy rejects, parses;
-  see `docs/divergences-from-spec.md` §3. (#94)
+  (`x = (a, b) = list`). It was an `ERROR`. Two on consecutive lines
+  are two statements, as in Groovy, since a `(` that opens a line
+  opens a statement (see Changed), and `def f(a, b) = list`, which
+  Groovy rejects, parses; see `docs/divergences-from-spec.md` §3.
+  (#94)
 - `compact_constructor_declaration` for a record's compact canonical
   constructor (`public Warning { … }`; annotations, modifiers, `def`
   or none), with `name` and `body`, in a record body only. The name is
@@ -39,11 +39,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `def out = sh script: 'make', returnStdout: true`, `x = foo 1, 2`,
   `(a, b) = f 3`. The value is a `command_chain` with the fields of
   the statement form. The first argument must start on the receiver's
-  line with a number, a string, `true`, `false`, `null` or a `name:`
-  key, so `def x = foo` followed by `1` on the next line stays two
-  statements. Not yet accepted, though Groovy takes them: a chain in
-  parentheses, as a call's only argument, or in an interpolation.
-  (#95)
+  line with a literal, a `name:` key, or one of the first arguments
+  added below (a creation, an array type value, a name, `!`, `~`, or
+  a call in parentheses), so `def x = foo` followed by `1` on the
+  next line stays two statements. A chain is also accepted in
+  parentheses and in an interpolation (see below). (#95)
 - A parenthesis-free call whose receiver is a name followed by member
   accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`) written without spaces,
   as a statement and as a value: `obj.method 1, 2`, `log.info "x"`,
@@ -53,6 +53,129 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line, so `result.size` followed by `2` on the next line stays two
   statements. Receivers that end in a call or a subscript
   (`foo().bar 1`) are not handled. (#52)
+- An annotation's arguments take annotations, as Apache's
+  `elementValue` does: as an argument (`@Foo(@Bar)`), as the value of
+  a pair (`@Foo(x = @Bar)`) and in a list (`@Foo([@Bar, @Baz])`),
+  nested to any depth (`@Foo(x = [@Bar(@Baz)])`). Each was an `ERROR`.
+  A pair is an `assignment_expression`, as in a call. A list that
+  mixes annotations and expressions (`[@A, 1]`) or holds a list of
+  annotations (`[[@A]]`), which Groovy rejects when it checks the
+  annotation, is an `ERROR`, and so is an annotation anywhere else
+  (`foo(@A)`).
+- The `default` modifier, which Apache's grammar takes among a
+  declaration's modifiers: `default void run() { }` in an interface,
+  in any other type body or as a statement is a `method_declaration`
+  with an anonymous `default` child, also after annotations, among
+  other modifiers, with `def` or with no return type (`default e() { }`
+  is a method, never a constructor). Class, interface, trait, enum and
+  record declarations take it too. The modifier is `@keyword.modifier`;
+  an `@interface` element's `default` field stays `@keyword`. Fields,
+  constructors, compact constructors, initializers and local variables
+  do not take it (see Changed; `docs/divergences-from-spec.md` §20).
+- An array type is a value where Groovy reads a class:
+  `def c = String[].class`, `int[][].class`, `xs.toArray(int[]::new)`,
+  `String[].&new`, `foo(String[])`, `@A(String[])`,
+  `def e = Map.Entry[].class` and an element's `default int[]` hold the
+  `array_type` a declaration has, under the `field_access`,
+  `method_reference_expression` or `method_pointer_expression` that
+  `String.class`, `Foo::new` and `String.&new` have. Each was a
+  subscript with a `MISSING` index, or an `ERROR` with two dimensions,
+  for `short[]` and at the start of a statement. The element must be a
+  primitive or capitalized name: package-qualified, lowercase and
+  generic elements (`java.lang.String[].class`, `List<String>[].class`)
+  and a bare `String[]` where a type may start (`return String[]`) read
+  as before (`SPECIFICATION.md` §6.15).
+- `multi_assignment_declaration` takes the forms of Apache's
+  `variableDeclaration` with names in parentheses: a type per name
+  (`def (int a, String b) = l`, in a new `type` field of the
+  `variable_declarator`), `final`, `final var`, `var` alone and
+  annotations before the names (`final (a, b) = l`, `var (a, b) = l`,
+  `@Field def (a, b) = l`), a `for` init, and a type body member with
+  a field's modifiers (`private static def (a, b) = l`,
+  `private var (a, b) = l`). It takes Groovy 6's rest binding,
+  `def (a, *b) = list`, with the `*` in a new `rest` field, and keyed
+  pairs, `def (name: n, age: int a) = map`, with the key in a `key`
+  field; a list holds names or pairs, not both. Each was an `ERROR`.
+  Annotations alone (`@A (a, b) = l`) and modifiers other than `final`
+  where a statement starts (`static def (a, b) = l`) are still one.
+- A parenthesis-free call takes more first arguments on the receiver's
+  line, as a statement, after a dotted receiver and as a value: an
+  object or array creation or an array type value
+  (`println new Date()`, `foo new int[3]`, `log.info new Foo()`,
+  `def r = foo new Foo()`, `foo String[].class`), and a name, `!` or
+  `~` (`println x`, `obj.m arg`, `def r = foo bar`,
+  `assertEquals expected, actual`, `foo !x`). The argument is the
+  whole expression (`foo new Foo().bar()`, `println x + 1`). Apache's
+  `isInvalidLocalVariableDeclaration` decides a name on its spelling,
+  so `String s`, `int x`, `foo.Bar x` and `foo bar = 1` stay
+  declarations. A name is no first argument before `->` (closure
+  parameters), before parentheses that hold typed parameters
+  (`foo bar(int a) { }` stays a method), or after a receiver that may
+  name a type in a value (`def x = Foo bar`). A new empty token,
+  `_command_statement_start`, opens such a statement whose receiver is
+  one name. Not supported: a chain that goes on after its first
+  argument (`foo 1 bar 2` is two calls and `foo a bar` a call and a
+  name, where Groovy reads `foo(1).bar(2)`) and a comment between the
+  receiver and the argument (`SPECIFICATION.md` §5.5, §6.14).
+- A parenthesis-free call is accepted in parentheses
+  (`(sh script: 'x').trim()`, `def x = (foo 1)`), as the condition of
+  `if`, `while` and `do`, a `switch` value and a `synchronized` lock
+  (`if (fileExists 'pom.xml') { }`), in a `${…}` interpolation
+  (`"${sh script: 'x'}"`), and in parentheses as another call's first
+  argument (`println(foo 1).trim()`, `x.add(foo 'a')`, `super(foo 1)`),
+  as Apache's `expressionInPar` and `commandExpression` take it. Each
+  was an `ERROR`. The look-ahead reads one parenthesis deep, so
+  `println(bar(foo 1))` is still an `ERROR`, as are `bar(a, foo 1)`,
+  which Groovy rejects, and more than one statement in an
+  interpolation. A keyword Groovy reserves is no receiver of a value:
+  `(return 1)` is an `ERROR`.
+- `lambda_expression` for Groovy 3's Java-style lambdas, with
+  `parameters` (`formal_parameters`, or one `identifier` without
+  parentheses) and `body` (a `block`, an expression or a
+  parenthesis-free call): `def f = (a, b) -> a + b`, `() -> 42`,
+  `(int a, String b = 'x') -> { a }`, `list.map(x -> x * 2)`,
+  `foo(k: x -> x)`, `def h = x -> foo 1`. Each was an `ERROR`. A lambda
+  in parentheses stands wherever an expression does, as Apache's
+  `primary` takes it; one without parentheses in a value, an argument
+  in parentheses, a map entry's or named argument's value and in
+  parentheses. Two empty scanner tokens, `_lambda_start` and
+  `_bare_lambda_start`, open the forms only when `->` follows. A closure
+  parameter's default and a case value keep their reading before `->`
+  (`def c = { a = (b) -> c }`, `case (A) -> 1`), as in Groovy. A brace
+  body ends at its `}` only where no expression continues it, so
+  `def v = a -> { y -> y }()` calls the closure and
+  `def w = a -> { } + 1` adds to it inside the body, while a line break
+  before a statement or a class member ends the body
+  (`SPECIFICATION.md` §6.19). A lambda is a scope, a fold and an indent
+  region, and its parameter without parentheses is a parameter
+  definition and `@variable.parameter`. Still an `ERROR`: a lambda as a
+  parenthesis-free call's argument (`foo (x) -> x`, `foo a: x -> x`), a
+  lowercase parameter type (`(foo a) -> a`), and `return x -> x`, which
+  Groovy rejects too. Read otherwise than Groovy: an assignment of a
+  lambda that an operator follows (`v = a -> { foo() } == 1` compares
+  the closure), more than eight comments between the `}` and what
+  continues the body, which end it, and the `{` of a lambda in
+  parentheses that also reads as a closure with a parameter
+  (`def v = (a) -> { b = (c) -> { } }.call()`); see
+  `docs/divergences-from-spec.md` §26.
+- Typed local declarations without an initializer: `String s`,
+  `int i;`, `List<String> xs`, `foo.Bar q`, `java.util.List<String> l`,
+  `String a, b`, `@Field String x` and the init of
+  `for (int i; i < n; i++)` are a `local_variable_declaration` with one
+  `type` and a `name` per variable, and a typed declaration takes later
+  names without a value (`String a = 1, b`, `final String a, b`). Each
+  was two statements, other expressions or an `ERROR` (see Changed).
+  Apache's `isInvalidLocalVariableDeclaration` decides it on the
+  spelling, as for a name argument above, so `foo bar` stays a call. An
+  empty scanner token, `_declaration_start`, opens the declaration
+  where a statement starts, after annotations and as a `for` init, when
+  it ends on its line, the next line does not go on with it, or an
+  initializer follows (`SPECIFICATION.md` §6.21). Not declarations, as
+  in v0.6.0: a comment between the type and the name
+  (`String /* c */ s`), a lowercase type after annotations
+  (`@A foo bar`), a space before `<` (`List <String> xs`), modifiers
+  other than `final` (`static String s` is an `ERROR`) and a `try`
+  resource without an initializer.
 
 ### Changed
 
@@ -75,8 +198,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`def x = foo 1 ?: 2`, `foo 1 as int`, `foo 1 { }`). A line escape
   between receiver and argument now joins them, and in
   `bar 1, x = foo 2` the assignment takes `foo 2`. `def (a, b) = foo 1`
-  followed by `(c, d) = bar 2` stays one statement, now
-  `foo(1(c, d) = bar 2)`. (#95)
+  followed by `(c, d) = bar 2` was the value `foo`, then
+  `1(c, d) = bar` and `2`; it is two statements, each with a chain.
+  (#95)
 - **BREAKING:** in a record body, a name after modifiers, annotations
   or `def` and followed by a block is a `compact_constructor_declaration`
   (see Added), which changes trees for input that parsed without an
@@ -111,28 +235,262 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **BREAKING:** the npm package's `engines.node` floor is now `>=22`
   (was `>=20`); Node 20 is end of life. npm warns and still installs.
   The CI lint job runs Node 24. (#62)
-- Five external scanner tokens are added: `_trait_keyword` and
-  `_sealed_keyword` (#73), `_command_value_start` (#95),
-  `_command_path_start` (#52) and `_unterminated_comment` (#75), an
-  empty hidden extra; the anonymous `trait` and `sealed` nodes keep
-  their kinds. The scanner now carries one bit of serialized state
-  (#75). Six named nodes and one field (`dimensions`) are added;
-  `SYMBOL_COUNT` goes from 321 to 363 and `FIELD_COUNT` from 45 to 46,
-  so most symbol ids and the field ids after `dimensions` change. In
-  `node-types.json` every expression position adds
-  `array_creation_expression` and `multi_assignment_expression`;
-  `variable_declarator.value`, `local_variable_declaration.value`,
-  `multi_assignment_declaration.value`,
-  `multi_assignment_expression.value` and
-  `assignment_expression.right` add `command_chain`; `class_body` adds
-  `compact_constructor_declaration`; `list_literal` adds `annotation`;
-  `method_declaration` gains `default`. (#52, #72, #73, #75, #94, #95,
-  #101, #102)
-- A script-level method head with untyped parameters
-  (`def f(a, b) { }`) parses slower: about 1.2x with two parameters and
-  1.4x with four, growing linearly. Lines that start with a dotted name
-  are about 3% slower and real files about 1%. The compiled parser is
-  about 29% larger. (#52, #94, #95)
+- **BREAKING:** a `:` after a pair in an annotation's arguments,
+  `@Foo(x = a: 1)`, parsed with no `ERROR` as a named argument whose
+  key is the assignment `x = a`; a pair now ends at its value (see
+  Added), so it is an `ERROR`, as in Groovy. The call form
+  `foo(x = a: 1)` is unchanged.
+- **BREAKING:** `default` is a keyword wherever a member or a statement
+  can start (see Added), which changes trees for input that parsed
+  without an `ERROR` at v0.6.0. `default void b() { }` in a type body
+  was a field of type `default` named `void` and a constructor `b`, and
+  at the start of a statement, like `default class C { }`, the
+  expression `default` and the declaration; each is now one
+  declaration. `default C() { }` in `class C` is a method, where Groovy
+  reads a constructor. As a name there, which Groovy rejects, the word
+  is now an `ERROR`: `default = 1`, `default.x()`, `return default`,
+  `println default`, `String default`, `{ default -> 1 }`,
+  `static default = 1` in a class body and `enum E { default }`. So are
+  `default final int X = 1` in a type body and `default int x = 1` in a
+  block, a field and a local variable in Groovy. After `=`, in arguments
+  and after `def` it is still a name (`x = default`, `foo(default)`,
+  `def default = 1`).
+- **BREAKING:** a line that ends in parentheses around a name, a dotted
+  name or a primitive type (`def y = (x)`, `return (x)`), followed on
+  the next line by a multi-assignment declaration that starts with
+  `final` or `var`, has a rest binding or keyed pairs, or is a type
+  body member (see Added), was the cast of a call of a method named
+  `final`, `var`, `def` and so on, `(x) final(a, b) = m`, with no
+  `ERROR`. It is two statements or members, as in Groovy.
+- **BREAKING:** `var`, `yield`, `in` and `as` are names wherever their
+  construct does not follow (see Fixed), which changes trees for input
+  that parsed without an `ERROR` at v0.6.0 to the trees an ordinary
+  name gets. `x = (b)` followed by `in` or `as` on the next line was a
+  cast of the word, and `def y = (x)` followed by `var (a, b) = l` the
+  cast of a call `var(a, b)`; each is two statements. `var instanceof T`
+  was a declaration of `instanceof` and the statement `T`, and
+  `yield instanceof T` a `yield_statement` and `T`; each is the test of
+  the name. `yield++` followed by `foo()` on the next line was
+  `yield ++foo()`, and `x = 1`, `in++` and `foo()` on three lines were
+  `x = 1 in ++foo()`; each is now the update of the name and the call.
+- **BREAKING:** a creation or an array type value is a parenthesis-free
+  call's first argument (see Added), which changes trees for input that
+  parsed without an `ERROR` at v0.6.0: `println new Date()`,
+  `foo new Foo() { }`, `log.info new Foo()` and `def r = foo new Foo()`
+  were the receiver, or a declaration whose value is the receiver,
+  followed by the creation as a statement of its own. Each is one
+  `command_chain`. After another statement on the same line,
+  `foo 1 bar new Baz()` is `foo 1` and the call `bar new Baz()`, where
+  Groovy continues the first.
+- **BREAKING:** a method header with no body whose parameter is named
+  `true`, `false` or `null` now reads the parentheses as a call in
+  parentheses (see Added): `def f(Foo true)`, which Groovy rejects, is
+  the declaration of `f` and the parenthesis `(Foo true)`, and
+  `foo bar(baz true)`, Groovy's `foo.bar(baz(true))`, is the statement
+  `foo` and the call `bar((baz true))`. Each was a `method_declaration`
+  with no `ERROR`. With a body it is still the method.
+- **BREAKING:** a name, `!` or `~` is a parenthesis-free call's first
+  argument (see Added), which changes trees for input that parsed
+  without an `ERROR` at v0.6.0. `println x`, `obj.m arg`, `foo !x`,
+  `then: thrown IllegalStateException` and `def r = foo bar` were the
+  receiver, or the declaration, followed by the argument as a
+  statement; each is one call. A script method with a lowercase return
+  type and untyped parameters (`foo bar(a) { }`) is a call of `foo`
+  with `bar(a) { }`, as in Groovy; typed parameters keep the method.
+  `if (x) foo bar else baz qux` was an `if` and four statements and is
+  an `if` with an `else`. Closure parameters after a lowercase type are
+  read for their `->` within 256 items, so 128 or more names after the
+  first (`{ foo a, b0, …, b127 -> a }`) are an `ERROR`.
+- **BREAKING:** the body of `if`, `else`, a loop or an arrow case that
+  holds the assignment of a lambda is a `block` that holds the lambda
+  (see Added), as in Groovy, which changes trees for input that parsed
+  without an `ERROR` at v0.6.0: `if (x) { a = b -> c }`,
+  `while (x) { String a = b -> c }` and nests such as
+  `if (x) { a = b -> { c = d -> { p -> p } } }` were a closure with the
+  parameter `a` (`String a`). On one line,
+  `(y.y) if (z) { a() } else { b() }`, which Groovy rejects, is the
+  parenthesis and an `if`; it was the cast of a call named `if`.
+- **BREAKING:** a `(` that opens a line after an expression opens the
+  next statement where one may start, as in Groovy, rather than the
+  arguments of a call of that expression, which changes trees for input
+  that parsed without an `ERROR` at v0.6.0: `foo` followed by `(1)` or
+  `(x);`, `foo()` followed by `(a, b) = [1, 2]`, `x = (a)` followed by
+  `(b) y` and `def d = load()` followed by
+  `(data as Map<String, Object>).each { }` are two statements now.
+  Inside parentheses and brackets the `(` still calls
+  (`bar(foo` then `(1))`), and so do parentheses that cannot open a
+  statement, so input Groovy rejects keeps its tree: `()`, `(a, b)`, a
+  spread, a named argument with any key (`(a: 1)`, `('a': 1)`), and
+  parentheses followed by `,`, `->` or `else`
+  (`if (x) foo` then `(1) else bar`). Java-style wrapped calls with
+  several arguments (`foo` then `(a, b);`) keep their tree. A block
+  comment that opens the `(` line hides the line break, so `foo` then
+  `/* c */ (1)` is a call. A new external token, `_statement_paren`,
+  carries that `(` (`SPECIFICATION.md` §6.18).
+- **BREAKING:** after `as`, `instanceof` and `!instanceof` a dotted
+  name with array dimensions or type arguments is one type (see Fixed),
+  which changes trees for input that parsed without an `ERROR` at
+  v0.6.0: `x as a.b.C<D>[]` was comparisons with a list, and
+  `l = x as java.util.List<T>` followed by `foo()` on the next line the
+  comparisons `(x as java.util.List) < T > foo()`; each is the cast to
+  a `generic_type` over a `qualified_type`, in an `array_type` for the
+  first, and `foo()` is a statement of its own. A `<` there opens type
+  arguments only where they close, so `x as a.B<c`, which was
+  `(x as a).B < c`, compares the cast to `a.B` with `c`. The dotted type
+  outranks field accesses by a dynamic precedence instead of
+  tree-sitter's order of rules, which decides a tie the other way: `x`,
+  `f() as a.B` and `y = 1` on three lines were a method `x f()` with no
+  body, the name `as` and a typed local `a.B y = 1`, and are the cast
+  and an assignment, as in Groovy. Now an `ERROR`, where Groovy reads a
+  command chain or rejects the input: a quoted name or `new` after a dot
+  of a cast type (`x as a."b"`, `x as T.new`), and type arguments on a
+  dotted cast type followed in brackets or a condition by what Groovy
+  compares or calls (`foo(x instanceof a.b<T> y, 1)`). Read otherwise
+  than Groovy: `x as a.b[0]` subscripts the cast, a space before `<`
+  makes a comparison (`x as List <String>` is an `ERROR`), and after
+  `return` or in brackets the type arguments of a name of three or more
+  parts are read where Groovy compares (`return x as a.b.C<T> y`); see
+  `docs/divergences-from-spec.md` §5.
+- **BREAKING:** parentheses before `instanceof`, `!instanceof` or
+  `!in`, or before `as` or `in` and what they take on the line, are
+  that operator's operand, not a cast of the word after them, which
+  changes trees for input that parsed without an `ERROR` at v0.6.0.
+  `(x) instanceof Foo`, `return (x) instanceof Foo`,
+  `(x) !instanceof Foo` and `(x) !in y` were the cast `(x)` of a name
+  (`instanceof`, or `!` applied to the name) and another statement, and
+  are the tests of `(x)` that Groovy reads. `(x) as Foo`,
+  `def v = (x) as a.b.c` and `(x) in y` were the cast of the name `as`
+  or `in` and another statement, and are a `cast_expression` and a
+  `membership_expression` of the parentheses, as Groovy 6.0.0 reads
+  them (GROOVY-10355); Groovy 3 to 5 read a call of the cast of a
+  variable `as` or `in` where a statement starts. Block comments on the
+  line count as spaces (`return (x) in /* c */ y`). `(Foo) in`,
+  `(Foo) in.read()`, `(byte) in[i]` and `(x) in -1` still cast the
+  name `in`. Now an `ERROR`: parentheses that hold only a generic or
+  array type before these operators (`(List<String>) instanceof Foo`,
+  `(String[]) as Foo`), where Groovy tests a class literal, and a
+  command argument after the operator where no statement may follow
+  (`class K { def f = (x) as Foo y }`). A new external token,
+  `_relational_close`, is that `)` (`SPECIFICATION.md` §6.11).
+- **BREAKING:** typed locals without an initializer are declarations
+  (see Added), which changes trees for input that parsed without an
+  `ERROR` at v0.6.0: `String s`, `int i;` and `foo.Bar q` were two
+  statements, or a field access and a name, and
+  `java.util.List<String> l` comparisons. Such a declaration ends at
+  the line break before a line that starts a statement, as in Groovy:
+  `String s` followed by `{ }`, `+ 1` or `(a) { }` on the next line was
+  `String` and `s { }`, `s + 1` or a method `s`, and is the declaration
+  and that statement. Followed by `in xs` or `as T` it is the
+  declaration and the statements `in` and `xs`, where Groovy calls
+  `in(xs)`; it was `String` and `s in xs`. `InputStream in` followed by
+  `foo()` was `InputStream in foo()` and is the declaration and the
+  call. A line that a name can continue (`.trim()`, `== 1`, `/ 2`) still
+  reads `String` and the expression of `s`, where Groovy calls
+  `String(s.trim())`. `final x` followed by `String s = 'a'` was the
+  blank final `final x String` and `s = 'a'` and is two declarations, as
+  in Groovy. A type and a name after another statement on its line
+  declare: `move left By steps` is the call `move left` and the
+  declaration `By steps`, where Groovy continues the call. Error
+  recovery changes too: `String s =` at the end of the input is the
+  declaration and an `ERROR` rather than a `MISSING` value, and
+  `enum E<T> { A }` loses its `enum_declaration`.
+- **BREAKING:** a `{ … }` that opens a statement, in a file, a block, a
+  closure or a colon case, or after a label, is a `block`, as Groovy
+  reads it (Apache's `statement` lists `block` first), which changes
+  trees for input that parsed without an `ERROR` at v0.6.0: it was an
+  `expression_statement` holding a `closure`. `{ a }` followed by
+  `{ b }` on the next line was a closure called with a closure and is
+  two blocks; `{ }` followed by `+ 1`, `- 1` or `++x` was a binary
+  expression or `{ }++`, and is a block and a unary expression or an
+  update; `{ a = b -> c }` was a closure with the parameter `a` and is a
+  block that holds a lambda. Braces that an expression continues stay a
+  closure (`{ foo() }()`, `{ foo() }.call()`, `{ foo() } as Runnable`,
+  `{ }` followed by `.call()`), and so do braces with parameters
+  (`{ a -> }`) and a `{` on the line after a call, its trailing closure.
+  Read otherwise than Groovy: `foo { a }` followed by `{ b }`, or
+  `foo { a } { b }`, is a call and a block, where Groovy passes `{ b }`
+  as one more argument; `{ } foo` is a block and a statement, where
+  Groovy calls the closure; `{ a = b -> { p -> p } }` stays the closure
+  with the parameter `a`; `return` followed by `{ }` returns a closure;
+  and `as` or `in` on the next line casts or tests it. Now an `ERROR`:
+  `{ }` followed by `()`, `(a, b)` or a bare `++` on the next line,
+  which Groovy rejects, and `{ }` followed by nine or more comments and
+  `.call()`, as the scanner reads at most eight comments after the `}`
+  (`SPECIFICATION.md` §6.19). Two JDK test files with Java array
+  initializers in fields recover as one `ERROR` for the whole file. A
+  new external token, `_statement_block_end`, ends the block
+  (`SPECIFICATION.md` §6.22).
+- Twenty-four external scanner tokens are added, so there are 35
+  instead of 11: `_trait_keyword` and `_sealed_keyword` (#73,
+  `SPECIFICATION.md` §6.13); `_var_keyword`, `_var_names_keyword`,
+  `_yield_keyword`, `_in_keyword`, `_as_keyword` and `_contextual_key`,
+  such a word as a named argument's key, aliased to `identifier`
+  (§6.16); `_command_value_start` (#95), `_command_path_start` (#52)
+  and `_command_statement_start`, empty starts of a parenthesis-free
+  call (§6.14); `_array_value_start` and `_type_start`, which is never
+  emitted (§6.15); `_lambda_start` and `_bare_lambda_start` (§6.17);
+  `_statement_paren` (§6.18); `_lambda_body_end`, and
+  `_lambda_body_reread`, which no rule takes (§6.19);
+  `_multi_assignment_comma`, the first `,` of `(a, b) = …` (§6.20);
+  `_declaration_start` (§6.21); `_statement_block_end` (§6.22);
+  `_relational_close` (§6.11); `_cast_type_arguments_open` (§3.2.2);
+  and `_unterminated_comment` (#75), an empty hidden extra (§6.6). The
+  keyword and punctuation tokens are aliased, so the anonymous `trait`,
+  `sealed`, `var`, `yield`, `in`, `as`, `(`, `)`, `,` and `<` nodes
+  keep their kinds. The scanner now carries two bits of serialized
+  state, one byte while either is set (§6.6, §6.19). Seven named node
+  kinds are added (`array_creation_expression`, `array_initializer`,
+  `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
+  `lambda_expression`, `multi_assignment_expression`) and two fields,
+  `dimensions` and `rest`; none is removed. `SYMBOL_COUNT` goes from
+  321 to 403, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
+  to 4,659, so most symbol ids and the field ids after `dimensions`
+  change. In `node-types.json`: every expression position adds
+  `array_creation_expression`, `array_type`, `lambda_expression` and
+  `multi_assignment_expression`; `command_chain` is added to the
+  `value` of `variable_declarator`, `local_variable_declaration`,
+  `multi_assignment_declaration`, `gstring_brace_interpolation` and
+  `switch_expression`, to `assignment_expression.right`, to the
+  children of `parenthesized_expression`, to the `condition` of
+  `if_statement`, `while_statement` and `do_while_statement` and to
+  `synchronized_statement.lock`; `command_chain.receiver` adds the six
+  member-access kinds; `argument_list`, `list_literal`,
+  `assignment_expression.right` and `multi_assignment_declaration` add
+  `annotation`; `variable_declarator` gains `type`, `key` and `rest`;
+  `method_declaration` gains `default`; `class_body` adds
+  `compact_constructor_declaration` and `multi_assignment_declaration`,
+  and `enum_body` and `for_statement.init` the latter; the children of
+  `source_file`, `block`, `closure`, `switch_case` and `switch_default`
+  and `labeled_statement.statement` add `block`; and
+  `object_creation_expression.type` drops `array_type`. (#52, #72, #73,
+  #75, #94, #95, #101, #102)
+- Parsing costs more than at v0.6.0, counted in user-space
+  instructions. On files that parse without an `ERROR` in both
+  versions, 148 real Groovy, Gradle and Jenkins files take 4.4% more
+  and 241 Java files 3.0% more; with the files that have an `ERROR`,
+  58 of 206 real files at v0.6.0 and 15 now, the real files take 4.9%
+  fewer, as error recovery is costly. Lines of one kind of statement
+  take 7% to 11% more (calls, assignments, dotted calls such as
+  `log.info(y)`). A script method head with untyped parameters and a
+  body (`def f(a, b) { }`) takes 10% to 13% more for two to sixteen
+  parameters, about as much as a typed head (9% more with two), and
+  1.8 times as much with twenty, past the scanner's look-ahead of
+  sixteen names (`SPECIFICATION.md` §6.20); a typed local with an
+  initializer (`String s = 'a'`) takes 42% fewer. The compiled parser
+  is about 30% larger.
+- A few edit sequences still reparse incrementally to a tree that
+  differs from a parse from scratch; each kind is described in
+  `SPECIFICATION.md` §6.16 to §6.22 and pinned in
+  `bindings/rust/tests/incremental_reparse.rs`.
+- `SPECIFICATION.md` targets the Groovy 6.x grammar (6.0.0 at the time
+  of writing) instead of 4.x: earlier versions parse where their syntax
+  is a subset, and where versions read the same text differently the
+  latest release wins, as for nested array initializers after two or
+  more `[]` (Groovy 5, GROOVY-8551) and `(x) as Foo` (Groovy 6.0.0,
+  GROOVY-10355), with the exceptions noted where they are made.
+  Coverage of Groovy 5 and 6 syntax is incomplete (`async`, `await`,
+  `defer` and `val` are names); `docs/divergences-from-spec.md` lists
+  the gaps.
 
 ### Fixed
 
@@ -150,10 +508,49 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   input each time, so parse time grew with the square of the count.
   Input that parsed without an `ERROR` parses as before. On malformed
   input, error recovery near the first unterminated `/*` can differ and
-  can be worse as well as better, and in one rare case an incremental
-  reparse after closing such a comment keeps a parenthesized expression
-  where a parse from scratch reads a cast (`SPECIFICATION.md` §6.6).
-  (#75)
+  can be worse as well as better (`SPECIFICATION.md` §6.6). (#75)
+- `var`, `yield`, `in` and `as` are names wherever their construct
+  does not follow, as Apache's `identifier` rule lists them:
+  `int var = 1`, `InputStream in = open()`, `int as = 1`, `in.close()`
+  on the line after a statement, `return yield`, `{ var -> var }`,
+  `for (String in : xs)` and `void var() { }` parse. Each was an
+  `ERROR`, and `final var = (1)` in a method could take in the rest of
+  the method. Like `record`, the keywords now come from the external
+  scanner, which emits `var` before a declared name or a
+  multi-assignment's names, `yield` and `in` before an expression, and
+  `as` before a type (`SPECIFICATION.md` §6.16). `for (var x in xs)`
+  and `for (var x : xs)` are loops; they were an `ERROR`. Still an
+  `ERROR`: `for (var in xs)`, `for (String in in xs)`, `yield(1, 2)` and
+  a method named `in` with a return type (`int in(int x) { x }`).
+- Queries. `tags.scm`: every parenthesis-free call is a
+  `@reference.call`, by its receiver's name or the last name of a dotted
+  receiver (`sh 'make'`, `def out = sh script: 'make'`, `log.info 'x'`),
+  and so is a call through `?.`, `??.`, `*.` or `.&` (`obj?.m(x)`); a
+  call through `.@` and `array_creation_expression` stay untagged.
+  `highlights.scm`: the method of a call through `?.`, `??.` or `*.`
+  is `@function.call`, where it was `@property`, and the names and dots
+  of an annotation's name are `@attribute`
+  (`@groovy.transform.CompileStatic`), where they were `@variable` and
+  `@operator`. `injections.scm`: SQL is injected into the first `"…"`
+  or `"""…"""` argument of a call on `sql` or `Sql`, also without
+  parentheses (`sql.execute "SELECT …", id`); with parentheses it was
+  injected into later string arguments too, bind parameters and slashy
+  strings included.
+- A closure that opens with a typed declaration of two names
+  (`def c = { String a, b }`, `foo { String a = 1, b }`) holds the
+  declaration; it was closure parameters with a `MISSING` `->`.
+- After `as`, `instanceof` and `!instanceof` a dotted name followed by
+  array dimensions or type arguments is one type, an `array_type` or a
+  `generic_type` over a `qualified_type`:
+  `o instanceof JTextComponent.KeyBinding[]`, `x as a.b.C[]` and
+  `x as java.util.List<String>` had a `MISSING` node (see Changed for
+  the trees this alters). A `<` after a cast type's name opens type
+  arguments only where they close, so `x as B<c` compares the cast
+  with `c`, where it had a `MISSING` `>`; a new external token,
+  `_cast_type_arguments_open`, is that `<` (`SPECIFICATION.md` §3.2.2).
+  Runs of lines such as `l = x as util.List<T>` took time quadratic in
+  their number, 4.4 billion instructions for 4,000 lines, and are
+  linear, 0.17 billion.
 
 ## [0.6.0] - 2026-11-12
 
