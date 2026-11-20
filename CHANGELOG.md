@@ -443,7 +443,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   initializers in fields recover as one `ERROR` for the whole file. A
   new external token, `_statement_block_end`, ends the block
   (`SPECIFICATION.md` §6.22).
-- Twenty-five external scanner tokens are added, so there are 36
+- Twenty-seven external scanner tokens are added, so there are 38
   instead of 11: `_trait_keyword` and `_sealed_keyword` (#73,
   `SPECIFICATION.md` §6.13); `_var_keyword`, `_var_names_keyword`,
   `_yield_keyword`, `_in_keyword`, `_as_keyword` and `_contextual_key`,
@@ -451,13 +451,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (§6.16); `_command_value_start` (#95), `_command_path_start` (#52)
   and `_command_statement_start`, empty starts of a parenthesis-free
   call (§6.14); `_array_value_start` and `_type_start`, which is never
-  emitted (§6.15); `_lambda_start` and `_bare_lambda_start` (§6.17);
+  emitted (§6.15); `_lambda_start`, `_bare_lambda_start`, and
+  `_body_block_end`, which is never emitted (§6.17);
   `_statement_paren` (§6.18); `_lambda_body_end`, and
   `_lambda_body_reread`, which no rule takes (§6.19);
   `_multi_assignment_comma`, the first `,` of `(a, b) = …` (§6.20);
   `_declaration_start`, and `_closure_parameters_start`, which is never
   emitted (§6.21); `_statement_block_end` (§6.22);
-  `_relational_close` (§6.11); `_cast_type_arguments_open` (§3.2.2);
+  `_relational_close`, and `_type_only_close`, which is never emitted
+  (§6.11); `_cast_type_arguments_open` (§3.2.2);
   and `_unterminated_comment` (#75), an empty hidden extra (§6.6). The
   keyword and punctuation tokens are aliased, so the anonymous `trait`,
   `sealed`, `var`, `yield`, `in`, `as`, `(`, `)`, `,` and `<` nodes
@@ -467,8 +469,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
   `lambda_expression`, `multi_assignment_expression`) and two fields,
   `dimensions` and `rest`; none is removed. `SYMBOL_COUNT` goes from
-  321 to 405, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
-  to 4,648, so most symbol ids and the field ids after `dimensions`
+  321 to 408, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
+  to 4,658, so most symbol ids and the field ids after `dimensions`
   change. In `node-types.json`: every expression position adds
   `array_creation_expression`, `array_type`, `lambda_expression` and
   `multi_assignment_expression`; `command_chain` is added to the
