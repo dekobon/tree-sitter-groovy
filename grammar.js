@@ -127,20 +127,29 @@ const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
 const LAMBDA_NESTING_DEPTH = 10;
 
 /*
- * The dynamic precedence of a lambda whose body is a closure or a
- * parenthesized expression, either of which another reading of the same
- * tokens holds otherwise. A lambda's body is a block before a closure
- * (Apache `lambdaBody`), so `x -> { a = b -> c }` must rank its block,
- * which holds a lambda, above the closure with the parameter `a`, and a
- * nest of LAMBDA_NESTING_DEPTH lambdas above the lambda whose closure holds
- * none. And a parenthesized expression is a lambda's whole body only before
- * a `->` that the lambda cannot take: `{ a = (b) -> (d) -> e }` is the
- * parameter `a = (b)` and the body `(d) -> e` in Groovy, which tries the
- * parenthesized expression first, and also the parameter
- * `a = (b) -> (d)` and the body `e`. The weight is below that of
+ * The dynamic precedence of a lambda whose body is a closure, which another
+ * reading of the same tokens holds otherwise. A lambda's body is a block
+ * before a closure (Apache `lambdaBody`), so `x -> { a = b -> c }` must
+ * rank its block, which holds a lambda, above the closure with the
+ * parameter `a`, and a nest of LAMBDA_NESTING_DEPTH lambdas above the
+ * lambda whose closure holds none. The weight is below that of
  * LAMBDA_NESTING_DEPTH lambdas.
  */
 const DEMOTED_LAMBDA_WEIGHT = LAMBDA_NESTING_DEPTH * LAMBDA_WEIGHT - 1;
+
+/*
+ * The dynamic precedence of a lambda whose whole body is a parenthesized
+ * expression, which is its body only before a `->` that the lambda cannot
+ * take. `{ a = (b) -> (d) -> e }` is the parameter `a = (b)` and the body
+ * `(d) -> e` in Groovy, which tries the parenthesized expression first, and
+ * also the parameter `a = (b) -> (d)` and the body `e`: the weight is below a
+ * lambda's. Where the parentheses before the `->` hold parameters and no
+ * expression, Groovy's default does end at the parenthesized expression:
+ * `{ T a = (b, c) -> (d) -> e }` is the parameter `a` with the default
+ * `(b, c) -> (d)`, which outweighs the typed local `a` that holds two
+ * lambdas only while it is just one below a lambda.
+ */
+const PARENTHESIZED_BODY_WEIGHT = LAMBDA_WEIGHT - 1;
 
 /*
  * The dynamic precedence of a block that is the body of `if`, `else`, a
@@ -542,10 +551,11 @@ function enhancedExpression($) {
  * Apache tries the block first: `() -> { }` and `x -> { a = b -> c }` hold
  * blocks, `x -> { y -> y }` a closure. A closure and a parenthesized
  * expression are also alternatives of their own, ranked low
- * (DEMOTED_LAMBDA_WEIGHT); the static precedence makes the parser reduce
- * the parenthesized expression here rather than as an expression, which
- * would carry no weight. A lambda without parentheses is no body, so
- * `a -> b -> c` is an error in Groovy and here; `a -> (b) -> c` is not.
+ * (DEMOTED_LAMBDA_WEIGHT, PARENTHESIZED_BODY_WEIGHT); the static precedence
+ * makes the parser reduce the parenthesized expression here rather than as
+ * an expression, which would carry no weight. A lambda without parentheses
+ * is no body, so `a -> b -> c` is an error in Groovy and here;
+ * `a -> (b) -> c` is not.
  *
  * A brace body ends at its `}` only where `_lambda_body_end` (§6.19)
  * follows, which the scanner emits unless an expression continues there.
@@ -566,7 +576,7 @@ function lambdaBody($, bare) {
   return choice(
     seq(body($.block), bare ? $._lambda_body_end : optional($._lambda_body_end)),
     prec.dynamic(DEMOTED_LAMBDA_WEIGHT, seq(body($.closure), $._lambda_body_end)),
-    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, prec(1, body(alias(
+    prec.dynamic(PARENTHESIZED_BODY_WEIGHT, prec(1, body(alias(
       $._lambda_parenthesized_expression,
       $.parenthesized_expression,
     )))),
