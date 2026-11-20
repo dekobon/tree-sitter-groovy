@@ -2382,6 +2382,85 @@ def d = { a = (String b) -> (d) -> e }
         (expression_statement
           (identifier))))))
 
+
+==================
+Lambda body before an instance initializer or a generic method on the next line
+==================
+
+class A {
+  def f = a -> { foo() }
+  { z }
+  def g = a -> { foo() }
+  <T> T m(T t) { t }
+}
+def v = a -> { foo() }
+<T> T m(T t) { t }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (block
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list)))))))
+      (block
+        (expression_statement
+          (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (block
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list)))))))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (method_declaration
+    type_parameters: (method_type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
 ==================
 Lambda body before eight comments and a call goes on, before nine it ends
 ==================

@@ -2871,25 +2871,53 @@ static inline bool token_valid(
     return valid_symbols == NULL || valid_symbols[token];
 }
 
+// Whether type parameters, which open a generic method or constructor,
+// start at this `<`: an annotation or a name followed by `>`, `,` or
+// `extends`, on the line. Consumes what it reads.
+static bool type_parameters_follow(TSLexer *lexer) {
+    advance(lexer);
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '@') {
+        return true;
+    }
+    if (!is_identifier_start(lexer->lookahead)) {
+        return false;
+    }
+    char word[sizeof "extends"];
+    read_word(lexer, word, sizeof word);
+    if (!skip_same_line_space(lexer, false)) {
+        return false;
+    }
+    if (lexer->lookahead == '>' || lexer->lookahead == ',') {
+        return true;
+    }
+    unsigned len = read_word(lexer, word, sizeof word);
+    return word_is(word, len, "extends");
+}
+
 // SPECIFICATION.md §6.19 — LAMBDA_BODY_END, empty, after the `}` of a
 // lambda's brace body unless an expression continues there. The trivia
 // after the `}` is read, comments included, and then one operator or
 // word. On the line of the `}` any operator, `(`, `[`, `{`, `instanceof`
 // and `as` or `in` that open a type or an expression (§6.16) continue
-// it. After a line break where a statement may start (STATEMENT_PAREN is
-// valid, §6.18) so do the operators that Groovy's grammar takes after
-// `nls`: not `(`, `[` and `{`, and `+`, `-`, `++` and `--` only as `+=`
-// and `-=`, all of which may start a statement there. Inside parentheses
-// and brackets Groovy's lexer drops the line break. A `/` that opens a
-// slashy string where a statement may start ends the body as well:
-// Groovy reads a statement. `)`, `]`, `}`, `,`, `;`, `:` other than `::`,
-// any other word, a literal, `!` other than `!=`, `!in` and `!instanceof`,
+// it. After a line break where Groovy's lexer keeps it, so do the
+// operators that Groovy's grammar takes after `nls`, but what may start
+// what follows: where a statement may start (STATEMENT_PAREN is valid,
+// §6.18) `(`, `+`, `-`, `++`, `--` and a slashy string, and where a
+// statement or a class member may (STATEMENT_PAREN or RECORD_KEYWORD is
+// valid, §6.7) `{` and the type parameters of a generic method. A `[` on a
+// later line ends it everywhere (§6.9). Neither token is valid inside
+// parentheses and brackets, where Groovy's lexer drops the line break,
+// and interpolations. `)`, `]`, `}`, `,`, `;`, `:` other than `::`, any
+// other word, a literal, `!` other than `!=`, `!in` and `!instanceof`,
 // the end of the input, a `/*` that does not close and more than
 // LAMBDA_BODY_END_COMMENTS comments end it. The token is empty and ends at
 // the `}`, so that the lambda keeps its range and a comment after the body
 // it ends stays outside. A call reads the trivia, at most
-// LAMBDA_BODY_END_COMMENTS comments of it, and one word or a few
-// characters.
+// LAMBDA_BODY_END_COMMENTS comments of it, and one word, a few characters
+// or the start of type parameters.
 static bool scan_lambda_body_end(
     Scanner *scanner,
     TSLexer *lexer,
@@ -2935,8 +2963,10 @@ static bool scan_lambda_body_end(
         comment = true;
         comments++;
     }
-    bool line_ends = crossed_line
+    bool statement_follows = crossed_line
         && token_valid(valid_symbols, STATEMENT_PAREN);
+    bool member_follows = statement_follows
+        || (crossed_line && token_valid(valid_symbols, RECORD_KEYWORD));
     int32_t c = lexer->lookahead;
     if (lexer->eof(lexer)) {
         return true;
@@ -2961,11 +2991,13 @@ static bool scan_lambda_body_end(
         return true;
     }
     switch (c) {
+        case '<':
+            return (member_follows && type_parameters_follow(lexer))
+                || lambda_body_continues(scanner, lexer, comment);
         case '.':
         case '?':
         case '*':
         case '%':
-        case '<':
         case '>':
         case '=':
         case '&':
@@ -2973,13 +3005,15 @@ static bool scan_lambda_body_end(
         case '^':
             return lambda_body_continues(scanner, lexer, comment);
         case '(':
+            return statement_follows
+                || lambda_body_continues(scanner, lexer, comment);
         case '{':
-            return line_ends
+            return member_follows
                 || lambda_body_continues(scanner, lexer, comment);
         case '+':
         case '-':
             advance(lexer);
-            if (line_ends && lexer->lookahead != '=') {
+            if (statement_follows && lexer->lookahead != '=') {
                 return true;
             }
             return lambda_body_continues(scanner, lexer, comment);
