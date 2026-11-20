@@ -1216,25 +1216,67 @@ static bool parenthesized_command_follows(
     return first_argument_follows(lexer, false, names, false, no_close_ahead);
 }
 
+// The dots of a varargs parameter's `...`, Apache's ELLIPSIS token.
+static const unsigned ELLIPSIS_DOTS = 3;
+
+// At the name after a parameter's type, which `parameter_name_follows` has
+// reached: whether it names the parameter. `instanceof` does not, and nor
+// do `as` and `in` (Apache `identifier` takes both) unless what ends a
+// parameter follows them, `,`, `)` or a default's `=`: otherwise they are
+// operators on a value (`(X as T)`, `(X in xs)`).
+static bool parameter_word_follows(TSLexer *lexer, bool no_close_ahead) {
+    char word[sizeof "instanceof"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "instanceof")) {
+        return false;
+    }
+    if (!word_is(word, len, "as") && !word_is(word, len, "in")) {
+        return true;
+    }
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+        return false;
+    }
+    int32_t c = lexer->lookahead;
+    return c == ',' || c == ')' || c == '=';
+}
+
 // After a type in parentheses, which `may_name_type` or a dotted name with
 // an upper-case last name starts: whether its type arguments, dimensions
 // and varargs dots, then a name, follow, which makes the parentheses a
 // parameter list. Groovy's trivia may come between, line breaks included,
-// as inside parentheses. Counts the items it reads in `items`.
+// as inside parentheses. `dots` counts the dots of `...` the caller has
+// read. Only what Apache's `type` has goes on with the type: inside the
+// type arguments names, `.`, `,`, `?` and dimensions; outside them a `[`
+// that `]` follows and the three dots of `...`. So a subscript (`X[i]`), a
+// ternary (`X ? a : b`), a range (`X..Y`) and `&&` (`A < b && C > d`) make
+// no parameter. Counts the items it reads in `items`.
 static bool parameter_name_follows(
     TSLexer *lexer,
     unsigned *items,
+    unsigned dots,
     bool no_close_ahead
 ) {
     unsigned depth = 0;
+    bool dimension = false;
     for (; *items < NAME_ARGUMENT_LOOKAHEAD_ITEMS; (*items)++) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
         }
         int32_t c = lexer->lookahead;
+        if (depth == 0) {
+            // A dimension's `[` is followed by its `]`, and the dots of
+            // `...` by one another and then the name.
+            if (dimension && c != ']') {
+                return false;
+            }
+            if (dots > 0 && c != '.'
+                && (dots != ELLIPSIS_DOTS || !is_identifier_start(c))) {
+                return false;
+            }
+        }
         if (is_identifier_start(c)) {
             if (depth == 0) {
-                return true;
+                return parameter_word_follows(lexer, no_close_ahead);
             }
             // Type arguments hold no string.
             if (read_dollar_slashy_open(lexer)) {
@@ -1246,8 +1288,15 @@ static bool parameter_name_follows(
             depth++;
         } else if (c == '>' && depth > 0) {
             depth--;
-        } else if (c != '[' && c != ']' && c != '?' && c != '.'
-                   && (depth == 0 || (c != ',' && c != '&'))) {
+        } else if (depth > 0) {
+            if (c != '[' && c != ']' && c != '?' && c != '.' && c != ',') {
+                return false;
+            }
+        } else if (c == '[') {
+            dimension = true;
+        } else if (c == ']' && dimension) {
+            dimension = false;
+        } else if (c != '.' || ++dots > ELLIPSIS_DOTS) {
             return false;
         }
         advance(lexer);
@@ -1311,7 +1360,8 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
             ? !path_takes_names(last_name, ends_in_new)
             : may_name_type(word, len, upper);
         if (type) {
-            return !parameter_name_follows(lexer, &items, no_close_ahead);
+            return !parameter_name_follows(lexer, &items, varargs ? 1 : 0,
+                                           no_close_ahead);
         }
         if (varargs) {
             return true;

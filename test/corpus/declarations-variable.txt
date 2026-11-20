@@ -2486,6 +2486,54 @@ String g
       value: (closure))))
 
 ==================
+A parenthesized range or cast on the next line ends a typed local
+==================
+
+int total
+(MIN..MAX).each { total += it }
+List<String> names
+(ITEMS as List).each { names << it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (range_expression
+            start: (identifier)
+            end: (identifier)))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (identifier))))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (cast_expression
+            value: (identifier)
+            type: (type_identifier)))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (identifier)))))))
+
+==================
 Typed declaration before a line that opens with a slashy string in parentheses
 ==================
 

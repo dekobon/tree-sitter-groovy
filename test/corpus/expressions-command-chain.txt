@@ -5955,6 +5955,94 @@ foo bar(a, b) { }
       closure: (closure))))
 
 ==================
+A capitalized value before an operator in parentheses after a name argument is the call's argument
+==================
+
+println max(VALUES[i])
+println format(DEBUG ? a : b)
+println range(MIN..MAX)
+println foo(MAX as long)
+println foo(X in list)
+println foo(Foo instanceof Bar)
+println valid(MIN < x && MAX > x)
+(foo x(B[i]))
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (subscript_expression
+          object: (identifier)
+          index: (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (ternary_expression
+          condition: (identifier)
+          consequence: (identifier)
+          alternative: (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (range_expression
+          start: (identifier)
+          end: (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (cast_expression
+          value: (identifier)
+          type: (type_identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (membership_expression
+          element: (identifier)
+          collection: (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (instanceof_expression
+          value: (identifier)
+          type: (type_identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (binary_expression
+            left: (identifier)
+            right: (identifier))
+          right: (binary_expression
+            left: (identifier)
+            right: (identifier))))))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (subscript_expression
+              object: (identifier)
+              index: (identifier))))))))
+
+==================
 Command chain whose name argument is a call with a slashy string argument
 ==================
 
@@ -5992,6 +6080,56 @@ def x = foo bar(/re/)
           arguments: (argument_list
             (string_literal
               (string_fragment))))))))
+
+==================
+Dimensions, wildcards, varargs and a parameter named in keep the method (known divergence)
+==================
+
+foo bar(String[] a, List<? extends T> l) { }
+foo bar(InputStream in, String... names) { }
+foo bar(String[]... a) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (array_type
+          (type_identifier))
+        name: (identifier))
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (wildcard
+              (type_identifier))))
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        type: (varargs_type
+          (type_identifier))
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (varargs_type
+          (array_type
+            (type_identifier)))
+        name: (identifier)))
+    body: (block)))
 
 ==================
 A declaring word as a name argument before a name (known divergence)

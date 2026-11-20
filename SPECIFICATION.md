@@ -2219,10 +2219,16 @@ A name argument: after spaces, tabs and line escapes, on the line:
         receiver and first argument, or a name followed after a line
         break by another, or parameters: an element that starts with
         `@`, `final` or `def`, or a receiver that may not take a name
-        argument followed, after type arguments, dimensions, varargs
-        dots and trivia, by a name; the elements are read up to the
-        first that is neither a parameter nor a lone name, such as a `/`
-        that opens no comment, a slashy string (`foo bar(x, /re/)`);
+        argument followed, after trivia and only what a type holds
+        (type arguments, which hold names, `.`, `,`, `?` and
+        dimensions; dimensions, each a `[` and its `]`; the three dots
+        of varargs), by a name that is not `instanceof`, nor `as` or
+        `in` unless `,`, `)` or `=` follows it, so that
+        `println max(VALUES[i])`, `println foo(MAX as long)` and
+        `println valid(MIN < x && MAX > x)` are calls; the elements are
+        read up to the first that is neither a parameter nor a lone
+        name, such as a `/` that opens no comment, a slashy string
+        (`foo bar(x, /re/)`);
       - `->`;
       - and, in a statement (COMMAND_PATH_START and
         COMMAND_STATEMENT_START), `=` that is not `==` or `=~` (a
