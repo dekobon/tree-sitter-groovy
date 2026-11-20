@@ -134,18 +134,20 @@ const TYPED_LOCAL_WEIGHT = 1;
 const CAST_WEIGHT = 1;
 
 /*
- * The dynamic precedence of a dotted type after `as`, `instanceof` or
- * `!instanceof`, alone or as the base of an array or generic type, whose
- * tokens also read as field accesses on a cast of the first name:
- * `x as java.util.Map` and `(x as java).util.Map`, `x as a.B<C> + x` and
- * `(x as a).B < C > +x`. Groovy reads the type (Apache's
- * `qualifiedClassName`). It is less than one step, so it ranks only readings
- * that the weights leave tied (see WEIGHT_UNIT). A whole step would tie
- * readings that a step now ranks: `(x) as` at the end of a line casts the
- * name `as`, as Groovy does, and `a.b` on the next line is a statement,
- * which outweighs `(x) as a.b` across the line break by CAST_WEIGHT.
+ * The weight of a dotted type after `as`, `instanceof` or `!instanceof`,
+ * alone or as the base of an array or generic type (`_dotted_type`). Its
+ * first dot continues the type, as Groovy reads it (Apache's
+ * `qualifiedClassName`), so the tokens no longer read as field accesses on
+ * a cast of the first name; the weight ranks the cast against other readings
+ * of the same lines: `x`, then `f() as a.B`, then `y = 1` is the cast and an
+ * assignment, and also a bodiless method `x f()`, the name `as` and a typed
+ * local `a.B y = 1`. It is half a step, so it ranks only readings that the
+ * weights leave tied (see WEIGHT_UNIT). A whole step would tie readings that
+ * a step now ranks: `(x) as` at the end of a line casts the name `as`, as
+ * Groovy does, and `a.b` on the next line is a statement, which outweighs
+ * `(x) as a.b` across the line break by CAST_WEIGHT.
  */
-const DOTTED_CAST_TYPE_WEIGHT = 1;
+const DOTTED_CAST_TYPE_WEIGHT = 1 / WEIGHT_UNIT;
 
 /*
  * The weight of a lambda. A closure parameter's default may
@@ -949,12 +951,6 @@ module.exports = grammar({
     // declaration.
     [$._expression, $.qualified_type],
 
-    // §3.2.2 — after `x as java` a `.` continues the type (`_dotted_type`,
-    // alone or as the base of an array or generic type), or ends it, so
-    // that `.util` is a field access on `x as java`. Both readings parse to
-    // the end of the name. DOTTED_CAST_TYPE_WEIGHT ranks the type first
-    // (docs/divergences-from-spec.md §5).
-    [$._cast_type, $._dotted_type],
     // §3.2.2 — at a `[` after the type of `x as T`, the type is a cast's
     // whole type, which a subscript follows (`x as T[0]`), or the element
     // of an array type (`x as T[]`); the `]` after the `[` decides.
@@ -2494,11 +2490,10 @@ module.exports = grammar({
     // §3.2.2 — RHS type of `as`, `instanceof`, and `!instanceof`.
     // Same alternatives as `_type`, with `_dotted_type` in place of
     // `qualified_type`, also as the base of an array or generic type:
-    // its tail shifts each dot at a precedence tighter than
-    // `field_access`, which the repeat of `qualified_type` does not, so
-    // that `x as a.b.C[]` and `x as java.util.List<String>` keep their
-    // type past the second dot, and its weight ranks it above field
-    // accesses on `x as a`.
+    // it shifts each dot at a precedence tighter than `field_access`,
+    // which the repeat of `qualified_type` does not, so that
+    // `x as a.b.C[]` and `x as java.util.List<String>` keep their type
+    // past every dot.
     _cast_type: $ => choice(
       alias($.identifier, $.type_identifier),
       alias($._cast_array_type, $.array_type),
@@ -2532,10 +2527,18 @@ module.exports = grammar({
       field('arguments', $.type_arguments),
     )),
 
-    _dotted_type: $ => prec.dynamic(DOTTED_CAST_TYPE_WEIGHT, seq(
+    // The first dot continues the type, at the precedence of the others.
+    // `x as java` followed by field accesses was the other reading the
+    // dot kept, and with type arguments its comparisons
+    // (`(x as java).util.List < T > …`) took the next line as an operand
+    // and forked again there, so a run of such lines took quadratic time.
+    // Without that reading, a quoted name or `new` after a dot of the type
+    // (`x as a."b"`, `x as a.new`) is an ERROR; Groovy reads a command
+    // chain on a variable `as` there (docs/divergences-from-spec.md §5).
+    _dotted_type: $ => weighted(DOTTED_CAST_TYPE_WEIGHT, prec(PREC.ACCESS + 1, seq(
       alias($.identifier, $.type_identifier),
       $._dotted_type_tail,
-    )),
+    ))),
 
     _dotted_type_tail: $ => prec.right(PREC.ACCESS + 1, seq(
       '.',

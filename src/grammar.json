@@ -7225,22 +7225,26 @@
       "type": "PREC_DYNAMIC",
       "value": 1,
       "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "ALIAS",
-            "content": {
-              "type": "SYMBOL",
-              "name": "identifier"
+        "type": "PREC",
+        "value": 19,
+        "content": {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              "named": true,
+              "value": "type_identifier"
             },
-            "named": true,
-            "value": "type_identifier"
-          },
-          {
-            "type": "SYMBOL",
-            "name": "_dotted_type_tail"
-          }
-        ]
+            {
+              "type": "SYMBOL",
+              "name": "_dotted_type_tail"
+            }
+          ]
+        }
       }
     },
     "_dotted_type_tail": {
@@ -12522,10 +12526,6 @@
     [
       "_expression",
       "qualified_type"
-    ],
-    [
-      "_cast_type",
-      "_dotted_type"
     ],
     [
       "_cast_type",
