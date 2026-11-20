@@ -430,7 +430,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   initializers in fields recover as one `ERROR` for the whole file. A
   new external token, `_statement_block_end`, ends the block
   (`SPECIFICATION.md` §6.22).
-- Twenty-four external scanner tokens are added, so there are 35
+- Twenty-five external scanner tokens are added, so there are 36
   instead of 11: `_trait_keyword` and `_sealed_keyword` (#73,
   `SPECIFICATION.md` §6.13); `_var_keyword`, `_var_names_keyword`,
   `_yield_keyword`, `_in_keyword`, `_as_keyword` and `_contextual_key`,
@@ -442,7 +442,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `_statement_paren` (§6.18); `_lambda_body_end`, and
   `_lambda_body_reread`, which no rule takes (§6.19);
   `_multi_assignment_comma`, the first `,` of `(a, b) = …` (§6.20);
-  `_declaration_start` (§6.21); `_statement_block_end` (§6.22);
+  `_declaration_start`, and `_closure_parameters_start`, which is never
+  emitted (§6.21); `_statement_block_end` (§6.22);
   `_relational_close` (§6.11); `_cast_type_arguments_open` (§3.2.2);
   and `_unterminated_comment` (#75), an empty hidden extra (§6.6). The
   keyword and punctuation tokens are aliased, so the anonymous `trait`,
@@ -453,8 +454,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
   `lambda_expression`, `multi_assignment_expression`) and two fields,
   `dimensions` and `rest`; none is removed. `SYMBOL_COUNT` goes from
-  321 to 403, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
-  to 4,659, so most symbol ids and the field ids after `dimensions`
+  321 to 405, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
+  to 4,648, so most symbol ids and the field ids after `dimensions`
   change. In `node-types.json`: every expression position adds
   `array_creation_expression`, `array_type`, `lambda_expression` and
   `multi_assignment_expression`; `command_chain` is added to the

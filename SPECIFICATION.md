@@ -2258,9 +2258,20 @@ A name argument: after spaces, tabs and line escapes, on the line:
         COMMAND_STATEMENT_START), `=` that is not `==` or `=~` (a
         declaration), or `->` after a line break and trivia, or `,` and
         then Groovy's tokens up to `->` (closure parameters): with
-        brackets counted, strings and comments read whole, and a line
-        break ending the list unless a comma, a modifier, an operator or
-        an open bracket comes before it or `->` after it.
+        brackets counted; comments, strings, `++` and `--` read whole (a
+        string's `${…}` with the strings in it, §6.17), a slashy string
+        where an operand may start, no `=` follows its `/` and it closes
+        on its line read whole, and a dollar-slashy string read whole,
+        across lines, within 1,024 characters (§5.7; one that does not
+        close within them ends the list with no `->`); an element, the
+        first item after a `,` outside brackets, that is `(` or a key
+        ending the list with no `->` (`foo x, () -> y` passes a
+        lambda); and a line break ending the
+        list unless a comma, a modifier, an operator or an open bracket
+        comes before it (a postfix `++` or `--` and a slashy string end
+        an operand), or after it `->` or an operator that Groovy lets a
+        line open with, other than `(` and `,` (`{ foo a, b = i++` then
+        `* 2 -> a }`).
   Each list is read for at most 256 items (a word, a number, a string, a
   comment, a line break or a punctuation character); at the end of the
   budget the answer is no parameters, and a list read to the budget
@@ -2913,10 +2924,15 @@ call's arguments), and:
     keyword of grammar.js other than `final` and `def`, `_`, `permits`
     and `pipeline`, no primitive type name and no `void`, not right after
     one `.` and not inside `<…>`); and after `=`, not `==` or `=~`, a
-    default value read token by token, brackets counted and strings
+    default value read token by token, brackets counted, strings
     skipped whole (a triple-quoted one across lines, a `\` before a
-    line break continuing a single-quoted or double-quoted one), to the
-    `,` or `)` that ends it. A
+    line break continuing a single-quoted or double-quoted one, a
+    `${…}` read as code with the strings in it, a dollar-slashy one
+    across lines within 1,024 characters, §5.7), a slashy string where
+    an operand may start and no `=` follows its `/` skipped whole when
+    it closes on its line (one that does not turns the token down), and
+    the `,` of type arguments that a `<` right after a capitalized name
+    opens taken for theirs, to the `,` or `)` that ends it. A
     parameter with no such name (`(int)`, `(a.b.C)`, `(String[])`) is
     read on as well, and the token is turned down after the `)`;
   - after the `)` and Groovy's trivia, `->`;
@@ -2982,7 +2998,22 @@ does not close on a long line, so the parse stays linear (`(a =`
 repeated, then an unterminated `'''` and 9,000 lines: 93 bytes read
 per input byte whether `(a =` comes 85, 400 or 1,000 times; the same
 test checks it, and `name_argument_cost.rs` the closure parameters of
-§6.14 before such a string).
+§6.14 before such a string). The same test checks defaults with type
+arguments, also where the `<` turns out to be an operator. The `${…}`
+of a double-quoted string is read as Groovy's lexer reads it, as code
+with its braces counted and the strings in it read whole
+(`(a = "${x.join(")")}") -> a`), and so in every look-ahead that reads a
+string whole (§6.14, §6.18, §6.21). A string nested more than
+STRING_NESTING_DEPTH (8) strings deep is taken not to close, which
+ends the look-ahead: without the bound a run of `"${` that never closes
+would be read to the end of the input from each of its quotes, in time
+quadratic in its length; real strings nest once or twice. A
+dollar-slashy string is one item as well, read for its `/$` within
+DOLLAR_SLASHY_LOOKAHEAD_CHARACTERS (1,024) characters (§5.7): its opener
+and its closer differ, so in a nest of interpolations that each open
+another (`$/ ${ (a = $/ ${ (a = …`) every look-ahead would read to the
+end of the input, and past the bound a string ends the look-ahead as
+one that does not close does.
 
 The scanner reads only the shape and the `->`, and an expression may
 be followed by `->` as a closure parameter's default or a case value
@@ -3112,12 +3143,19 @@ here) and STATEMENT_PAREN is, and:
     and the commas read inside them count.
   - The elements are read as Groovy's tokens: brackets counted,
     strings read whole (a triple-quoted one across lines, a `\` before
-    a line break continuing a single-quoted or double-quoted one) and
+    a line break continuing a single-quoted or double-quoted one, a
+    `${…}` read as code with the strings in it, §6.17), inside an
+    element a slashy string where an operand may start and no `=`
+    follows its `/` read whole to its close on its line, so that its
+    `,` and `:` are none of the element's (`(text =~ /a, b/)`), and
     comments skipped, within LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256)
     items (§6.17). Where the reading cannot go on, at the end of the
     budget or the input, at a string or comment that does not close, at
-    a bracket that does not match, and at a `/` or a dollar-slashy
-    string that opens an element, the parentheses are judged as if
+    such a slashy string that does not close on its line, at a bracket
+    that does not match, at a `/` that opens an element, and at the
+    `$/` of a dollar-slashy string anywhere in one, which this reading
+    does not enter (`(foo $/a/$, 2)`, §5.7), the parentheses are judged
+    as if
     they closed there: they open a statement unless a `,` came, and
     then only when the first element is a parenthesis-free call.
 The token is the `(` alone. On any other input return false; the
