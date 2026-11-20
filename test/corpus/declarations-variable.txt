@@ -3015,3 +3015,344 @@ as T
     (identifier))
   (expression_statement
     (identifier)))
+
+==================
+A line that starts with an operator goes on with a typed local's name (Groovy reads a call)
+==================
+
+String a
+? 1 : 2
+String b
+% 2
+String c
+^ 1
+String d
+| 1
+String e
+& 1
+String f
+< 1
+String g
+> 1
+String h
++= 1
+String i
+-= 1
+String j
+!= 1
+String k
+!in xs
+String l
+instanceof T
+String n
+.x
+String o
+:: x
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier))))
+
+==================
+A negation or a complement on the next line starts a statement after a typed local
+==================
+
+String m
+!x
+String p
+~x
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
+A comma that opens the next line ends no typed local (error recovery)
+==================
+
+String s
+, b
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+A parenthesis that closes on the next line ends no typed local (error recovery)
+==================
+
+String s
+) x
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+A bracket that closes on the next line ends no typed local (error recovery)
+==================
+
+String s
+] x
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+Reserved words name no variable of a typed local
+==================
+
+foo.Bar this
+String super
+String int
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+A reserved word in a typed local's list of names is no name (error recovery)
+==================
+
+String a, this
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (ERROR
+      (identifier))
+    (identifier)))
+
+==================
+A typed local with a long list of names and long type arguments
+==================
+
+String a1, a2, a3, a4, a5, a6, a7, a8, a9, a10
+Map<String, Map<String, List<Integer>>> m
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))))))
+    name: (identifier)))
+
+==================
+Form feeds and vertical tabs after a typed local's name are whitespace (Groovy rejects them)
+==================
+
+String s
+x
+String t;
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+An equality after a typed local's name is no initializer (Groovy reads a call)
+==================
+
+String s == 1
+String t
+== 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A name after a lowercase word in a for init opens no call (error recovery)
+==================
+
+for (foo bar;;) {}
+
+---
+
+(source_file
+  (for_statement
+    (ERROR
+      (type_identifier)
+      (identifier))
+    body: (block)))
+
+==================
+A typed local at the end of the input
+==================
+
+String s
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
