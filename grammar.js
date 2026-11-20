@@ -831,9 +831,9 @@ module.exports = grammar({
     // `def f(a, b)` to the token after the `)`. Listed last but for the
     // sentinel, so that it renumbers no symbol before it.
     $._multi_assignment_comma,
-    // §6.21 — empty token before the type of a typed local declaration whose
-    // first declarator has no initializer (`String s`, `int a, b`), emitted
-    // when the declaration ends on the name's line or a list of names
+    // §6.21 — empty token before the type of a typed local declaration
+    // (`String s`, `int a, b`, `String s = 'a'`), emitted when the
+    // declaration ends on the name's line, an initializer or a list of names
     // follows. Listed last but for the sentinel, so that it renumbers no
     // symbol before it.
     $._declaration_start,
@@ -1978,18 +1978,19 @@ module.exports = grammar({
     // (`final String name`, a blank final). After the first declarator
     // of a typed form any may go without one (`String a = 1, b`).
     //
-    // A typed form whose first declarator has no initializer
-    // (`String s`, `int i;`, `List<String> a, b = []`) opens with
+    // A typed form without `final` (`String s`, `int i;`,
+    // `List<String> a, b = []`, `String s = 'a'`) opens with
     // `_declaration_start`, which the scanner emits before the type
-    // only when it reads such a declaration (§6.21), where a statement
-    // starts, after its annotations and as a `for` init. Its tokens are
-    // also `String` followed by the statement `s`, and a line break
-    // after the type or the name ends the statement in Groovy, which
-    // only the scanner sees. Apart from this form only `return`, `break`
-    // and `continue` take the token (see return_statement), so the form
-    // needs no weight.
+    // when it reads such a declaration (§6.21), where a statement starts,
+    // after its annotations and as a `for` init. Its tokens are also
+    // `String` followed by the statement `s` (or `s = 'a'`), and a line
+    // break after the type or the name ends the statement in Groovy,
+    // which only the scanner sees. Apart from this form only `return`,
+    // `break` and `continue` take the token (see return_statement), so
+    // the form needs no weight, and where the scanner emits it the
+    // declaration and the two statements no longer fork.
     //
-    // The typed forms carry a dynamic precedence because their tokens
+    // The other typed forms carry a dynamic precedence because their tokens
     // also parse another way: `String s = 'a'` as the expression
     // `String` followed by `s = 'a'`, and `final String s = 'a'` as
     // the modifier-only `final String` followed by `s = 'a'`. Without
@@ -2004,10 +2005,9 @@ module.exports = grammar({
     // - `final x` followed by a line that starts with an identifier
     //   reads `x` as the type and that identifier as the name. `y = 2`
     //   becomes `final x y = 2`, the same resolution modifier-only
-    //   fields get (`static x` then `y = 1`), and `String s = 'a'`
-    //   becomes `final x String` followed by `s = 'a'`. A declaration
-    //   without an initializer on that line is one of its own:
-    //   `final x` then `String s` declares `x` and `s`.
+    //   fields get (`static x` then `y = 1`). A typed declaration on that
+    //   line is one of its own: `final x` then `String s` or
+    //   `String s = 'a'` declares `x` and `s`.
     // - `final String name` followed by a line reading `foo() { }` is
     //   `final String` followed by the method `name foo() { }`. A
     //   method with a body outranks the blank form, so that

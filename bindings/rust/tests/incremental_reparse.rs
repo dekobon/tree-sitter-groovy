@@ -46,13 +46,16 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// and an operator follow (§6.19). The three after it hold multi-assignments
 /// without `def` and script methods with untyped parameters, where the
 /// first `,` after a name in parentheses is read on to the `)` and the token
-/// after it (§6.20), so an edit there must lex the `,` again. The last four
-/// hold typed declarations without an initializer (§6.21), with a list, an
+/// after it (§6.20), so an edit there must lex the `,` again. The four after
+/// it hold typed declarations without an initializer (§6.21), with a list, an
 /// annotation, a generic type, closure parameters that share their start,
 /// a line that goes on with the name, and a `return` before one after a
 /// statement that forks (`(a) { }`), whose start token depends on what
 /// follows the name on its line and the next, so an edit there must lex
-/// the type again, and the `return` must not end before the token.
+/// the type again, and the `return` must not end before the token. The
+/// last holds a typed declaration with an initializer, which the token opens
+/// too, and a `(` two lines below it, which opens a statement or a call's
+/// arguments (§6.18).
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -89,6 +92,7 @@ const TEXTS: &[&str] = &[
     "String a, b = 1\n{ String c, d -> c }\nfinal String e, f\n",
     "@Field List<String> xs\nInputStream in\nopen()\n",
     "(a) { }\nreturn\nString s\nx = (a)\nString t\n.u()\n",
+    "String s = \"a\"\nprintln x\n(a)\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
@@ -550,30 +554,35 @@ fn a_comment_on_the_line_after_a_lambda_body_moves_into_it_on_reparse() {
 }
 
 /// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a
-/// node only while one stack version exists. A typed declaration keeps
-/// two alive to its end, so the statement after it is reused at the
-/// fork although the `(` on the line after it now makes the
-/// parentheses its arguments. The reparse is free of errors but reads
-/// the first line as `String` and `s = "a"`. This test pins the
-/// difference. If it fails, the two parses agree again: remove the
-/// limitation from §6.18 and move the text to `TEXTS`.
+/// node only while one stack version exists. A typed declaration after
+/// `final` keeps two alive to its end, so the statement after it is reused
+/// at the fork although the `(` on the line after it now makes the
+/// parentheses its arguments. The reparse is free of errors but reads the
+/// first line as `final String` and `s = "a"`. Without `final` the scanner
+/// opens the declaration (§6.21), which then does not fork, and `TEXTS`
+/// holds that text. This test pins the difference. If it fails, the two
+/// parses agree again: remove the limitation from §6.18 and move the text
+/// to `TEXTS`.
 #[test]
-fn a_comma_after_a_typed_declaration_reuses_the_split_statement() {
-    const TEXT: &str = "String s = \"a\"\nprintln x\n(a)\n";
+fn a_comma_after_a_final_typed_declaration_reuses_the_split_statement() {
+    const TEXT: &str = "final String s = \"a\"\nprintln x\n(a)\n";
     /// The offset before the `)`, where `,` is inserted.
-    const INSERT_AT: usize = 27;
+    const INSERT_AT: usize = 33;
 
     let mut parser = parser();
     let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, ",");
-    assert_eq!(edited, "String s = \"a\"\nprintln x\n(a,)\n");
+    assert_eq!(edited, "final String s = \"a\"\nprintln x\n(a,)\n");
     assert!(!incremental.root_node().has_error());
     assert!(!fresh.root_node().has_error());
 
+    // The typed declaration has a `type`; the modifier-only `final String`
+    // the reparse reads has none.
+    let typed = "(local_variable_declaration type:";
     let fresh = fresh.root_node().to_sexp();
     let incremental = incremental.root_node().to_sexp();
-    assert!(fresh.contains("local_variable_declaration"), "{fresh}");
+    assert!(fresh.contains(typed), "{fresh}");
     assert!(
-        !incremental.contains("local_variable_declaration"),
+        !incremental.contains(typed),
         "the reparse now matches the parse from scratch: {incremental}",
     );
 }

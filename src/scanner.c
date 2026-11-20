@@ -32,8 +32,8 @@
 // hands such a `}` back to the parser when it reused the body whole;
 // §6.20 MULTI_ASSIGNMENT_COMMA, the first `,` of `(a, b) = …`, emitted
 // unless the parentheses go on as a method's parameters; and §6.21
-// DECLARATION_START, an empty token before the type of a typed declaration
-// whose first name has no initializer (`String s`, `int a, b`), which the
+// DECLARATION_START, an empty token before the type of a statement's typed
+// local declaration (`String s`, `int a, b`, `String s = 'a'`), which the
 // statement's first name decides with COMMAND_STATEMENT_START.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
@@ -814,7 +814,7 @@ static bool skip_comment_body(TSLexer *lexer) {
 // it: a call's last argument ends at it (`foo a, b` then the next
 // statement). `;`, a closing bracket with none open and the end of the
 // budget, `budget` items, end the look-ahead with no `->`. §6.21 reads the
-// same after the `=` of a later declared name (`{ String a, b = 1 -> }`).
+// same after the `=` of a declared name (`{ String a = 1 -> }`).
 static bool parameters_follow(
     TSLexer *lexer,
     unsigned budget,
@@ -2054,13 +2054,13 @@ static bool is_reserved_variable_name(const char *word, unsigned len) {
     return is_reserved_bare_lambda_name(word, len);
 }
 
-// SPECIFICATION.md §6.21 — the most the look-ahead of a declaration without
-// an initializer reads, in items: a name of its list, a word, a bracket or
-// another character of its type arguments, and of a later name's default
-// the items `parameters_follow` counts. That default is read to the `->`
+// SPECIFICATION.md §6.21 — the most the look-ahead of a typed declaration
+// reads, in items: a name of its list, a word, a bracket or another
+// character of its type arguments, and of a name's initializer the items
+// `parameters_follow` counts. That default is read to the `->`
 // that would make the list closure parameters, so in a nest of closures
-// that open with such a list (`{ T a, b = { T a, b = { …`), and on lines of
-// a broken one, each declaration reads the rest of the nest; with the bound
+// that open with a declaration (`{ T a = { T a = { …`), and on lines of a
+// broken list, each declaration reads the rest of the nest; with the bound
 // each reads at most this many items, and the parse stays linear. Type
 // arguments or a list of names longer than this are read as before, the
 // type followed by its names as statements; a default that runs past the
@@ -2229,23 +2229,21 @@ static bool next_line_continues(
 }
 
 // After the first declared name of a typed declaration and the spaces after
-// it (`String s`): whether the declaration has no initializer there, which
-// the typed form with one does not take. It ends on the line, past spaces
-// and block comments, at `;`, `}`, `else`, the end of input or a line comment,
-// or at a line break where the next line does not go on with it
-// (`next_line_continues`). Or a list of names follows, each after a `,` and
-// Groovy's trivia (`String a, b`), which ends there as well or at the `=` of
-// a later name's initializer, on its line or the next (`String a, b = 1`),
-// unless `->` ends the list (`{ String a, b = 1 -> }`), which makes closure
-// parameters (`parameters_follow`). `=` after the first name, on its line or
-// the next, is the typed form with an initializer (`String s = 1`), and `->`,
-// `(`, a name or anything else on the line is no declaration without one.
+// it (`String s`): whether the declaration ends or goes on as a declaration.
+// It ends on the line, past spaces and block comments, at `;`, `}`, `else`,
+// the end of input or a line comment, or at a line break where the next line
+// does not go on with it (`next_line_continues`). Or a list of names follows,
+// each after a `,` and Groovy's trivia (`String a, b`), which ends there as
+// well. Or the `=` of a name's initializer follows, on its line or the next
+// (`String s = 1`, `String a, b = 1`), unless `->` ends the list
+// (`{ String a = 1 -> }`), which makes closure parameters
+// (`parameters_follow`); the parser then reads the initializer. `->`, `(`, a
+// name or anything else on the line is no declaration.
 static bool declaration_end_follows(
     TSLexer *lexer,
     unsigned *items,
     bool no_close_ahead
 ) {
-    bool first = true;
     for (; *items < DECLARATION_LOOKAHEAD_ITEMS; (*items)++) {
         bool slash = false;
         if (!skip_line_extras(lexer, true, no_close_ahead, &slash)) {
@@ -2275,9 +2273,6 @@ static bool declaration_end_follows(
             c = '=';
         }
         if (c == '=') {
-            if (first) {
-                return false;
-            }
             advance(lexer);
             return lexer->lookahead != '=' && lexer->lookahead != '~'
                 && !parameters_follow(lexer,
@@ -2303,15 +2298,13 @@ static bool declaration_end_follows(
         if (is_reserved_variable_name(name, len)) {
             return false;
         }
-        first = false;
     }
     return false;
 }
 
 // After the type of a declaration: whether, after spaces, tabs and line
 // escapes, a name follows on the line, no keyword Groovy reserves, and then
-// the end of a declaration without an initializer
-// (`declaration_end_follows`). Between the type and the name nothing else is
+// the end of a declaration or its initializer (`declaration_end_follows`). Between the type and the name nothing else is
 // skipped, as between a receiver and a name argument (§6.14).
 static bool declared_name_follows(
     TSLexer *lexer,
@@ -2437,7 +2430,7 @@ static bool scan_dotted_statement_start(
 // capitalized or a primitive type name, and the spaces after it, at a name:
 // a call whose first argument starts with `new` or is an array type value
 // (`Foo new Bar()`, `Foo String[].class`, COMMAND_STATEMENT_START), or a
-// declaration without an initializer (`String s`, DECLARATION_START). Such a
+// declaration (`String s`, `String s = 'a'`, DECLARATION_START). Such a
 // receiver takes no other name as an argument (`may_name_type`), so each
 // statement that starts with two names is a call, a declaration or neither,
 // and never both.

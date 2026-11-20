@@ -1736,7 +1736,7 @@ foo()
       arguments: (argument_list))))
 
 ==================
-Untyped blank final before a typed local reads as a typed blank final
+Untyped blank final before a typed local is two declarations
 ==================
 
 final a
@@ -1746,12 +1746,12 @@ String b = 'y'
 
 (source_file
   (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
     type: (type_identifier)
-    name: (identifier))
-  (expression_statement
-    (assignment_expression
-      left: (identifier)
-      right: (string_literal))))
+    name: (identifier)
+    value: (string_literal)))
 
 ==================
 Annotated local declarations in a script
