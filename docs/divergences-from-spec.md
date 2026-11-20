@@ -295,20 +295,64 @@ positions: generics (`List<String>`), array dimensions
   same stack nodes. Defining `field_access` before
   `cast_expression` turned every such type into field accesses.
 
+  The weight is on `_dotted_type` only. The dotted base of a
+  generic or array type, a `qualified_type` under `generic_type` or
+  `array_type`, carries none, so between that reading and the field
+  accesses the last resort still decides: `x as Map.Entry<C> + x`
+  reads the generic cast, and reads field accesses and comparisons
+  once the cast rules are defined after the others.
+
   The weight is half a step: every other weight is a number of
   steps of `WEIGHT_UNIT` (`weighted` in `grammar.js`), so it decides
   only between readings that the steps leave tied, as long as they
   differ in fewer than `WEIGHT_UNIT` dotted cast types. A whole step
-  would tie `CAST_WEIGHT`: `(x) instanceof a.b` also reads the cast
-  of a name `instanceof` (`instanceof` is not reserved) followed by
-  the statement `a.b`, which wins by `CAST_WEIGHT`. Ties it does
-  decide were decided by the last resort before. One clean tree in
-  1.12 million fuzz inputs changed so, and none in the corpus, the
-  Groovy files or 20,910 Java files: `def v = (x) as a.b.c y`, then
-  `y = 1` and `f(1)`, reads `(x) as a.b.c` and a typed local
-  `y y = 1` where it read the cast `(x)` of the name `as`, the call
-  `a.b.c y` and an assignment (`operators-as-cast.txt`). Groovy 3
-  reads neither, but `def v = ((x) as)(a.b.c).y` and `y = 1`.
+  would tie readings that a step ranks now: `(x) as a.b` also reads
+  the cast `(x)` of the name `as`, as Groovy does, followed by the
+  statement `a.b`, and that reading outweighs the dotted cast
+  `(x) as a.b` by `CAST_WEIGHT`.
+
+  The ties the weight decides were decided by the last resort
+  before. A fuzz of about 1.97 million inputs around these operators
+  changed 2,903 clean trees and turned none into an `ERROR`; the
+  corpus, the Groovy files and 20,910 Java files keep every clean
+  tree. Most of the changes read as Groovy does:
+
+  - `x`, then `f() as a.B` (or `instanceof`, `!instanceof`), then
+    `y = 1` at the end of the input is the cast and an assignment
+    (about four in five of the changes). It read a bodiless method
+    `x f()`, the name `as` and a typed local `a.B y = 1`, and still
+    does with a plain type (`f() as B`), which has no weight.
+  - A generic type with a dotted base followed by another `as`,
+    `instanceof` or `!instanceof` and a dotted type
+    (`y as a.B<C> instanceof c.D` after a line) is the cast and the
+    test. It read field accesses and comparisons.
+  - `(x) as instanceof x.a` then `x = T`, and
+    `(x) in (x) instanceof x.a`, test the cast `(x)` of the name
+    `as` or of the call `in(x)`. They read a cast to the type
+    `instanceof` and a typed local `x.a x = T`, and a cast `(x)` of a
+    name `instanceof` followed by `x.a`.
+  - A record after a field whose value is a cast to a dotted type
+    (`def f = (T) x as a.T`, then `record R(int a) { R { } }`) is
+    that field and the record. The field split into fields and a
+    constructor.
+
+  Two kinds moved away from Groovy's reading:
+
+  - `def v = (x) as a.b.c y`, then `y = 1` and another statement,
+    reads `(x) as a.b.c` and a typed local `y y = 1`
+    (`operators-as-cast.txt`). It read the cast `(x)` of the name
+    `as`, the call `a.b.c y` and an assignment, closer to Groovy 3's
+    `def v = ((x) as)(a.b.c).y` and `y = 1`. The new reading is the
+    one those lines have without the statement after them, and that
+    `(x) as a.b y` then `y = 1` had before the weight.
+  - Type arguments after a dotted name of three or more parts at the
+    start of a line (`x //`, then `f() as a.b.C<T>`, then `y = 1`)
+    read the cast to `a.b.C` and comparisons,
+    `(f() as a.b.C) < T > y = 1`. A tie kept them in a typed local
+    `a.b.C<T> y = 1` after a bodiless method `x f()`. Groovy reads
+    the cast to `a.b.C<T>` and `y = 1`; the grammar does not take
+    such arguments (below).
+
   Taking the dot statically for the type would end the fork, but
   turn the inputs on which only the field accesses parse
   (`x as a."b"`, `x as a.new`) into `ERROR`s.
@@ -317,9 +361,17 @@ positions: generics (`List<String>`), array dimensions
   dimensions after a dotted name (`x instanceof a.B[]` is an
   `ERROR`) and type arguments after a name of three or more parts
   (`x as java.util.List<String>`). A name of two parts takes them,
-  but before a line that starts with an expression the field
-  accesses win (`x as a.B<C>` then `y` reads `x as a`, `.B < C`,
-  `> y`).
+  but the last resort ranks that type against the field accesses
+  (above), and before a line that starts with an expression the
+  field accesses win (`x as a.B<C>` then `y` reads `x as a`,
+  `.B < C`, `> y`).
+
+  A bug, not yet fixed: `(x) instanceof T` and `(x) !instanceof T`
+  read the cast `(x)` of a name `instanceof`, followed by the
+  statement `T` (`return (x) instanceof Foo`,
+  `def ok = (x) instanceof Foo`). `instanceof` is reserved (spec
+  §5.2) and Groovy reads the test of `(x)`; here the word lexes as a
+  name where the keyword has no action.
 - Generics (`List<String>`) ✓ via `generic_type`, with bounded
   wildcards (`? extends Foo`, `? super Bar`), nested arguments
   (`Map<String, List<Integer>>`), qualified bases
@@ -330,8 +382,11 @@ positions: generics (`List<String>`), array dimensions
   base name without intervening whitespace — preserving `a < b` as
   a binary comparison.
 
-**Action**: none for the readings above. `x as (java.util.Map)`
-is no cast: it reads `x` and a call of `as`, as in Groovy 3.
+**Action**: array dimensions and type arguments after a dotted name,
+the ranking of a dotted generic or array type, and `(x) instanceof T`
+are open. `x as (java.util.Map)` is no cast here: it reads two
+statements, `x` and a call of `as`, where Groovy 3 reads one, the
+command call `x(as(java.util.Map))`.
 
 ---
 

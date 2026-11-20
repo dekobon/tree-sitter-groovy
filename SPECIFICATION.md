@@ -266,7 +266,8 @@ Notes on the corrected ordering versus v1 of this spec:
   `qualifiedClassName` takes every name and dot before the last
   name. The same tokens also parse as field accesses on `x as a`,
   which a weight on the type ranks below it
-  (`DOTTED_CAST_TYPE_WEIGHT`, `docs/divergences-from-spec.md` §5).
+  (`DOTTED_CAST_TYPE_WEIGHT`); a dotted base of a generic or array
+  type is not ranked yet (`docs/divergences-from-spec.md` §5).
 
 ### 3.2 Operator → node kind map
 
