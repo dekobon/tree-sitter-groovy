@@ -3320,8 +3320,8 @@ call `s /x/`, `String s` then `(a) { }` the method `s`, `String s` then
 was checked by the declarations of the changed lines: on every new
 declaration in the 1,970 Java files of 24,548 that changed to a tree with
 no `ERROR` (4,215 names, all agree; Groovy rejects 250 of the files), on
-2,414 of the 2,680 changed fuzzed inputs with no `ERROR` before or after
-that Groovy accepts (the grammar before agreed on 237), and on the
+2,370 of the 2,613 changed fuzzed inputs with no `ERROR` before or after
+that Groovy accepts (the grammar before agreed on 214), and on the
 corpus. The rest are two kinds of
 input where Groovy reads something this grammar has no reading for: a
 second statement on the line of a first (`foo() String s` is `foo()` and
@@ -3347,7 +3347,7 @@ stay an `ERROR` (§4). In an interpolation no statement is taken, so
 
 Of 394,000 fuzzed inputs made from templates of types, names, separators
 and what may follow them in 70 contexts and from mutations of the corpus,
-the real files and the Java files, 142 went from no `ERROR` to one, and
+the real files and the Java files, 137 went from no `ERROR` to one, and
 Groovy 3 rejects all but 12: three where a closure on the next line is
 followed by a `,` (`Integer _` then `{ }, b`, Groovy's call
 `Integer(_({ }), b)`), six where Groovy reads `in` after a declared name
