@@ -71,7 +71,9 @@ The default branch is **`main`**.
   it emits nothing (§6.10). Its state is two bits, "no `*/` from
   here on" and "the body goes on past the token that follows", carried
   by an empty hidden token emitted at the first unterminated `/*` (§6.6)
-  and after such a `}` that a comment, `as` or `in` follows (§6.19).
+  and after such a `}` where the body goes on past a comment, or past
+  `as` or `in`, which the scanner reads (§6.19); the next call clears
+  the second.
   GString interpolation, automatic semicolons and label
   colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
