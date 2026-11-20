@@ -32,7 +32,7 @@ reasoning here.
 | §5.13 Trailing commas | **Done** | accepted in list / map / argument / enum-constant lists. A parameter list takes none, as in Apache's `formalParameterList`. |
 | §5.14 Method reference `::` | **Done** | identifier and `new` targets. |
 | §5.15 Parenthesized type cast | **Done** | distinct `parenthesized_type_cast` node kind. |
-| §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). A `{` that is the body of `if`, `else`, a loop, an arrow case or a lambda, or that opens a statement, is a block before a closure, as in Groovy, also when it holds a lambda (`if (x) { a = b -> c }`, `{ a = b -> c }`), and so is each block of a nest of lambdas at any depth. An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`; see #26 and #28 below. |
+| §5.16 Lambda expressions | **Mostly done** | `lambda_expression` with `parameters` (`formal_parameters` or one `identifier`) and `body` (a block, an expression or a parenthesis-free call), each form where Apache takes it. Not accepted where Groovy takes one: a lambda as a call's parenthesis-free or appended argument (`foo (x) -> x`), a lambda without parentheses as a named argument of a parenthesis-free call (`foo a: x -> x`), and a lowercase parameter type (`(foo a) -> a`). A `{` that is the body of `if`, `else`, a loop, an arrow case or a lambda, or that opens a statement, is a block before a closure, as in Groovy, also when it holds a lambda (`if (x) { a = b -> c }`, `{ a = b -> c }`), and so is each block of a nest of lambdas at any depth, but for a `{` that opens a statement and holds a lambda whose body is a closure (`{ a = b -> { p -> p } }`), which is the closure with the parameter `a`. An assignment in a closure parameter's default or a case value, and `var` called in parentheses there, read as a lambda before `->`; see #26 and #28 below. |
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead. |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
@@ -49,7 +49,7 @@ reasoning here.
 | §6.18 STATEMENT_PAREN | **Mostly done** | a `(` that opens a line after an expression, emitted where a statement may start and the parentheses can open one, so that it opens the next statement as in Groovy (`foo()` followed by `(a, b) = l`); a call's arguments do not take it. Inside parentheses and brackets the `(` still calls. Parentheses that cannot open a statement (`(a, b)`, `(a: 1)`, `()`) stay a call's arguments, and a block comment that opens the line hides the line break; see #3 below. |
 | §6.17 LAMBDA_START, BARE_LAMBDA_START | **Done** | empty tokens before a lambda's `(` and before its one name without parentheses, emitted only when `->` follows; the `(` is read where an expression may start and none ends, within 256 items. See #26 below. |
 | §6.15 ARRAY_VALUE_START, TYPE_START | **Mostly done** | an empty token before an array type that is a value (`String[].class`, `int[]::new`, `@A(String[])`), emitted when a primitive or capitalized name and `[]` follow; where a type may also start, only when `.name`, `.&` or `::` follows the dimensions. `TYPE_START` is never emitted and marks where a type may start. Package-qualified, lowercase and generic element types, and a bare `String[]` where a type may start, are not taken (see #21 below). |
-| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, and `return` then a brace on the next line; see #28 below. |
+| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, `return` then a brace on the next line, a brace that holds a lambda whose body is a closure, and two lines of braces after a lambda where the readings differ by a step (`def c = { a = (b) -> (d) -> e` then `{ z }` twice); see #28 below. |
 | §6.21 DECLARATION_START | **Mostly done** | an empty token before the type of a statement that is a typed declaration by Apache's `isInvalidLocalVariableDeclaration` (`String s`, `foo.Bar q`, `foo<T> x`, `int a, b`, `String s = 'a'`), emitted where a statement starts, after annotations and as a `for` init, when the declaration ends on the line, the next line does not go on with it, or an initializer follows. Decided from the same reading of the first name as `_command_statement_start`, so `foo bar` stays a call. See #27 below. |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
@@ -1911,8 +1911,11 @@ The Groovy column was observed by running Groovy 3.
 | `{ }()`, `{ }.call()`, `{ } as Runnable`, `{ } + 1`, `{ }[0]`, `{ } { b }`, `{ }` then `.call()`, `* 2` or `?.x` on the next line | the closure called, cast, added, subscripted, given a closure, multiplied | the same, as before |
 | `{ a -> }`, `{ -> 1 }`, `{ a, b -> a }` that open a statement | a closure | the same, as before |
 | `foo()`, `foo` or `x = 1` then `{ a }` on the next line | `foo({ a })`, `x = 1({ a })` | the same, as before (#11 above) |
-| `{ } foo`, `{ } 1` | the closure called with `foo`, `1` | a block and a statement; before, a closure and a statement |
-| `println 1` or `foo { a }` then `{ b }` on the next line | `{ b }` one more argument of the call | a block; before, a closure statement |
+| `{ } foo`, `{ } 1`, `{ } !x`, `{ } ~x`, `{ } new A()` | the closure called with `foo`, `1`, `!x`, `~x`, `new A()` | a block and a statement; before, a closure and a statement |
+| `println 1` or `foo { a }` then `{ b }` on the next line, `foo { a } { b }` | `{ b }` one more argument of the call | a block; before, a closure statement |
+| `def c = { a = (b) -> (d) -> e` then two or more lines of `{ z }` and `}`; `{ a = b -> c` then two or more lines of `{ z }` and `}` | the parameter `a = (b)` and the lambda `(d) -> e` called with each `{ z }`; a block that holds `a = (b -> c({ z }, …))` | the parameter `a` with the default `(b) -> (d)`, the call `e { z }` and blocks; the closure with the parameter `a = b`, the call `c { z }` and blocks. Before, the same readings with closure statements for the blocks in the second, and Groovy's reading in the first: each block weighs a step, the call `e { z }` takes no second closure (the row above), and the readings differ by one step (spec §5.16) |
+| `{ a = b -> { p -> p } }` that opens a statement, also after a label and in a colon case | a block that holds the lambda | the closure with the parameter `a`, as before: a statement block's step does not make up a lambda whose body is a closure (spec §5.16) |
+| `def c = { a = b -> { p -> p }` or `if (x) { a = (b) -> { }` then eight lines of `{ z }` and `}` | the parameter `a` and the closure called with each `{ z }`; the block of the `if` and the lambda called with each `{ z }` | the same, up to 75 such lines (`LAMBDA_NESTING_DEPTH` 100); at a depth of 10 eight lines read the lambda and a block per line, or a closure for the `if`'s body |
 | `{ }` then `as T` or `in l` on the next line | a block and `as(T)`, `in(l)` | the closure cast or tested, as before |
 | `return` then `{ }` on the next line | `return`, then a block | `return { }`, as before: a line break is whitespace |
 | `{ }` then `()`, `(a, b)` or `++` on the next line | rejected | a block and an `ERROR`; before, the closure called or incremented |
@@ -1925,16 +1928,21 @@ second Groovy has none.
 Measured on 8,448 inputs of brace shapes in statement positions
 (spec §6.22): 1,360 trees changed, 1,080 to Groovy's reading and 280 from
 a reading Groovy does not have to another (the rows of `{ } foo` and of a
-brace after a command); no input that read as Groovy does reads otherwise.
+brace after a command); no input of that set that read as Groovy does
+reads otherwise. Outside it some do: the two lambda templates below, and
+of 5,600 inputs of a lambda before lines of braces, calls or closures, 12,
+each the parameter `a = (b)` before `(d) -> e` and lines of braces (the
+row above); with the depth at 10 it was 116.
 The 11 corpus trees and 152 of the 24,548 Java files that changed with no
 `ERROR` are each a brace that opens a statement, now a block, two of them
 on consecutive lines included; no real Groovy file changes. Of 231,760
-mutations, 41 gained an `ERROR`, each the `()`, `(a, b)` or `++` row
-above, which Groovy rejects.
+mutations, 41 gained an `ERROR` (40 with the depth at 100), each the
+`()`, `(a, b)` or `++` row above, which Groovy rejects.
 
 A block that ends a lambda's brace body weighs as much as one that opens
 a statement, and the lambda in it a step less, so the nests of #26 read
-as blocks at any depth: `if (x) { a = b -> { c = d -> { p -> p } } }`,
+as blocks at any depth, but for the row of `{ a = b -> { p -> p } }` above:
+`if (x) { a = b -> { c = d -> { p -> p } } }`,
 `x -> { a = b -> { p -> p } }` and nests of more than ten lambdas, which
 read as closures with parameters before (the rows of #26 that name
 #28), are Groovy's blocks now. Of the 61,246 lambda template inputs of
@@ -1949,9 +1957,22 @@ is the name `def`. The other 519 match in neither; 3 of them
 hold a closure in a method parameter's default, which the comparison does
 not see in Groovy's tree.
 
+Two JDK test files whose class holds fields with Java array
+initializers, one empty and the others with a trailing comma
+(`String[] n = { };` then `OpenType[] t = { SimpleType.LONG,
+SimpleType.STRING, };`), had an `ERROR` at each comma in the class and
+are one `ERROR` for the whole file now; no variant of the grammar or its
+weights tried avoids it.
+
 **Action**: the four rows that read otherwise than Groovy with no
 `ERROR` would need the scanner to know the call before the brace (a
 command's arguments, `return`) or whether the braces parse as a block
-(`as`, `in`), which it does not read. The row of nine comments is the
+(`as`, `in`), which it does not read. A command with a closure that took
+the closures after it, as Groovy does, was tried for the call row and its
+step-only consequence: it read `foo { a }` then `{ }()`, `{ }.x` or
+`{ } * 2` on the next line as an `ERROR`, as a call without parentheses
+cannot be continued, in 646 of 66,076 mutated inputs. The lambda whose
+body is a closure would need a block weight above the demoted lambda's,
+which would add up over the blocks of a file. The row of nine comments is the
 bound of spec §6.19; a closure past the bound would cost 31 bytes read
 per byte of input on runs of 255 comments, against 1.2 (spec §6.22).

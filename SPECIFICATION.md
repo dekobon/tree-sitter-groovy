@@ -1251,7 +1251,7 @@ A parenthesized expression after `_lambda_start`
 that is a name after `_bare_lambda_start` (`_bare_lambda_name`) keep the
 closure's reading; the lambda's negative weight (`LAMBDA_WEIGHT`) ranks
 a lambda below it. A lambda whose whole body is a closure ranks below
-ten lambdas (`DEMOTED_LAMBDA_WEIGHT`), one whose whole body is a
+a hundred lambdas (`DEMOTED_LAMBDA_WEIGHT`), one whose whole body is a
 parenthesized expression one step below a lambda
 (`PARENTHESIZED_BODY_WEIGHT`), and a block in the body of `if`, `else`,
 a loop or an arrow case outweighs a lambda whose body is a closure
@@ -1262,14 +1262,43 @@ statement (§6.22), outweighs the lambda in it by one step
 lambda's weight. The closure reading makes the first assignment in the
 braces a parameter, so it holds a lambda less and loses that step, and
 the blocks win for nests of any depth, each in the block of the one
-before: `if (x) { a = b -> { p -> p } }`, `if (x) { a = b -> { c = d -> e } }`,
-`f(x -> { a = b -> { c = d -> e } })`, `x -> { a = b -> { p -> p } }`
-and `{ a = b -> { c = d -> e } }` that opens a statement are blocks, as
-in Groovy. The step is on every block rather than on the outermost one:
-tree-sitter keeps a few stack versions only, those of the highest weight
-so far, and a weight that only the last `}` of a nest added let a reading
-of closures that had gained the weight of a statement block early push
-the blocks' reading out at ten lambdas. And
+before: `if (x) { a = b -> { p -> p } }`,
+`if (x) { a = b -> { c = d -> e } }`, `f(x -> { a = b -> { c = d -> e } })`,
+`x -> { a = b -> { p -> p } }` and `{ a = b -> { c = d -> e } }` that
+opens a statement are blocks, as in Groovy. A `{` that opens a statement
+and holds a lambda whose body is a closure, `{ a = b -> { p -> p } }`,
+also after a label and in a colon case, is the closure with the parameter
+`a`, where Groovy reads a block that holds the lambda: the block's one
+step does not make up the demoted lambda's weight, and a block weight that
+did would add up over the blocks of a file. The step is on every block
+rather than on the outermost one: tree-sitter keeps a few stack versions
+only, those of the highest weight so far, and a weight that only the last
+`}` of a nest added let a reading of closures that had gained the weight
+of a statement block early push the blocks' reading out at ten lambdas.
+
+Because the step is on every block, a reading gains one for each line of
+braces it takes for blocks where another takes them for closures that a
+call takes: `def c = { a = b -> { p -> p }` followed by lines of `{ z }`
+is the parameter `a` and a closure called with each `{ z }` in Groovy, and
+also a lambda whose body is a closure and a block per line. The demoted
+lambda and the body block weigh enough that such lines change no reading
+below 75 of them (`LAMBDA_NESTING_DEPTH` is 100; it was 10, and eight lines
+were enough). Of 5,600 inputs, 40 forms of such a lambda in seven contexts
+followed by 1 to 20 lines of braces, of calls with a closure, of closures
+with parameters or of braces after `;`, Groovy 3 reads 2,673 as the
+grammar now does; 116 that the grammar before blocks read as Groovy does
+read otherwise with the depth at 10, and 12 at 100, all the next case.
+Where the readings differ by a step only, two lines do:
+`def c = { a = (b) -> (d) -> e` followed by `{ z }` twice is the parameter
+with the default `(b) -> (d)`, the call `e { z }` and a block, where Groovy
+reads the parameter `a = (b)` and the lambda `(d) -> e` called with both
+closures, and `{ a = b -> c` followed by `{ z }` twice and `}` is the
+closure with the parameter `a = b`, the call `c { z }` and a block, where
+Groovy reads a block. Both come from a call of a name with a closure,
+`e { z }` and `c { z }`, which takes no closure after its first: Groovy
+reads `foo { a }` followed by `{ b }` as `foo({ a }, { b })`, and the
+grammar as the call and a block (`docs/divergences-from-spec.md` §28).
+
 `{ a = (b) -> (d) -> e }` keeps the parameter `a = (b)` and the body
 `(d) -> e`, as Groovy, which tries the parenthesized expression first at
 each `(`, reads it. Where the parentheses before the first `->` hold
@@ -3465,9 +3494,10 @@ continues there. The scan is §6.19's, with the state's valid tokens:
 STATEMENT_PAREN and RECORD_KEYWORD are valid after such a `}`, so after a
 line break `(`, `+`, `-`, `{`, `[`, a slashy string and type parameters
 start the next statement, and the other operators continue the braces.
-On the line of the `}` every operator, `(`, `[`, `{`, `as` and `in`
-continue them; a word, a literal, `;`, `}` and the end of the input end
-them.
+On the line of the `}` every binary and postfix operator, `(`, `[`,
+`{`, `as` and `in` continue them; a word, `new` included, a literal, `!`
+other than `!=`, `!in` and `!instanceof`, `~`, `;`, `}` and the end of the
+input end them.
 Where only STATEMENT_BLOCK_END is valid, after a block the parser shifted
 whole or read beside another reading of the braces, decide as §6.19 does
 there (BODY_END_HAND_BACK) and emit LAMBDA_BODY_REREAD where it continues.
@@ -3501,8 +3531,10 @@ inside parentheses, so that reading ended. In the state after a block
 shifted whole the scan hands back every `}` that §6.19 hands back, as
 after a lambda's block: with a scan that took a statement to follow
 there, 76 of 60,000 random edit sequences around such blocks reparsed to
-a tree other than a parse from scratch, against 45, the added ones all in
-trees with an `ERROR`.
+a tree other than a parse from scratch, against 45: the 31 added have an
+`ERROR` both ways, and the one without an `ERROR`, a tie of weights, is
+among both counts (`bindings/rust/tests/incremental_reparse.rs` pins an
+added one).
 
 Measured against Groovy 3 on 8,448 inputs, 24 contexts (a script, a
 method, a closure, a block, a label on the line or the one before,
@@ -3514,8 +3546,11 @@ after the `}`, classified by what the node at the `{` is in Groovy's AST
 and in the tree: 1,360 trees changed. 1,080 now read as Groovy does where
 the grammar before did not: a block where it read a closure statement,
 two blocks where it called a closure with a closure, and a block and a
-statement where it added `+ 1` on the next line. No input that the
-grammar before read as Groovy does reads otherwise. 280 changed and read
+statement where it added `+ 1` on the next line. No input of this set
+that the grammar before read as Groovy does reads otherwise; outside it
+some do: two of the lambda templates (`docs/divergences-from-spec.md`
+§28) and a lambda before two or more lines of braces where the readings
+differ by one step (§5.16). 280 changed and read
 otherwise still: a word or a literal after the `}` on its line
 (`{ } foo`, Groovy's `{ }.call(foo)`) and a brace on the line after
 `println 1` or `foo { a }`, which Groovy passes to that call as one more
@@ -3535,7 +3570,10 @@ Groovy calls the closure with it; a `{` on the line after `println 1`
 or `foo { a }` opens a block, where Groovy adds it to the call's
 arguments; `return` followed by `{ … }` on the next line returns the
 closure, where Groovy reads `return` and a block, as a line break is
-whitespace here (§5.10); and more than eight comments between the `}`
+whitespace here (§5.10); a block that holds a lambda whose body is a
+closure is the closure with the lambda's assignment for a parameter, and
+`{ a = b -> c` followed by two lines of braces is too (§5.16); and more
+than eight comments between the `}`
 and an operator end the block (§6.19), which leaves the operator an
 `ERROR` where the grammar before read the closure as Groovy does. Taking
 the braces for a closure past the bound instead has the scan run again
@@ -3552,24 +3590,34 @@ a label and a case, all of them that kind
 
 Measured against the grammar before this section: STATE_COUNT 4637 to
 4655, LARGE_STATE_COUNT 1773 to 1784, SYMBOL_COUNT 396 to 397, `parser.c`
-9,328,518 to 9,395,185 bytes, one external token and no conflict added.
+9,328,518 to 9,395,199 bytes, one external token and no conflict added.
 The 266 real Groovy and Gradle files and code made of conditions,
 closures, calls, class bodies, lambdas, parentheses, names, GStrings and
 parenthesis-free calls take 0.02% to 0.09% more instructions, the 24,548
-Java files 0.14% fewer, and code made only of braces that open
-statements 6.3% more, 1% of it the scan. No tree of the 266 real files
+Java files 0.14% fewer. Code that holds blocks that open statements
+takes 2.8% to 10.4% more (lines of `{ a() }` and `foo()`, `{ a() }` in
+methods, class bodies with initializers and such blocks, lines of
+`{ a() };`), about 1% of it the scan and the rest the token and the
+block's reductions, and code made only of consecutive lines of such
+blocks 28.7% more, which the grammar before read as one closure called
+with the next. No tree of the 266 real files
 changes. Of the corpus inputs 11 trees without an `ERROR` change, and of
 the Java files 152, each only by braces that open statements, now
 blocks, also where two followed each other on consecutive lines and read
 as a closure called with a closure; 587 Java files with an `ERROR`
 change, 346 only by such blocks, and their bytes in an `ERROR` go from
-1,366,605 to 1,375,607, nearly all in two files whose fields take Java
-array initializers, where the error recovery now takes the whole class
-into an `ERROR`. Of 231,760 mutations of
+1,366,605 to 1,375,607, nearly all in two JDK test files whose class
+holds fields with Java array initializers, one of them empty and the
+others with a trailing comma (`OpenType[] t = { SimpleType.LONG,
+SimpleType.STRING, };` after `String[] n = { };`): the error recovery,
+which kept the class and an `ERROR` at each comma, now takes the whole
+file for one `ERROR`. No variant of the grammar or its weights tried
+avoids it. Of 231,760 mutations of
 the corpus, the truth-table inputs, lambda templates, real files and
 Java files, 41 lost a tree without an `ERROR`, each a brace that opens a
 statement followed on the next line by what no statement starts with
-(`()`, `(a, b)`, `++`), which Groovy 3 rejects in all 41. Over 18,000
+(`()`, `(a, b)`, `++`), which Groovy 3 rejects in all 41; with
+`LAMBDA_NESTING_DEPTH` at 100, 40 of them. Over 18,000
 sequences that type and delete what follows such a `}` and 60,000 random
 edits around such blocks, the reparses that differ from a parse from
 scratch went from 0 and 53 to 42 and 45, one of the 45 without an
