@@ -1847,7 +1847,7 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `return x -> x`, `[x -> x]`, `c ? x -> x : y`, `foo 1, x -> x`, `a -> b -> c`, `x -> x` as a statement | rejected | an `ERROR`, as before |
 | `foo (x) -> x`, `list.each (x) -> println x`, `foo()` then `(a) -> a` on the next line | `foo((x) -> x)` | the call `foo(x)` and an `ERROR`, as before: the scanner does not read the arguments of a call (spec §6.17) |
 | `foo a: x -> x` | rejected by Groovy 3, a call in 5.0.x and later | an `ERROR`, as before: in a parenthesis-free call's named argument only a lambda with parentheses is taken (`foo a: (x) -> x`). With it, the grammar grew by about 50 states |
-| `(foo a) -> a` | a lambda with the parameter type `foo` | an `ERROR`, as before: the parentheses read as the call `foo a` (spec §6.14) |
+| `(foo a) -> a`, `def f = (foo bar) -> 1`, `(x x) -> x`, `foo((foo bar) -> 1)` | a lambda with the parameter type `foo` (`x`), observed with Groovy 3 | an `ERROR`, as before: the parentheses read as the call `foo a` (spec §6.14); a capitalized or dotted type (`(Foo bar) -> 1`, `(foo.Bar b) -> 1`) is a lambda |
 | `foo(null -> 1)`, `foo(int -> 1)`, `(int) -> 1`, `(if) -> 1` | rejected | an `ERROR`, as before: a reserved word, a primitive type or `void` names no parameter |
 | `(_) -> 1`, `_ -> 1`, `var -> var`, `(String this) -> 1` | a lambda | the same |
 | `def c = { a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }`, `{ a = (b) -> { } }`, as a value or an argument | the closure parameter `a` with a default | the same, as before |
@@ -1926,6 +1926,21 @@ corpus, the 266 real files or the 24,548 Java files is among them:
 
 Of 116,000 mutations of the corpus, real and Java inputs, the third
 kind accounts for the only 2 changed trees that had no `ERROR`.
+
+Two limits are known (spec §6.17). Nested lambdas whose bodies are
+expressions, `x = (a) -> (a) -> … a`, parse in time quadratic in the
+nesting: 1.1 seconds at 4,000 levels and 28.6 at 20,000 (140 KB),
+where block bodies take a fraction of that; a cast's operand
+(`(T) (a) -> …`), a sum, a ternary's branch and nests in a closure
+parameter's default, a closure's first statement and a case value do
+the same. Nests with block bodies, in arguments and of closures are
+linear, and real code nests a few lambdas. A grammar fix that left
+some of the nests quadratic was not taken. And a reparse can read a
+closure parameter's default otherwise than a parse from scratch:
+typing `{` before `T a = (b, c) -> (d) -> e }` reuses the lambda
+`(d) -> e`, so the closure's body declares `a`, where a parse from
+scratch reads the parameter `T a` with the default `(b, c) -> (d)`, as
+Groovy 3 does; neither tree has an `ERROR`.
 
 **Action**: the call forms in the fourth row would need the scanner to
 read every call's arguments; measured on code made of calls, the

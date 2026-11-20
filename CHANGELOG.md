@@ -157,7 +157,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   continues the body, which end it, and the `{` of a lambda in
   parentheses that also reads as a closure with a parameter
   (`def v = (a) -> { b = (c) -> { } }.call()`); see
-  `docs/divergences-from-spec.md` §26.
+  `docs/divergences-from-spec.md` §26. Nested lambdas whose bodies are
+  expressions (`x = (a) -> (a) -> … a`) parse in time quadratic in the
+  nesting, 1.1 s at 4,000 levels (`SPECIFICATION.md` §6.17).
 - Typed local declarations without an initializer: `String s`,
   `int i;`, `List<String> xs`, `foo.Bar q`, `java.util.List<String> l`,
   `String a, b`, `@Field String x` and the init of

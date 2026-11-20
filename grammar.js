@@ -3326,7 +3326,10 @@ module.exports = grammar({
     // after the `->` or the end of the case ends it; where both survive, the
     // lambda's weight ranks it last. Elsewhere this reading ends at the `->`,
     // which nothing else takes after an expression, two tokens after the
-    // `(`.
+    // `(`, but its stack version first reduces every lambda still open before
+    // it, as the parentheses may be the whole body of each: a nest of lambdas
+    // whose bodies are expressions, `(a) -> (a) -> … a`, takes reductions
+    // quadratic in its depth (SPECIFICATION.md §6.17).
     _lambda_parenthesized_expression: $ => seq(
       $._lambda_start,
       '(',

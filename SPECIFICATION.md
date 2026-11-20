@@ -2914,6 +2914,40 @@ edit below its `)`: `foo()`, `final g`, `(int a, int b)`, then `-> a`
 typed on the next line, is a lambda from scratch and an `ERROR` on
 reparse (`bindings/rust/tests/incremental_reparse.rs` pins it; §6.20).
 
+Another reparse differs where a closure parameter's default and a
+lambda's body share a parenthesized expression (§5.16).
+`def d =  T a = (b, c) -> (d) -> e }` with the space at byte 8 replaced
+by `{` is `def d = {T a = (b, c) -> (d) -> e }`, which a parse from
+scratch reads as the closure parameter `T a` with the default
+`(b, c) -> (d)` and the body `e`, Groovy 3's reading; the reparse
+reuses the old `lambda_expression` `(d) -> e` and reads a closure whose
+body declares `T a = (b, c) -> (d) -> e`. Neither tree has an `ERROR`.
+
+Nested lambdas whose bodies are expressions parse in time quadratic in
+the nesting, a known cost limit. The parenthesized reading after
+LAMBDA_START (`_lambda_parenthesized_expression`, kept for a closure
+parameter's default and a case value) is reachable wherever an
+expression starts, and the stack version that holds it reaches the
+`->` after an expression, where nothing takes it; before it dies there
+it reduces every lambda still open before it, as the parentheses may be
+the whole body of each. `x = (a) -> (a) -> … a`, `(a) ->` repeated,
+takes 32,378, 127,253 and 504,503 reductions for 250, 500 and 1,000
+levels, about half the square of the depth, and 0.07, 0.29 and 1.1
+seconds for 1,000, 2,000 and 4,000 levels, 28.6 seconds for 20,000
+(140 KB); the same nest with block bodies takes 1,754, 3,504 and 7,004
+reductions. A cast's operand (`(T) (a) -> …`, 4.8 seconds at 4,000
+levels), a sum (`(a) -> 1 + …`), a ternary's branch
+(`a ? b : (c) -> …`) and nests in a closure parameter's default, a
+closure's first statement and a case value (2.1 to 2.4 seconds at
+4,000) are quadratic too. Nests with block bodies, without parentheses
+(`a -> b -> c`, an `ERROR` as in Groovy), in arguments
+(`f((a) -> f((a) -> …))`) and of closures are linear. A grammar fix was
+prototyped with derived "arrow tail" twins of rules (172 more states
+with two contrived divergences, or 236 with none). It left the cast,
+closure default, first-statement and case-value nests quadratic, so it
+was not taken; the patches are kept outside the repository. Real code
+nests a few lambdas.
+
 Measured against the grammar before: STATE_COUNT 4330 to 4516 (+4.3%),
 LARGE_STATE_COUNT 1575 to 1693, `parser.c` 8.2 to 8.9 MB, two
 external tokens, one precedence (`PREC.LAMBDA`, below assignment, so
