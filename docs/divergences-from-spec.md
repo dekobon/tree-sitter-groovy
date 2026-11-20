@@ -42,7 +42,7 @@ reasoning here.
 | §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
 | §6.9 SUBSCRIPT_OPEN | **Done** | a `[` after a newline starts a list or map literal, not a subscript. A newline before `[` ends the expression everywhere, including inside `(…)`, `[…]`, `${…}` and conditions such as `if (a` + newline + `[0])`. Differs from Groovy inside `(…)`, `[…]` and `?[…]`, where Groovy ignores newlines: `foo(a` + newline + `[0])`, `[a` + newline + `[0]]`, and the array-type forms `(String` + newline + `[]) x` and `def m(String` + newline + `[] a) { }` are valid Groovy and an `ERROR` here (the scanner tracks no brackets; a faithful fix needs a paren/bracket/brace stack). A block comment at the start of the `[` line hides the newline, so `a` + newline + `/* c */ [0]` is a subscript here. |
 | §6.10 STRING_BODY | **Done** | never emitted; valid only where a segment of a `"…"`, `"""…"""`, `/…/` or `$/…/$` body may start. The scanner emits nothing there, so `//` and `/*` in a string are text. A comment inside `${…}` is still a comment. |
-| §6.11 CAST_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. |
+| §6.11 CAST_CLOSE, RELATIONAL_CLOSE | **Mostly done** | a `)` with something after it on its line (spaces, tabs, line escapes and same-line block comments skipped; a line comment ends the line). A cast that closes with it outranks a parenthesized expression; a cast whose operand is on a later line ranks below one. `x = (a)` followed by `foo()` is two statements, as in Groovy, and `foo((String)` followed by `x)` is still a cast. The ranking is not the bracket-aware rule Groovy has; see #15 below. A `)` before `instanceof`, `!instanceof`, `!in`, or `as` or `in` and what it takes, is RELATIONAL_CLOSE, which closes no cast, so `(x) instanceof Foo` tests `(x)`; parentheses that can only hold a type before one of them are an `ERROR` (see #5 below). |
 | §6.12 NOT_IN | **Done** | `!in`, emitted only before whitespace or `[`, `(`, `{`; the scanner reads that character and leaves it, so `a !in[1, 2]` parses. |
 | §6.13 TRAIT_KEYWORD, SEALED_KEYWORD | **Done** | `trait` and `sealed`, emitted only before the declaration each opens: `trait` before a name on its line and then `{`, `<`, `extends`, `implements` or `permits`; `sealed` before `class`, `interface` or `trait`, or before another modifier, an annotation, `record` or `enum` on its line. Anywhere else the word is a name (see #12 below). |
 | §6.14 COMMAND_VALUE_START, COMMAND_PATH_START, COMMAND_STATEMENT_START | **Done** | an empty token before the receiver of a call that is a value, emitted only when a literal, a key, a `new`, an array type value or a name follows the receiver on its line (a name only after a receiver that may not name a type, see #25 below), so `def x = foo` followed by `1` on the next line stays two statements. The second token sits between the first name and the first member access of a statement's dotted receiver (#52), with the same condition, so `result.size` followed by `2` stays two statements; a value's dotted receiver is read by the first token. A third, `_command_statement_start`, sits before a statement's one-name receiver whose first argument is a `new`, an array type value or a name (`println x`), so `foo` followed by `new Bar()` or `bar` stays two statements; it is decided before the name, which costs a second read of every statement's first name (see #23 below). A first argument may also be a call in parentheses (`println(foo 1)`), which all three tokens read into, one parenthesis deep (see #24 below). A keyword Groovy reserves is no receiver of a value (`def x = return 1`); `super`, `permits`, `pipeline` and `_` are, and start a statement's call before a call in parentheses (`super(foo 1)`). A comment between the receiver and the argument on one line is not read past (see #18, #19 and #23 below). |
@@ -285,7 +285,7 @@ positions: generics (`List<String>`), array dimensions
   each dot at a precedence tighter than `field_access`.
 
   That precedence acts after the first dot only. At the first dot
-  the `[_cast_type, _dotted_type, qualified_type]` conflict keeps
+  the `[_cast_type, _dotted_type]` conflict keeps
   both readings: the type, and `x as java` followed by field
   accesses. Both parse to the end of the name. Groovy reads the
   type for any name, lowercase included (`x as a.b.c`, after
@@ -297,21 +297,33 @@ positions: generics (`List<String>`), array dimensions
   same stack nodes. Defining `field_access` before
   `cast_expression` turned every such type into field accesses.
 
-  The weight is on `_dotted_type` only. The dotted base of a
-  generic or array type, a `qualified_type` under `generic_type` or
-  `array_type`, carries none, so between that reading and the field
-  accesses the last resort still decides: `x as Map.Entry<C> + x`
-  reads the generic cast, and reads field accesses and comparisons
-  once the cast rules are defined after the others.
+  The array and generic forms of `_cast_type` are built over
+  `_dotted_type` too (`_cast_array_type` and `_cast_generic_type` in
+  `grammar.js`), so a dotted name with array dimensions or type
+  arguments is one type (`o instanceof JTextComponent.KeyBinding[]`,
+  `x as java.util.List<String>`, `x as a.b.C<D>[]`), and its base
+  carries the weight: `x as Map.Entry<C> + x` and
+  `y as a.B<C> instanceof c.D` read the generic cast by weight, where
+  the last resort decided before. The array's element is a rule of
+  its own, which forks with the whole cast type at the `[` until the
+  `]` (`x as a.b[0]` is a subscript of the cast). Before, the
+  `qualified_type` under `array_type` and `generic_type` lost to
+  `_dotted_type` by precedence at the second dot and at the `[`:
+  array dimensions after a dotted name were an `ERROR`
+  (`o instanceof JTextComponent.KeyBinding[]` in the JDK's
+  `BasicTextUI.java`), and type arguments after a name of three or
+  more parts read comparisons. In the parenthesized cast the type is
+  `_type`, and `(a.b.C[]) x` and `(java.util.List<String>) x` were
+  already one type.
 
   The weight is half a step: every other weight is a number of
   steps of `WEIGHT_UNIT` (`weighted` in `grammar.js`), so it decides
   only between readings that the steps leave tied, as long as they
   differ in fewer than `WEIGHT_UNIT` dotted cast types. A whole step
-  would tie readings that a step ranks now: `(x) as a.b` also reads
-  the cast `(x)` of the name `as`, as Groovy does, followed by the
-  statement `a.b`, and that reading outweighs the dotted cast
-  `(x) as a.b` by `CAST_WEIGHT`.
+  would tie readings that a step ranks now: `(x) as` at the end of a
+  line casts the name `as`, as Groovy does, and a dotted name on the
+  next line is a statement, a reading that outweighs `(x) as a.b`
+  across the line break by `CAST_WEIGHT`.
 
   The ties the weight decides were decided by the last resort
   before. A fuzz of about 1.97 million inputs around these operators
@@ -346,34 +358,116 @@ positions: generics (`List<String>`), array dimensions
     `as`, the call `a.b.c y` and an assignment, closer to Groovy 3's
     `def v = ((x) as)(a.b.c).y` and `y = 1`. The new reading is the
     one those lines have without the statement after them, and that
-    `(x) as a.b y` then `y = 1` had before the weight.
+    `(x) as a.b y` then `y = 1` had before the weight. Since the
+    `)` before `as` and a name closes no cast (spec §6.11), no
+    weight takes part.
   - Type arguments after a dotted name of three or more parts at the
     start of a line (`x //`, then `f() as a.b.C<T>`, then `y = 1`)
     read the cast to `a.b.C` and comparisons,
     `(f() as a.b.C) < T > y = 1`. A tie kept them in a typed local
     `a.b.C<T> y = 1` after a bodiless method `x f()`. Groovy reads
-    the cast to `a.b.C<T>` and `y = 1`; the grammar does not take
-    such arguments (below).
+    the cast to `a.b.C<T>` and `y = 1`, and so does the grammar now
+    that such a name takes type arguments.
 
   Taking the dot statically for the type would end the fork, but
   turn the inputs on which only the field accesses parse
   (`x as a."b"`, `x as a.new`) into `ERROR`s.
 
-  Not supported after `as`, `instanceof` and `!instanceof`: array
-  dimensions after a dotted name (`x instanceof a.B[]` is an
-  `ERROR`) and type arguments after a name of three or more parts
-  (`x as java.util.List<String>`). A name of two parts takes them,
-  but the last resort ranks that type against the field accesses
-  (above), and before a line that starts with an expression the
-  field accesses win (`x as a.B<C>` then `y` reads `x as a`,
-  `.B < C`, `> y`).
+  Arrays and type arguments on a dotted base changed clean trees
+  that Groovy reads otherwise as well. A truth table of 63,648
+  inputs (`as`, `instanceof`, `!instanceof` and the parenthesized
+  cast, 39 types, six left sides, fourteen followers, twelve
+  contexts) changed 3,561 clean trees and 8,883 `ERROR`s into clean
+  trees, and no clean tree into an `ERROR`. Against Groovy 3, 1,369
+  of the clean trees and 5,712 of the `ERROR`s now read as Groovy
+  does, and 489 trees no longer do, all of one kind:
 
-  A bug, not yet fixed: `(x) instanceof T` and `(x) !instanceof T`
-  read the cast `(x)` of a name `instanceof`, followed by the
-  statement `T` (`return (x) instanceof Foo`,
-  `def ok = (x) instanceof Foo`). `instanceof` is reserved (spec
-  §5.2) and Groovy reads the test of `(x)`; here the word lexes as a
-  name where the keyword has no action.
+  - Type arguments after a dotted name of three or more parts that
+    Groovy cannot take as type arguments, as what follows the `>`
+    cannot follow a type: `x as a.b.C<T> y`, `x as a.b.C<T>[0]`,
+    `return x as a.b.C<T>[].x`, and inside brackets a next line
+    (`foo(x as a.b.C<T>` then `foo(), 1)`). Groovy reads the cast to
+    `a.b.C` and comparisons, `(x as a.b.C) < T > y`, which the
+    grammar read before, when such a name took no type arguments.
+    Now the `<` after the name, with no space, opens type
+    arguments, as it does after a plain name and a name of two parts
+    (`x as B<T> y`, `x as a.B<T> y`), and the input reads a cast to
+    the generic type and what follows it, or field accesses and
+    comparisons on `x as a` where nothing else parses.
+
+  A fuzz of 1,000,000 inputs around these operators changed 7,018
+  clean trees and 183,227 `ERROR`s into clean trees, and no clean
+  tree into an `ERROR`; of 4,000 changed clean trees judged, 872 now
+  read as Groovy and 86 no longer do, all of the kind above. The
+  corpus and the Groovy files keep every tree, and of 24,548 Java
+  files one changes, from an `ERROR` to a clean tree (the
+  `KeyBinding[]` test above).
+
+  Read otherwise than Groovy, as before: `x as a.b[0]` is a subscript
+  of the cast, where Groovy calls the cast with the list `[0]` (also
+  after a plain name, `x as B[0]`); `x as a.B<c` without a `>` reads
+  `(x as a).B < c`, where Groovy reads `(x as a.B) < c` (after a
+  plain name, `x as B<c`, it is an `ERROR`). The parse costs more where
+  a dotted generic type follows `as` or `instanceof`: the field
+  accesses and comparisons on `x as a` go on into the next statements
+  until something stops them, so a line `l = x as java.util.List<T>`
+  takes about seven times the instructions of `l = x as List<T>`, as
+  `l = x as util.List<T>` already did.
+
+  The `)` of parentheses before `instanceof`, `!instanceof`, `!in`,
+  and before `as` or `in` and what they take, closes no cast (spec
+  §6.11), so `return (x) instanceof Foo`, `def ok = (x) instanceof Foo`
+  and `(x) !in y` are the tests of `(x)` that Groovy reads, and
+  `(x) as Foo` and `(x) in y` the operators that Apache's parser
+  reads since GROOVY-10355 (Groovy 3 reads a call of the cast of a
+  variable `as` or `in` where a statement starts, as a declaration's
+  value or as a condition, and the operator elsewhere). They read the
+  cast `(x)` of a name `instanceof`, of `!` applied to the name `in`,
+  or of the name `as` or `in`, followed by the next word as another
+  statement. A truth table of 34,920 inputs (ten contents of the
+  parentheses, the five operators with 42 right sides, seven followers,
+  twelve contexts) changed 2,248 clean trees, 884 of them to Groovy 3's
+  reading and none away from it, and turned 2,244 into an `ERROR`,
+  1,577 of them rejected by Groovy and 667 of two kinds:
+
+  - Parentheses that can only be a cast's type, a generic or an array
+    type (`(List<String>) instanceof Foo`, `(String[]) as Foo`,
+    `(a.B<T>) in y`, `(List<String>) !in (y)`), or an operand that is
+    one (`(a.b) !in(Foo[])`). Groovy reads a class literal tested, or
+    a call of the cast of a variable `as` or `in`; the grammar has no
+    value reading of a generic type, nor of an array type in
+    parentheses (`x !in (Foo[])` is an `ERROR` too). They read the
+    cast of the operator word and another statement.
+  - A call of the cast of a variable `as` or `in` with a command
+    argument where no statement may follow on the line: in a field
+    (`class K { def f = (x) as Foo y }`) and before a `,`
+    (`def v = (x) as T y, z = 1`). Groovy reads
+    `((x) as)(Foo).y`; the grammar reads the operator and leaves the
+    `y` over. It read two fields, or two declarations.
+
+  On the first truth table the `)` changed 1,230 more clean trees,
+  468 of them to Groovy's reading and none away, and turned 180 into
+  an `ERROR`, 150 of them rejected by Groovy and 30 fields of the
+  second kind. A fuzz of 500,000 inputs around the `)` changed 10,036
+  clean trees (of 4,000 judged, 644 now as Groovy and none away) and
+  turned 18,749 into an `ERROR`, all but 1,055 of them rejected by
+  Groovy: 1,042 hold parentheses that can only be a type, 9 `!in`
+  before an array type in parentheses, and 4 the second kind. In the
+  fuzz of 1,000,000, 8,237 clean trees changed (of 4,000 judged, 412
+  now as Groovy and none away) and 512 turned into an `ERROR`, 495 of
+  them rejected by Groovy, 14 parentheses that can only be a type,
+  2 fields, and one `x[0] as C.d.e()..(x) instanceof T` followed by
+  `foo()[]`, which no longer hides that the empty subscript
+  `foo()[]` is an `ERROR` here.
+
+  Read otherwise than Groovy: `(Foo) in [0]` casts a subscript of the
+  name `in`, as Groovy 3 does, where Apache's AstBuilder reads
+  `Foo in [0]` since GROOVY-10355; the scanner cannot tell `(Foo)`
+  from `(byte)` in `(byte) in[i]`, which the rewrite keeps a cast.
+  `(x) as T y` and `(x) in y z` read the operator and a statement,
+  where Groovy reads a call of the cast of `as` or `in` with a command
+  argument, and `(int) as Foo` reads `int` in parentheses coerced,
+  where Groovy reads the cast `(int)` of `as` called with `Foo`.
 - Generics (`List<String>`) ✓ via `generic_type`, with bounded
   wildcards (`? extends Foo`, `? super Bar`), nested arguments
   (`Map<String, List<Integer>>`), qualified bases
@@ -384,11 +478,24 @@ positions: generics (`List<String>`), array dimensions
   base name without intervening whitespace — preserving `a < b` as
   a binary comparison.
 
-**Action**: array dimensions and type arguments after a dotted name,
-the ranking of a dotted generic or array type, and `(x) instanceof T`
-are open. `x as (java.util.Map)` is no cast here: it reads two
-statements, `x` and a call of `as`, where Groovy 3 reads one, the
-command call `x(as(java.util.Map))`.
+**Action**: the comparisons Groovy reads after type arguments it
+cannot take (`x as a.b.C<T> y`) and the call of a cast with a list
+(`x as a.b[0]`) are open. `x as (java.util.Map)` is no cast here: it
+reads two statements, `x` and a call of `as`, where Groovy 3 reads one,
+the command call `x(as(java.util.Map))`, and Groovy 6 the cast
+(`coercionType` takes a `castParExpression`).
+
+Ties that tree-sitter's last resort still decides here: a
+parenthesized cast whose operand is on the line of its `)`, followed by
+a line that assigns (`(T) x` then `y = 1`), weighs as much as `(T)`
+followed by the typed local `x y = 1`, and the cast is kept, as Groovy
+reads it; and readings that hold as many dotted cast types tie, as the
+weight counts them. `x instanceof a.b.C<D>`, then `y`, then
+`1 as c.b.E` reads the comparisons `(x instanceof a).b.C < D > y` and
+the cast `1 as c.b.E`, against the generic type, the call `y 1` (a name
+followed by a literal on the next line, #90) and the name `as`
+followed by `c.b.E`; Groovy reads the generic type, `y` and the
+cast.
 
 ---
 

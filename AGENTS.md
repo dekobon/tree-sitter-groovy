@@ -62,7 +62,9 @@ The default branch is **`main`**.
   (§6.18), the start of an array type that is a
   value (`String[].class`), which needs `[]` after the name (§6.15),
   a `)` with something after it on its
-  line, which ranks a cast (§6.11), the `!in` operator, which
+  line, which ranks a cast, and a `)` before a relational operator
+  that Groovy applies to the parentheses (`(x) instanceof Foo`),
+  which closes none (§6.11), the `!in` operator, which
   needs whitespace or a bracket after it (§6.12), the start of a
   lambda, before its parameters in parentheses or its one name, when
   `->` follows (§6.17), an empty token after the `}` of a lambda's

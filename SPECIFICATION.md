@@ -264,10 +264,14 @@ Notes on the corrected ordering versus v1 of this spec:
   instanceof_expression fields. A dotted name there is one type,
   whatever the case of its parts (`x as a.b.c`), as Apache's
   `qualifiedClassName` takes every name and dot before the last
-  name. The same tokens also parse as field accesses on `x as a`,
-  which a weight on the type ranks below it
-  (`DOTTED_CAST_TYPE_WEIGHT`); a dotted base of a generic or array
-  type is not ranked yet (`docs/divergences-from-spec.md` §5).
+  name. It takes array dimensions and type arguments as `_type`
+  does (`o instanceof JTextComponent.KeyBinding[]`,
+  `x as java.util.List<String>`). The same tokens also parse as field
+  accesses on `x as a`, which a weight on the type ranks below it
+  (`DOTTED_CAST_TYPE_WEIGHT`), also where the dotted name is the base
+  of an array or generic type (`docs/divergences-from-spec.md` §5).
+  Before these operators, a `)` closes no cast (§6.11):
+  `(x) instanceof Foo` tests `(x)`.
 
 ### 3.2 Operator → node kind map
 
@@ -1141,6 +1145,14 @@ Two rules settle it, both from Apache's
   not. The first alternative carries this: it closes with the scanner
   token `CAST_CLOSE` (§6.11), a `)` with something after it on its
   line, and has a positive dynamic precedence.
+- A relational operator that Groovy applies to the parentheses ends
+  the cast: `instanceof`, `!instanceof` and `!in` are operators
+  wherever Groovy's lexer meets them, and `as` and `in` with what they
+  take on the line are the operators of Apache's parser since
+  GROOVY-10355, so `(x) instanceof Foo`, `(x) !in y`, `(x) as Foo` and
+  `(x) in y` are no cast of a name. The `)` there is the scanner token
+  RELATIONAL_CLOSE (§6.11), which only a parenthesized expression
+  takes.
 - The rule has no `nls` between its two parts, so where a line break
   can end a statement the operand is on the line of the `)`: `x = (a)`
   followed by `foo()` on the next line is two statements. The second
@@ -1423,6 +1435,7 @@ enum TokenType {
   STATEMENT_PAREN,        // §6.18 — `(` that opens a line after an expression and opens a statement
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
+  RELATIONAL_CLOSE,       // §6.11 — `)` before a relational operator Groovy applies to the parentheses; closes no cast
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   LAMBDA_START,           // §6.17 — empty; before the `(` of a lambda's parameters
   BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses
@@ -1828,6 +1841,57 @@ because inside `(…)` and `[…]` a line break does not end anything and
 the scanner does not know which brackets enclose it. The token is
 aliased to `)` and the tree is the same either way. It is not emitted
 during error recovery.
+
+The same scan emits RELATIONAL_CLOSE instead of CAST_CLOSE when what
+follows the `)` is a relational operator that Groovy applies to the
+parentheses:
+
+```text
+Emit RELATIONAL_CLOSE for a `)` when, after the trivia above, the line
+goes on with
+  - `instanceof` as a whole word,
+  - `!instanceof` and whitespace, or `!in` and whitespace, `[`, `(` or
+    `{` (GroovyLexer.g4 NOT_INSTANCEOF and NOT_IN, §3.2.2), or
+  - `as` or `in` as a whole word, then only spaces, tabs and line
+    escapes, then a name that is not `as`, `in` or `instanceof`, nor
+    `new` after `as`, or after `in` a digit or a quote.
+Emit it also in a state where it is not valid, where only a cast's type
+takes the `)`: no rule takes it there, so that reading ends.
+```
+
+`instanceof` is reserved in Groovy, but here a keyword lexes as a name
+where it has no action, so `(x) instanceof Foo` read the cast `(x)` of a
+name `instanceof` and the statement `Foo`, and `(x) !in y` the cast of
+`!` applied to the name `in`. The cast closed with CAST_CLOSE and
+outranked the test. A weight could not settle it: the cast reading also
+takes the weight of the statement after the name, and
+`def ok = (x) instanceof Foo` followed by `bar() { }` read the method
+`Foo bar() { }`. Only `parenthesized_expression` takes the token. Where
+only a cast's type takes the `)`, as in the version of `(a.b)` that
+forked at the dot to read `a.b` as a type and lexes the `)` on its own,
+no rule takes it, like `_lambda_body_reread` (§6.19), and that version
+ends. Parentheses that hold only a type (`(List<String>) instanceof T`)
+are then an `ERROR`, where Groovy tests a class literal.
+
+`as` and `in` are names (§6.16): `(Foo) in` casts the name `in`, and a
+`.`, `(`, `[`, `{`, an operator or the end of the line after the word
+goes on with the name (`(Foo) in.read()`, `(byte) in[i]`, and
+`(x) in -1`, which Groovy reads as `((x) in) - 1`). Groovy 3 reads
+`(x) as Foo` and `(x) in y` at the start of a statement, as the value
+of a declaration and as a condition as a call of the cast of a variable
+`as` or `in` (`((x) as)(Foo)`), and as the operator where an expression
+must stand (`return (x) as Foo`, `foo((x) in y)`); Apache's AstBuilder
+rewrites the call into the operator since GROOVY-10355 when the
+parentheses hold a name, which is the reading here. The rewrite also
+reads `(Foo) in [0]` as `Foo in [0]`; a `[` is no operand here, as
+the scanner cannot tell `(Foo)` from `(byte)`
+(`docs/divergences-from-spec.md` §5).
+
+The read stops at the first character after the word, or after the
+spaces and the word or character that follow `as` or `in`, so a line
+of `(x) in y && …` reads each part once
+(`bindings/rust/tests/relational_close_cost.rs`). The token is aliased
+to `)`. It is not emitted during error recovery.
 
 ### 6.12 NOT_IN — implementation contract
 
