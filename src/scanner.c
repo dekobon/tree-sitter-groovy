@@ -2692,16 +2692,51 @@ static RelationalWord read_relational_word(TSLexer *lexer) {
                                                 : IN_WORD;
 }
 
+// SPECIFICATION.md §6.11 — skips spaces, tabs, line escapes and block
+// comments that close on the line, as `read_paren_close` does before the
+// word. Returns false where the line ends or something that is no operand
+// comes first: a line comment, a block comment that runs past the end of
+// the line, or a `/`.
+static bool skip_same_line_trivia(TSLexer *lexer) {
+    for (;;) {
+        if (!skip_same_line_space(lexer, false)) {
+            return false;
+        }
+        if (lexer->lookahead != '/') {
+            return true;
+        }
+        advance(lexer);
+        if (lexer->lookahead != '*') {
+            return false;
+        }
+        advance(lexer);
+        for (;;) {
+            if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                return false;
+            }
+            if (lexer->lookahead == '*') {
+                advance(lexer);
+                if (lexer->lookahead == '/') {
+                    advance(lexer);
+                    break;
+                }
+            } else {
+                advance(lexer);
+            }
+        }
+    }
+}
+
 // SPECIFICATION.md §6.11 — whether `as` or `in`, consumed by the caller,
 // takes what follows it on its line: a type for `as`, so a name other than
 // `new`, and for `in` a name, a number or a string. Another of the
 // operators that a name spells applies to the cast of the name instead
 // (`(x) as instanceof T`, `(x) in as T`). A `[` does not count:
-// `(byte) in[i]` casts an element of an array named `in`. Only spaces,
-// tabs and line escapes are skipped, so the read stops at the first
-// character after them, or after the word that starts there.
+// `(byte) in[i]` casts an element of an array named `in`. The read stops at
+// the first character after the trivia, or after the word that starts
+// there.
 static bool keyword_operand_follows(TSLexer *lexer, bool in) {
-    if (!skip_same_line_space(lexer, false)) {
+    if (!skip_same_line_trivia(lexer)) {
         return false;
     }
     int32_t c = lexer->lookahead;
