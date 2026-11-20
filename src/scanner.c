@@ -3611,18 +3611,34 @@ static void read_parentheses_extent(
     }
 }
 
+// SPECIFICATION.md §6.2 — the most escaped slashes (`\/`) the look-ahead
+// for a slashy string's closing `/` reads past; at the last of them it takes
+// the string to close. The look-ahead runs from every `/` where a slashy
+// string may start, which during error recovery is every `/`, and an escaped
+// slash ends none of them: a line of `\/` was read from each of its slashes
+// to its end, in time quadratic in its length. With the bound a character is
+// read from at most this many slashes before it. Regexes in real code hold a
+// few (at most five on a line of the Java set, none in the Groovy one).
+static const unsigned SLASHY_LOOKAHEAD_ESCAPED_SLASHES = 64;
+
 // After a `/` that opens no comment: guards (1) to (3) of the slashy
 // opener in `tree_sitter_groovy_external_scanner_scan`, a body that is
 // neither empty nor starts with whitespace, and a closing `/` on the line
-// (looked for without keeping what is read).
+// (looked for without keeping what is read), or
+// SLASHY_LOOKAHEAD_ESCAPED_SLASHES escaped slashes before the end of it.
 static bool slashy_body_follows(TSLexer *lexer) {
     if (lexer->lookahead == '/' || is_whitespace(lexer->lookahead)) {
         return false;
     }
+    unsigned escaped_slashes = 0;
     while (!lexer->eof(lexer)) {
         if (lexer->lookahead == '\\') {
             advance(lexer);
             if (!lexer->eof(lexer)) {
+                if (lexer->lookahead == '/'
+                    && ++escaped_slashes == SLASHY_LOOKAHEAD_ESCAPED_SLASHES) {
+                    return true;
+                }
                 advance(lexer);
             }
             continue;

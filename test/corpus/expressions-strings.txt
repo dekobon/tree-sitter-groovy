@@ -480,6 +480,30 @@ def url = /path\/to\/file/
         (string_fragment)))))
 
 ==================
+Slashy string with more escaped slashes than the look-ahead reads past
+==================
+
+def url = /a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/b/
+def n = x / 2 / y
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (identifier)))))
+
+==================
 Slashy string with dollar interpolation
 ==================
 

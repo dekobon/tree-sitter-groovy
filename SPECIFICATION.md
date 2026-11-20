@@ -1527,6 +1527,33 @@ SLASHY_STRING_END emits iff lookahead is `/` AND state says we are
 mid-slashy.
 ```
 
+As implemented, the grammar's valid tokens stand in for `last_token`,
+and the scanner emits only SLASHY_STRING_START, after the `/`; the
+grammar reads the body and the closing `/`. The opener needs a body
+that is not empty, does not start with whitespace, and reaches a
+closing `/` on its line, an escaped character (`\/` among them) read as
+one (`slashy_body_follows`). That look-ahead runs from every `/` where
+a slashy string may start, which during error recovery is every `/`,
+and an escaped slash ends none of them, so a line of `\/` was read from
+each of its slashes to its end: 2,505 bytes read per input byte for
+10,000 bytes and 25,005 for 100,000 (24 seconds), in `x = /` followed
+by `\/` repeated and in `@` followed by `/\` repeated. The look-ahead
+now stops at SLASHY_LOOKAHEAD_ESCAPED_SLASHES (64) escaped slashes and
+takes the string to close there, so a character is read from at most
+that many slashes before it: 1.0 and 6.0 bytes per input byte for the
+two lines at 100,000 bytes. Real regexes hold a few escaped slashes (at
+most five on a line of the Java set of 24,548 files, none in the
+Groovy set), and a slashy string that does close reads as before
+however many it holds. Past the bound a `/` with no closing `/` on its
+line is a slashy string whose `/` is missing, an `ERROR`, where it was
+division or another `ERROR`; on the line after a statement it starts
+the next statement rather than continuing the one before (§6.21).
+No tree of the corpus, the real and Java sets and 40,000 fuzzed lines
+of regexes with escaped slashes, long lines and division chains
+changed, but for the inputs with a line past the bound, all of which
+had an `ERROR` before and after (1,583 of 17,762).
+`bindings/rust/tests/slashy_string_cost.rs` checks the two lines.
+
 ### 6.3 GSTRING — implementation contract
 
 Double-quoted strings, triple-double-quoted strings, slashy, and

@@ -71,6 +71,10 @@ path = "bindings/rust/tests/relational_close_cost.rs"
 name = "dotted_cast_type_cost"
 path = "bindings/rust/tests/dotted_cast_type_cost.rs"
 
+[[test]]
+name = "slashy_string_cost"
+path = "bindings/rust/tests/slashy_string_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 
