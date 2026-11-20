@@ -3618,8 +3618,12 @@ what makes them operators (§6.12), `+=`, `-=`, `->`, `/=`, the word
 string needs a closing `/` on the line, `slashy_body_follows`:
 `Foo foo` then `/ 2` is Groovy's `Foo(foo / 2)`), and `(` when the
 parentheses hold parameters (`call_arguments_follow`, §6.14: `Foo f`
-then `(int a) { }`). A line that starts with `in` or `as` starts the next
-statement, as in Groovy (`InputStream in` then `in.close()`).
+then `(int a) { }`), where a call in parentheses, unlike after a name
+argument, does not count, as it opens a statement of its own
+(`String s` then `(foo 1)`, and `Foo f` then `(foo bar) { }`, Groovy's
+declaration and call `foo(bar, { })`). A line that starts with `in` or
+`as` starts the next statement, as in Groovy (`InputStream in` then
+`in.close()`).
 The type arguments, the names of the list and the value after an `=` are
 read for at most DECLARATION_LOOKAHEAD_ITEMS (256) items: past them there
 is no declaration, and a value read to the end of the budget is no

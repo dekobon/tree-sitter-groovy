@@ -2023,6 +2023,7 @@ The Groovy column was observed by running Groovy 3.
 | `String s; x`, `{ String s }`, `String s // c`, `String s /* c */`, `if (c) String s else String t`, `while (c) String s` | a declaration | the same; before, two statements, the last with `else` read as a name |
 | `String s` then `x`, `(a, b) = l`, `{ }`, `[1]`, `+ 1`, `!x` or `/x/` on the next line | the declaration, then a statement | the same; before, `String` and the line read with `s` (`s { }`, `s + 1`, the call `s /x/`) or after it |
 | `String s` then `(a) { }` | the declaration and a cast | the same; before, the method `s` |
+| `String s` then `(foo 1)`; `Foo f` then `(foo bar) { }` | the declaration and a call | the same: a call in parentheses on the next line opens a statement of its own; before, the method `s` with an `ERROR`, and the method `f` |
 | `Foo f` then `(int a) { }` | the declaration and the call `int(a, { })` | the method `f`, as before: parameters on the next line go on with the name |
 | `String s` then `= 1` | a declaration with the value | the same, as before |
 | `String s` then `.trim()`, `?.x()`, `* 2`, `== 1`, `instanceof T` or `/ 2` | `String(s.trim())`, … | `String` and `s.trim()`, …, as before |

@@ -701,7 +701,11 @@ static bool parenthesized_command_follows(
     TSLexer *lexer,
     bool no_close_ahead
 );
-static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead);
+static bool call_arguments_follow(
+    TSLexer *lexer,
+    bool commands,
+    bool no_close_ahead
+);
 
 // Defined after is_grammar_keyword, which they call.
 static bool is_value_keyword(const char *word, unsigned len, int32_t next);
@@ -914,7 +918,7 @@ static bool continuation_follows(
         return lexer->lookahead != '=' && lexer->lookahead != '~';
     }
     if (lexer->lookahead == '(' && !nested) {
-        return !call_arguments_follow(lexer, no_close_ahead);
+        return !call_arguments_follow(lexer, true, no_close_ahead);
     }
     return !statement;
 }
@@ -1176,7 +1180,7 @@ static bool name_argument_rest(
     }
     int32_t c = lexer->lookahead;
     if (c == '(') {
-        return nested || call_arguments_follow(lexer, no_close_ahead);
+        return nested || call_arguments_follow(lexer, true, no_close_ahead);
     }
     if (is_literal_start(c)) {
         return false;
@@ -1427,7 +1431,16 @@ static bool parameter_name_follows(
 // `NAME_ARGUMENT_LOOKAHEAD_ITEMS`; at its end they are arguments. A `/` that
 // opens no comment is such an element: after the `(` or a `,` Groovy's lexer
 // reads it as the start of a slashy string (`foo bar(x, /re/)`).
-static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
+//
+// `commands` is unset where only parameters make the parentheses no
+// arguments: on the line after a typed local (`next_line_continues`, §6.21),
+// where a parenthesis-free call in parentheses opens a statement of its own
+// (`String s` then `(foo 1)`, §6.18) and so does not go on with the name.
+static bool call_arguments_follow(
+    TSLexer *lexer,
+    bool commands,
+    bool no_close_ahead
+) {
     unsigned items = 0;
     for (bool first = true; items < NAME_ARGUMENT_LOOKAHEAD_ITEMS;
          first = false, items++) {
@@ -1475,8 +1488,9 @@ static bool call_arguments_follow(TSLexer *lexer, bool no_close_ahead) {
         if (varargs) {
             return true;
         }
-        if (first && first_argument_follows(lexer, false, true, false,
-                                            no_close_ahead)) {
+        if (commands && first
+            && first_argument_follows(lexer, false, true, false,
+                                      no_close_ahead)) {
             return false;
         }
         if (!skip_same_line_space(lexer, false)) {
@@ -2646,7 +2660,7 @@ static bool next_line_continues(
             return lexer->lookahead == '='
                 || (c == '-' && lexer->lookahead == '>');
         case '(':
-            return !call_arguments_follow(lexer, no_close_ahead);
+            return !call_arguments_follow(lexer, false, no_close_ahead);
         default:
             break;
     }

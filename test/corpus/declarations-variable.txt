@@ -2478,6 +2478,66 @@ open()
       arguments: (argument_list))))
 
 ==================
+Typed local without an initializer before a parenthesis-free call in parentheses on the next line
+==================
+
+String s
+(foo 1)
+List<String> xs
+(sh 'ls').trim()
+int a, b
+(println x)
+@Field String t
+(foo 1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (string_literal)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
 A line that goes on with the name ends no typed local (known divergence)
 ==================
 
