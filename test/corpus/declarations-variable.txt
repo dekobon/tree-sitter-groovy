@@ -2944,3 +2944,36 @@ x<<y
     (binary_expression
       left: (identifier)
       right: (identifier))))
+
+==================
+A division on the next line ends no typed local
+==================
+
+Foo foo
+/ 2
+String s
+/x
+String t
+/= 2
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))

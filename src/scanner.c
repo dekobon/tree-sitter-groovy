@@ -333,6 +333,7 @@ static bool array_dimensions_follow(
     bool no_close_ahead
 );
 static bool is_contextual_word(const char *word, unsigned len);
+static bool slashy_body_follows(TSLexer *lexer);
 static bool scan_contextual_word(
     TSLexer *lexer,
     const char *word,
@@ -2201,7 +2202,10 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 // `+`, `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `==`, `=~`, `<`, `-=`,
 // `/=`, the `->` of closure parameters), `instanceof`, `in` or `as`
 // (`for (String s` then `in xs)`), `:`, `,` or a closing bracket. A `/` that
-// opens no comment starts a slashy string there, as Groovy's lexer reads it.
+// opens no comment starts a slashy string there, as Groovy's lexer reads it,
+// when the string closes on its line (`slashy_body_follows`); otherwise it is
+// a division that goes on with the name (`Foo foo` then `/ 2` is Groovy's
+// `Foo(foo / 2)`).
 // So does `(` when the parentheses hold parameters (`call_arguments_follow`):
 // `Tab x` then `(int x) { }` stays the method `x`, where Groovy reads the
 // declaration and the call `int(x, { })`, which has no reading here.
@@ -2212,7 +2216,7 @@ static bool next_line_continues(
 ) {
     int32_t c = lexer->lookahead;
     if (slash) {
-        return c == '=';
+        return !slashy_body_follows(lexer);
     }
     if (lexer->eof(lexer)) {
         return false;
