@@ -317,8 +317,10 @@ positions: generics (`List<String>`), array dimensions
   8,000 lines, and 0.049, 0.099, 0.197 and 0.394 billion now; with
   `util.List<T>` 0.43 to 16.3 billion before dotted names took type
   arguments, 0.044 to 0.349 billion now; `l = x as List<T>` takes
-  0.036 to 0.289 billion (`bindings/rust/tests/dotted_cast_type_cost.rs`
-  times such runs).
+  0.036 to 0.289 billion. The reading kept a stack version per line,
+  1,001 at once for 1,000 lines and 8,001 for 8,000, and one now;
+  `bindings/rust/tests/dotted_cast_type_cost.rs` counts them in the
+  parser's log for such runs.
 
   The weight stays: it ranks the cast against other readings of the
   same lines, as below. It is half a step: every other weight is a

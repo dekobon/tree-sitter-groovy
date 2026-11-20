@@ -8,10 +8,9 @@
 //! following line of the same shape, so a run of such lines took time
 //! quadratic in its length. The first dot now continues the type.
 //!
-//! The progress callbacks, which count parse operations, and the parser's
-//! log grew linearly with the run while the time did not, so this test
-//! measures time: the fastest of a few parses of each run, per line, at two
-//! run lengths. The bound is generous, to stay clear of timing noise.
+//! The parser's work per line is what grew: each line added a stack version
+//! that every later token was parsed on. The first test counts those
+//! versions in the parser's log, which is deterministic where time is not.
 //!
 //! The scanner reads the type arguments after the name of a cast's type to
 //! see whether they close (§3.2.2). Where they do not, as in a call whose
@@ -19,11 +18,12 @@
 //! items, or it reads the rest of the line from each `<`. The second test
 //! compares the bytes the parser asks for at two lengths of such a line.
 
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tree_sitter::Parser;
+use tree_sitter::{LogType, Parser};
 
-// -- Runs of dotted generic casts, timed --------------------------------
+// -- Runs of dotted generic casts, by stack versions -----------------------
 
 /// Lines in the shorter run; the longer one has eight times as many.
 const SHORT_RUN: usize = 1_000;
@@ -31,52 +31,54 @@ const SHORT_RUN: usize = 1_000;
 /// How many times longer the second run is.
 const SCALE: usize = 8;
 
-/// Parses of each run; the fastest counts.
-const ATTEMPTS: usize = 3;
+/// Most stack versions the parser may hold at once while it parses a run.
+/// A run that forks nowhere keeps one (measured: 1 at both lengths); the
+/// reading that went on as comparisons kept one more per line (1,001 for
+/// 1,000 lines and 8,001 for 8,000 before the first dot continued the type).
+const MAX_VERSIONS: usize = 2;
 
-/// Most the time per line may grow from the shorter run to the longer.
-/// Linear work keeps the two about equal (measured in a debug build: 0.9
-/// to 1.0 for each line below); the reading that went on as comparisons
-/// made it grow 2.6 times for `l = x as java.util.List<T>`, and 4.0 times
-/// for `l = x as util.List<T>` before the first dot continued the type.
-const MAX_GROWTH: f64 = 1.6;
+/// The key of the version count in the parser's `process version` messages.
+const VERSION_COUNT_KEY: &str = "version_count:";
 
-/// The fastest of `ATTEMPTS` parses of `line` repeated `count` times.
-fn fastest_parse(parser: &mut Parser, line: &str, count: usize) -> Duration {
-    let source = line.repeat(count);
-    (0..ATTEMPTS)
-        .map(|_| {
-            let start = Instant::now();
-            let tree = parser.parse(&source, None).expect("parse");
-            let elapsed = start.elapsed();
-            assert!(!tree.root_node().has_error(), "{line:?}");
-            elapsed
-        })
-        .min()
-        .expect("at least one attempt")
-}
-
-/// Asserts that the time per line does not grow with the length of a run
-/// of `line`.
-fn assert_linear(line: &str) {
+/// Parses `line` repeated `count` times and returns the most stack versions
+/// the parser's log reports at once.
+fn most_stack_versions(line: &str, count: usize) -> usize {
     let mut parser = Parser::new();
     parser
         .set_language(&dekobon_tree_sitter_groovy::LANGUAGE.into())
         .expect("load Groovy grammar");
-    let short = fastest_parse(&mut parser, line, SHORT_RUN).as_secs_f64();
-    let long = fastest_parse(&mut parser, line, SHORT_RUN * SCALE).as_secs_f64();
-    #[allow(clippy::cast_precision_loss, reason = "a small constant")]
-    let growth = long / (short * SCALE as f64);
-    assert!(
-        growth <= MAX_GROWTH,
-        "time per line grew {growth:.2} times for {line:?} ({short:.4} s, then {long:.4} s)",
-    );
+    let most = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::clone(&most);
+    parser.set_logger(Some(Box::new(move |log_type, message| {
+        if log_type != LogType::Parse || !message.starts_with("process version") {
+            return;
+        }
+        let count = message
+            .split_once(VERSION_COUNT_KEY)
+            .and_then(|(_, rest)| rest.split(',').next())
+            .and_then(|digits| digits.trim().parse::<usize>().ok())
+            .expect("version count in a process message");
+        seen.fetch_max(count, Ordering::Relaxed);
+    })));
+    let tree = parser.parse(line.repeat(count), None).expect("parse");
+    assert!(!tree.root_node().has_error(), "{line:?}");
+    most.load(Ordering::Relaxed)
+}
+
+/// Asserts that the parser keeps at most `MAX_VERSIONS` stack versions on
+/// either length of a run of `line`.
+fn assert_linear(line: &str) {
+    for count in [SHORT_RUN, SHORT_RUN * SCALE] {
+        let most = most_stack_versions(line, count);
+        assert!(
+            most <= MAX_VERSIONS,
+            "{most} stack versions at once for {count} lines of {line:?}",
+        );
+    }
 }
 
 /// Lines whose runs are parsed: coercions and tests to dotted generic
 /// types, with names of three parts and of two, after a name and a call.
-/// One test parses them one after another, so that no other test of this
-/// file runs beside the timing.
 const LINES: &[&str] = &[
     "l = x as java.util.List<T>\n",
     "l = x as util.List<T>\n",
