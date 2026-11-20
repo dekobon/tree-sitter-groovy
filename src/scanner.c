@@ -2811,6 +2811,15 @@ static bool slashy_body_follows(TSLexer *lexer) {
     return false;
 }
 
+// SPECIFICATION.md §6.19 — the most comments the scan after a lambda body's
+// `}` reads before the token it decides on; one more ends the body. Where
+// the body goes on past them, the scan runs again after each comment of the
+// run and reads the rest of it, so a run costs comment reads quadratic in
+// its length, which the bound keeps small. Runs of comments between a
+// lambda's body and an operator that continues it are a line or two in
+// practice; a longer run ends the body as a statement after it would.
+static const unsigned LAMBDA_BODY_END_COMMENTS = 8;
+
 // SPECIFICATION.md §6.19 — the end of the scan after a lambda body's `}`
 // when an expression continues there: false, so that the in-grammar lexer
 // reads the operator, unless the scan read past the start of the next
@@ -2875,11 +2884,12 @@ static inline bool token_valid(
 // slashy string where a statement may start ends the body as well:
 // Groovy reads a statement. `)`, `]`, `}`, `,`, `;`, `:` other than `::`,
 // any other word, a literal, `!` other than `!=`, `!in` and `!instanceof`,
-// the end of the input and a `/*` that does not close end it. The token
-// is empty and ends at the `}`, so that the lambda keeps its range and a
-// comment after it stays outside. Linear: one call reads the trivia, at
-// most LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS comments of it, and one word or
-// a few characters, and a call after a comment reads only what follows.
+// the end of the input, a `/*` that does not close and more than
+// LAMBDA_BODY_END_COMMENTS comments end it. The token is empty and ends at
+// the `}`, so that the lambda keeps its range and a comment after the body
+// it ends stays outside. A call reads the trivia, at most
+// LAMBDA_BODY_END_COMMENTS comments of it, and one word or a few
+// characters.
 static bool scan_lambda_body_end(
     Scanner *scanner,
     TSLexer *lexer,
@@ -2903,7 +2913,7 @@ static bool scan_lambda_body_end(
         if (lexer->lookahead != '/') {
             break;
         }
-        if (comments == LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS) {
+        if (comments == LAMBDA_BODY_END_COMMENTS) {
             return true;
         }
         advance(lexer);
@@ -3011,19 +3021,25 @@ static bool scan_lambda_body_end(
     }
 }
 
-// SPECIFICATION.md §6.19 — at a `}`, which may close a lambda's brace body,
-// that a comment follows: reads past it as far as `scan_lambda_body_end`
-// would read after it, with every token valid so that no state reads
-// farther. The scan then returns false and the in-grammar lexer reads the
-// `}`, whose look-ahead the runtime counts from what was read here, so that
-// a node that ends at the `}` is reused only while the text the body's end
-// depends on is unchanged, in the states where LAMBDA_BODY_END is valid
-// after the `}` and in all others. A reused closure that the parse had
-// continued as an expression would otherwise take the comment as an extra
-// in that state, where LAMBDA_BODY_END is not valid, before the parser
-// breaks it down again and decides the body's end after the comment. With
-// no comment there the parser breaks the closure down before it shifts
-// anything, so only the whitespace is read.
+// SPECIFICATION.md §6.19 — at a `}` that closes a list of statements, as a
+// lambda's brace body does (STATEMENT_PAREN is valid before it), and that a
+// comment or a line escape follows on its line: reads past it as far as
+// `scan_lambda_body_end` would read after it, with every token valid so
+// that no state reads farther. The scan then returns false and the
+// in-grammar lexer reads the `}`, whose look-ahead the runtime counts from
+// what was read here, so that a node that ends at the `}` is reused only
+// while the text the body's end depends on is unchanged, in the states
+// where LAMBDA_BODY_END is valid after the `}` and in all others. A reused
+// closure that the parse had continued as an expression would otherwise
+// take the comment as an extra in that state, where LAMBDA_BODY_END is not
+// valid, before the parser breaks it down again and decides the body's end
+// after the comment. With no comment there the parser breaks the closure
+// down before it shifts anything, so only the whitespace is read. The `}` of an interpolation or
+// a class body, which no lambda's body ends with, is not read past: after
+// an interpolation's `}` a string goes on, where a `/*` opens no comment
+// that could set the §6.6 bit, and every such `}` would read to the end of
+// the input. After a `}` of statements the comment is lexed next, so an
+// unterminated one is read to the end once and sets the bit.
 static void read_lambda_body_end_extent(TSLexer *lexer, bool no_close_ahead) {
     advance(lexer);
     while (is_inline_space(lexer->lookahead)) {
@@ -3390,7 +3406,8 @@ bool tree_sitter_groovy_external_scanner_scan(
         parentheses_open_statement(lexer, no_close_ahead);
         return false;
     }
-    if (lexer->lookahead == '}' && !valid_symbols[ERROR_SENTINEL]) {
+    if (lexer->lookahead == '}' && valid_symbols[STATEMENT_PAREN]
+        && !valid_symbols[ERROR_SENTINEL]) {
         read_lambda_body_end_extent(lexer, no_close_ahead);
         return false;
     }

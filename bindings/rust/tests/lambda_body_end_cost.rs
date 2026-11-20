@@ -3,13 +3,18 @@
 //!
 //! After such a `}` the scanner reads the comments that follow it and the
 //! token after them. When that token continues the body, the comments are
-//! read again, each from the one after it, so a long run of comments before
-//! the operator would be read in time quadratic in its length: the
-//! look-ahead must stop after a fixed number of comments. Before every `}`
-//! the scanner reads as far again when a comment follows on its line, so
-//! many lambdas with comments must cost no more per byte than a few. Time
-//! is not measured: the parser reads its input through a callback here,
-//! and the test compares the bytes it asks for at two input sizes.
+//! read again, each from the one after it, so a run of comments before the
+//! operator costs the square of its length: the look-ahead stops after a
+//! small number of comments. Before a `}` that closes statements the
+//! scanner reads as far again when a comment follows on its line, so many
+//! lambdas with comments must cost no more per byte than a few, and it must
+//! not read past the `}` of an interpolation, after which a `/*` in the
+//! string is no comment and was read to the end of the input from every
+//! such `}`. Time is not measured: the parser reads its input through a
+//! callback here, and the test compares the bytes it asks for at two input
+//! sizes, and for runs of comments with a fixed bound.
+
+use std::fmt::Write as _;
 
 use tree_sitter::Parser;
 
@@ -57,6 +62,13 @@ fn bytes_served_per_input_byte(source: &str) -> f64 {
     ratio
 }
 
+/// Most bytes served per input byte for runs of comments before an
+/// operator, one just under the bound and one far over it. Each comment of
+/// a run is read again from every one before it (measured: 2.8 for runs of
+/// 7, and 1.1 for runs of 255, whose body ends at the ninth comment); the
+/// bound of 256 comments used before served 261 per byte for runs of 255.
+const MAX_BYTES_PER_BYTE_IN_A_COMMENT_RUN: f64 = 8.0;
+
 /// Asserts that the bytes served per input byte do not grow with the
 /// number of elements `make` puts in its input.
 fn assert_linear(make: fn(usize) -> String) {
@@ -81,4 +93,36 @@ fn comments_before_an_operator_after_a_lambda_body_are_read_a_bounded_number_of_
 #[test]
 fn lambda_bodies_with_comments_after_them_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("foo({}b)\n", "a -> { y -> y } /* c */ .x(), ".repeat(n)));
+}
+
+#[test]
+fn interpolation_braces_before_a_comment_opener_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| {
+        (0..n).fold(String::new(), |mut text, i| {
+            let _ = writeln!(
+                text,
+                "task t{i} {{ doLast {{ sh \"rm -rf ${{buildDir}}/*\" }} }}"
+            );
+            text
+        })
+    });
+    assert_linear(|n| "s = \"${x}/* \"\n".repeat(n));
+}
+
+#[test]
+fn comment_runs_under_the_bound_before_an_operator_cost_a_fixed_amount() {
+    for run in [7, 255] {
+        let make = |n: usize| {
+            format!(
+                "def v = (a) -> {{ y -> y }}{} .call()\n",
+                " /* c */".repeat(run)
+            )
+            .repeat(n)
+        };
+        let served = bytes_served_per_input_byte(&make(SMALL_ELEMENTS));
+        assert!(
+            served <= MAX_BYTES_PER_BYTE_IN_A_COMMENT_RUN,
+            "runs of {run} comments: {served:.1} bytes served per input byte",
+        );
+    }
 }
