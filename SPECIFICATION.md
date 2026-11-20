@@ -779,7 +779,10 @@ The resolution we adopt:
    `as`, which go on with the receiver as operators; when `->` follows
    it, also on a later line or after comments, or a list that ends in
    `->` (`{ foo a, @A b = 1 -> }`), which makes closure parameters, the
-   first of type `foo`; and when it names a method whose parentheses
+   first of type `foo`, unless an element of the list starts with `(` or
+   a key, as no closure parameter does: that `->` is a lambda's
+   (`assertThrows IllegalArgumentException, () -> foo()`,
+   `foo x, k: () -> b`); and when it names a method whose parentheses
    hold parameters (`foo bar(int a) { }`, `foo bar(a, String... b) { }`
    and `foo bar(int` then `a) { }` stay methods, which Groovy rejects).
    With untyped parameters or none it is a call (`foo bar(a) { }`,

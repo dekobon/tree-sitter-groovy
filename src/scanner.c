@@ -933,6 +933,62 @@ static bool skip_comment_body(TSLexer *lexer) {
     }
 }
 
+static bool next_line_continues(
+    TSLexer *lexer,
+    bool slash,
+    bool no_close_ahead
+);
+
+// How the line after a list element that may be complete starts, past
+// Groovy's trivia (`default_line_follows`).
+enum {
+    LINE_ENDS,
+    LINE_GOES_ON,
+    LINE_ARROW,
+};
+
+// At a line break after a list element that may be complete (`foo a, b`
+// then a line): LINE_ARROW when `->` follows, which ends closure
+// parameters; LINE_GOES_ON when the line goes on with the element, as
+// Groovy lets a line open with most binary operators, `?`, `:` and a member
+// access (`next_line_continues`, and `=` with the operators that start with
+// it, `in` and `as`: `{ foo a, b = i++` then `* 2 -> a }`); and LINE_ENDS
+// when it starts the next statement. A `(` or `,` that opens the line ends
+// the element, as it ends a call's last argument.
+static int default_line_follows(TSLexer *lexer, bool no_close_ahead) {
+    bool slash = false;
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)) {
+        return LINE_ENDS;
+    }
+    int32_t c = lexer->lookahead;
+    if (!slash) {
+        if (c == '-') {
+            advance(lexer);
+            if (lexer->lookahead == '>') {
+                return LINE_ARROW;
+            }
+            return lexer->lookahead == '=' ? LINE_GOES_ON : LINE_ENDS;
+        }
+        if (c == '=') {
+            return LINE_GOES_ON;
+        }
+        if (c == '(' || c == ',') {
+            return LINE_ENDS;
+        }
+        if (is_identifier_start(c)) {
+            char word[sizeof "instanceof"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            return word_is(word, len, "in") || word_is(word, len, "as")
+                    || word_is(word, len, "instanceof")
+                ? LINE_GOES_ON
+                : LINE_ENDS;
+        }
+    }
+    return next_line_continues(lexer, slash, no_close_ahead)
+        ? LINE_GOES_ON
+        : LINE_ENDS;
+}
+
 // After the `,` of `foo a,` in a statement: whether `->` ends the list,
 // which makes it a closure's parameters, the first of type `foo`
 // (`{ foo a, b -> }`, `{ foo a, @A b = 1 -> }`). The elements are read as
@@ -940,11 +996,17 @@ static bool skip_comment_body(TSLexer *lexer) {
 // anything; comments are trivia, and a string is one item, a triple-quoted
 // one across lines (`skip_string`) and a dollar-slashy one as well
 // (`skip_dollar_slashy_string`). A line break ends the list unless a comma,
-// a modifier, an operator or an open bracket comes before it, or `->` after
-// it: a call's last argument ends at it (`foo a, b` then the next
-// statement). `;`, a closing bracket with none open and the end of the
-// budget, `budget` items, end the look-ahead with no `->`. §6.21 reads the
-// same after the `=` of a declared name (`{ String a = 1 -> }`).
+// a modifier, an operator or an open bracket comes before it (a postfix `++`
+// or `--` and a slashy string end an operand), or `->` or a line that goes on
+// with the element after it (`default_line_follows`): a call's last argument
+// ends at it (`foo a, i++` then the next statement). `;`, a closing bracket
+// with none open and the end of the
+// budget, `budget` items, end the look-ahead with no `->`. So does an
+// element, the first item after a `,` outside brackets, that is `(` or a
+// key (`name:`), which starts no closure parameter: the `->` after it is a
+// lambda's, and the list a call's arguments (`foo a, () -> b`,
+// `foo a, k: (x) -> b`). §6.21 reads the same after the `=` of a declared
+// name (`{ String a = 1 -> }`).
 static bool parameters_follow(
     TSLexer *lexer,
     unsigned budget,
@@ -952,6 +1014,9 @@ static bool parameters_follow(
 ) {
     unsigned depth = 0;
     bool continued = true;
+    // Whether the item read next starts an element: the last item read, line
+    // breaks and comments aside, is a `,` outside brackets.
+    bool element_start = false;
     for (unsigned items = 0; items < budget; items++) {
         if (!skip_same_line_space(lexer, false) || lexer->eof(lexer)) {
             return false;
@@ -959,7 +1024,12 @@ static bool parameters_follow(
         int32_t c = lexer->lookahead;
         if (is_line_break(c)) {
             if (depth == 0 && !continued) {
-                return arrow_follows(lexer, no_close_ahead);
+                int line = default_line_follows(lexer, no_close_ahead);
+                if (line != LINE_GOES_ON) {
+                    return line == LINE_ARROW;
+                }
+                continued = true;
+                continue;
             }
             advance(lexer);
             continue;
@@ -988,17 +1058,30 @@ static bool parameters_follow(
                 && slashy_body_follows(lexer)) {
                 advance(lexer);
                 continued = false;
+                element_start = false;
                 continue;
             }
             continued = true;
+            element_start = false;
             continue;
         }
-        if (c == '-') {
+        // `++` and `--` are one token each, as Groovy's lexer reads them, so
+        // the `--` of `i-->0` opens no `->`. A postfix update ends its
+        // operand, and a line break after it ends the list (`foo a, i++`
+        // then the next statement); Groovy rejects one after a prefix update.
+        if (c == '+' || c == '-') {
             advance(lexer);
-            if (lexer->lookahead == '>' && depth == 0) {
+            if (lexer->lookahead == c) {
+                advance(lexer);
+                continued = false;
+                element_start = false;
+                continue;
+            }
+            if (c == '-' && lexer->lookahead == '>' && depth == 0) {
                 return true;
             }
             continued = true;
+            element_start = false;
             continue;
         }
         if (c == '\'' || c == '"') {
@@ -1006,6 +1089,7 @@ static bool parameters_follow(
                 return false;
             }
             continued = false;
+            element_start = false;
             continue;
         }
         if (is_identifier_char(c)) {
@@ -1016,10 +1100,18 @@ static bool parameters_follow(
                     return false;
                 }
                 continued = false;
+                element_start = false;
                 continue;
             }
+            if (element_start && key_colon_follows(lexer, word, len)) {
+                return false;
+            }
             continued = is_modifier_word(word, len) || word_is(word, len, "def");
+            element_start = false;
             continue;
+        }
+        if (c == '(' && element_start) {
+            return false;
         }
         if (c == '(' || c == '[' || c == '{') {
             depth++;
@@ -1033,6 +1125,7 @@ static bool parameters_follow(
         }
         advance(lexer);
         continued = c != ')' && c != ']' && c != '}';
+        element_start = c == ',' && depth == 0;
     }
     return false;
 }

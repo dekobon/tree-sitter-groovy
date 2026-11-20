@@ -5379,6 +5379,74 @@ list.each { println it }
           argument: (identifier))))))
 
 ==================
+A lambda with parentheses after a name argument is an argument
+==================
+
+assertThrows IllegalArgumentException, () -> foo()
+executor.submit task, (x) -> x + 1
+foo x, y: () -> b
+list.each { foo x, () -> b }
+c = { foo a, b = (1) -> b }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (lambda_expression
+      parameters: (formal_parameters)
+      body: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (identifier)
+    argument: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters)
+        body: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (lambda_expression
+            parameters: (formal_parameters)
+            body: (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (parenthesized_expression
+              (number_literal))))
+        (expression_statement
+          (identifier))))))
+
+==================
 Command chains in the branches of an if
 ==================
 
@@ -5830,6 +5898,84 @@ foo a, b = 1
       right: (number_literal))))
 
 ==================
+A call's last argument that ends in an update or a slashy string ends at the line break before an arrow
+==================
+
+foo a, i++
+def f = x -> x
+foo a, /re/
+def g = x -> x
+switch (v) {
+    case 1 -> inc counter, i--
+    case 2 -> split s, /->/
+    default -> foo a, i-->0
+}
+c = { foo a, b = /->/ }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (update_expression
+      operand: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (command_chain
+            receiver: (identifier)
+            argument: (identifier)
+            argument: (update_expression
+              operand: (identifier))))
+        (switch_arrow_case
+          value: (number_literal)
+          body: (command_chain
+            receiver: (identifier)
+            argument: (identifier)
+            argument: (string_literal
+              (string_fragment))))
+        (switch_default
+          body: (command_chain
+            receiver: (identifier)
+            argument: (identifier)
+            argument: (binary_expression
+              left: (update_expression
+                operand: (identifier))
+              right: (number_literal)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (assignment_expression
+            left: (identifier)
+            right: (string_literal
+              (string_fragment))))))))
+
+==================
 A dollar-slashy string that holds an arrow is one argument, and a slashy default stays a closure parameter's
 ==================
 
@@ -5856,6 +6002,68 @@ c = { foo a, b = /re/ -> a }
             name: (identifier)
             default: (string_literal
               (string_fragment))))
+        (expression_statement
+          (identifier))))))
+
+==================
+A closure parameter's default goes on at a line that opens with an operator
+==================
+
+c = { foo a, b = i++
+  * 2 -> a }
+c = { String a = /x/
+  ?: 'y' -> a }
+c = { foo a, b = i
+  .size() -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (binary_expression
+              left: (update_expression
+                operand: (identifier))
+              right: (number_literal))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (elvis_expression
+              value: (string_literal
+                (string_fragment))
+              default: (string_literal))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (method_invocation
+              function: (field_access
+                object: (identifier)
+                field: (identifier))
+              arguments: (argument_list))))
         (expression_statement
           (identifier))))))
 

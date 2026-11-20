@@ -109,13 +109,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `isInvalidLocalVariableDeclaration` decides a name on its spelling,
   so `String s`, `int x`, `foo.Bar x` and `foo bar = 1` stay
   declarations. A name is no first argument before `->` (closure
-  parameters), before parentheses that hold typed parameters
-  (`foo bar(int a) { }` stays a method), or after a receiver that may
-  name a type in a value (`def x = Foo bar`). A new empty token,
-  `_command_statement_start`, opens such a statement whose receiver is
-  one name. Not supported: a chain that goes on after its first
-  argument (`foo 1 bar 2` is two calls and `foo a bar` a call and a
-  name, where Groovy reads `foo(1).bar(2)`) and a comment between the
+  parameters), unless an argument after a comma starts with `(` or a
+  key (`assertThrows IllegalArgumentException, () -> foo()` and
+  `foo x, k: () -> b` pass a lambda), before parentheses that hold
+  typed parameters (`foo bar(int a) { }` stays a method), or after a
+  receiver that may name a type in a value (`def x = Foo bar`). A new
+  empty token, `_command_statement_start`, opens such a statement whose
+  receiver is one name. Not supported: a chain that goes on after its
+  first argument (`foo 1 bar 2` is two calls and `foo a bar` a call and
+  a name, where Groovy reads `foo(1).bar(2)`) and a comment between the
   receiver and the argument (`SPECIFICATION.md` §5.5, §6.14).
 - A parenthesis-free call is accepted in parentheses
   (`(sh script: 'x').trim()`, `def x = (foo 1)`), as the condition of
