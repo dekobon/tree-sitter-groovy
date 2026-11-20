@@ -2506,11 +2506,11 @@ module.exports = grammar({
     // of the left-associative `cast_expression`, which precedence settles
     // for the reduction, so `x as T[]` would not parse. The element and
     // the whole type compete as two reductions instead, until the `]`.
-    _cast_array_type: $ => prec(PREC.ARRAY_TYPE, seq(
+    _cast_array_type: $ => seq(
       $._cast_array_element,
       alias($._subscript_open, '['),
       ']',
-    )),
+    ),
 
     _cast_array_element: $ => choice(
       alias($.identifier, $.type_identifier),
@@ -2519,13 +2519,13 @@ module.exports = grammar({
       alias($._cast_generic_type, $.generic_type),
     ),
 
-    _cast_generic_type: $ => prec.right(PREC.ARRAY_TYPE, seq(
+    _cast_generic_type: $ => seq(
       field('base', choice(
         alias($.identifier, $.type_identifier),
         alias($._dotted_type, $.qualified_type),
       )),
       field('arguments', $.type_arguments),
-    )),
+    ),
 
     // The first dot continues the type, at the precedence of the others.
     // `x as java` followed by field accesses was the other reading the
