@@ -69,3 +69,19 @@ final String first, second
 //    ^ type
 //           ^ variable
 //                  ^ variable
+
+def list = x as java.util.List<String>
+//              ^ type
+//                   ^ type
+//                        ^ type
+//                             ^ type
+
+if (o instanceof JTextComponent.KeyBinding[]) { }
+//               ^ type
+//                              ^ type
+
+def maps = x as a.b.Map<K, V>[]
+//              ^ type
+//                  ^ type
+//                      ^ type
+//                         ^ type

@@ -168,6 +168,14 @@ x = y as String
 as = it in xs
 // <- variable
 //      ^ keyword.operator
+return (x) instanceof Foo
+//         ^ keyword.operator
+//                    ^ type
+def kept = (k) in keys
+//             ^ keyword.operator
+//                ^ variable
+def name = (Foo) in
+//               ^ variable
 
 var (p, q) = pair()
 // <- keyword
