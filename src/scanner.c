@@ -25,7 +25,8 @@
 // §6.11 CAST_CLOSE, a `)` with
 // something after it on its line, and RELATIONAL_CLOSE, one before a
 // relational operator that Groovy applies to the parentheses (`(x)
-// instanceof Foo`); §6.12 NOT_IN, the `!in`
+// instanceof Foo`); §3.2.2 CAST_TYPE_ARGUMENTS_OPEN, the `<` of a cast
+// type's type arguments where they close; §6.12 NOT_IN, the `!in`
 // operator; §6.17 LAMBDA_START and BARE_LAMBDA_START, empty tokens
 // before a lambda's parameters in parentheses and before its one name
 // without them, when `->` follows; and §6.19 LAMBDA_BODY_END, an empty
@@ -49,8 +50,8 @@
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
-// ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, NOT_IN, LAMBDA_START,
-// BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
+// ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, CAST_TYPE_ARGUMENTS_OPEN,
+// NOT_IN, LAMBDA_START, BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
 // MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END and the
 // STRING_BODY check are suppressed.
 //
@@ -97,6 +98,7 @@ enum TokenType {
     DECLARATION_START,
     STATEMENT_BLOCK_END,
     RELATIONAL_CLOSE,
+    CAST_TYPE_ARGUMENTS_OPEN,
     ERROR_SENTINEL,
 };
 
@@ -2819,6 +2821,52 @@ static ParenClose read_paren_close(TSLexer *lexer) {
     }
 }
 
+// SPECIFICATION.md §3.2.2 — whether the type arguments of a cast's type,
+// whose `<` the caller consumed, close with their `>`: names, dots, commas,
+// `?`, `[`, `]` and a nested `<` right after a name, with Groovy's trivia,
+// line breaks and comments included, between them. Anything else, an
+// operator or a literal, makes the `<` a comparison: Groovy reads
+// `x as a.B<c` as `(x as a.B) < c`. At most DECLARATION_LOOKAHEAD_ITEMS
+// items are read; longer arguments are compared.
+static bool cast_type_arguments_close(TSLexer *lexer, bool no_close_ahead) {
+    unsigned depth = 1;
+    // Whether a name ends right before the lookahead.
+    bool after_name = false;
+    for (unsigned items = 0; items < DECLARATION_LOOKAHEAD_ITEMS; items++) {
+        int32_t c = lexer->lookahead;
+        if (is_whitespace(c) || c == '\\' || c == '/') {
+            bool slash = false;
+            if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
+                || slash) {
+                return false;
+            }
+            after_name = false;
+            continue;
+        }
+        if (is_identifier_start(c)) {
+            read_word(lexer, NULL, 0);
+            after_name = true;
+            continue;
+        }
+        if (c == '<') {
+            if (!after_name) {
+                return false;
+            }
+            depth++;
+        } else if (c == '>') {
+            depth--;
+            if (depth == 0) {
+                return true;
+            }
+        } else if (c != ',' && c != '?' && c != '.' && c != '[' && c != ']') {
+            return false;
+        }
+        advance(lexer);
+        after_name = false;
+    }
+    return false;
+}
+
 // SPECIFICATION.md §6.17 — the most the look-ahead for a lambda's
 // parameters reads, in items: a word, a string, a comment, an annotation or
 // a punctuation character. It runs at every `(` that may start an
@@ -3996,6 +4044,21 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         scanner->lambda_body_continues = false;
         body_continues = true;
+    }
+
+    // SPECIFICATION.md §3.2.2 — the `<` right after the name of a cast's
+    // type, where type arguments that close follow it. On false the
+    // runtime rewinds and the in-grammar lexer reads the `<` of a
+    // comparison; after whitespace the `<` is never one of type arguments.
+    if (valid_symbols[CAST_TYPE_ARGUMENTS_OPEN] && !valid_symbols[ERROR_SENTINEL]
+        && lexer->lookahead == '<') {
+        advance(lexer);
+        lexer->mark_end(lexer);
+        if (!cast_type_arguments_close(lexer, no_comment_close_ahead(scanner))) {
+            return false;
+        }
+        lexer->result_symbol = CAST_TYPE_ARGUMENTS_OPEN;
+        return true;
     }
 
     // SPECIFICATION.md §6.14 — a member access directly after the first

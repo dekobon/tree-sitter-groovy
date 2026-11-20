@@ -7207,9 +7207,52 @@
           "type": "FIELD",
           "name": "arguments",
           "content": {
-            "type": "SYMBOL",
-            "name": "type_arguments"
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_cast_type_arguments"
+            },
+            "named": true,
+            "value": "type_arguments"
           }
+        }
+      ]
+    },
+    "_cast_type_arguments": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_cast_type_arguments_open"
+          },
+          "named": false,
+          "value": "<"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_type_argument"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": ","
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_type_argument"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ">"
         }
       ]
     },
@@ -12712,6 +12755,10 @@
     {
       "type": "SYMBOL",
       "name": "_relational_close"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_cast_type_arguments_open"
     },
     {
       "type": "SYMBOL",

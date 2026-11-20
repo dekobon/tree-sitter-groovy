@@ -919,6 +919,11 @@ module.exports = grammar({
     // there. Listed last but for the sentinel, so that it renumbers no
     // symbol before it.
     $._relational_close,
+    // §3.2.2 — the `<` of a cast type's type arguments, emitted only where
+    // they close (`x as List<String>`), so that `x as a.B<c` compares the
+    // cast with `c`. Listed last but for the sentinel, so that it renumbers
+    // no symbol before it.
+    $._cast_type_arguments_open,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2524,7 +2529,18 @@ module.exports = grammar({
         alias($.identifier, $.type_identifier),
         alias($._dotted_type, $.qualified_type),
       )),
-      field('arguments', $.type_arguments),
+      field('arguments', alias($._cast_type_arguments, $.type_arguments)),
+    ),
+
+    // The `<` is the scanner's, emitted only where the arguments close:
+    // where they do not, Groovy compares the cast with what follows
+    // (`x as a.B<c`, `v as java.lang.Integer<max && min>v`), and the `<`
+    // is the comparison's.
+    _cast_type_arguments: $ => seq(
+      alias($._cast_type_arguments_open, '<'),
+      $._type_argument,
+      repeat(seq(',', $._type_argument)),
+      '>',
     ),
 
     // The first dot continues the type, at the precedence of the others.
