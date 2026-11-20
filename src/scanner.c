@@ -30,8 +30,8 @@
 // token after the `}` of a lambda's brace body that no expression
 // continues, and LAMBDA_BODY_REREAD, an empty token no rule takes, which
 // hands such a `}` back to the parser when it reused the body whole;
-// §6.20 MULTI_ASSIGNMENT_REST, an empty token after the first name of
-// `(a, b) = …`, when the other names, `)` and `=` follow.
+// §6.20 MULTI_ASSIGNMENT_COMMA, the first `,` of `(a, b) = …`, emitted
+// unless the parentheses go on as a method's parameters.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
@@ -43,7 +43,7 @@
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
-// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_REST and the
+// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA and the
 // STRING_BODY check are suppressed.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
@@ -85,7 +85,7 @@ enum TokenType {
     STATEMENT_PAREN,
     LAMBDA_BODY_END,
     LAMBDA_BODY_REREAD,
-    MULTI_ASSIGNMENT_REST,
+    MULTI_ASSIGNMENT_COMMA,
     ERROR_SENTINEL,
 };
 
@@ -2404,40 +2404,94 @@ static bool lambda_parameters_follow(
     return arrow_follows(lexer, no_close_ahead) && named;
 }
 
-// SPECIFICATION.md §6.20 — at the `,` after the first name of a
-// multi-assignment without `def`: whether only names follow, each after a
-// `,`, then `)` and `=` (`(a, b) = l`), with Groovy's trivia between them.
-// Anything else is where the multi-assignment would end without a tree, and
-// ends the reading here: `(a, b) {`, `(a, b) throws`, `(a, int b)`,
-// `(a, b + c)`, the end of the input, a `/` that opens no comment and a
-// `/*` that does not close. A list longer than the lambda budget is taken
-// as one, which leaves the decision to the grammar, at the `)`. The `,` is
-// not consumed when this is called.
-static bool multi_assignment_rest_follows(
-    TSLexer *lexer,
-    bool no_close_ahead
-) {
-    unsigned items = 0;
-    while (lexer->lookahead == ',') {
-        if (!spend_lambda_item(&items)) {
-            return true;
-        }
-        advance(lexer);
-        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
-            || !is_identifier_start(lexer->lookahead)) {
-            return false;
-        }
-        read_word(lexer, NULL, 0);
+// How many names after its first comma the look-ahead of a multi-assignment
+// reads before it leaves the list to the grammar (§6.20). Error recovery may
+// re-enter the state after the first name at every name of a broken list,
+// and each comma there starts a look-ahead, so the bound keeps such a list
+// linear; a method rarely has more parameters.
+static const unsigned MULTI_ASSIGNMENT_LOOKAHEAD_NAMES = 16;
+
+// Skips Groovy's trivia as `skip_header_trivia` does, and the form feeds and
+// vertical tabs that the grammar's extras skip as well.
+static bool skip_multi_assignment_trivia(TSLexer *lexer, bool no_close_ahead) {
+    for (;;) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
         }
+        if (lexer->lookahead != '\v' && lexer->lookahead != '\f') {
+            return true;
+        }
+        advance(lexer);
     }
-    if (lexer->lookahead != ')') {
+}
+
+// SPECIFICATION.md §6.20 — after the first comma of a multi-assignment
+// without `def`: whether the multi-assignment may go on. It may not where the
+// parentheses go on as a method's parameters do: after a `,` an annotation;
+// after a name another name (`(a, int b)`), the `=` of a default value, or
+// the `.`, `<` or `[` of a type; after the `)` of a list of names, past
+// Groovy's trivia, the `{` or `throws` of a method's body or throws clause
+// (`def f(a, b) { }`). Any other text is left to the grammar, which ends the
+// reading at the token it did without the look-ahead: `(a, b) = l`, a list
+// longer than the bound, `(a, b + c)`, `(a, b);`, a `)` at the end of the
+// input. What decides is then inside the parentheses or the method that the
+// parse keeps, so a reparse that reuses a node of that method has read the
+// same text.
+static bool multi_assignment_may_go_on(TSLexer *lexer, bool no_close_ahead) {
+    for (unsigned names = 0; names < MULTI_ASSIGNMENT_LOOKAHEAD_NAMES; names++) {
+        if (!skip_multi_assignment_trivia(lexer, no_close_ahead)) {
+            return true;
+        }
+        if (!is_identifier_start(lexer->lookahead)) {
+            return lexer->lookahead != '@';
+        }
+        read_word(lexer, NULL, 0);
+        if (!skip_multi_assignment_trivia(lexer, no_close_ahead)) {
+            return true;
+        }
+        int32_t c = lexer->lookahead;
+        if (c == ')') {
+            advance(lexer);
+            if (!skip_multi_assignment_trivia(lexer, no_close_ahead)) {
+                return true;
+            }
+            return lexer->lookahead != '{' && !consume_keyword(lexer, "throws");
+        }
+        if (c == '=') {
+            advance(lexer);
+            return lexer->lookahead == '=' || lexer->lookahead == '~';
+        }
+        if (is_identifier_start(c) || c == '.' || c == '<' || c == '[') {
+            return false;
+        }
+        if (c != ',') {
+            return true;
+        }
+        advance(lexer);
+    }
+    return true;
+}
+
+// SPECIFICATION.md §6.20 — the first comma of a multi-assignment without
+// `def`, after the spaces the scan skipped and any form feeds and vertical
+// tabs, which the grammar's extras skip as well. The token is the `,`; what
+// is read after it is look-ahead. On `false` the runtime rewinds and the
+// in-grammar lexer reads the `,`, which the multi-assignment does not take.
+static bool scan_multi_assignment_comma(TSLexer *lexer, bool no_close_ahead) {
+    while (lexer->lookahead == '\v' || lexer->lookahead == '\f'
+           || is_whitespace(lexer->lookahead)) {
+        lexer->advance(lexer, true);
+    }
+    if (lexer->lookahead != ',') {
         return false;
     }
     advance(lexer);
-    return skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
-        && lexer->lookahead == '=';
+    lexer->mark_end(lexer);
+    if (!multi_assignment_may_go_on(lexer, no_close_ahead)) {
+        return false;
+    }
+    lexer->result_symbol = MULTI_ASSIGNMENT_COMMA;
+    return true;
 }
 
 // Reads a string from its quote: one that closes on its line, where a `\`
@@ -3407,7 +3461,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !wants_sealed && !wants_value_start && !wants_statement_start
         && !wants_array && !wants_cast_close && !wants_not_in && !wants_lambda
         && !wants_bare_lambda && !wants_paren_extent
-        && !valid_symbols[MULTI_ASSIGNMENT_REST]
+        && !valid_symbols[MULTI_ASSIGNMENT_COMMA]
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
@@ -3539,20 +3593,6 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->result_symbol = CAST_CLOSE;
         return true;
     }
-    // §6.20 — the validity is read only at a `,`: a flag computed with the
-    // ones above, on every scan, cost real files 0.06% more instructions.
-    if (lexer->lookahead == ',' && valid_symbols[MULTI_ASSIGNMENT_REST]
-        && !valid_symbols[ERROR_SENTINEL]) {
-        // The token is empty and ends here. On `false` the runtime rewinds
-        // and the in-grammar lexer reads the `,`, which the multi-assignment
-        // does not take without the token.
-        lexer->mark_end(lexer);
-        if (!multi_assignment_rest_follows(lexer, no_close_ahead)) {
-            return false;
-        }
-        lexer->result_symbol = MULTI_ASSIGNMENT_REST;
-        return true;
-    }
     if (lexer->lookahead == '(' && wants_statement_paren) {
         // On `false` the runtime rewinds and the in-grammar lexer reads
         // the `(` of a call's arguments.
@@ -3585,8 +3625,14 @@ bool tree_sitter_groovy_external_scanner_scan(
         read_lambda_body_end_extent(lexer, no_close_ahead);
         return false;
     }
+    // §6.20 — the first comma of a multi-assignment, or a form feed or
+    // vertical tab before it, which the loop above leaves. No branch above
+    // takes those characters, and testing the token's validity only here,
+    // rather than with the flags above on every scan, is cheaper.
     if (lexer->lookahead != '/') {
-        return false;
+        return valid_symbols[MULTI_ASSIGNMENT_COMMA]
+            && !valid_symbols[ERROR_SENTINEL]
+            && scan_multi_assignment_comma(lexer, no_close_ahead);
     }
 
     // UNTERMINATED_COMMENT is empty and ends here. Every other token

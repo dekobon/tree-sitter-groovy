@@ -22,8 +22,8 @@
  *   - The `!in` operator, which depends on the character after it
  *   - The start of a lambda: the parameters in parentheses, or the one
  *     name, that `->` follows
- *   - The rest of a multi-assignment after its first name: the other
- *     names, `)` and `=`
+ *   - The first comma of a multi-assignment, which it turns down where
+ *     the parentheses go on as a method's parameters
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
  */
@@ -789,12 +789,12 @@ module.exports = grammar({
     // block down and the `}` is decided where a parse from scratch decides
     // it.
     $._lambda_body_reread,
-    // §6.20 — empty token after the first name of `(a, b) = …`, emitted when
-    // only names follow up to the `)` and `=` after it. Without it the
+    // §6.20 — the first `,` of `(a, b) = …`, emitted unless the parentheses
+    // go on as a method's parameters (`def f(a, b) { }`). Without it the
     // reading in which the `(` after `def f` opens the next statement held
     // `def f(a, b)` to the token after the `)`. Listed last but for the
     // sentinel, so that it renumbers no symbol before it.
-    $._multi_assignment_rest,
+    $._multi_assignment_comma,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2833,23 +2833,26 @@ module.exports = grammar({
     // every declarator's name as a definition.
     //
     // A parenthesized expression or a cast has no `,` at its top level, so
-    // the first `,` after `( identifier`, and the token before it, decide
-    // with no declared conflict. With one name, `(a) = 1` stays an
-    // `assignment_expression`, as in Apache.
+    // the first `,` after `( identifier` decides with no declared conflict.
+    // That `,` is `_multi_assignment_comma` (§6.20), the scanner's, aliased
+    // to `,`. With one name, `(a) = 1` stays an `assignment_expression`, as
+    // in Apache.
     //
     // After `def f` or `final f` where a statement can start, a declared
     // conflict keeps a reading in which the `(` opens the next statement.
     // It parses `def f` followed by `(a, b) = list` on the next line, and it
     // also accepts `def f(a, b) = list`, which Groovy rejects (divergence
-    // 3). `_multi_assignment_rest` (§6.20) ends that reading at the first
-    // `,` of `def f(a, b) { }`. Decided at the `{`, it read every untyped
+    // 3). The scanner turns down the first `,` of `def f(a, b) { }`, which
+    // ends that reading there. Decided at the `{`, it read every untyped
     // parameter a second time: 17% more instructions for a head with two
-    // and 49% with eight.
+    // and 49% with eight. A token of the `,` itself, rather than an empty
+    // one before it, costs a multi-assignment no parse step of its own.
     multi_assignment_expression: $ => prec.right(PREC.ASSIGN, seq(
       statementParen($),
       field('name', $.identifier),
-      $._multi_assignment_rest,
-      repeat1(seq(',', field('name', $.identifier))),
+      alias($._multi_assignment_comma, ','),
+      field('name', $.identifier),
+      repeat(seq(',', field('name', $.identifier))),
       ')',
       '=',
       field('value', statementExpression($)),

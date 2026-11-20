@@ -9451,11 +9451,24 @@
             }
           },
           {
-            "type": "SYMBOL",
-            "name": "_multi_assignment_rest"
+            "type": "ALIAS",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_multi_assignment_comma"
+            },
+            "named": false,
+            "value": ","
           },
           {
-            "type": "REPEAT1",
+            "type": "FIELD",
+            "name": "name",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            }
+          },
+          {
+            "type": "REPEAT",
             "content": {
               "type": "SEQ",
               "members": [
@@ -12251,7 +12264,7 @@
     },
     {
       "type": "SYMBOL",
-      "name": "_multi_assignment_rest"
+      "name": "_multi_assignment_comma"
     },
     {
       "type": "SYMBOL",
