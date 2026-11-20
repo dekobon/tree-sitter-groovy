@@ -230,7 +230,7 @@ Subscript continued on a new line inside brackets is unsupported
 ---
 
 ==================
-List literal on the same line after a block is not a subscript
+List literal on the same line after a block is not a subscript (Groovy subscripts a closure)
 ==================
 
 if (a) { } [1].each { }
@@ -250,7 +250,7 @@ if (a) { } [1].each { }
       closure: (closure))))
 
 ==================
-Subscript after a block comment on the next line
+Subscript after a block comment on the next line (known divergence)
 ==================
 
 a

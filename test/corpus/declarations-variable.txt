@@ -2254,7 +2254,7 @@ a<b>c
     name: (identifier)))
 
 ==================
-Two names that start no typed local
+Two names that start no typed local (known divergence)
 ==================
 
 foo bar
@@ -2291,7 +2291,7 @@ String this
     (identifier)))
 
 ==================
-Type arguments after a space start no typed local
+Type arguments after a space start no typed local (known divergence)
 ==================
 
 a < b > c
@@ -2425,7 +2425,7 @@ open()
       arguments: (argument_list))))
 
 ==================
-A line that goes on with the name ends no typed local
+A line that goes on with the name ends no typed local (known divergence)
 ==================
 
 String s
@@ -2458,7 +2458,7 @@ String u
     value: (number_literal)))
 
 ==================
-Typed local without an initializer before parameters on the next line stays a method
+Typed local without an initializer before parameters on the next line stays a method (known divergence)
 ==================
 
 Foo f
@@ -2789,7 +2789,7 @@ String s
     name: (identifier)))
 
 ==================
-A type after return, break and continue is their operand before a declared name too
+A type after return, break and continue is their operand before a declared name too (known divergence)
 ==================
 
 return
@@ -2821,7 +2821,7 @@ while (c) {
         (identifier)))))
 
 ==================
-Typed local without an initializer after a statement on its line
+Typed local without an initializer after a statement on its line (known divergence)
 ==================
 
 foo() String s
@@ -2904,7 +2904,7 @@ sourceCompatibility JavaVersion.VERSION_1_8
       field: (identifier))))
 
 ==================
-Typed local without an initializer in an interpolation is an error
+Typed local without an initializer in an interpolation is an error (Groovy 3 reads a closure that declares s)
 :error
 ==================
 
@@ -2970,7 +2970,7 @@ def (String a, int b) = l
     value: (identifier)))
 
 ==================
-A dotted name that starts with this is no type of a typed local
+A dotted name that starts with this is no type of a typed local (known divergence)
 ==================
 
 this.Foo x
@@ -3004,7 +3004,7 @@ this.Foo<T> x
       right: (identifier))))
 
 ==================
-A dotted name that starts with super is no type of a typed local
+A dotted name that starts with super is no type of a typed local (known divergence)
 ==================
 
 super.Foo x
@@ -3101,7 +3101,7 @@ String u
   (line_comment))
 
 ==================
-A line that starts with in or as starts a statement after a typed local
+A line that starts with in or as starts a statement after a typed local (known divergence)
 ==================
 
 String s
@@ -3357,7 +3357,7 @@ String int
     (identifier)))
 
 ==================
-A reserved word in a typed local's list of names is no name (error recovery)
+A reserved word in a typed local's list of names is no name (error recovery) (Groovy reads a call)
 ==================
 
 String a, this

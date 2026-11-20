@@ -86,6 +86,9 @@ default record Pair(int a) { }
 default void script() { }
 // <- keyword.modifier
 
+// A known divergence: Groovy reads `foo(default: 1)`, a named argument; here
+// `default:` is a label, so that `case 1: foo default: bar` keeps its
+// `default` case (SPECIFICATION.md §6.8).
 foo default: 1
 //  ^ label
 

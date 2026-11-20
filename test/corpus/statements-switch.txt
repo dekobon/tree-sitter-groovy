@@ -16,7 +16,7 @@ switch (x) { case 1: foo }
           (expression_statement (identifier)))))))
 
 ==================
-Classic switch with default
+Classic switch with default (known divergence)
 ==================
 
 switch (x) { case 1: foo default: bar }

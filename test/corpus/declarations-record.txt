@@ -163,7 +163,7 @@ record Point (int x) { }
     body: (class_body)))
 
 ==================
-Command-style call named record with a call argument reads as a record header
+Command-style call named record with a call argument reads as a record header (Groovy reads a call)
 :error
 ==================
 

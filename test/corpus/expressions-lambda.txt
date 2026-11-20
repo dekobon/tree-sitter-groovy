@@ -1178,7 +1178,7 @@ foo(this -> 1)
           (number_literal))))))
 
 ==================
-A lambda in parentheses after a call's name is no argument of it
+A lambda in parentheses after a call's name is no argument of it (Groovy reads foo((x) -> x))
 ==================
 
 foo((x) -> x)
@@ -2957,7 +2957,7 @@ def v = a -> { foo() }
         (identifier)))))
 
 ==================
-Lambda body before eight comments and a call goes on, before nine it ends
+Lambda body before eight comments and a call goes on, before nine it ends (known divergence)
 ==================
 
 def v = (a) -> { y -> y } /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ .call()

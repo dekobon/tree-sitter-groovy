@@ -833,7 +833,7 @@ x = [@A]
 ---
 
 ==================
-Annotation list mixed with an expression is an error
+Annotation list mixed with an expression is an error (Groovy's parser takes it, its annotation check rejects it)
 :error
 ==================
 
@@ -843,7 +843,7 @@ class X { }
 ---
 
 ==================
-Nested annotation list is an error
+Nested annotation list is an error (Groovy's parser takes it, its annotation check rejects it)
 :error
 ==================
 

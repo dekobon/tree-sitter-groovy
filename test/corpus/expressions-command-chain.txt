@@ -486,7 +486,7 @@ foo 1, 2
       (identifier))))
 
 ==================
-Prefix increment on the line after a multi-argument command chain
+Prefix increment on the line after a multi-argument command chain (known divergence)
 ==================
 
 foo 1, 2
@@ -504,7 +504,7 @@ foo 1, 2
     (identifier)))
 
 ==================
-Prefix decrement on the line after a multi-argument command chain
+Prefix decrement on the line after a multi-argument command chain (known divergence)
 ==================
 
 foo 1, 2
@@ -541,7 +541,7 @@ foo a: 1
       (identifier))))
 
 ==================
-Label after a block comment on the next line becomes a named argument
+Label after a block comment on the next line becomes a named argument (known divergence)
 ==================
 
 foo
@@ -558,7 +558,7 @@ foo
       value: (identifier))))
 
 ==================
-Label after a groovydoc comment on the next line becomes a named argument
+Label after a groovydoc comment on the next line becomes a named argument (known divergence)
 ==================
 
 foo
@@ -1922,7 +1922,7 @@ println(foo 1), 2
     argument: (number_literal)))
 
 ==================
-A first argument in parentheses is a whole expression
+A first argument in parentheses is a whole expression (known divergence)
 ==================
 
 println(foo 1).trim()
@@ -2224,7 +2224,7 @@ h = "${this.foo 1}"
             argument: (number_literal)))))))
 
 ==================
-Keywords Groovy takes as names before a command chain in parentheses
+Keywords Groovy takes as names before a command chain in parentheses (known divergence)
 ==================
 
 class A extends B {
@@ -3089,7 +3089,7 @@ x.y \
     argument: (number_literal)))
 
 ==================
-A dotted call after a statement on the same line is a command chain
+A dotted call after a statement on the same line is a command chain (known divergence)
 ==================
 
 x.y a.b 'c'
@@ -3173,7 +3173,7 @@ obj.m 1
     argument: (number_literal)))
 
 ==================
-A dotted call after a call with an identifier receiver on the same line is a second command chain
+A dotted call after a call with an identifier receiver on the same line is a second command chain (known divergence)
 ==================
 
 foo 'a' obj.m 'b'
@@ -4326,7 +4326,7 @@ instanceof new Foo()
       arguments: (argument_list))))
 
 ==================
-A command chain with new after another statement on the same line
+A command chain with new after another statement on the same line (known divergence)
 ==================
 
 foo 1 bar new Baz()
@@ -4530,7 +4530,7 @@ package new Foo()
 ---
 
 ==================
-The keyword pipeline before new is not a receiver
+The keyword pipeline before new is not a receiver (Groovy reads pipeline(new Foo()))
 :error
 ==================
 
@@ -4970,7 +4970,7 @@ foo bar
     argument: (identifier)))
 
 ==================
-A receiver that may name a type takes no name argument
+A receiver that may name a type takes no name argument (known divergence)
 ==================
 
 Foo bar
@@ -5036,7 +5036,7 @@ foo bar =~ /x/
         (string_fragment)))))
 
 ==================
-A name argument on the next line stays a statement
+A name argument on the next line stays a statement (known divergence)
 ==================
 
 foo
@@ -5570,7 +5570,7 @@ foo 1 + 2
       operand: (number_literal))))
 
 ==================
-Comments after a name argument are trivia
+Comments after a name argument are trivia (known divergence)
 ==================
 
 myType x /* c */ = compute()
@@ -5925,7 +5925,7 @@ foo bar(a, b) { }
       closure: (closure))))
 
 ==================
-A declaring word as a name argument before a name
+A declaring word as a name argument before a name (known divergence)
 ==================
 
 foo var x
@@ -5972,7 +5972,7 @@ foo var
     argument: (identifier)))
 
 ==================
-Further names after a name argument in a value
+Further names after a name argument in a value (known divergence)
 ==================
 
 class C { def r = a b c }

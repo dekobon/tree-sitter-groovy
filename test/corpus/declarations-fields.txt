@@ -338,7 +338,7 @@ class A {
               right: (identifier))))))))
 
 ==================
-Modified field with no initializer before a comment and a modifier-only method
+Modified field with no initializer before a comment and a modifier-only method (Groovy reads a method)
 ==================
 
 class A {
