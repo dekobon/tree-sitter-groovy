@@ -59,6 +59,27 @@
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
 // calls.
+//
+// Known inconsistencies, kept as they are:
+//   - Form feeds and vertical tabs. The grammar's extras skip them, and so
+//     do the look-aheads of §6.20 and §6.21 (`skip_line_extras`,
+//     `skip_extras`, `skip_multi_assignment_trivia`), but the others read
+//     them as no trivia: `var\fx = 1` is a typed local of type `var`,
+//     `x = y as\fFoo` three statements and `foo a\f: 1` an `ERROR`, where a
+//     space makes the keyword, the cast and the named argument. Groovy's
+//     lexer rejects both characters outside strings and comments, so no
+//     input that Groovy accepts reads differently.
+//   - Duplicated helpers. Look-aheads read the same lexical units with
+//     helpers of their own: trivia (`skip_same_line_space`,
+//     `skip_header_trivia`, `skip_argument_trivia`, `skip_same_line_trivia`,
+//     `skip_line_extras`, `skip_extras`, `skip_multi_assignment_trivia`),
+//     tokens with brackets counted (`parameters_follow`, `skip_lambda_tokens`,
+//     `parentheses_open_statement`, `read_parentheses_extent`), strings
+//     (`skip_string`, `method_name_follows`) and block comments
+//     (`skip_comment_body`, and loops in `skip_header_trivia` and the scan
+//     function). Each reads what its look-ahead was measured with; merging
+//     them would change what some take for trivia, the form feeds above
+//     among them, and needs every look-ahead's trees compared again.
 
 #include "tree_sitter/alloc.h"
 #include "tree_sitter/parser.h"
