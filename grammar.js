@@ -135,13 +135,15 @@ const CAST_WEIGHT = 1;
 
 /*
  * The dynamic precedence of a dotted type after `as`, `instanceof` or
- * `!instanceof`, whose tokens also read as field accesses on a cast of the
- * first name: `x as java.util.Map` and `(x as java).util.Map`. Groovy reads
- * the type (Apache's `qualifiedClassName`). It is less than one step, so it
- * ranks only readings that the weights leave tied (see WEIGHT_UNIT). A whole
- * step would tie readings that a step now ranks: `(x) as a.b` also reads the
- * cast `(x)` of the name `as`, as Groovy does, followed by `a.b`, which
- * outweighs `(x) as a.b` by CAST_WEIGHT.
+ * `!instanceof`, alone or as the base of an array or generic type, whose
+ * tokens also read as field accesses on a cast of the first name:
+ * `x as java.util.Map` and `(x as java).util.Map`, `x as a.B<C> + x` and
+ * `(x as a).B < C > +x`. Groovy reads the type (Apache's
+ * `qualifiedClassName`). It is less than one step, so it ranks only readings
+ * that the weights leave tied (see WEIGHT_UNIT). A whole step would tie
+ * readings that a step now ranks: `(x) as` at the end of a line casts the
+ * name `as`, as Groovy does, and `a.b` on the next line is a statement,
+ * which outweighs `(x) as a.b` across the line break by CAST_WEIGHT.
  */
 const DOTTED_CAST_TYPE_WEIGHT = 1;
 
@@ -940,19 +942,16 @@ module.exports = grammar({
     // declaration.
     [$._expression, $.qualified_type],
 
-    // §3.2.2 — `_cast_type` overlaps `_type` on identifier / array /
-    // generic alternatives; only the dotted path diverges.
-    [$._cast_type, $._type],
-    // After `x as java` a `.` continues the type (`_dotted_type`, or the
-    // `qualified_type` of an array or generic type), or ends it, so that
-    // `.util` is a field access on `x as java`. Both readings parse to the
-    // end of the name. DOTTED_CAST_TYPE_WEIGHT ranks `_dotted_type` first.
-    // The `qualified_type` under `array_type` and `generic_type` carries no
-    // weight, so between it and the field accesses
-    // (`x as Map.Entry<C> + x`) tree-sitter's last resort still decides, by
-    // the order of the rule definitions and of the parse stacks
+    // §3.2.2 — after `x as java` a `.` continues the type (`_dotted_type`,
+    // alone or as the base of an array or generic type), or ends it, so
+    // that `.util` is a field access on `x as java`. Both readings parse to
+    // the end of the name. DOTTED_CAST_TYPE_WEIGHT ranks the type first
     // (docs/divergences-from-spec.md §5).
-    [$._cast_type, $._dotted_type, $.qualified_type],
+    [$._cast_type, $._dotted_type],
+    // §3.2.2 — at a `[` after the type of `x as T`, the type is a cast's
+    // whole type, which a subscript follows (`x as T[0]`), or the element
+    // of an array type (`x as T[]`); the `]` after the `[` decides.
+    [$._cast_type, $._cast_array_element],
 
     // §4 — `for ( identifier …` could continue as a for_statement
     // (identifier is part of the init expression) or as a
@@ -2486,15 +2485,45 @@ module.exports = grammar({
     )),
 
     // §3.2.2 — RHS type of `as`, `instanceof`, and `!instanceof`.
-    // Same alternatives as `_type` except `qualified_type` is
-    // replaced by `_dotted_type`, whose tail shifts each dot at a
-    // precedence tighter than `field_access`.
+    // Same alternatives as `_type`, with `_dotted_type` in place of
+    // `qualified_type`, also as the base of an array or generic type:
+    // its tail shifts each dot at a precedence tighter than
+    // `field_access`, which the repeat of `qualified_type` does not, so
+    // that `x as a.b.C[]` and `x as java.util.List<String>` keep their
+    // type past the second dot, and its weight ranks it above field
+    // accesses on `x as a`.
     _cast_type: $ => choice(
       alias($.identifier, $.type_identifier),
-      $.array_type,
+      alias($._cast_array_type, $.array_type),
       alias($._dotted_type, $.qualified_type),
-      $.generic_type,
+      alias($._cast_generic_type, $.generic_type),
     ),
+
+    // The element is a rule of its own, not `_cast_type`: after a whole
+    // `_cast_type` the `[` of a dimension would compete with the reduction
+    // of the left-associative `cast_expression`, which precedence settles
+    // for the reduction, so `x as T[]` would not parse. The element and
+    // the whole type compete as two reductions instead, until the `]`.
+    _cast_array_type: $ => prec(PREC.ARRAY_TYPE, seq(
+      $._cast_array_element,
+      alias($._subscript_open, '['),
+      ']',
+    )),
+
+    _cast_array_element: $ => choice(
+      alias($.identifier, $.type_identifier),
+      alias($._cast_array_type, $.array_type),
+      alias($._dotted_type, $.qualified_type),
+      alias($._cast_generic_type, $.generic_type),
+    ),
+
+    _cast_generic_type: $ => prec.right(PREC.ARRAY_TYPE, seq(
+      field('base', choice(
+        alias($.identifier, $.type_identifier),
+        alias($._dotted_type, $.qualified_type),
+      )),
+      field('arguments', $.type_arguments),
+    )),
 
     _dotted_type: $ => prec.dynamic(DOTTED_CAST_TYPE_WEIGHT, seq(
       alias($.identifier, $.type_identifier),
