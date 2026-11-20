@@ -4,7 +4,7 @@
 //! At a `/` where a slashy string may start, which during error recovery is
 //! every `/`, the scanner looks for the string's closing `/` on the line. An
 //! escaped slash ends no look-ahead, so a line of `\/` was read from each of
-//! its slashes to its end, in time quadratic in its length: 24 seconds for
+//! its slashes to its end, in time quadratic in its length: 17 seconds for
 //! 100,000 bytes. The look-ahead now stops at a fixed number of escaped
 //! slashes. Time is not measured: the parser reads its input through a
 //! callback here, and the test compares the bytes it asks for at two input

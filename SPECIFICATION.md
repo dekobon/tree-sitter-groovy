@@ -1538,7 +1538,7 @@ one (`slashy_body_follows`). That look-ahead runs from every `/` where
 a slashy string may start, which during error recovery is every `/`,
 and an escaped slash ends none of them, so a line of `\/` was read from
 each of its slashes to its end: 2,505 bytes read per input byte for
-10,000 bytes and 25,005 for 100,000 (24 seconds), in `x = /` followed
+10,000 bytes and 25,005 for 100,000 (17 seconds), in `x = /` followed
 by `\/` repeated and in `@` followed by `/\` repeated. The look-ahead
 now stops at SLASHY_LOOKAHEAD_ESCAPED_SLASHES (64) escaped slashes and
 takes the string to close there, so a character is read from at most

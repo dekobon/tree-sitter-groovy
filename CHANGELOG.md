@@ -139,7 +139,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `primary` takes it; one without parentheses in a value, an argument
   in parentheses, a map entry's or named argument's value and in
   parentheses. Two empty scanner tokens, `_lambda_start` and
-  `_bare_lambda_start`, open the forms only when `->` follows. A closure
+  `_bare_lambda_start`, open the forms only when `->` follows; the
+  look-ahead reads a default value's strings whole, a triple-quoted one
+  across lines (`(a = '''it's''') -> a`). A closure
   parameter's default and a case value keep their reading before `->`
   (`def c = { a = (b) -> c }`, `case (A) -> 1`), as in Groovy. A brace
   body ends at its `}` only where no expression continues it, so
@@ -301,8 +303,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   with `bar(a) { }`, as in Groovy; typed parameters keep the method.
   `if (x) foo bar else baz qux` was an `if` and four statements and is
   an `if` with an `else`. Closure parameters after a lowercase type are
-  read for their `->` within 256 items, so 128 or more names after the
-  first (`{ foo a, b0, …, b127 -> a }`) are an `ERROR`.
+  read for their `->` within 256 items, strings whole (a triple-quoted
+  one across lines, `{ foo a, b = '''x` then `y''' -> a }`), so 128 or
+  more names after the first (`{ foo a, b0, …, b127 -> a }`) are an
+  `ERROR`.
 - **BREAKING:** the body of `if`, `else`, a loop or an arrow case that
   holds the assignment of a lambda is a `block` that holds the lambda
   (see Added), as in Groovy, which changes trees for input that parsed
@@ -390,7 +394,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   reads `String` and the expression of `s`, where Groovy calls
   `String(s.trim())`. `final x` followed by `String s = 'a'` was the
   blank final `final x String` and `s = 'a'` and is two declarations, as
-  in Groovy. A type and a name after another statement on its line
+  in Groovy, whatever the value, a lambda included
+  (`Runnable r = () -> { foo() }`). `{ String a = '''x` then
+  `y''' -> a }` stays closure parameters, as at v0.6.0. A type and a name after another statement on its line
   declare: `move left By steps` is the call `move left` and the
   declaration `By steps`, where Groovy continues the call. Error
   recovery changes too: `String s =` at the end of the input is the
@@ -553,6 +559,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Runs of lines such as `l = x as util.List<T>` took time quadratic in
   their number, 4.4 billion instructions for 4,000 lines, and are
   linear, 0.17 billion.
+- A lambda without parentheses in an enum's first constant's arguments
+  parses (`enum E { A(v -> v) }`, `A(value -> value)`): those arguments
+  are also a constructor's parameters, where `var` may start one, and the
+  scanner turned down any name that began like `var` at its first
+  letters. It now reads the whole name first. `A(var -> var)` is still an
+  `ERROR` (`docs/divergences-from-spec.md` §22).
+- The look-ahead for a slashy string's closing `/` stops after 64
+  escaped slashes and takes the string to close there: it ran from every
+  `/` where a slashy string may start, during error recovery every `/`,
+  so a line of `\/` was read in time quadratic in its length, 17 s for
+  100 KB, as at v0.6.0; it is linear now. A slashy string that closes
+  reads as before however many escaped slashes it holds; past the bound
+  an unterminated one is a slashy string with a `MISSING` `/` instead of
+  another `ERROR` (`SPECIFICATION.md` §6.2).
+- `tree-sitter.json` names `queries/groovy/injections.scm`, so
+  `tree-sitter highlight` and other tools that read the file load the
+  injections; v0.6.0 left them out. `locals.scm` stays unlisted, as
+  `tree-sitter tags` rejects its `@local.definition.var` captures.
 
 ## [0.6.0] - 2026-11-12
 
