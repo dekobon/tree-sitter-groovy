@@ -1514,6 +1514,250 @@ xs.each { v = a -> { foo() }
             operand: (number_literal)))))))
 
 ==================
+Closure parameter before a lambda whose body is a closure and eight lines of braces
+==================
+
+def c = { a = b -> { p -> p }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z } }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (method_invocation
+            function: (method_invocation
+              function: (method_invocation
+                function: (method_invocation
+                  function: (method_invocation
+                    function: (method_invocation
+                      function: (method_invocation
+                        function: (method_invocation
+                          function: (closure
+                            (closure_parameters
+                              (closure_parameter
+                                name: (identifier)))
+                            (expression_statement
+                              (identifier)))
+                          closure: (closure
+                            (expression_statement
+                              (identifier))))
+                        closure: (closure
+                          (expression_statement
+                            (identifier))))
+                      closure: (closure
+                        (expression_statement
+                          (identifier))))
+                    closure: (closure
+                      (expression_statement
+                        (identifier))))
+                  closure: (closure
+                    (expression_statement
+                      (identifier))))
+                closure: (closure
+                  (expression_statement
+                    (identifier))))
+              closure: (closure
+                (expression_statement
+                  (identifier))))
+            closure: (closure
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Body block before a lambda with a block and eight lines of braces
+==================
+
+if (x) { a = (b) -> { }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z }
+{ z } }
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (method_invocation
+            function: (method_invocation
+              function: (method_invocation
+                function: (method_invocation
+                  function: (method_invocation
+                    function: (method_invocation
+                      function: (method_invocation
+                        function: (method_invocation
+                          function: (lambda_expression
+                            parameters: (formal_parameters
+                              (formal_parameter
+                                name: (identifier)))
+                            body: (block))
+                          closure: (closure
+                            (expression_statement
+                              (identifier))))
+                        closure: (closure
+                          (expression_statement
+                            (identifier))))
+                      closure: (closure
+                        (expression_statement
+                          (identifier))))
+                    closure: (closure
+                      (expression_statement
+                        (identifier))))
+                  closure: (closure
+                    (expression_statement
+                      (identifier))))
+                closure: (closure
+                  (expression_statement
+                    (identifier))))
+              closure: (closure
+                (expression_statement
+                  (identifier))))
+            closure: (closure
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Closure parameter in parentheses before a lambda and two lines of braces (divergence 28)
+==================
+
+def c = { a = (b) -> (d) -> e
+{ z }
+{ z } }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (lambda_expression
+              parameters: (formal_parameters
+                (formal_parameter
+                  name: (identifier)))
+              body: (parenthesized_expression
+                (identifier)))))
+        (command_chain
+          receiver: (identifier)
+          argument: (closure
+            (expression_statement
+              (identifier))))
+        (block
+          (expression_statement
+            (identifier)))))))
+
+==================
+A brace that opens a statement before a lambda and two lines of braces (divergence 28)
+==================
+
+{ a = b -> c
+{ z }
+{ z } }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          name: (identifier)
+          default: (identifier)))
+      (command_chain
+        receiver: (identifier)
+        argument: (closure
+          (expression_statement
+            (identifier))))
+      (block
+        (expression_statement
+          (identifier))))))
+
+==================
+A brace that opens a statement before a lambda whose body is a closure (divergence 28)
+==================
+
+{ a = b -> { p -> p } }
+lbl: { a = b -> { p -> p } }
+switch (v) { case 1: { a = b -> { p -> p } } }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          name: (identifier)
+          default: (identifier)))
+      (expression_statement
+        (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier))))))
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier)))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (closure
+              (closure_parameters
+                (closure_parameter
+                  name: (identifier)
+                  default: (identifier)))
+              (expression_statement
+                (closure
+                  (closure_parameters
+                    (closure_parameter
+                      name: (identifier)))
+                  (expression_statement
+                    (identifier)))))))))))
+
+==================
 Closure parameter in parentheses before a lambda body
 ==================
 
