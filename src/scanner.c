@@ -809,11 +809,15 @@ static bool skip_comment_body(TSLexer *lexer) {
 // a modifier, an operator or an open bracket comes before it, or `->` after
 // it: a call's last argument ends at it (`foo a, b` then the next
 // statement). `;`, a closing bracket with none open and the end of the
-// budget end the look-ahead with no `->`.
-static bool parameters_follow(TSLexer *lexer, bool no_close_ahead) {
+// budget, `budget` items, end the look-ahead with no `->`.
+static bool parameters_follow(
+    TSLexer *lexer,
+    unsigned budget,
+    bool no_close_ahead
+) {
     unsigned depth = 0;
     bool continued = true;
-    for (unsigned items = 0; items < NAME_ARGUMENT_LOOKAHEAD_ITEMS; items++) {
+    for (unsigned items = 0; items < budget; items++) {
         if (!skip_same_line_space(lexer, false) || lexer->eof(lexer)) {
             return false;
         }
@@ -926,7 +930,8 @@ static bool name_argument_rest(
         return true;
     }
     if (c == ',') {
-        return !parameters_follow(lexer, no_close_ahead);
+        return !parameters_follow(lexer, NAME_ARGUMENT_LOOKAHEAD_ITEMS,
+                                  no_close_ahead);
     }
     if (c == '=') {
         advance(lexer);
