@@ -2011,3 +2011,881 @@ void level(String trait, sealed) {
                 name: (identifier)))
             (expression_statement
               (identifier))))))))
+
+==================
+Typed local without an initializer
+==================
+
+String s
+int i;
+List<String> xs
+Map<String, List<Integer>> m
+String[] arr
+int[][] grid
+foo.Bar q
+java.util.List<String> l
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (array_type
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)))
+
+==================
+Typed locals without an initializer in a list
+==================
+
+String a, b
+String a, b = 1
+String a = 1, b
+int x, y, z;
+List<String> xs, ys = []
+String c,
+  d
+String e, f
+  = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Typed local without an initializer whose type Groovy reads by its spelling
+==================
+
+Été x
+foo<T> x
+foo[] x
+foo [] y
+foo.bar.Baz q
+a<b>c
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)))
+
+==================
+Two names that start no typed local
+==================
+
+foo bar
+foo.bar x
+foo.Bar.baz q
+void x
+String this
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+Type arguments after a space start no typed local
+==================
+
+a < b > c
+List <String> xs
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Typed local without an initializer ends at a semicolon, a brace, a comment or an else
+==================
+
+String a; String b
+{ String c }
+String d // note
+String e /* note */
+String f /* note */ = 1
+if (x) String g else String h
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (closure
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (line_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (block_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    (block_comment)
+    value: (number_literal))
+  (if_statement
+    condition: (identifier)
+    consequence: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    alternative: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))))
+
+==================
+Typed local without an initializer before a line that starts a statement
+==================
+
+String a
+x
+String b
+(c, d) = l
+String e
+{ }
+String f
+[1]
+String g
++ 1
+String h
+/x/
+InputStream in
+open()
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (closure))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (list_literal
+      (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A line that goes on with the name ends no typed local
+==================
+
+String s
+.trim()
+String t
+* 2
+String u
+= 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Typed local without an initializer before parameters on the next line stays a method
+==================
+
+Foo f
+(int a) { }
+String g
+(a) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (closure))))
+
+==================
+Typed locals without an initializer in bodies
+==================
+
+def m() {
+  String a
+  int b, c
+}
+xs.each { String s }
+x = { -> String t }
+def f = x -> { String u }
+switch (x) {
+  case 1: String v; break
+  default: int w
+}
+lbl: String y
+while (c) String z
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        name: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters)
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))
+          (break_statement))
+        (switch_default
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))))))
+  (labeled_statement
+    label: (identifier)
+    statement: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)))
+  (while_statement
+    condition: (identifier)
+    body: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))))
+
+==================
+Closure parameters are not typed locals without an initializer
+==================
+
+f = { String a, b -> a }
+g = { String a, b = 1 -> a }
+h = { String a
+  -> a }
+k = { String a,
+  b -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Typed local without an initializer in a for header
+==================
+
+for (int i; i < n; i++) { }
+for (int j, k; j < n; j++) { }
+for (String s : xs) { }
+for (String t
+  : xs) { }
+for (String u in xs) { }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+Annotated typed locals without an initializer
+==================
+
+@Field String v
+@Field int a, b
+@Field
+List<String> xs
+@A(1) @B Foo f
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (number_literal)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Blank final locals in a list
+==================
+
+final String a, b
+final String c, d = 1
+final String e = 1, f
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)
+    name: (identifier)))
+
+==================
+Typed local without an initializer after an untyped blank final
+==================
+
+final x
+String s
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Typed local without an initializer after a blank final
+==================
+
+final String u
+String s
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+A type after return, break and continue is their operand before a declared name too
+==================
+
+return
+String s
+while (c) {
+  break
+  String t
+  continue
+  String u
+}
+
+---
+
+(source_file
+  (return_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement
+        label: (identifier))
+      (expression_statement
+        (identifier))
+      (continue_statement
+        label: (identifier))
+      (expression_statement
+        (identifier)))))
+
+==================
+Typed local without an initializer after a statement on its line
+==================
+
+foo() String s
+x = 1 String t
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Method declarations and def are not typed locals without an initializer
+==================
+
+String f()
+String g() { }
+def String s
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier)))
+
+==================
+Command chains whose first argument is capitalized stay command chains
+==================
+
+println Foo
+assertEquals Expected, actual
+compile Libs.guava
+sourceCompatibility JavaVersion.VERSION_1_8
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Typed local without an initializer in an interpolation is an error
+:error
+==================
+
+"${String s}"
+
+---
+
+==================
+Typed declarations elsewhere keep their nodes
+==================
+
+class C { String s; int a, b }
+try (R r = open()) { } catch (E e) { }
+def f = (String s) -> s
+def (String a, int b) = l
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))))
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier)))
