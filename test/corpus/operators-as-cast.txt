@@ -136,3 +136,88 @@ int as = 1
     type: (type_identifier)
     name: (identifier)
     value: (number_literal)))
+
+==================
+as cast to a qualified type inside an expression
+==================
+
+y = x as a.b.C
+[x as a.b.C, 1]
+f(x as a.b.C)
+x as a.b.C ? 1 : 2
+return x as a.b.C
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (expression_statement
+    (list_literal
+      (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))))))
+  (expression_statement
+    (ternary_expression
+      condition: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      consequence: (number_literal)
+      alternative: (number_literal)))
+  (return_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+as cast to a qualified type with lowercase names
+==================
+
+x as a.b.c
+x as foo.bar + 1
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (number_literal))))

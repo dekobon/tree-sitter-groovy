@@ -139,3 +139,52 @@ in instanceof T
     (instanceof_expression
       value: (identifier)
       type: (type_identifier))))
+
+==================
+instanceof with a qualified type inside an expression
+==================
+
+x instanceof a.b.C && y
+x !instanceof a.b.C || z
+!(x instanceof a.b.C)
+def v = x instanceof a.b.c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (parenthesized_expression
+        (instanceof_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))))))
