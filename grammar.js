@@ -2737,8 +2737,8 @@ module.exports = grammar({
     //
     // A `)` before `instanceof`, `!instanceof`, `!in`, or `as` or `in`
     // and what it takes, is `_relational_close`, which closes no cast:
-    // Groovy reads no cast of a name `instanceof` there, nor one of `as`
-    // or `in` since GROOVY-10355 (§6.11).
+    // Groovy reads no cast of a name `instanceof` there, nor, from
+    // Groovy 6.0.0 on (GROOVY-10355), one of `as` or `in` (§6.11).
     parenthesized_type_cast: $ => choice(
       weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),

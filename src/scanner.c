@@ -2771,9 +2771,9 @@ typedef enum {
 // them (GroovyLexer.g4 INSTANCEOF, NOT_INSTANCEOF and NOT_IN), so
 // `(x) instanceof Foo` tests `(x)` and is no cast of a name `instanceof`.
 // `as` and `in` are names too, and `(Foo) in` casts the name `in`; they
-// are the operators when what they take follows on the line, as Apache's
-// parser reads `(x) as Foo` and `(x) in y` since GROOVY-10355. A `-`, `(`,
-// `[`, `{` or `.` goes on with the name in Groovy (`(Foo) in.read()`).
+// are the operators when what they take follows on the line, as Groovy
+// 6.0.0 reads `(x) as Foo` and `(x) in y` (GROOVY-10355). A `-`, `(`, `[`,
+// `{` or `.` goes on with the name in Groovy (`(Foo) in.read()`).
 static ParenClose read_relational_operator(TSLexer *lexer) {
     bool negated = lexer->lookahead == '!';
     if (negated) {
