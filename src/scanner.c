@@ -4427,9 +4427,12 @@ static bool scan_lambda_body_end(
             if (no_close_ahead || !skip_comment_body(lexer)) {
                 return true;
             }
-        } else if (lexer->lookahead == '='
+        } else if (lexer->lookahead == '=' || !crossed_line
                    || !token_valid(valid_symbols, mode, STATEMENT_PAREN)
                    || !slashy_body_follows(lexer)) {
+            // On the line of the `}` a `/` divides, as after any expression
+            // (`x -> { a } /2/ 3`): Groovy's lexer starts no regex after a
+            // `}`. A slashy string starts only the statement on a later line.
             return lambda_body_continues(scanner, lexer, mode, comment);
         } else {
             return true;

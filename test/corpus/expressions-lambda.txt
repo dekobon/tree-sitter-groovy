@@ -3084,6 +3084,46 @@ def v = (a) -> { y -> y } /* c */ /* c */ /* c */ /* c */ /* c */ /* c */ /* c *
         arguments: (argument_list)))))
 
 ==================
+A slash on the line of a lambda body's closing brace divides
+==================
+
+def f = x -> { x } /2/ 3
+def g = x -> { x }
+/ab/.matcher(s)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (binary_expression
+            left: (closure
+              (expression_statement
+                (identifier)))
+            right: (number_literal))
+          right: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (string_literal
+          (string_fragment))
+        field: (identifier))
+      arguments: (argument_list
+        (identifier)))))
+
+==================
 Lambda parameter whose default is a string with a quote inside its interpolation
 ==================
 

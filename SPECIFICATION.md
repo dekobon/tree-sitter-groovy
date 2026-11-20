@@ -3306,8 +3306,11 @@ LAMBDA_BODY_END_COMMENTS (8) comments, then one token.
     opens type parameters (`@`, or a name and then `>`, `,` or `extends`,
     on its line) end it, as they start a block or an initializer and a
     generic method or constructor.
-  - A `/` that opens a slashy string where a statement may start ends
-    it, as Groovy reads a statement; any other `/` continues it.
+  - After a line break where a statement may start, a `/` that opens a
+    slashy string ends it, as Groovy reads a statement; any other `/`
+    continues it, and so does every `/` on the line of the `}`, after
+    which Groovy's lexer starts no slashy string
+    (`def f = x -> { x } /2/ 3` divides).
 Anything else ends the body: `)`, `]`, `}`, `,`, `;`, `:` other than
 `::`, a word, a literal, a `[` on a later line, the end of the input, a
 `/*` that does not close (or one the §6.6 bit says cannot), and a ninth
