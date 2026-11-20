@@ -64,7 +64,9 @@ The default branch is **`main`**.
   a `)` with something after it on its
   line, which ranks a cast, and a `)` before a relational operator
   that Groovy applies to the parentheses (`(x) instanceof Foo`),
-  which closes none (§6.11), the `!in` operator, which
+  which closes none (§6.11), the `<` after the name of a cast's type
+  where its type arguments close, so that `x as a.B<c` compares
+  (§3.2.2), the `!in` operator, which
   needs whitespace or a bracket after it (§6.12), the start of a
   lambda, before its parameters in parentheses or its one name, when
   `->` follows (§6.17), an empty token after the `}` of a lambda's
