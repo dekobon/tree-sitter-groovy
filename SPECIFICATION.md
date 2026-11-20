@@ -986,6 +986,27 @@ Escape rules:
   first case and the second is an `ERROR`. Write `$$` for the dollar:
   `$/a$$/$`.
 
+`$` starts a name, and the external scanner's look-aheads (§6) take a
+lone `$` before `/` for the start of a dollar-slashy string, as the
+in-grammar lexer does wherever a string may start: one that read the
+name `$` went on at the `/` and took the body of `$/*.txt/$` for a
+block comment, read to the next `*/` or to the end of the input
+(§6.6). A longer
+name that ends in `$` is a name (`x = a$/b` divides), as in Groovy's
+lexer. What a string decides is decided at the `$`: a dollar-slashy
+string is a first argument after any receiver, as a quoted one is
+(§6.14), and no lambda, typed declaration, `record` or `trait` header,
+cast type arguments or multi-assignment starts there. Where a
+look-ahead reads Groovy's tokens one by one (closure parameters,
+§6.14; a lambda's defaults and annotations, §6.17), the string is one
+item, read across lines to its `/$` with `$$` and `$/` escaped and an
+interpolation's braces counted, for at most
+DOLLAR_SLASHY_LOOKAHEAD_CHARACTERS (1,024) characters; a longer string,
+or one that does not close, ends that look-ahead. Groovy's lexer
+starts the string only where a `/$` closes it and reads the name `$`
+otherwise, so `x = $/* c */ -> 1`, its lambda with the parameter `$`,
+is a dollar-slashy string with a `MISSING` `/$` here, as at v0.6.0.
+
 ### 5.8 Closure parameters and the `it` shorthand
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
@@ -1693,7 +1714,13 @@ expression statements, a 54-byte `ERROR` and a closure.
 The look-ahead after `record`, `trait` or `sealed` cannot set the bit,
 because its token would start at the keyword, before the position the
 fact holds from; the comment branch reaches the same `/*` next and
-sets it, so that costs one extra read of the input, once.
+sets it, so that costs one extra read of the input, once. That holds
+outside a string body only: in one no scan reaches a `/*` (§6.10), so a
+look-ahead that took the body of `$/*.txt/$` for a comment read to the
+next `*/` or to the end of the input once per such string, 2.2 s for
+8,000 lines of `println $/*.txt/$`. The look-aheads read `$/` as a
+dollar-slashy string instead (§5.7), and those lines take about 10 ms,
+as at v0.6.0 (`bindings/rust/tests/dollar_slashy_string_cost.rs`).
 
 ### 6.7 RECORD_KEYWORD — implementation contract
 
@@ -2127,6 +2154,7 @@ statement, when:
     with the rules of a statement, when the receiver takes one; and
   - not: the last name of the receiver starts with `A` to `Z`, the
     argument is a string that closes on the line with no `$` in it,
+    or a dollar-slashy string that closes with no interpolation in it,
     and `(` follows it on the line.
 The token ends after the name.
 
@@ -2152,7 +2180,8 @@ names to Groovy and are none, and so is `static` before a `.`.
 Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
 a name, with no space anywhere.
 The first argument: after spaces, tabs and line escapes, but no line
-break and no comment, a digit, `'`, `"`, the word `true`, `false` or
+break and no comment, a digit, `'`, `"`, the `$/` of a dollar-slashy
+string (§5.7), the word `true`, `false` or
 `null`, a creation, an array type value, a key: a name followed on
 the same line by `:` and not `::`, other than `case` and `default`
 (§6.8), or a call in parentheses.
@@ -2429,8 +2458,9 @@ where Groovy reads one (observed with Groovy 3):
   or none, with a body (`foo bar() { }`, `task build(a) { }`), was a
   `method_declaration` and is the call `foo(bar() { })`, as in Groovy.
 - A dollar-slashy string after a receiver (`obj.m $/x/$`,
-  `def x = foo $/a/$`) is a first argument, as the scanner reads `$` as
-  a name: before, the receiver and the string.
+  `def x = foo $/a/$`) is a first argument, as a quoted string is, also
+  after a receiver that may name a type (`def x = Foo $/a/$`,
+  `obj.Bar $/a/$`): before, the receiver and the string.
 - A name argument and an operator that started a declaration's value
   before: `foo bar =~ x` was the declaration of `bar` with the value
   `~x`, and is `foo(bar =~ x)`.
@@ -2465,7 +2495,10 @@ A string after a receiver whose last name is capitalized, followed by
 `java.util.List 'foo'() { }` and `java.util.List '''foo''' () { }`, and
 calls in `obj.m 'a'() { }`, `java.util.list 'a'() { }` and
 `java.util.List "$x"() { }` (observed). The scanner reads the string,
-triple-quoted or not, to its close on the line.
+triple-quoted or not, to its close on the line. A dollar-slashy string
+there is read to its `/$` (§5.7), and one without an interpolation names
+the method as well: `java.util.List $/foo/$() { }` declares `foo` and
+`obj.Bar $/$a/$() { }` calls, as in Groovy.
 
 A slashy string is not a first argument, as in Groovy, which reads `/`
 after a name as division. Known differences from Groovy:
@@ -2849,7 +2882,8 @@ declarator, an assignment other than `(a, b) = …`, a closure
 parameter's default, what is in parentheses, a condition), when after
 the name and spaces, tabs and line escapes comes `->`, or a `-`, `/`
 or line break after which Groovy's trivia lead to `->`, and the name
-is none of the words above that cannot name a parameter, nor `this`.
+is none of the words above that cannot name a parameter, nor `this`,
+nor the `$` of a dollar-slashy string (`def glob = $/*.txt/$`, §5.7).
 Neither is emitted during error recovery.
 ```
 

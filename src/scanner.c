@@ -79,7 +79,8 @@
 //     `skip_line_extras`, `skip_extras`, `skip_multi_assignment_trivia`),
 //     tokens with brackets counted (`parameters_follow`, `skip_lambda_tokens`,
 //     `parentheses_open_statement`, `read_parentheses_extent`), strings
-//     (`skip_string`, `method_name_follows`) and block comments
+//     (`skip_string`, `skip_dollar_slashy_string`, `method_name_follows`)
+//     and block comments
 //     (`skip_comment_body`, and loops in `skip_header_trivia` and the scan
 //     function). Each reads what its look-ahead was measured with; merging
 //     them would change what some take for trivia, the form feeds above
@@ -252,6 +253,110 @@ static bool word_is(const char *word, unsigned len, const char *keyword) {
 static bool is_literal_word(const char *word, unsigned len) {
     return word_is(word, len, "true") || word_is(word, len, "false")
         || word_is(word, len, "null");
+}
+
+// SPECIFICATION.md §5.7 — whether the word that `read_word` just returned
+// is the `$` of `$/`, which opens a dollar-slashy string. `$` is an
+// identifier start, so every look-ahead reads it as a name, but the
+// in-grammar lexer takes `$/` wherever a string may start, and what
+// follows is the string's body. A `/*` there opens no comment, and no
+// scan reaches it to set the §6.6 bit (§6.10), so a look-ahead that read
+// on took the body of `$/*.txt/$` for a comment and read to the next `*/`
+// or to the end of input, once per string. A longer name that ends in `$`
+// is a name (`a$/b` divides), as in Groovy's lexer.
+static inline bool opens_dollar_slashy(
+    const char *word,
+    unsigned len,
+    TSLexer *lexer
+) {
+    return len == 1 && word[0] == '$' && lexer->lookahead == '/';
+}
+
+// Consumes a name whose spelling the caller does not need, and returns
+// whether it opens a dollar-slashy string instead (`opens_dollar_slashy`).
+static bool read_dollar_slashy_open(TSLexer *lexer) {
+    char word[sizeof "$"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    return opens_dollar_slashy(word, len, lexer);
+}
+
+// The most characters of a dollar-slashy string that a look-ahead reads
+// for its closing `/$`. A string's opener and its closer differ, so no
+// later opener closes one that does not close: in a nest of interpolations
+// that each open another (`$/ ${ (a = $/ ${ (a = $/ …`) every look-ahead
+// would read to the end of input. With the bound each reads this much, and
+// a longer string ends the look-ahead as one that does not close does. The
+// strings a look-ahead meets are a default value or an annotation's
+// argument, a pattern or a path of a few dozen characters.
+static const unsigned DOLLAR_SLASHY_LOOKAHEAD_CHARACTERS = 1024;
+
+// Reads a dollar-slashy string from the `/` of its `$/`, which
+// `opens_dollar_slashy` has seen, to past its closing `/$`, as
+// `_dollar_slashy_string` in grammar.js lexes it: `$$` and `$/` are
+// escapes, and of a run of slashes before `$` the last one closes. An
+// interpolation in braces is read to the `}` that matches its `{`, so that
+// a `/$` inside it closes nothing (`$/ ${f($/a/$)} /$`): braces are
+// counted, but for those in a quoted string (`${ '{' }`), read to its
+// quote with `\` taking the next character, and nothing else of the
+// expression is told apart. `*interpolated`, when not NULL, is set at the
+// `$` of an interpolation, which a name or `{` follows. Returns false at
+// the end of input and after DOLLAR_SLASHY_LOOKAHEAD_CHARACTERS characters.
+static bool skip_dollar_slashy_string(TSLexer *lexer, bool *interpolated) {
+    advance(lexer);
+    // The braces open in an interpolation, and the quote of a string open
+    // in one.
+    unsigned braces = 0;
+    int32_t quote = 0;
+    for (unsigned read = 0; read < DOLLAR_SLASHY_LOOKAHEAD_CHARACTERS; read++) {
+        if (lexer->eof(lexer)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        advance(lexer);
+        if (quote != 0) {
+            if (c == '\\' && !lexer->eof(lexer)) {
+                advance(lexer);
+            } else if (c == quote) {
+                quote = 0;
+            }
+        } else if (braces > 0) {
+            if (c == '{') {
+                braces++;
+            } else if (c == '}') {
+                braces--;
+            } else if (c == '\'' || c == '"') {
+                quote = c;
+            }
+        } else if (c == '$') {
+            int32_t next = lexer->lookahead;
+            if (next == '$' || next == '/') {
+                advance(lexer);
+            } else if (next == '{' || is_identifier_start(next)) {
+                if (interpolated != NULL) {
+                    *interpolated = true;
+                }
+                if (next == '{') {
+                    advance(lexer);
+                    braces = 1;
+                }
+            }
+        } else if (c == '/' && lexer->lookahead == '$') {
+            advance(lexer);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether the dollar-slashy string that starts here, at the `/` of its
+// `$/`, is the name of a method declared with a qualified return type
+// (`java.util.List $/foo/$() { }`), as `method_name_follows` tells for a
+// quoted one: it closes, has no interpolation, and `(` follows it on the
+// line. Groovy reads an interpolated name before `(` as a dynamic call.
+static bool dollar_slashy_method_name_follows(TSLexer *lexer) {
+    bool interpolated = false;
+    return skip_dollar_slashy_string(lexer, &interpolated) && !interpolated
+        && skip_same_line_space(lexer, false) && lexer->lookahead == '(';
 }
 
 // SPECIFICATION.md §6.15 — the element type of an array type that is a
@@ -745,9 +850,10 @@ static bool dotted_argument_rest(TSLexer *lexer, bool no_close_ahead) {
 
 // After a name argument, at a name that follows it: whether that name
 // starts a chain continuation, which is left as before (§5.5 item 4) —
-// a literal word, a key, a creation or an array type value, the first
-// argument as the grammar takes it after a name (`foo bar true`,
-// `foo bar baz: 1`, `foo bar new Baz()`, `foo bar String[].class`), or a
+// a literal word, a dollar-slashy string, a key, a creation or an array
+// type value, the first argument as the grammar takes it after a name
+// (`foo bar true`, `foo bar $/a/$`, `foo bar baz: 1`, `foo bar new Baz()`,
+// `foo bar String[].class`), or a
 // name and `=` (`foo bar x = 1`, Groovy's `foo.bar(x = 1)`); in a value
 // any name (`def r = a b c` is Groovy's `a(b).c`, and the rest would be no
 // member of a class body). After `var`, `yield`, `record`, `trait` or
@@ -771,7 +877,8 @@ static bool continuation_follows(
         || word_is(word, len, "instanceof")) {
         return key_colon_follows(lexer, word, len);
     }
-    if (declaring || is_literal_word(word, len)) {
+    if (declaring || is_literal_word(word, len)
+        || opens_dollar_slashy(word, len, lexer)) {
         return true;
     }
     if (word_is(word, len, "new")) {
@@ -831,7 +938,8 @@ static bool skip_comment_body(TSLexer *lexer) {
 // (`{ foo a, b -> }`, `{ foo a, @A b = 1 -> }`). The elements are read as
 // Groovy's tokens, bracket depth counted, so that a default value may hold
 // anything; comments are trivia, and a string is one item, a triple-quoted
-// one across lines (`skip_string`). A line break ends the list unless a comma,
+// one across lines (`skip_string`) and a dollar-slashy one as well
+// (`skip_dollar_slashy_string`). A line break ends the list unless a comma,
 // a modifier, an operator or an open bracket comes before it, or `->` after
 // it: a call's last argument ends at it (`foo a, b` then the next
 // statement). `;`, a closing bracket with none open and the end of the
@@ -891,6 +999,13 @@ static bool parameters_follow(
         if (is_identifier_char(c)) {
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
+            if (opens_dollar_slashy(word, len, lexer)) {
+                if (!skip_dollar_slashy_string(lexer, NULL)) {
+                    return false;
+                }
+                continued = false;
+                continue;
+            }
             continued = is_modifier_word(word, len) || word_is(word, len, "def");
             continue;
         }
@@ -980,7 +1095,9 @@ static bool name_argument_rest(
 // `~`: Apache's argumentList after any expression that a name, `!` or `~`
 // cannot continue. `statement` adds the rules of a statement. A quote is
 // left unread. A slashy string is not an argument here: after a name
-// Groovy reads `/` as division.
+// Groovy reads `/` as division. A dollar-slashy string is one after any
+// receiver, as a quoted string is (`def x = Foo $/a/$`): Groovy's lexer
+// asks nothing of what comes before its `$/`.
 static bool first_argument_follows(
     TSLexer *lexer,
     bool parenthesized,
@@ -1013,6 +1130,13 @@ static bool first_argument_follows(
     unsigned argument_len = read_word(lexer, argument, sizeof argument);
     if (is_literal_word(argument, argument_len)) {
         return true;
+    }
+    if (opens_dollar_slashy(argument, argument_len, lexer)) {
+        // In a statement whose receiver may name a type, a string before
+        // `(` names a method instead, as `scan_command_path_start` tells
+        // for a quoted one.
+        return !statement || names
+            || !dollar_slashy_method_name_follows(lexer);
     }
     if (word_is(argument, argument_len, "new")) {
         return key_colon_follows(lexer, argument, argument_len)
@@ -1100,7 +1224,10 @@ static bool parameter_name_follows(
             if (depth == 0) {
                 return true;
             }
-            read_word(lexer, NULL, 0);
+            // Type arguments hold no string.
+            if (read_dollar_slashy_open(lexer)) {
+                return false;
+            }
             continue;
         }
         if (c == '<') {
@@ -1235,6 +1362,10 @@ static bool scan_bare_lambda_start(
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
     }
+    // A dollar-slashy string names no parameter and is no element type.
+    if (opens_dollar_slashy(word, len, lexer)) {
+        return false;
+    }
     if (lexer->lookahead != '.' && lexer->lookahead != '[') {
         if (!skip_same_line_space(lexer, false)) {
             return false;
@@ -1311,7 +1442,10 @@ static bool scan_value_start(
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
     }
-    if (is_value_keyword(word, len, lexer->lookahead)) {
+    // A dollar-slashy string is the value itself: no receiver, no
+    // parameter's name and no element type.
+    if (is_value_keyword(word, len, lexer->lookahead)
+        || opens_dollar_slashy(word, len, lexer)) {
         return false;
     }
     bool accesses = is_member_access_start(lexer->lookahead);
@@ -1574,12 +1708,8 @@ static bool scan_header_name(TSLexer *lexer, bool no_close_ahead) {
     if (!is_identifier_start(lexer->lookahead)) {
         return false;
     }
-    // EOF-bounded: lookahead is 0 at end of input, which fails the
-    // predicate.
-    while (is_identifier_char(lexer->lookahead)) {
-        advance(lexer);
-    }
-    return true;
+    // `record $/a/$` and `trait $/a/$` call a method with a string.
+    return !read_dollar_slashy_open(lexer);
 }
 
 // SPECIFICATION.md §6.7 — `record` is a keyword only at the start of
@@ -1775,7 +1905,10 @@ static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
         }
         int32_t c = lexer->lookahead;
         if (is_identifier_start(c)) {
-            read_word(lexer, NULL, 0);
+            // `var ($/a/$)` calls a method named `var`.
+            if (read_dollar_slashy_open(lexer)) {
+                return false;
+            }
             continue;
         }
         if (c == ')') {
@@ -2040,7 +2173,11 @@ static bool is_reserved_bare_lambda_name(const char *word, unsigned len) {
 // receiver takes `names`, a name, a negation or `~` as
 // `first_argument_follows` takes them in a statement (`println x`,
 // `foo !x`). A literal and the key of a named argument (`foo 1`,
-// `foo a: 1`, `foo new: 1`) are not: the grammar's form takes them. Without
+// `foo a: 1`, `foo new: 1`) are not: the grammar's form takes them. A
+// dollar-slashy string after a receiver that takes `names` is one all the
+// same, as it was while its `$` passed for a name: the token makes the
+// argument a whole expression (`println $/a/$ + b`), which the grammar's
+// form does not. Without
 // `names`, a lowercase name is read only while it can still be `new` or a
 // primitive type name.
 static bool statement_argument_follows(
@@ -2073,6 +2210,9 @@ static bool statement_argument_follows(
     unsigned len = read_word(lexer, word, sizeof word);
     if (word_is(word, len, "new")) {
         return creation_follows(lexer, no_close_ahead);
+    }
+    if (opens_dollar_slashy(word, len, lexer)) {
+        return true;
     }
     int32_t next = lexer->lookahead;
     if (next == '.' || next == '[') {
@@ -2388,7 +2528,8 @@ static bool declaration_end_follows(
         }
         char name[sizeof "synchronized"];
         unsigned len = read_word(lexer, name, sizeof name);
-        if (is_reserved_variable_name(name, len)) {
+        if (is_reserved_variable_name(name, len)
+            || opens_dollar_slashy(name, len, lexer)) {
             return false;
         }
     }
@@ -2413,6 +2554,7 @@ static bool declared_name_follows(
     char name[sizeof "synchronized"];
     unsigned len = read_word(lexer, name, sizeof name);
     return !is_reserved_variable_name(name, len)
+        && !opens_dollar_slashy(name, len, lexer)
         && declaration_end_follows(lexer, items, valid_symbols, no_close_ahead);
 }
 
@@ -2548,6 +2690,10 @@ static bool scan_typed_statement_start(
         lexer->result_symbol = COMMAND_STATEMENT_START;
         return valid_symbols[COMMAND_STATEMENT_START]
             && creation_follows(lexer, no_close_ahead);
+    }
+    // `String $/a/$` is a call with a string, which the grammar's form takes.
+    if (opens_dollar_slashy(name, len, lexer)) {
+        return false;
     }
     bool keyword = is_reserved_variable_name(name, len);
     if (lexer->lookahead == '.') {
@@ -2915,7 +3061,10 @@ static bool cast_type_arguments_close(TSLexer *lexer, bool no_close_ahead) {
             continue;
         }
         if (is_identifier_start(c)) {
-            read_word(lexer, NULL, 0);
+            // A string is a literal: `x as a.B<$/c/$` compares.
+            if (read_dollar_slashy_open(lexer)) {
+                return false;
+            }
             after_name = true;
             continue;
         }
@@ -2962,15 +3111,19 @@ static inline bool spend_lambda_item(unsigned *items) {
 // open, and, when `comma` is set, a `,` with none open; it leaves that
 // character. That is a parameter's default value (`comma`) or the arguments
 // of an annotation, from after their `(`. Strings (`skip_string`, so a
-// triple-quoted one may span lines) and comments are items of their own, and
+// triple-quoted one may span lines, and `skip_dollar_slashy_string`) and
+// comments are items of their own, and
 // line breaks are trivia, as inside parentheses for Groovy's lexer. Returns
 // false at the end of input, a string or block comment that does not close, a
-// closing bracket that does not match and the end of the budget.
+// closing bracket that does not match and the end of the budget. It sets
+// `*in_string` where it stops inside a dollar-slashy string, whose body no
+// caller may read on through as tokens.
 static bool skip_lambda_tokens(
     TSLexer *lexer,
     unsigned *items,
     bool comma,
-    bool no_close_ahead
+    bool no_close_ahead,
+    bool *in_string
 ) {
     unsigned depth = 0;
     while (spend_lambda_item(items)) {
@@ -2990,7 +3143,11 @@ static bool skip_lambda_tokens(
             continue;
         }
         if (is_identifier_char(c)) {
-            read_word(lexer, NULL, 0);
+            if (read_dollar_slashy_open(lexer)
+                && !skip_dollar_slashy_string(lexer, NULL)) {
+                *in_string = true;
+                return false;
+            }
             continue;
         }
         if (c == '(' || c == '[' || c == '{') {
@@ -3018,12 +3175,16 @@ static bool skip_lambda_tokens(
 // `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
 // keyword is in it (`(if)`). Where no name ends it (`(String[])`, `(a.b)`,
 // `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
-// types, and the caller reads on past the `)` all the same.
+// types, and the caller reads on past the `)` all the same. A dollar-slashy
+// string where a name may be is a literal as well (`($/a/$)`); there, and
+// inside one that a default value or an annotation's arguments do not read
+// past, it sets `*in_string`.
 static bool lambda_parameter_follows(
     TSLexer *lexer,
     unsigned *items,
     bool *named_parameter,
-    bool no_close_ahead
+    bool no_close_ahead,
+    bool *in_string
 ) {
     for (;;) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
@@ -3036,23 +3197,27 @@ static bool lambda_parameter_follows(
             return false;
         }
         advance(lexer);
-        if (!is_identifier_start(lexer->lookahead)) {
-            return false;
-        }
-        read_word(lexer, NULL, 0);
-        while (lexer->lookahead == '.') {
-            advance(lexer);
+        // The names of the annotation, joined by dots.
+        for (;;) {
             if (!is_identifier_start(lexer->lookahead)) {
                 return false;
             }
-            read_word(lexer, NULL, 0);
+            if (read_dollar_slashy_open(lexer)) {
+                *in_string = true;
+                return false;
+            }
+            if (lexer->lookahead != '.') {
+                break;
+            }
+            advance(lexer);
         }
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
         }
         if (lexer->lookahead == '(') {
             advance(lexer);
-            if (!skip_lambda_tokens(lexer, items, false, no_close_ahead)) {
+            if (!skip_lambda_tokens(lexer, items, false, no_close_ahead,
+                                    in_string)) {
                 return false;
             }
             advance(lexer);
@@ -3069,6 +3234,10 @@ static bool lambda_parameter_follows(
         if (is_identifier_start(c)) {
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
+            if (opens_dollar_slashy(word, len, lexer)) {
+                *in_string = true;
+                return false;
+            }
             bool modifier = word_is(word, len, "final")
                 || word_is(word, len, "def");
             if (!modifier && is_reserved_lambda_name(word, len)
@@ -3113,7 +3282,7 @@ static bool lambda_parameter_follows(
     if (lexer->lookahead == '=' || lexer->lookahead == '~') {
         return false;
     }
-    return skip_lambda_tokens(lexer, items, true, no_close_ahead);
+    return skip_lambda_tokens(lexer, items, true, no_close_ahead, in_string);
 }
 
 // SPECIFICATION.md §6.17 — whether the `(` here opens a lambda's parameters:
@@ -3127,11 +3296,14 @@ static bool lambda_parameter_follows(
 // such as closing a comment that did not close (§6.6), makes it lex the `(`
 // again, as it does after `(String)`. `*closed` is set once the look-ahead
 // has passed the `)`, so that a caller can read on from where it stopped
-// (§6.18).
+// (§6.18), and `*in_string` where it stopped at a dollar-slashy string or
+// inside one: no caller reads on from there, and the reading of §6.18 ends
+// at the first such string as well (`parentheses_open_statement`).
 static bool lambda_parameters_follow(
     TSLexer *lexer,
     bool no_close_ahead,
-    bool *closed
+    bool *closed,
+    bool *in_string
 ) {
     unsigned items = 0;
     bool named = true;
@@ -3142,7 +3314,7 @@ static bool lambda_parameters_follow(
     if (lexer->lookahead != ')') {
         for (;;) {
             if (!lambda_parameter_follows(lexer, &items, &named,
-                                          no_close_ahead)) {
+                                          no_close_ahead, in_string)) {
                 return false;
             }
             if (lexer->lookahead == ')') {
@@ -3200,8 +3372,9 @@ static bool multi_assignment_may_go_on(TSLexer *lexer, bool no_close_ahead) {
         if (!is_identifier_start(lexer->lookahead)) {
             return lexer->lookahead != '@';
         }
-        read_word(lexer, NULL, 0);
-        if (!skip_multi_assignment_trivia(lexer, no_close_ahead)) {
+        // A dollar-slashy string is other text, left to the grammar.
+        if (read_dollar_slashy_open(lexer)
+            || !skip_multi_assignment_trivia(lexer, no_close_ahead)) {
             return true;
         }
         int32_t c = lexer->lookahead;
@@ -3311,8 +3484,8 @@ static bool skip_string(TSLexer *lexer) {
 //
 // The elements are read as Groovy's tokens within the budget of the lambda
 // look-ahead. Where the reading cannot go on (the end of the budget or the
-// input, a string or a comment that does not close, a `/` or a
-// dollar-slashy string that opens an element, a bracket that does not
+// input, a string or a comment that does not close, a `/` that opens an
+// element, a dollar-slashy string, a bracket that does not
 // match), the parentheses are judged by what was read as if they closed
 // there: a statement unless a `,` came, and then a call's arguments unless
 // the first element is a parenthesis-free call. That is the reading the
@@ -3476,7 +3649,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
-            if (word_is(word, len, "$") && lexer->lookahead == '/') {
+            if (opens_dollar_slashy(word, len, lexer)) {
                 known = false;
                 break;
             }
@@ -3518,6 +3691,12 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                 command = !word_is(argument, argument_len, "in")
                     && !word_is(argument, argument_len, "as")
                     && !word_is(argument, argument_len, "instanceof");
+                // The argument is a dollar-slashy string (`(foo $/a/$, 2)`),
+                // where the reading cannot go on.
+                if (opens_dollar_slashy(argument, argument_len, lexer)) {
+                    known = false;
+                    break;
+                }
             } else if (is_literal_start(next)) {
                 command = true;
             }
@@ -3609,7 +3788,11 @@ static void read_parentheses_extent(
             continue;
         }
         if (is_identifier_char(c)) {
-            read_word(lexer, NULL, 0);
+            // `parentheses_open_statement` reads no further than the `$/` of
+            // a dollar-slashy string.
+            if (read_dollar_slashy_open(lexer)) {
+                return;
+            }
             continue;
         }
         advance(lexer);
@@ -4448,13 +4631,16 @@ bool tree_sitter_groovy_external_scanner_scan(
         // and the in-grammar lexer reads the `(`.
         lexer->mark_end(lexer);
         bool closed = false;
-        if (!lambda_parameters_follow(lexer, no_close_ahead, &closed)) {
+        bool in_string = false;
+        if (!lambda_parameters_follow(lexer, no_close_ahead, &closed,
+                                      &in_string)) {
             // §6.18 — STATEMENT_PAREN is valid only where a statement may
             // start, and a lambda may start there too (every external
             // scanner state with STATEMENT_PAREN has LAMBDA_START), so
             // where no expression ends this is the one branch that reads
-            // that `(` as far as where one does.
-            if (wants_paren_extent && crossed_line) {
+            // that `(` as far as where one does. At a dollar-slashy string
+            // that reading has ended.
+            if (wants_paren_extent && crossed_line && !in_string) {
                 read_parentheses_extent(lexer, closed, no_close_ahead);
             }
             return false;

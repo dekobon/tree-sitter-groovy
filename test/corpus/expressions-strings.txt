@@ -1009,3 +1009,19 @@ def w = """cost "$5" """
         (string_fragment)
         (string_fragment)
         (string_fragment)))))
+
+==================
+A name that is a dollar before a comment reads as a dollar-slashy string (known divergence)
+==================
+
+x = $/* c */ -> 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (MISSING "/$")))))

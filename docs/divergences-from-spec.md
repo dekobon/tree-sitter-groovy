@@ -1268,7 +1268,7 @@ The Groovy column was observed by running Groovy 3.
 | `def x = c ? y = foo a : 2` | `c ? (y = foo(a)) : 2` | `ERROR` over the whole ternary: the scanner takes `a :` as a key, so the call takes the ternary's `: 2`; before, a local `ERROR` at `a` |
 | `def x = foo /* c */ 1` | a call | `def x = foo`, the comment and `1`, as before |
 | `def x = foo 1` then `(c)` on the next line | two statements | two statements: the `(` opens the next (spec §6.18); before that, the argument was `1(c)` |
-| `def x = foo bar`, `def x = foo $/a/$` | `foo(bar)`, `foo('a')` | `command_chain` value (#25 below); before, `def x = foo` then the argument |
+| `def x = foo bar`, `def x = foo $/a/$`, `def x = Foo $/a/$` | `foo(bar)`, `foo('a')`, `Foo('a')` | `command_chain` value (#25 below), as a dollar-slashy string is a first argument after any receiver (spec §5.7); before, `def x = foo` (`Foo`) then the argument |
 | `def x = foo .5` | `foo(0.5)` | an `ERROR`, as before (spec §6.14) |
 | `def x = foo default: 1` | a named argument `default` | `def x = foo` then the label `default:`, as for the statement form (spec §6.8) |
 | `def r = obj.method 1` | a call | `command_chain` value whose receiver is a `field_access` (#52; see #19) |
@@ -1808,7 +1808,7 @@ The Groovy column was observed by running Groovy 3.
 | `{ foo a, b0, b1, …, b127 -> a }`, 128 or more names after a lowercase-typed first parameter | closure parameters | `ERROR`: the look-ahead for `->` reads 256 items (a comma and a name are two), then answers that no parameters follow; 127 names parse |
 | `{ foo a, b = '->' }`, `{ foo a, b = { x -> x } }` | a call with two arguments | the same: strings are read whole, and an `->` inside brackets ends no list |
 | `foo a bar`, `a b c d`, `foo bar baz qux` | `foo(a).bar`, `a(b).c(d)`, `foo(bar).baz(qux)` | the calls `foo a` and the statement `bar`, the calls `a b` and `c d` (spec §5.5 item 4); before, one statement per name |
-| `foo bar 1`, `foo bar baz: 1`, `compile group as: 1, name: 2`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
+| `foo bar 1`, `foo bar baz: 1`, `compile group as: 1, name: 2`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'`, `foo bar $/a/$` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a`, `foo(bar).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
 | `foo bar x = 1`, `foo bar baz(int a) { }`, `foo bar true` | `foo.bar(x = 1)`, `foo(bar).baz(…)`, `foo(bar).true` | `foo` and the declaration, the method or the call after it, as before (spec §5.5 item 4) |
 | `foo var x`, `foo var x, y`, `foo yield x`, `foo record x`, `obj.m var x` | `foo(var).x`, `foo.var(x, y)`, … | the receiver, then `var x` (`var x, y`, `yield x`, …), as before: after a name argument that starts declarations, any name leaves the input as it was |
 | `def x = foo bar baz`, `class C { def r = a b c }` | `foo(bar).baz`, a field `a(b).c` | `def x = foo` and the call `bar baz`; the field `r` and a field `c` of type `b`, as before: in a value a further name is a continuation |
@@ -1818,7 +1818,8 @@ The Groovy column was observed by running Groovy 3.
 | `return foo bar`, `throw foo bar`, `assert foo bar` | rejected | the statement with `foo`, then `bar`, as before |
 | `foo class`, `foo def`, `foo default` | rejected | the same as before |
 | `foo var`, `foo yield`, `foo record`, `foo super`, `foo pipeline { }` | a call | `command_chain`; before, two statements, and `foo` and a `pipeline_statement` for the last |
-| `obj.m $/x/$`, `def x = foo $/a/$` | a call | `command_chain`, as `$` starts a name to the scanner; before, the receiver and the string |
+| `obj.m $/x/$`, `def x = foo $/a/$`, `obj.Bar $/a/$` | a call | `command_chain`: a dollar-slashy string is a first argument after any receiver, as a quoted one is (spec §5.7); before, the receiver and the string |
+| `java.util.List $/foo/$() { }`, `obj.Bar $/$a/$() { }` | a method `foo`; a call | the same, as for a quoted name (spec §6.14); before, a `method_declaration` for the second |
 | `this.new Inner()`, `x.new Inner()` | a creation | the access `x.new` and the call `Inner()`, as before (#23 above) |
 | `foo true + 1`, `foo 1 + 2` | `foo(true + 1)`, `foo(1 + 2)` | the call `foo true` (`foo 1`) and `+ 1` (`+ 2`), as before: a literal first argument of a statement is matched by the grammar's own form, which is no whole expression |
 
@@ -1877,6 +1878,7 @@ cases; for those it is the reading of the 4.0.x to 6.0.x grammars.
 | `(foo a) -> a`, `def f = (foo bar) -> 1`, `(x x) -> x`, `foo((foo bar) -> 1)` | a lambda with the parameter type `foo` (`x`), observed with Groovy 3 | an `ERROR`, as before: the parentheses read as the call `foo a` (spec §6.14); a capitalized or dotted type (`(Foo bar) -> 1`, `(foo.Bar b) -> 1`) is a lambda |
 | `foo(null -> 1)`, `foo(int -> 1)`, `(int) -> 1`, `(if) -> 1` | rejected | an `ERROR`, as before: a reserved word, a primitive type or `void` names no parameter |
 | `(_) -> 1`, `_ -> 1`, `var -> var`, `(String this) -> 1` | a lambda | the same |
+| `x = $/* c */ -> 1` | a lambda with the parameter `$` | a dollar-slashy string with a `MISSING` `/$`, as before: `$/` always opens a dollar-slashy string here, where Groovy's lexer needs a `/$` that closes it (spec §5.7) |
 | `def c = { a = (b) -> c }`, `{ a = b -> c }`, `{ String a = b -> c }`, `{ a = 1 + (b) -> c }`, `{ String a = (T) (b, c) -> d }`, `{ a = (b) -> { } }`, as a value or an argument | the closure parameter `a` with a default | the same, as before |
 | `if (x) { a = b -> c }`, `else { a = (b) -> c }`, `while (x) { String a = b -> c }`, `for (…) { def g = t -> 1 }`, `do { … } while (x)`, `case 1 -> { a = b -> c }`, `default -> { … }` | a block that holds the lambda | the same; **before, the closure with the parameter `a`** (the BREAKING class below) |
 | `f(x -> { Consumer<String> c = s -> foo(s); c.accept(x) })`, `(x) -> { b = (t) -> 1 }` | a block that holds the lambda | the same |

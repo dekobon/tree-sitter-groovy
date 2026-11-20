@@ -1276,3 +1276,42 @@ xs.each { int yield -> yield.abs() }
               object: (identifier)
               field: (identifier))
             arguments: (argument_list)))))))
+
+==================
+Closure first parameter with a dollar-slashy default after a type
+==================
+
+xs.each { String a = $//x/$ -> a }
+xs.each { String a = $/*x/$ -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        (expression_statement
+          (identifier))))))

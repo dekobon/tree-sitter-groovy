@@ -6075,3 +6075,182 @@ A receiver with a non-ASCII capital takes no name argument
   (command_chain
     receiver: (identifier)
     argument: (identifier)))
+
+==================
+A dollar-slashy string is a first argument after a receiver that may name a type
+==================
+
+def x = Foo $/a/$
+y = (Foo $/b/$)
+z = "${Foo $/c/$}"
+obj.Bar $/d/$
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (identifier)
+          argument: (string_literal
+            (string_fragment))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (command_chain
+            receiver: (identifier)
+            argument: (string_literal
+              (string_fragment)))))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal
+      (string_fragment))))
+
+==================
+A dollar-slashy argument whose text starts like a comment is no comment
+==================
+
+Foo $//server/share/$
+String $/*.txt/$
+/* c */
+println $/*.txt/$ + suffix
+/* doc */ foo = 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (block_comment)
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (block_comment)
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A dollar-slashy name after a capitalized dotted type declares a method
+==================
+
+java.util.List $/foo/$() { }
+java.util.List $//foo/$() { }
+obj.Bar $/$a/$() { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters)
+    body: (block))
+  (method_declaration
+    return_type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters)
+    body: (block))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (method_invocation
+      function: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier)))
+      arguments: (argument_list)
+      closure: (closure))))
+
+==================
+A dollar-slashy string after a name argument is left split (known divergence)
+==================
+
+foo bar $/a/$
+foo x.y $/b/$
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (string_literal
+      (string_fragment))))
+
+==================
+A dollar-slashy argument that holds an arrow ends no closure parameters
+==================
+
+println a, $/x -> y/$
+foo a, $/x, y -> z/$, b
+c = { foo a, b = $/->/$ -> a }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal
+      (string_fragment))
+    argument: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        (expression_statement
+          (identifier))))))
