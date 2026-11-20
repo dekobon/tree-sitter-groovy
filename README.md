@@ -159,9 +159,14 @@ These are documented in detail in
 - **Groovy 5 contextual keywords** (`val`, `async`, `await`, `defer`)
   are not yet exposed as keyword tokens. They parse as plain
   identifiers, matching Groovy 2.x--4.x compiler behavior.
-- **Typed local declarations require an initializer** -- `String x`
-  is ambiguous with `String(x)` (method call). Use `String x = ...`
-  or `def x` instead.
+- **Typed local declarations without an initializer follow Groovy's
+  rule on the spelling** -- `String x`, `int a, b` and `foo.Bar q`
+  declare, while `foo bar` is a call. A comment between the type and
+  the name (`String /* c */ x`), a lowercase type after annotations
+  (`@A foo bar`) and a type with a space before `<` (`List <String> x`)
+  are not declarations here, and a declaration followed by a line that
+  starts with an operator (`String s` then `.trim()`) reads as two
+  statements, where Groovy reads a call.
 - **Leading-operator line continuation** -- `a\n+ b` greedily joins
   as `a + b` rather than splitting into two statements. Idiomatic
   Groovy places continuation operators at the end of the previous
