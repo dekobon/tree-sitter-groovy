@@ -4658,11 +4658,21 @@ bool tree_sitter_groovy_external_scanner_scan(
     // type, where type arguments that close follow it. On false the
     // runtime rewinds and the in-grammar lexer reads the `<` of a
     // comparison; after whitespace the `<` is never one of type arguments.
-    if (valid_symbols[CAST_TYPE_ARGUMENTS_OPEN] && !valid_symbols[ERROR_SENTINEL]
-        && lexer->lookahead == '<') {
+    //
+    // The same read runs where the token is not valid but an expression has
+    // ended (NOT_IN is valid): a reparse that reuses the cast, or its type,
+    // lexes the `<` after it in that state, where no scan decided it. Reading
+    // as far there makes the runtime count the type arguments against the
+    // in-grammar `<` in both states, so an edit that closes them
+    // (`y = foo as List<String`, then `>`) breaks the cast down and lexes the
+    // `<` again where the token is valid. No other scanner token starts with
+    // `<`.
+    if ((valid_symbols[CAST_TYPE_ARGUMENTS_OPEN] || valid_symbols[NOT_IN])
+        && !valid_symbols[ERROR_SENTINEL] && lexer->lookahead == '<') {
         advance(lexer);
         lexer->mark_end(lexer);
-        if (!cast_type_arguments_close(lexer, no_comment_close_ahead(scanner))) {
+        if (!cast_type_arguments_close(lexer, no_comment_close_ahead(scanner))
+            || !valid_symbols[CAST_TYPE_ARGUMENTS_OPEN]) {
             return false;
         }
         lexer->result_symbol = CAST_TYPE_ARGUMENTS_OPEN;
@@ -4917,6 +4927,20 @@ bool tree_sitter_groovy_external_scanner_scan(
             case PLAIN_CLOSE:
                 return false;
             case OPERAND_CLOSE:
+                // §6.17 — a `(` after the `)` opens a lambda where the `)`
+                // closed a cast (`(Runnable) () -> { }`) and a call's
+                // arguments where it closed an expression, and only the
+                // first reading's scan reads on to the `->`. The reading
+                // that survives may be the call (`(A) () x`), whose `(`
+                // read nothing, so read as far here: both readings take
+                // this `)`, and an edit that adds or removes the `->` makes
+                // the runtime lex it again and fork anew.
+                if (lexer->lookahead == '(') {
+                    bool closed = false;
+                    bool in_string = false;
+                    lambda_parameters_follow(lexer, no_close_ahead, &closed,
+                                             &in_string);
+                }
                 lexer->result_symbol = CAST_CLOSE;
                 return true;
             default:
@@ -4960,6 +4984,18 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (lexer->lookahead == '}' && valid_symbols[STATEMENT_PAREN]
         && !valid_symbols[ERROR_SENTINEL]) {
         read_lambda_body_end_extent(lexer, no_close_ahead);
+        return false;
+    }
+    // §6.16 — the name `in` where its keyword is not valid, as after a
+    // type that a reparse reused (`for (x in )`, where `x` was reduced to a
+    // type while no expression followed `in`): read as far as where the
+    // keyword is decided, so that the name's token depends on the same
+    // text in both states, and an edit after it makes the runtime lex it
+    // again and break the reused type down. No branch above took the name.
+    if (lexer->lookahead == 'i' && !valid_symbols[ERROR_SENTINEL]) {
+        if (consume_keyword(lexer, "in")) {
+            expression_follows(lexer, no_close_ahead);
+        }
         return false;
     }
     // §6.20 — the first comma of a multi-assignment, or a form feed or

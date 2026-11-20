@@ -592,6 +592,49 @@ fn reparse_after_declaration_edits_matches_parse_from_scratch() {
 /// pins the difference. If it fails, the two parses agree again: remove the
 /// limitation from §6.17 and move the text to
 /// `MULTI_ASSIGNMENT_EDIT_SEQUENCES`.
+/// Texts where the scanner decides a token from the text after it in one
+/// parser state, while a reparse that reuses the node before it lexes the
+/// same characters in another, each with the edits that left the old reading
+/// before the scanner read as far in both states. The `<` after the type of
+/// `as` or `instanceof` (§3.2.2): with the type arguments still open, a
+/// reparse that reuses the type lexes the `<` after an expression, and the
+/// `>` typed afterwards must still turn the comparison into type arguments.
+/// The name `in` of a `for` header (§6.16): with no collection yet, a
+/// reparse reuses the variable as a type (an edit on another line, or the
+/// body's braces typed first), and the collection typed afterwards must
+/// still make the loop. The `)` of a cast's type before
+/// `()` (§6.17): the reading that survives without `->` is a call, and an
+/// arrow typed or restored after it must still make the cast of a lambda.
+const SECOND_STATE_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    ("y = foo as List<String\n", &[(4, 3, "bar"), (22, 0, ">")]),
+    ("p as p</**/", &[(0, 0, ""), (11, 0, "r>")]),
+    (
+        "if (foo instanceof List<String) { }\n",
+        &[(6, 1, "x"), (30, 0, ">")],
+    ),
+    ("a = 1\nfor (x in ) doIt()\n", &[(4, 1, "2"), (16, 0, "ys")]),
+    ("for(x in s)", &[(9, 0, ","), (12, 0, "8"), (9, 1, "")]),
+    ("for (x in ) {", &[(13, 0, "\n    \n}"), (10, 0, "xs")]),
+    ("r = (A) () x\n", &[(11, 1, "-> x")]),
+    (
+        "\ndef r = (Runnable) () -> { }\n",
+        &[(23, 0, "x"), (23, 1, "")],
+    ),
+];
+
+#[test]
+fn reparse_after_edits_past_a_reused_node_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in SECOND_STATE_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
 #[test]
 fn a_lambda_arrow_after_a_final_method_head_is_an_error_on_reparse() {
     const TEXT: &str = "foo()\nfinal g\n(int a, int b)\n";

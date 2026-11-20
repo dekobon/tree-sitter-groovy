@@ -425,8 +425,12 @@ lexer then reads the `<` of a comparison.
 As in every `_type`, a space before the `<` makes it a comparison:
 `x as List <String>` is an `ERROR`, where Groovy, whose lexer drops
 the space, reads the type arguments. The scanner reads up to the `>`,
-so the token is lexed again after any edit there. It is not emitted
-during error recovery.
+so the token is lexed again after any edit there. It reads as far in
+the state after an expression, where the token is not valid and a
+reparse that reuses the cast lexes the in-grammar `<`, so there too an
+edit that closes the type arguments makes the runtime lex the `<` again
+where the token is valid (`bindings/rust/tests/incremental_reparse.rs`
+pins it). It is not emitted during error recovery.
 
 ---
 
