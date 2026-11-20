@@ -31,14 +31,18 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// for a name, a primitive and a dotted type alike, so inserting `*/` makes
 /// the runtime lex the `(` again. The one before them holds lambdas, whose
 /// start tokens depend on the `->` after the parentheses or the name, also
-/// across a line break or a comment. The last six open lines with `(` after
-/// an expression (§6.18), which opens a statement or a call's arguments by
-/// the line break before it, by whether a statement may start there and by
-/// what the parentheses hold, so inserting or deleting a line break, a `,`
-/// or an `=` there must lex the `(` again and parse the line above anew.
+/// across a line break or a comment. The six after those open lines with
+/// `(` after an expression (§6.18), which opens a statement or a call's
+/// arguments by the line break before it, by whether a statement may start
+/// there and by what the parentheses hold, so inserting or deleting a line
+/// break, a `,` or an `=` there must lex the `(` again and parse the line
+/// above anew.
 ///
-/// The last text holds lambdas whose brace bodies a call, a comment and
-/// an operator follow (§6.19).
+/// The text after them holds lambdas whose brace bodies a call, a comment
+/// and an operator follow (§6.19). The last three hold multi-assignments
+/// without `def` and script methods with untyped parameters, where the
+/// first `,` after a name in parentheses is read on to the `)` and the token
+/// after it (§6.20), so an edit there must lex the `,` again.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -68,6 +72,9 @@ const TEXTS: &[&str] = &[
     "foo\n(a, b)\nfoo()\n()\n",
     "println x\n(1..3).each { }\n",
     "def v = a -> { y -> y }.x()\nfoo(b -> { } /* c */, (c) -> { z } + 1)\n",
+    "def f(a, b) { }\n(a, b) = l\nx = (c, d) = m\n",
+    "def f(a,\n  b) = l\nfinal g(a, /* c */ b) { }\n",
+    "def f(a, b, c) throws E { (d, e) = f }\nfoo((a, b) = l)\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
@@ -339,6 +346,45 @@ fn reparse_sequence(parser: &mut Parser, text: &str, edits: &[Edit]) -> (String,
 fn reparse_after_lambda_body_edits_matches_parse_from_scratch() {
     let mut parser = parser();
     for &(text, edits) in LAMBDA_BODY_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
+/// Texts with the names of a multi-assignment, or a script method's untyped
+/// parameters, in parentheses (§6.20), each with a sequence of edits after
+/// the first `,`: the method's body turned into `= l` and back, a name
+/// added, a typed parameter, and the `=` turned into `==` and `{`. Each
+/// edit changes what the look-ahead at the first `,` reads, so the reparse
+/// must lex that `,` again.
+const MULTI_ASSIGNMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "def f(a, b) { }\nfoo()\n",
+        &[
+            (12, 3, "= l"),
+            (12, 3, "{ }"),
+            (10, 0, ", c"),
+            (15, 3, "= l"),
+        ],
+    ),
+    (
+        "(a, b) = l\nfoo()\n",
+        &[(7, 0, "="), (7, 2, "{"), (7, 1, "="), (4, 0, "int ")],
+    ),
+    (
+        "def f(a,\n  b)\n= l\n",
+        &[(14, 0, "{ }"), (14, 3, ""), (9, 0, "/* c */ ")],
+    ),
+];
+
+#[test]
+fn reparse_after_multi_assignment_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in MULTI_ASSIGNMENT_EDIT_SEQUENCES {
         let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
         assert_eq!(
             dumped(&incremental),
