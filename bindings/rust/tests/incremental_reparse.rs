@@ -582,16 +582,6 @@ fn reparse_after_declaration_edits_matches_parse_from_scratch() {
     }
 }
 
-/// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks
-/// before its `(` (after `final g`), the method's version reads the `(` of
-/// its parameters on its own, with none of the look-ahead for a lambda that
-/// the other version's `(` reads. When the method has typed parameters, so
-/// that the other version ends at their names, the method's nodes are not
-/// fragile and a reparse reuses them past an edit after the `)`: `-> a`
-/// typed there is a lambda from scratch and an `ERROR` on reparse. This test
-/// pins the difference. If it fails, the two parses agree again: remove the
-/// limitation from §6.17 and move the text to
-/// `MULTI_ASSIGNMENT_EDIT_SEQUENCES`.
 /// Texts where the scanner decides a token from the text after it in one
 /// parser state, while a reparse that reuses the node before it lexes the
 /// same characters in another, each with the edits that left the old reading
@@ -635,6 +625,16 @@ fn reparse_after_edits_past_a_reused_node_matches_parse_from_scratch() {
     }
 }
 
+/// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks
+/// before its `(` (after `final g`), the method's version reads the `(` of
+/// its parameters on its own, with none of the look-ahead for a lambda that
+/// the other version's `(` reads. When the method has typed parameters, so
+/// that the other version ends at their names, the method's nodes are not
+/// fragile and a reparse reuses them past an edit after the `)`: `-> a`
+/// typed there is a lambda from scratch and an `ERROR` on reparse. This test
+/// pins the difference. If it fails, the two parses agree again: remove the
+/// limitation from §6.17 and move the text to
+/// `MULTI_ASSIGNMENT_EDIT_SEQUENCES`.
 #[test]
 fn a_lambda_arrow_after_a_final_method_head_is_an_error_on_reparse() {
     const TEXT: &str = "foo()\nfinal g\n(int a, int b)\n";
