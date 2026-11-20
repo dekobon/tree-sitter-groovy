@@ -29,7 +29,9 @@
 // without them, when `->` follows; and §6.19 LAMBDA_BODY_END, an empty
 // token after the `}` of a lambda's brace body that no expression
 // continues, and LAMBDA_BODY_REREAD, an empty token no rule takes, which
-// hands such a `}` back to the parser when it reused the body whole.
+// hands such a `}` back to the parser when it reused the body whole;
+// §6.20 MULTI_ASSIGNMENT_REST, an empty token after the first name of
+// `(a, b) = …`, when the other names, `)` and `=` follow.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
@@ -41,8 +43,8 @@
 // COMMAND_NAMED_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
-// LAMBDA_BODY_END, LAMBDA_BODY_REREAD and the STRING_BODY check are
-// suppressed.
+// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_REST and the
+// STRING_BODY check are suppressed.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -83,6 +85,7 @@ enum TokenType {
     STATEMENT_PAREN,
     LAMBDA_BODY_END,
     LAMBDA_BODY_REREAD,
+    MULTI_ASSIGNMENT_REST,
     ERROR_SENTINEL,
 };
 
@@ -2401,6 +2404,42 @@ static bool lambda_parameters_follow(
     return arrow_follows(lexer, no_close_ahead) && named;
 }
 
+// SPECIFICATION.md §6.20 — at the `,` after the first name of a
+// multi-assignment without `def`: whether only names follow, each after a
+// `,`, then `)` and `=` (`(a, b) = l`), with Groovy's trivia between them.
+// Anything else is where the multi-assignment would end without a tree, and
+// ends the reading here: `(a, b) {`, `(a, b) throws`, `(a, int b)`,
+// `(a, b + c)`, the end of the input, a `/` that opens no comment and a
+// `/*` that does not close. A list longer than the lambda budget is taken
+// as one, which leaves the decision to the grammar, at the `)`. The `,` is
+// not consumed when this is called.
+static bool multi_assignment_rest_follows(
+    TSLexer *lexer,
+    bool no_close_ahead
+) {
+    unsigned items = 0;
+    while (lexer->lookahead == ',') {
+        if (!spend_lambda_item(&items)) {
+            return true;
+        }
+        advance(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+            || !is_identifier_start(lexer->lookahead)) {
+            return false;
+        }
+        read_word(lexer, NULL, 0);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+    }
+    if (lexer->lookahead != ')') {
+        return false;
+    }
+    advance(lexer);
+    return skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        && lexer->lookahead == '=';
+}
+
 // Reads a string from its quote: one that closes on its line, where a `\`
 // before the line break continues it, as in Groovy, or a triple-quoted one,
 // which may span lines. Returns false at the end of input, or at a line
@@ -3368,6 +3407,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !wants_sealed && !wants_value_start && !wants_statement_start
         && !wants_array && !wants_cast_close && !wants_not_in && !wants_lambda
         && !wants_bare_lambda && !wants_paren_extent
+        && !valid_symbols[MULTI_ASSIGNMENT_REST]
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]) {
@@ -3497,6 +3537,20 @@ bool tree_sitter_groovy_external_scanner_scan(
             return false;
         }
         lexer->result_symbol = CAST_CLOSE;
+        return true;
+    }
+    // §6.20 — the validity is read only at a `,`: a flag computed with the
+    // ones above, on every scan, cost real files 0.06% more instructions.
+    if (lexer->lookahead == ',' && valid_symbols[MULTI_ASSIGNMENT_REST]
+        && !valid_symbols[ERROR_SENTINEL]) {
+        // The token is empty and ends here. On `false` the runtime rewinds
+        // and the in-grammar lexer reads the `,`, which the multi-assignment
+        // does not take without the token.
+        lexer->mark_end(lexer);
+        if (!multi_assignment_rest_follows(lexer, no_close_ahead)) {
+            return false;
+        }
+        lexer->result_symbol = MULTI_ASSIGNMENT_REST;
         return true;
     }
     if (lexer->lookahead == '(' && wants_statement_paren) {

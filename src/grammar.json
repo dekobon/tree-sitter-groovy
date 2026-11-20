@@ -9451,6 +9451,10 @@
             }
           },
           {
+            "type": "SYMBOL",
+            "name": "_multi_assignment_rest"
+          },
+          {
             "type": "REPEAT1",
             "content": {
               "type": "SEQ",
@@ -12244,6 +12248,10 @@
     {
       "type": "SYMBOL",
       "name": "_lambda_body_reread"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_multi_assignment_rest"
     },
     {
       "type": "SYMBOL",
