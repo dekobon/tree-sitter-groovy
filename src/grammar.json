@@ -1423,7 +1423,7 @@
               "members": [
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": 32,
+                  "value": 64,
                   "content": {
                     "type": "SYMBOL",
                     "name": "block"
@@ -3228,7 +3228,7 @@
     },
     "_modified_constructor_declaration": {
       "type": "PREC_DYNAMIC",
-      "value": 4,
+      "value": 8,
       "content": {
         "type": "PREC_RIGHT",
         "value": 3,
@@ -3324,7 +3324,7 @@
       "members": [
         {
           "type": "PREC_DYNAMIC",
-          "value": 4,
+          "value": 8,
           "content": {
             "type": "SEQ",
             "members": [
@@ -3384,7 +3384,7 @@
         },
         {
           "type": "PREC_DYNAMIC",
-          "value": -1,
+          "value": -2,
           "content": {
             "type": "SEQ",
             "members": [
@@ -3435,7 +3435,7 @@
         "members": [
           {
             "type": "PREC_DYNAMIC",
-            "value": -1,
+            "value": -2,
             "content": {
               "type": "SEQ",
               "members": [
@@ -3536,7 +3536,7 @@
           },
           {
             "type": "PREC_DYNAMIC",
-            "value": 3,
+            "value": 6,
             "content": {
               "type": "SEQ",
               "members": [
@@ -3659,7 +3659,7 @@
         "members": [
           {
             "type": "PREC_DYNAMIC",
-            "value": -1,
+            "value": -2,
             "content": {
               "type": "SEQ",
               "members": [
@@ -3767,7 +3767,7 @@
           },
           {
             "type": "PREC_DYNAMIC",
-            "value": 3,
+            "value": 6,
             "content": {
               "type": "SEQ",
               "members": [
@@ -4545,7 +4545,7 @@
     },
     "record_declaration": {
       "type": "PREC_DYNAMIC",
-      "value": 1,
+      "value": 2,
       "content": {
         "type": "PREC_RIGHT",
         "value": 0,
@@ -4722,7 +4722,7 @@
     },
     "_record_type_member": {
       "type": "PREC_DYNAMIC",
-      "value": 14,
+      "value": 28,
       "content": {
         "type": "CHOICE",
         "members": [
@@ -4785,7 +4785,7 @@
     },
     "compact_constructor_declaration": {
       "type": "PREC_DYNAMIC",
-      "value": 6,
+      "value": 12,
       "content": {
         "type": "PREC",
         "value": 1,
@@ -5105,7 +5105,7 @@
           },
           {
             "type": "PREC_DYNAMIC",
-            "value": 1,
+            "value": 2,
             "content": {
               "type": "SEQ",
               "members": [
@@ -5197,7 +5197,7 @@
           },
           {
             "type": "PREC_DYNAMIC",
-            "value": 2,
+            "value": 4,
             "content": {
               "type": "SEQ",
               "members": [
@@ -5245,7 +5245,7 @@
           },
           {
             "type": "PREC_DYNAMIC",
-            "value": 2,
+            "value": 4,
             "content": {
               "type": "SEQ",
               "members": [
@@ -7523,7 +7523,7 @@
       "members": [
         {
           "type": "PREC_DYNAMIC",
-          "value": 1,
+          "value": 2,
           "content": {
             "type": "PREC_RIGHT",
             "value": 14,
@@ -7579,7 +7579,7 @@
         },
         {
           "type": "PREC_DYNAMIC",
-          "value": -1,
+          "value": -2,
           "content": {
             "type": "PREC_RIGHT",
             "value": 14,
@@ -10806,7 +10806,7 @@
     },
     "lambda_expression": {
       "type": "PREC_DYNAMIC",
-      "value": -3,
+      "value": -6,
       "content": {
         "type": "PREC_RIGHT",
         "value": -1,
@@ -10859,7 +10859,7 @@
                 },
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": -31,
+                  "value": -62,
                   "content": {
                     "type": "SEQ",
                     "members": [
@@ -10880,7 +10880,7 @@
                 },
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": -4,
+                  "value": -8,
                   "content": {
                     "type": "PREC",
                     "value": 1,
@@ -10929,7 +10929,7 @@
     },
     "_bare_lambda_expression": {
       "type": "PREC_DYNAMIC",
-      "value": -3,
+      "value": -6,
       "content": {
         "type": "PREC_RIGHT",
         "value": -1,
@@ -10974,7 +10974,7 @@
                 },
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": -31,
+                  "value": -62,
                   "content": {
                     "type": "SEQ",
                     "members": [
@@ -10995,7 +10995,7 @@
                 },
                 {
                   "type": "PREC_DYNAMIC",
-                  "value": -4,
+                  "value": -8,
                   "content": {
                     "type": "PREC",
                     "value": 1,
@@ -11061,7 +11061,7 @@
     },
     "_body_block": {
       "type": "PREC_DYNAMIC",
-      "value": 32,
+      "value": 64,
       "content": {
         "type": "ALIAS",
         "content": {

@@ -68,7 +68,27 @@ const PREC = {
 /* eslint-enable no-multi-spaces */
 
 /*
- * Dynamic precedences of class members that are tied to each other
+ * Every weight below is a number of steps, which `weighted` turns into a
+ * dynamic precedence of WEIGHT_UNIT per step. Tree-sitter adds up the
+ * dynamic precedences in a reading, so a dynamic precedence of less than
+ * one step can rank readings that the steps leave tied without changing an
+ * order that they set.
+ */
+const WEIGHT_UNIT = 2;
+
+/**
+ * A rule with the dynamic precedence of a weight in steps.
+ *
+ * @param {number} steps The weight, in steps of WEIGHT_UNIT.
+ * @param {RuleOrLiteral} rule The rule to weight.
+ * @returns {PrecDynamicRule} The weighted rule.
+ */
+function weighted(steps, rule) {
+  return prec.dynamic(steps * WEIGHT_UNIT, rule);
+}
+
+/*
+ * Weights of class members that are tied to each other
  * (docs/divergences-from-spec.md §6). In a record, `static count`
  * followed by `R { }` is a modifier-only field and a compact
  * constructor, and also the typed field `static count R` followed by
@@ -95,20 +115,20 @@ const RECORD_TYPE_MEMBER_WEIGHT =
   MODIFIER_ONLY_FIELD_WEIGHT + 2 * TYPED_FIELD_WEIGHT + COMPACT_CONSTRUCTOR_WEIGHT + 1;
 
 /*
- * The dynamic precedence of a typed local variable declaration, which
+ * The weight of a typed local variable declaration, which
  * its tokens also parse as an expression followed by an assignment.
  */
 const TYPED_LOCAL_WEIGHT = 1;
 
 /*
- * The dynamic precedence of a cast whose operand is on the line of its
+ * The weight of a cast whose operand is on the line of its
  * `)`, and the negative one of a cast whose operand is on a later line
  * (see `parenthesized_type_cast`).
  */
 const CAST_WEIGHT = 1;
 
 /*
- * The dynamic precedence of a lambda. A closure parameter's default may
+ * The weight of a lambda. A closure parameter's default may
  * end where a lambda's parameters do: `def c = { a = (b) -> c }` is a
  * closure with the parameter `a` in Groovy, and also a closure whose body
  * assigns `a` the lambda `(b) -> c`. The weight must outweigh what else the
@@ -129,7 +149,7 @@ const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
 const LAMBDA_NESTING_DEPTH = 10;
 
 /*
- * The dynamic precedence of a lambda whose body is a closure, which another
+ * The weight of a lambda whose body is a closure, which another
  * reading of the same tokens holds otherwise. A lambda's body is a block
  * before a closure (Apache `lambdaBody`), so `x -> { a = b -> c }` must
  * rank its block, which holds a lambda, above the closure with the
@@ -140,7 +160,7 @@ const LAMBDA_NESTING_DEPTH = 10;
 const DEMOTED_LAMBDA_WEIGHT = LAMBDA_NESTING_DEPTH * LAMBDA_WEIGHT - 1;
 
 /*
- * The dynamic precedence of a lambda whose whole body is a parenthesized
+ * The weight of a lambda whose whole body is a parenthesized
  * expression, which is its body only before a `->` that the lambda cannot
  * take. `{ a = (b) -> (d) -> e }` is the parameter `a = (b)` and the body
  * `(d) -> e` in Groovy, which tries the parenthesized expression first, and
@@ -154,7 +174,7 @@ const DEMOTED_LAMBDA_WEIGHT = LAMBDA_NESTING_DEPTH * LAMBDA_WEIGHT - 1;
 const PARENTHESIZED_BODY_WEIGHT = LAMBDA_WEIGHT - 1;
 
 /*
- * The dynamic precedence of a block that is the body of `if`, `else`, a
+ * The weight of a block that is the body of `if`, `else`, a
  * loop or an arrow case, where Groovy tries a block before a closure
  * (Apache `statement` lists `block` first). `if (x) { a = b -> c }` is a
  * block that assigns a lambda, and also a closure with the parameter `a`,
@@ -367,8 +387,8 @@ function methodHead($, modifiers = choice(
 function methodDeclaration($, head) {
   const signature = seq(...head, optional($.throws_clause));
   return prec.right(2, choice(
-    prec.dynamic(-1, signature),
-    prec.dynamic(3, seq(signature, field('body', $.block))),
+    weighted(-1, signature),
+    weighted(3, seq(signature, field('body', $.block))),
   ));
 }
 
@@ -577,8 +597,8 @@ function lambdaBody($, bare) {
   const body = (rule) => field('body', rule);
   return choice(
     seq(body($.block), bare ? $._lambda_body_end : optional($._lambda_body_end)),
-    prec.dynamic(DEMOTED_LAMBDA_WEIGHT, seq(body($.closure), $._lambda_body_end)),
-    prec.dynamic(PARENTHESIZED_BODY_WEIGHT, prec(1, body(alias(
+    weighted(DEMOTED_LAMBDA_WEIGHT, seq(body($.closure), $._lambda_body_end)),
+    weighted(PARENTHESIZED_BODY_WEIGHT, prec(1, body(alias(
       $._lambda_parenthesized_expression,
       $.parenthesized_expression,
     )))),
@@ -1156,7 +1176,7 @@ module.exports = grammar({
       '(',
       field('condition', $._statement_expression),
       ')',
-      field('consequence', choice(prec.dynamic(BODY_BLOCK_WEIGHT, $.block), $._statement)),
+      field('consequence', choice(weighted(BODY_BLOCK_WEIGHT, $.block), $._statement)),
       optional(';'),
       optional(seq(
         'else',
@@ -1548,7 +1568,7 @@ module.exports = grammar({
     // qualify: `static f() { }` there is a method. The weight is above
     // a method with a body, which matches the same text through its
     // modifier-only form.
-    _modified_constructor_declaration: $ => prec.dynamic(4, constructorDeclaration(
+    _modified_constructor_declaration: $ => weighted(4, constructorDeclaration(
       $,
       repeat1(choice('public', 'private', 'protected')),
     )),
@@ -1577,7 +1597,7 @@ module.exports = grammar({
       // splitting `private final int v\n C() {}` after `int`. The
       // weight is above a method body's: the split reading holds a
       // method (`v C() {}`), which would otherwise tie.
-      prec.dynamic(TYPED_FIELD_WEIGHT, seq(
+      weighted(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
         repeat($._modifier),
         choice('def', field('type', $._type)),
@@ -1590,7 +1610,7 @@ module.exports = grammar({
       // `A() { }`: a keyword is an identifier wherever it has no
       // action. Both readings hold one typed field, so they tied, and
       // a comment between the two members made the split win.
-      prec.dynamic(MODIFIER_ONLY_FIELD_WEIGHT, seq(
+      weighted(MODIFIER_ONLY_FIELD_WEIGHT, seq(
         repeat($.annotation),
         repeat1($._modifier),
         $.variable_declarator,
@@ -1817,7 +1837,7 @@ module.exports = grammar({
     // which tree wins depends on tree shape, and a comment between
     // the two lines flipped it. Favouring the record declaration is
     // right whenever both parse.
-    record_declaration: $ => prec.dynamic(1, prec.right(seq(
+    record_declaration: $ => weighted(1, prec.right(seq(
       repeat($.annotation),
       optional($._type_modifiers),
       alias($._record_keyword, 'record'),
@@ -1848,7 +1868,7 @@ module.exports = grammar({
     // Each type is aliased to itself because the generator drops the
     // reduction of a hidden rule with one unaliased child, and the
     // weight with it.
-    _record_type_member: $ => prec.dynamic(RECORD_TYPE_MEMBER_WEIGHT, choice(
+    _record_type_member: $ => weighted(RECORD_TYPE_MEMBER_WEIGHT, choice(
       ...typeDeclarations($).map(type => alias(type, type)),
     )),
 
@@ -1869,7 +1889,7 @@ module.exports = grammar({
     // The dynamic precedence decides where the `[variable_declarator,
     // _type]` conflict keeps two readings alive, as in `static count`
     // then `R { }`; see COMPACT_CONSTRUCTOR_WEIGHT for its value.
-    compact_constructor_declaration: $ => prec.dynamic(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
+    compact_constructor_declaration: $ => weighted(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
       repeat($.annotation),
       repeat($._modifier),
       optional('def'),
@@ -1965,7 +1985,7 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
-      prec.dynamic(TYPED_LOCAL_WEIGHT, seq(
+      weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
         optional('final'),
         field('type', $._type),
@@ -1981,14 +2001,14 @@ module.exports = grammar({
       // A statement may follow `final Type`, a declaration of `Type`, so
       // the scanner may emit `_command_statement_start` before the name
       // (§6.14); `final String s new Foo()` still declares `s`.
-      prec.dynamic(2, seq(
+      weighted(2, seq(
         repeat($.annotation),
         'final',
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
       )),
-      prec.dynamic(2, seq(
+      weighted(2, seq(
         repeat1($.annotation),
         alias($._placeholder_declarator, $.variable_declarator),
       )),
@@ -2525,13 +2545,13 @@ module.exports = grammar({
     // followed by a line that starts with a literal lost the cast
     // once #83 added its forks.
     parenthesized_type_cast: $ => choice(
-      prec.dynamic(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+      weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),
         field('type', $._type),
         alias($._cast_close, ')'),
         field('value', $._expression),
       ))),
-      prec.dynamic(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+      weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),
         field('type', $._type),
         ')',
@@ -3043,7 +3063,7 @@ module.exports = grammar({
     //
     // The body takes all it can, as Apache's greedy `lambdaBody` does:
     // `(a) -> a + 1 as T` is a lambda whose body is the cast.
-    lambda_expression: $ => prec.dynamic(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+    lambda_expression: $ => weighted(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
       $._lambda_start,
       field('parameters', $.formal_parameters),
       '->',
@@ -3059,7 +3079,7 @@ module.exports = grammar({
     // reduction of its own: tree-sitter skips the step from a name to an
     // expression only in a state that has no other action, and a call with
     // names for arguments took a fifth more reductions.
-    _bare_lambda_expression: $ => prec.dynamic(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+    _bare_lambda_expression: $ => weighted(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
       $._bare_lambda_start,
       field('parameters', $.identifier),
       '->',
@@ -3085,7 +3105,7 @@ module.exports = grammar({
     // the largest of the weights in it, not their sum, and the `if` before it
     // has one. The consequence of `if` takes it inline. Aliased to itself so
     // that the reduction, and the weight, is kept.
-    _body_block: $ => prec.dynamic(BODY_BLOCK_WEIGHT, alias($.block, $.block)),
+    _body_block: $ => weighted(BODY_BLOCK_WEIGHT, alias($.block, $.block)),
 
     // A parenthesized expression after `_lambda_start`, aliased to
     // `parenthesized_expression`. The scanner reads only the parentheses
