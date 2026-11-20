@@ -40,6 +40,10 @@ name = "scanner_keywords"
 path = "bindings/rust/tests/scanner_keywords.rs"
 
 [[test]]
+name = "scanner_states"
+path = "bindings/rust/tests/scanner_states.rs"
+
+[[test]]
 name = "name_argument_cost"
 path = "bindings/rust/tests/name_argument_cost.rs"
 

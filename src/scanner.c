@@ -4395,6 +4395,11 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->mark_end(lexer);
         bool closed = false;
         if (!lambda_parameters_follow(lexer, no_close_ahead, &closed)) {
+            // §6.18 — STATEMENT_PAREN is valid only where a statement may
+            // start, and a lambda may start there too (every external
+            // scanner state with STATEMENT_PAREN has LAMBDA_START), so
+            // where no expression ends this is the one branch that reads
+            // that `(` as far as where one does.
             if (wants_paren_extent && crossed_line) {
                 read_parentheses_extent(lexer, closed, no_close_ahead);
             }
@@ -4402,10 +4407,6 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         lexer->result_symbol = LAMBDA_START;
         return true;
-    }
-    if (lexer->lookahead == '(' && wants_paren_extent && crossed_line) {
-        parentheses_open_statement(lexer, no_close_ahead);
-        return false;
     }
     if (lexer->lookahead == '}' && valid_symbols[STATEMENT_PAREN]
         && !valid_symbols[ERROR_SENTINEL]) {
