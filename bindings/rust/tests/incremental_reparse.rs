@@ -360,7 +360,11 @@ fn reparse_after_lambda_body_edits_matches_parse_from_scratch() {
 /// the first `,`: the method's body turned into `= l` and back, a name
 /// added, a typed parameter, and the `=` turned into `==` and `{`. Each
 /// edit changes what the look-ahead at the first `,` reads, so the reparse
-/// must lex that `,` again.
+/// must lex that `,` again. The last four put `= l` after the `)` of a
+/// method head that has no body, after `final`, `final def` or an
+/// annotation, which fork before the `(` (`foo()` then `final g` then
+/// `(a, b)` on the next line): the parentheses the method took are its
+/// parameters, and the reparse must read them again as a multi-assignment.
 const MULTI_ASSIGNMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
     (
         "def f(a, b) { }\nfoo()\n",
@@ -379,6 +383,13 @@ const MULTI_ASSIGNMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
         "def f(a,\n  b)\n= l\n",
         &[(14, 0, "{ }"), (14, 3, ""), (9, 0, "/* c */ ")],
     ),
+    ("foo()\nfinal g\n(a, b)\n", &[(21, 0, "= l\n")]),
+    ("foo()\nfinal def g\n(a, b)\n", &[(25, 0, "= l\n")]),
+    ("@A final g\n(a, b)\n", &[(18, 0, "= l\n")]),
+    (
+        "list.each {\n  final g\n  (a, b)\n}\n",
+        &[(31, 0, "  = l\n"), (31, 6, "")],
+    ),
 ];
 
 #[test]
@@ -392,6 +403,32 @@ fn reparse_after_multi_assignment_edits_matches_parse_from_scratch() {
             "after the edits of {text:?}: {edited:?}",
         );
     }
+}
+
+/// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks
+/// before its `(` (after `final g`), the method's version reads the `(` of
+/// its parameters on its own, with none of the look-ahead for a lambda that
+/// the other version's `(` reads. When the method has typed parameters, so
+/// that the other version ends at their names, the method's nodes are not
+/// fragile and a reparse reuses them past an edit after the `)`: `-> a`
+/// typed there is a lambda from scratch and an `ERROR` on reparse. This test
+/// pins the difference. If it fails, the two parses agree again: remove the
+/// limitation from §6.17 and move the text to
+/// `MULTI_ASSIGNMENT_EDIT_SEQUENCES`.
+#[test]
+fn a_lambda_arrow_after_a_final_method_head_is_an_error_on_reparse() {
+    const TEXT: &str = "foo()\nfinal g\n(int a, int b)\n";
+    /// The end of the text, where `-> a` is typed.
+    const INSERT_AT: usize = 29;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, "-> a\n");
+    assert_eq!(edited, "foo()\nfinal g\n(int a, int b)\n-> a\n");
+    assert!(!fresh.root_node().has_error());
+    assert!(
+        incremental.root_node().has_error(),
+        "the reparse now matches the parse from scratch",
+    );
 }
 
 /// A known limitation (`SPECIFICATION.md` §6.19): the scanner reads past a
