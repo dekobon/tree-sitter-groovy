@@ -38,7 +38,7 @@ follows.
 ### 1.1 Goals
 
 1. Produce a tree-sitter grammar named `groovy` that parses idiomatic
-   Groovy 2.x–4.x source files without `ERROR` nodes for the constructs
+   Groovy 2.x–6.x source files without `ERROR` nodes for the constructs
    listed in §3 ("Operator coverage matrix") and §4 ("Statement and
    declaration coverage").
 2. Emit **distinct named nodes** for every Groovy-specific operator
@@ -87,9 +87,19 @@ follows.
    regular declaration (resolving #37), but Jenkins-specific step
    methods (`sh`, `agent`, `stage`) are ordinary method calls — no
    special node kinds.
-5. **No tracking of Groovy 5+ syntax** until released. We target the
-   Groovy 4.x grammar; Groovy 3.x and 2.x are subsets and parse with
-   the same productions.
+5. **Target the latest released Groovy.** We target the Groovy 6.x
+   grammar (6.0.0 at the time of writing). Earlier versions parse
+   where their syntax is a subset of it. Where versions read the same
+   text differently, the latest release's reading wins: nested array
+   initializers after two or more `[]` follow Groovy 5 (GROOVY-8551,
+   §3.2), and `(x) as Foo` is the coercion of `(x)`, as in Groovy
+   6.0.0 (GROOVY-10355, §5.15). Exceptions are noted where they are
+   made, such as a `{` among the elements after a single `[]`, which
+   stays a closure as in Groovy 3 and 4 (§3.2). No tracking of
+   Groovy 7+ syntax until it is released. Coverage of the syntax that
+   Groovy 5 and 6 added is incomplete: `async`, `await`, `defer` and
+   `val` have no construct and parse as names, and
+   `docs/divergences-from-spec.md` lists the other gaps.
 
 ---
 

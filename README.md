@@ -156,9 +156,9 @@ let tree = parser.parse(source, None).unwrap();
 These are documented in detail in
 [`docs/divergences-from-spec.md`](docs/divergences-from-spec.md).
 
-- **Groovy 5 contextual keywords** (`val`, `async`, `await`, `defer`)
+- **Groovy 6 contextual keywords** (`val`, `async`, `await`, `defer`)
   are not yet exposed as keyword tokens. They parse as plain
-  identifiers, matching Groovy 2.x--4.x compiler behavior.
+  identifiers, matching Groovy 2.x--5.x compiler behavior.
 - **Typed local declarations without an initializer follow Groovy's
   rule on the spelling** -- `String x`, `int a, b` and `foo.Bar q`
   declare, while `foo bar` is a call. A comment between the type and

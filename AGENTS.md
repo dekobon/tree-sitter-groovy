@@ -101,8 +101,8 @@ The default branch is **`main`**.
 - `queries/groovy/highlights.scm` — Treesitter highlight captures.
   Includes the Groovy 4 contextual keywords presently recognised by
   the grammar (`var`, `record`, `sealed`, `non-sealed`, `permits`,
-  `yield`). The Groovy-5 candidates `async`, `await`, `defer`, and
-  `val` are not yet in the grammar — when they land, add highlight
+  `yield`). The Groovy 6 contextual keywords `async`, `await`, `defer`,
+  and `val` are not yet in the grammar — when they land, add highlight
   rules and assertions at the same time.
 - `queries/groovy/folds.scm`, `queries/groovy/indents.scm` — fold and
   indent.
