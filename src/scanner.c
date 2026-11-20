@@ -3489,12 +3489,16 @@ static bool skip_multi_assignment_trivia(TSLexer *lexer, bool no_close_ahead) {
 // after a name another name (`(a, int b)`), the `=` of a default value, or
 // the `.`, `<` or `[` of a type; after the `)` of a list of names, past
 // Groovy's trivia, the `{` or `throws` of a method's body or throws clause
-// (`def f(a, b) { }`). Any other text is left to the grammar, which ends the
-// reading at the token it did without the look-ahead: `(a, b) = l`, a list
-// longer than the bound, `(a, b + c)`, `(a, b);`, a `)` at the end of the
-// input. What decides is then inside the parentheses or the method that the
-// parse keeps, so a reparse that reuses a node of that method has read the
-// same text.
+// (`def f(a, b) { }`). Nor may it after a name that anything but a `,` or
+// the `)` follows (`(a, b + c)`, `(Ab, Cd>)`), which no list of names holds:
+// emitting the token there committed the parser to a multi-assignment inside
+// a call's broken arguments (`foo(x, (Ab, Cd>)y)`), and the `ERROR` that
+// followed took the rest of the file. Any other text is left to the grammar,
+// which ends the reading at the token it did without the look-ahead:
+// `(a, b) = l`, a list longer than the bound, `(a, 1)`, `(a, b);`, a `)` at
+// the end of the input. What decides is then inside the parentheses or the
+// method that the parse keeps, so a reparse that reuses a node of that
+// method has read the same text.
 static bool multi_assignment_may_go_on(TSLexer *lexer, bool no_close_ahead) {
     for (unsigned names = 0; names < MULTI_ASSIGNMENT_LOOKAHEAD_NAMES; names++) {
         if (!skip_multi_assignment_trivia(lexer, no_close_ahead)) {
@@ -3520,11 +3524,11 @@ static bool multi_assignment_may_go_on(TSLexer *lexer, bool no_close_ahead) {
             advance(lexer);
             return lexer->lookahead == '=' || lexer->lookahead == '~';
         }
-        if (is_identifier_start(c) || c == '.' || c == '<' || c == '[') {
-            return false;
-        }
+        // Another name, or the `.`, `<` or `[` of a type, makes the
+        // parentheses a method's parameters; any other character makes them
+        // no list of names.
         if (c != ',') {
-            return true;
+            return false;
         }
         advance(lexer);
     }

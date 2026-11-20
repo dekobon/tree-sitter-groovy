@@ -3436,9 +3436,11 @@ included, line escapes and comments) between the items, at most
 MULTI_ASSIGNMENT_LOOKAHEAD_NAMES (16) names, each after a `,`:
   - after a `,`, `@` (an annotation) turns the token down; anything else
     that is no name emits it;
-  - after a name, another name (`(a, int b)`, `(a, b c)`), `=` that is not
-    `==` or `=~` (a default value), `.`, `<` or `[` (a type's) turn it
-    down; `,` reads on; anything else emits it;
+  - after a name, `,` reads on, `)` is read as below, `==` and `=~` emit
+    it, and anything else turns it down: another name (`(a, int b)`,
+    `(a, b c)`), `=` (a default value), `.`, `<` or `[` (a type's), which
+    go on as a method's parameters, and any other character
+    (`(a, b + c)`, `(Ab, Cd>)`), which no list of names holds;
   - after a name and `)`, the `{` or the word `throws` of a method's body
     or throws clause turns it down; anything else (`=`, `;`, a line's next
     statement, the end of the input) emits it.
@@ -3455,7 +3457,11 @@ the same parentheses, or at the `{` or `throws` after them; where it
 emits, the grammar ends the reading at the token it did without the
 look-ahead. Names are read wider than the grammar's (keywords, non-ASCII
 characters), which can only emit. So no tree changes for input that
-parsed without an `ERROR`. The token is valid only in the states after the
+parsed without an `ERROR`. Text that no list of names holds turns the
+token down so that an error stays in its statement: emitted there, the
+token committed the parser to a multi-assignment inside a call's broken
+arguments, and the `ERROR` took the rest of the file (`foo((Ab, Cd>)y)`
+followed by `bar()`). The token is valid only in the states after the
 first name in parentheses where a multi-assignment may start, where the
 grammar takes no other `,`.
 

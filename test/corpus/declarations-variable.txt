@@ -1405,6 +1405,59 @@ println 1
     argument: (number_literal)))
 
 ==================
+Broken parentheses with more than names after a comma are no multi-assignment (error recovery)
+==================
+
+foo((Ab, Cd>)y)
+bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_expression
+          (identifier)
+          (MISSING ")"))
+        (binary_expression
+          left: (identifier)
+          (ERROR)
+          right: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+An unclosed list of names in an argument is no multi-assignment (error recovery)
+==================
+
+def f() {
+  list.sort((a, b
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list
+            (parenthesized_expression
+              (identifier)
+              (MISSING ")"))
+            (identifier)
+            (MISSING ")")))))))
+
+==================
 Typed local variable declaration
 ==================
 
