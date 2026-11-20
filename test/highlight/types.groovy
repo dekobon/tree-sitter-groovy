@@ -40,3 +40,32 @@ def f = int[]::new
 @Foo(String[])
 //   ^ type
 class Arr { }
+
+String name
+// <- type
+//     ^ variable
+
+int count, total;
+// <- type.builtin
+//  ^ variable
+//         ^ variable
+
+List<String> items, more = []
+// <- type
+//   ^ type
+//           ^ variable
+//                  ^ variable
+
+foo.Bar bar
+// <- type
+//  ^ type
+//      ^ variable
+
+@Field String field
+//     ^ type
+//            ^ variable
+
+final String first, second
+//    ^ type
+//           ^ variable
+//                  ^ variable
