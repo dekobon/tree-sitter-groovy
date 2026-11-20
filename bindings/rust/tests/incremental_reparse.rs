@@ -15,6 +15,10 @@
 //! A lambda's brace body ends at its `}` only where no expression goes on
 //! after it (§6.19), so edits after the `}` must make the lambda parse
 //! again.
+//!
+//! A typed declaration without an initializer (§6.21) is decided at its
+//! type from the names, the list and the line after it, so edits there must
+//! make the statement parse again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -39,10 +43,16 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// above anew.
 ///
 /// The text after them holds lambdas whose brace bodies a call, a comment
-/// and an operator follow (§6.19). The last three hold multi-assignments
+/// and an operator follow (§6.19). The three after it hold multi-assignments
 /// without `def` and script methods with untyped parameters, where the
 /// first `,` after a name in parentheses is read on to the `)` and the token
-/// after it (§6.20), so an edit there must lex the `,` again.
+/// after it (§6.20), so an edit there must lex the `,` again. The last four
+/// hold typed declarations without an initializer (§6.21), with a list, an
+/// annotation, a generic type, closure parameters that share their start,
+/// a line that goes on with the name, and a `return` before one after a
+/// statement that forks (`(a) { }`), whose start token depends on what
+/// follows the name on its line and the next, so an edit there must lex
+/// the type again, and the `return` must not end before the token.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -75,6 +85,10 @@ const TEXTS: &[&str] = &[
     "def f(a, b) { }\n(a, b) = l\nx = (c, d) = m\n",
     "def f(a,\n  b) = l\nfinal g(a, /* c */ b) { }\n",
     "def f(a, b, c) throws E { (d, e) = f }\nfoo((a, b) = l)\n",
+    "String s\nint i;\nfoo.Bar q\n",
+    "String a, b = 1\n{ String c, d -> c }\nfinal String e, f\n",
+    "@Field List<String> xs\nInputStream in\nopen()\n",
+    "(a) { }\nreturn\nString s\nx = (a)\nString t\n.u()\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.
@@ -396,6 +410,76 @@ const MULTI_ASSIGNMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
 fn reparse_after_multi_assignment_edits_matches_parse_from_scratch() {
     let mut parser = parser();
     for &(text, edits) in MULTI_ASSIGNMENT_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
+/// Texts with a typed declaration without an initializer (§6.21), or text
+/// that becomes one, each with a sequence of edits: typing `String s` one
+/// character at a time, adding and removing an initializer, a second name
+/// and a commented initializer, changing the case of the type's first
+/// letter, joining and splitting the type and the name, and the name and a
+/// line that goes on with it, breaking and mending type arguments, ending
+/// the name in a member access, after a parenthesized name that forks,
+/// adding `->` to make closure parameters, and editing a `for` header and
+/// the declaration after a `return`. Each edit changes what the look-ahead
+/// at the type reads, so the reparse must lex the type again.
+const DECLARATION_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "foo()\n\nbar()\n",
+        &[
+            (6, 0, "S"),
+            (7, 0, "t"),
+            (8, 0, "r"),
+            (9, 0, "i"),
+            (10, 0, "n"),
+            (11, 0, "g"),
+            (12, 0, " "),
+            (13, 0, "s"),
+        ],
+    ),
+    (
+        "String s\nfoo()\n",
+        &[
+            (8, 0, " = 1"),
+            (8, 4, ""),
+            (8, 0, ", b"),
+            (8, 3, ""),
+            (8, 0, " /* c */ = 1"),
+            (8, 12, ""),
+        ],
+    ),
+    (
+        "string s\nfoo()\n",
+        &[(0, 1, "S"), (0, 1, "s"), (0, 1, "S")],
+    ),
+    ("String\ns\nfoo()\n", &[(6, 1, " "), (6, 1, "\n")]),
+    ("String s\n.trim()\n", &[(8, 1, ""), (8, 0, "\n")]),
+    (
+        "List<String> xs\nfoo()\n",
+        &[(4, 1, ""), (4, 0, "<"), (4, 0, " "), (4, 1, "")],
+    ),
+    ("x = (a)\nString s\n", &[(16, 0, ".y"), (16, 2, "")]),
+    ("{ String a, b }\n", &[(13, 0, " ->"), (13, 3, "")]),
+    (
+        "return\nString s\nfoo()\n",
+        &[(15, 0, " = 1"), (15, 4, ""), (7, 1, "s"), (7, 1, "S")],
+    ),
+    (
+        "for (int i; i < n; i++) { }\n",
+        &[(10, 0, "\n"), (10, 1, ""), (10, 0, " = 0"), (10, 4, "")],
+    ),
+];
+
+#[test]
+fn reparse_after_declaration_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in DECLARATION_EDIT_SEQUENCES {
         let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
         assert_eq!(
             dumped(&incremental),
