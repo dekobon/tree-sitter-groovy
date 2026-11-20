@@ -261,7 +261,11 @@ Notes on the corrected ordering versus v1 of this spec:
   `op=(LE | GE | …) nls right=expression`. The grammar must
   thread this through — the RHS of `as` is `_type`, RHS of `<` is
   `_expression`. See §3.2 cast_expression and
-  instanceof_expression fields.
+  instanceof_expression fields. A dotted name there is one type,
+  whatever the case of its parts (`x as a.b.c`), as Apache's
+  `qualifiedClassName` takes every name and dot before the last
+  name. The same tokens also parse as field accesses on `x as a`;
+  `docs/divergences-from-spec.md` §5 says how the type is chosen.
 
 ### 3.2 Operator → node kind map
 

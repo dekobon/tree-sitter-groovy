@@ -281,6 +281,44 @@ positions: generics (`List<String>`), array dimensions
   `(field_access (cast x as java.util) Map)`. They take `_cast_type`
   instead, whose dotted form (`_dotted_type`, spec §3.2.2) shifts
   each dot at a precedence tighter than `field_access`.
+
+  That precedence acts after the first dot only. At the first dot
+  the `[_cast_type, _dotted_type, qualified_type]` conflict keeps
+  both readings: the type, and `x as java` followed by field
+  accesses. Both parse to the end of the name, and nothing in the
+  grammar ranks them. Tree-sitter's last resort picks the type,
+  which is Groovy's reading for any name, lowercase included
+  (`x as a.b.c`, after Apache's `qualifiedClassName`): where the two
+  trees meet in a node it compares their symbol numbers, and
+  `cast_expression` and `instanceof_expression` are defined before
+  `field_access`; where they meet as two equal links between the
+  same two stack nodes it keeps the older stack, which is the one
+  that shifted the dot. Defining `field_access` first, or keeping
+  the unit reduction to `_expression` above it, turns every
+  qualified type there into field accesses; the qualified-type
+  tests in `operators-as-cast.txt` and `operators-instanceof.txt`
+  fail when it does.
+
+  A weight does not replace that tie-break without changing other
+  trees. Any dynamic precedence on the type reading also counts
+  against readings that hold no cast of those tokens. With one
+  step it ties `CAST_WEIGHT`: `(x) instanceof a.b` reads the cast
+  of a name `instanceof` (`instanceof` is not reserved) and the
+  statement `a.b`, and with the weight it reads the `instanceof`
+  test. Below one step of every other weight (all of them doubled)
+  it still decides ties that the last resort decides today, such as
+  a cast against a typed local whose type and name are on two lines.
+  Taking the dot statically for the type ends the fork, and turns
+  the inputs on which only the field accesses parse (`x as a."b"`,
+  `x as a.new`) into `ERROR`s.
+
+  Not supported after `as`, `instanceof` and `!instanceof`: array
+  dimensions after a dotted name (`x instanceof a.B[]` is an
+  `ERROR`) and type arguments after a name of three or more parts
+  (`x as java.util.List<String>`). A name of two parts takes them,
+  but before a line that starts with an expression the field
+  accesses win (`x as a.B<C>` then `y` reads `x as a`, `.B < C`,
+  `> y`).
 - Generics (`List<String>`) ✓ via `generic_type`, with bounded
   wildcards (`? extends Foo`, `? super Bar`), nested arguments
   (`Map<String, List<Integer>>`), qualified bases
@@ -291,16 +329,9 @@ positions: generics (`List<String>`), array dimensions
   base name without intervening whitespace — preserving `a < b` as
   a binary comparison.
 
-**Action**: real-world fix is one of
-(a) move `as Type` and `instanceof Type` recognition into an
-    external scanner so the type slot consumes the full dotted
-    name greedily, or
-(b) inline the cast/instanceof RHS to require a `_type` that's
-    explicitly NOT a single identifier followed by a `.`
-    expression continuation.
-Both are larger refactors. For v1 users can parenthesise:
-`x as (java.util.Map)` parses cleanly (the parens force the type
-context).
+**Action**: a rule in place of the last resort needs one of the
+trade-offs above. `x as (java.util.Map)` is no way around it: it
+reads `x` and a call of `as`, as in Groovy 3.
 
 ---
 
