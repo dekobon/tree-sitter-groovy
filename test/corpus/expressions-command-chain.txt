@@ -3356,7 +3356,7 @@ java.util.List "$x"() { }
       closure: (closure))))
 
 ==================
-A line after a dotted call that can continue its first argument joins it
+A line after a dotted call that can continue its first argument joins it (known divergence)
 ==================
 
 x.y 1
@@ -3384,7 +3384,7 @@ x.y 2
     (identifier)))
 
 ==================
-A literal followed by a member access is not the receiver of a command chain
+A literal followed by a member access is not the receiver of a command chain (known divergence)
 ==================
 
 true.x 1
@@ -6020,7 +6020,7 @@ def z = foo bar baz.qux
       field: (identifier))))
 
 ==================
-A key after a name argument
+A key after a name argument (known divergence)
 ==================
 
 compile group as: 1, name: 2

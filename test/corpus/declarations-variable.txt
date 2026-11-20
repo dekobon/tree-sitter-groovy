@@ -3331,7 +3331,7 @@ String s
     (identifier)))
 
 ==================
-Reserved words name no variable of a typed local
+Reserved words name no variable of a typed local (known divergence)
 ==================
 
 foo.Bar this

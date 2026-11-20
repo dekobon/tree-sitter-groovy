@@ -799,9 +799,10 @@ Jenkinsfile or Gradle block (`node('linux')` with its `{ … }`
 opening the next line). After a `;` or a block the `{` opens a
 statement and is a block (#28). After a parenthesis-free call with
 arguments it is a block as well (`foo 1` then `{ y }`), where Groovy
-calls the last argument with it, and after a postfix update it joins
-the expression (`x++` then `{ y }` calls `x++`), where Groovy reads a
-block. In a class body the same holds after a field
+calls the last argument with it, and after a postfix update, an
+`instanceof` test or an `as` cast it joins the expression (`x++`,
+`x instanceof Foo` or `x as Foo`, then `{ y }`, calls the result with a
+closure), where Groovy reads a block. In a class body the same holds after a field
 initialiser:
 
 ```groovy
@@ -1071,6 +1072,15 @@ line, below every other complete reading when it is not.
 At v0.5.0 the two readings were unranked and the stack order decided:
 `x = (a)` followed by `foo()` was a cast of the call.
 
+In a class body a cast's own line does not decide either. `def k =
+(Foo) x` followed by `void m() { }` or `private int n` on the next line
+is the field `k` with the value `(Foo)`, a field `x void` (`x private`)
+and the constructor `m() { }` (the field `n`), with no `ERROR`, where
+Groovy 3 reads the cast and a method or a field: the second reading
+holds a typed field, whose weight (`TYPED_FIELD_WEIGHT`, 4 steps)
+outweighs the cast's (`CAST_WEIGHT`, 1 step). A `;` after `x` ends the
+field.
+
 A multi-assignment declaration on the next line is a case where only
 one reading used to be complete. After a line that ends in a
 parenthesized name, dotted name or primitive type (`def y = (x)`,
@@ -1309,6 +1319,7 @@ The Groovy column was observed by running Groovy 3.
 | `x.y` then `/* c */ a.b 'c'` on the next line | two statements, the second a call | the same |
 | `obj . m 1`, `obj` then `.m 1` on the next line | a call | the expression and `1`, as before |
 | `foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`, `(obj).m 1`, `obj.'name' 1`, `obj::m 1` | a call | the expression and `1`, as before |
+| `true.x 1`, `null.x 2`, `def a = true.x 3` | `true.x(1)`, a call | the field access and the number as two statements, as before: a receiver starts with a name, and `true` and `null` are literals |
 | `a.b c` | `a.b(c)` | `command_chain` (#25 below); before, `a.b` then `c` |
 | `a.b.C x = 1`, `a.b c = 1` | a declaration | a declaration, as before |
 | `obj.m { }`, `obj.m -1`, `obj.m [1]`, `obj.m (1)` | a call with a closure; a subtraction; a subscript; a call | the same, as before |
@@ -1320,6 +1331,7 @@ The Groovy column was observed by running Groovy 3.
 | `obj.m 'a'() { }`, `obj.m 'a'(b)`, `java.util.list 'a'() { }`, `java.util.List "$x"() { }` | a call with the argument `'a'(…)` | the same; before, a method declaration, or `obj.m` and `'a'(b)` |
 | `java.util.List 'foo'(1)` | a call | `java.util.List` and `'foo'(1)`, as before |
 | `x.y 1` then `-1` on the next line | two statements | one call with the argument `1 - 1`; before, `x.y` and `1 - 1` |
+| `x.y 2` then `++i` on the next line | `x.y(2)`, then `++i` | the call with the argument `2++`, then `i`: the line goes on with the first argument |
 | `obj.m 1, *xs`, `obj.m 'a': 1` | a call | `ERROR` |
 
 **Action**: none planned for the spaced and multi-line receivers. A
@@ -1504,7 +1516,7 @@ and later is read off `GroovyParser.g4`.
 | `var (a, b) = l`, and `private var (a, b) = l` in a class body | declarations | `ERROR` | declarations |
 | `var(a, b)`, `var (a, b).foo()` in a method | calls of `var` | `ERROR` | calls |
 | `import a.B` then `as = 1` on the next line | an import and an assignment | `ERROR` | the same as Groovy |
-| `println var`, `println in` | calls | `ERROR` | `println var` a call, as `println x` (#25 below); `println in` two statements, as `in` goes on with the receiver as an operator |
+| `println var`, `println in`, `foo as` | calls | `ERROR` | `println var` a call, as `println x` (#25 below); `println in` and `foo as` two statements, as `in` and `as` go on with the receiver as operators |
 | `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | the same as before |
 | `var` then `x = 1` on the next line | a declaration of `x` | the same | the same |
 | `return var` then `x = 1` on the next line | `return var`, then an assignment | `return`, then a declaration of `x` | the same as before |
@@ -1775,6 +1787,7 @@ The Groovy column was observed by running Groovy 3.
 | `foo -1`, `foo [1]`, `foo *x`, `foo (1)`, `foo in xs`, `foo as T`, `foo instanceof T`, `foo ? a : b`, `foo++` | the operator goes on with `foo` | the same, as before |
 | `Foo bar`, `int x`, `foo.Bar x` | a declaration with no value | a `local_variable_declaration` (#27 below); before, two statements |
 | `void x` | `void(x)` | two statements, as before: `void` takes no name argument and names no type of a variable |
+| `foo.Bar this`, `String super`, `String int` | `foo.Bar(this)`, `String(super)`, `String(int)` | two statements, as before: a receiver that may name a type takes no name argument, and a reserved word declares no variable |
 | `Été x`, `Ωmega x`, `Жук x` | a declaration with no value | a `local_variable_declaration` (#27 below); before, two statements: a capital of Latin-1, Greek or Cyrillic counts as upper case; one of another script reads as lower case, and such a receiver takes a name argument |
 | `foo bar = 1`, `foo.bar baz = 1`, `myType x /* c */ = compute()`, `foo bar /* c` then `*/ = 1` | a declaration | the same, as before: comments after the name are trivia |
 | `foo a /* c */ b`, `println x // c` | `foo(a).b`; a call | the call `foo a`, the comment and `b`; the call and the comment |
@@ -1795,7 +1808,7 @@ The Groovy column was observed by running Groovy 3.
 | `{ foo a, b0, b1, …, b127 -> a }`, 128 or more names after a lowercase-typed first parameter | closure parameters | `ERROR`: the look-ahead for `->` reads 256 items (a comma and a name are two), then answers that no parameters follow; 127 names parse |
 | `{ foo a, b = '->' }`, `{ foo a, b = { x -> x } }` | a call with two arguments | the same: strings are read whole, and an `->` inside brackets ends no list |
 | `foo a bar`, `a b c d`, `foo bar baz qux` | `foo(a).bar`, `a(b).c(d)`, `foo(bar).baz(qux)` | the calls `foo a` and the statement `bar`, the calls `a b` and `c d` (spec §5.5 item 4); before, one statement per name |
-| `foo bar 1`, `foo bar baz: 1`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
+| `foo bar 1`, `foo bar baz: 1`, `compile group as: 1, name: 2`, `foo bar new Baz()`, `foo bar(baz 1)`, `foo x.y 'a'` | `foo(bar).1`, `foo.bar(baz: 1)`, `foo.bar(new Baz())`, `foo.bar(baz(1))`, `foo(x.y).a` | `foo` and the call after it, as before (spec §5.5 item 4) |
 | `foo bar x = 1`, `foo bar baz(int a) { }`, `foo bar true` | `foo.bar(x = 1)`, `foo(bar).baz(…)`, `foo(bar).true` | `foo` and the declaration, the method or the call after it, as before (spec §5.5 item 4) |
 | `foo var x`, `foo var x, y`, `foo yield x`, `foo record x`, `obj.m var x` | `foo(var).x`, `foo.var(x, y)`, … | the receiver, then `var x` (`var x, y`, `yield x`, …), as before: after a name argument that starts declarations, any name leaves the input as it was |
 | `def x = foo bar baz`, `class C { def r = a b c }` | `foo(bar).baz`, a field `a(b).c` | `def x = foo` and the call `bar baz`; the field `r` and a field `c` of type `b`, as before: in a value a further name is a continuation |
@@ -2008,6 +2021,7 @@ The Groovy column was observed by running Groovy 3.
 | `Foo<<Baz>> result`, `this.Foo x` | `(Foo << Baz) >> result`, `this.Foo(x)` | the same; the field access and the name, as before |
 | `Foo f =~ /x/` | `Foo(f =~ /x/)` | the declaration of `f` with the value `~/x/`, as before |
 | `String /* c */ s` | a declaration | two statements and the comment, as before |
+| `List</* c */String> l`, `Map<K,` then `V> m` on the next line | declarations | an `ERROR`: the look-ahead reads type arguments on one line, without comments |
 | `{ String a, b -> }`, `{ String a, b = 1 -> }`, `{ String a` then `-> }`, `{ String a, b -> }` with `b` on the next line | closure parameters | the same, as before |
 | `{ String a, b }`, `{ String a = 1, b }` | declarations | the same; before, closure parameters with a missing `->` |
 | `for (int i; i < n; i++)`, `for (int i, j; …)` | a declaration as the init | the same; before, an `ERROR` |
