@@ -2252,11 +2252,10 @@ if (x) String g else String h
   (local_variable_declaration
     type: (type_identifier)
     name: (identifier))
-  (expression_statement
-    (closure
-      (local_variable_declaration
-        type: (type_identifier)
-        name: (identifier))))
+  (block
+    (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)))
   (local_variable_declaration
     type: (type_identifier)
     name: (identifier))
@@ -2317,8 +2316,7 @@ open()
   (local_variable_declaration
     type: (type_identifier)
     name: (identifier))
-  (expression_statement
-    (closure))
+  (block)
   (local_variable_declaration
     type: (type_identifier)
     name: (identifier))

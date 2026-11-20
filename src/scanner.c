@@ -31,10 +31,12 @@
 // continues, and LAMBDA_BODY_REREAD, an empty token no rule takes, which
 // hands such a `}` back to the parser when it reused the body whole;
 // §6.20 MULTI_ASSIGNMENT_COMMA, the first `,` of `(a, b) = …`, emitted
-// unless the parentheses go on as a method's parameters; and §6.21
+// unless the parentheses go on as a method's parameters; §6.21
 // DECLARATION_START, an empty token before the type of a statement's typed
 // local declaration (`String s`, `int a, b`, `String s = 'a'`), which the
-// statement's first name decides with COMMAND_STATEMENT_START.
+// statement's first name decides with COMMAND_STATEMENT_START; and §6.22
+// STATEMENT_BLOCK_END, an empty token after the `}` of a block that opens a
+// statement, decided as LAMBDA_BODY_END is where a statement may follow.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
@@ -47,7 +49,8 @@
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
 // LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA,
-// DECLARATION_START and the STRING_BODY check are suppressed.
+// DECLARATION_START, STATEMENT_BLOCK_END and the STRING_BODY check are
+// suppressed.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -90,6 +93,7 @@ enum TokenType {
     LAMBDA_BODY_REREAD,
     MULTI_ASSIGNMENT_COMMA,
     DECLARATION_START,
+    STATEMENT_BLOCK_END,
     ERROR_SENTINEL,
 };
 
@@ -3438,12 +3442,14 @@ static bool slashy_body_follows(TSLexer *lexer) {
 // practice; a longer run ends the body as a statement after it would.
 static const unsigned LAMBDA_BODY_END_COMMENTS = 8;
 
-// SPECIFICATION.md §6.19 — how a scan after a lambda body's `}` ends.
+// SPECIFICATION.md §6.19 — how a scan after a lambda body's `}` ends, and
+// after the `}` of a block that opens a statement (§6.22).
 // BODY_END_DECIDE is the scan in a state after the `}`, where the braces may
 // still be a closure that an expression continues. BODY_END_HAND_BACK is the
-// scan in a state where only LAMBDA_BODY_END is valid: after the block of a
-// lambda without parentheses that the parser reused from an old tree, or
-// that a stack version read beside one reading the braces as a closure. It
+// scan in a state where only LAMBDA_BODY_END, or STATEMENT_BLOCK_END, is
+// valid: after the block of a lambda without parentheses, or of a statement,
+// that the parser reused from an old tree, or that a stack version read
+// beside one reading the braces as a closure or as another block. It
 // ends the body where the scan in every state after the `}` would, and
 // elsewhere emits LAMBDA_BODY_REREAD, which no rule takes. A reused block is
 // then broken down and the `}` lexed again in the state after it, and the
@@ -3510,12 +3516,20 @@ static bool lambda_body_continues_with(
 // as invalid the tokens that end the body where they are valid
 // (STATEMENT_PAREN, RECORD_KEYWORD) and as valid the others, which let it go
 // on, so that it ends the body only where the scan in every state after the
-// `}` would.
+// `}` would. After a block that opens a statement (§6.22, `end` is
+// STATEMENT_BLOCK_END) a statement may follow in every state after the `}`,
+// so those two are valid in every mode, and the scan decides the same in the
+// state after a shifted block as in the one after the `}`.
 static inline bool token_valid(
     const bool *valid_symbols,
     BodyEndScan mode,
+    enum TokenType end,
     enum TokenType token
 ) {
+    if (end == STATEMENT_BLOCK_END
+        && (token == STATEMENT_PAREN || token == RECORD_KEYWORD)) {
+        return true;
+    }
     switch (mode) {
         case BODY_END_READ:
             return true;
@@ -3573,13 +3587,16 @@ static bool type_parameters_follow(TSLexer *lexer) {
 // and a comment after the body it ends stays outside. A call reads the
 // trivia, at most LAMBDA_BODY_END_COMMENTS comments of it, and one word,
 // a few characters or the start of type parameters. `mode` says how it
-// ends (BodyEndScan).
+// ends (BodyEndScan). `end` is the token it emits where the braces end:
+// LAMBDA_BODY_END, or STATEMENT_BLOCK_END after a block that opens a
+// statement (§6.22), which is decided the same way.
 static bool scan_lambda_body_end(
     Scanner *scanner,
     TSLexer *lexer,
     const bool *valid_symbols,
     bool no_close_ahead,
-    BodyEndScan mode
+    BodyEndScan mode,
+    enum TokenType end
 ) {
     // A scan that only reads skips nothing either: the token it follows
     // must keep its start.
@@ -3587,7 +3604,7 @@ static bool scan_lambda_body_end(
     if (decides) {
         lexer->mark_end(lexer);
     }
-    lexer->result_symbol = LAMBDA_BODY_END;
+    lexer->result_symbol = end;
     bool crossed_line = false;
     bool comment = false;
     unsigned comments = 0;
@@ -3616,7 +3633,7 @@ static bool scan_lambda_body_end(
                 return true;
             }
         } else if (lexer->lookahead == '='
-                   || !token_valid(valid_symbols, mode, STATEMENT_PAREN)
+                   || !token_valid(valid_symbols, mode, end, STATEMENT_PAREN)
                    || !slashy_body_follows(lexer)) {
             return lambda_body_continues(scanner, lexer, mode, comment);
         } else {
@@ -3626,10 +3643,10 @@ static bool scan_lambda_body_end(
         comments++;
     }
     bool statement_follows = crossed_line
-        && token_valid(valid_symbols, mode, STATEMENT_PAREN);
+        && token_valid(valid_symbols, mode, end, STATEMENT_PAREN);
     bool member_follows = statement_follows
         || (crossed_line
-            && token_valid(valid_symbols, mode, RECORD_KEYWORD));
+            && token_valid(valid_symbols, mode, end, RECORD_KEYWORD));
     int32_t c = lexer->lookahead;
     if (lexer->eof(lexer)) {
         return true;
@@ -3643,14 +3660,14 @@ static bool scan_lambda_body_end(
         // What `scan_contextual_word` decides for these words, and reads.
         bool as = word_is(word, len, "as");
         if ((as || word_is(word, len, "in"))
-            && token_valid(valid_symbols, mode, as ? AS_KEYWORD : IN_KEYWORD)
+            && token_valid(valid_symbols, mode, end, as ? AS_KEYWORD : IN_KEYWORD)
             && (as ? skip_header_trivia(lexer, true, no_close_ahead, NULL,
                                         NULL)
                          && is_identifier_start(lexer->lookahead)
                    : expression_follows(lexer, no_close_ahead))) {
             return lambda_body_continues(scanner, lexer, mode, true);
         }
-        lexer->result_symbol = LAMBDA_BODY_END;
+        lexer->result_symbol = end;
         return true;
     }
     switch (c) {
@@ -3688,7 +3705,7 @@ static bool scan_lambda_body_end(
             // A `[` on a later line opens no subscript (§6.9).
             advance(lexer);
             if (crossed_line
-                || !token_valid(valid_symbols, mode, SUBSCRIPT_OPEN)) {
+                || !token_valid(valid_symbols, mode, end, SUBSCRIPT_OPEN)) {
                 return true;
             }
             return lambda_body_continues_with(scanner, lexer, mode, comment,
@@ -3707,7 +3724,7 @@ static bool scan_lambda_body_end(
                                                  comment);
                 }
                 if (word_is(word, len, "in")
-                    && token_valid(valid_symbols, mode, NOT_IN)
+                    && token_valid(valid_symbols, mode, end, NOT_IN)
                     && (is_whitespace(next) || next == '[' || next == '('
                         || next == '{')) {
                     return lambda_body_continues_with(scanner, lexer, mode,
@@ -3749,7 +3766,7 @@ static void read_lambda_body_end_extent(TSLexer *lexer, bool no_close_ahead) {
     }
     if (lexer->lookahead == '/' || lexer->lookahead == '\\') {
         scan_lambda_body_end(NULL, lexer, NULL, no_close_ahead,
-                             BODY_END_READ);
+                             BODY_END_READ, LAMBDA_BODY_END);
     }
 }
 
@@ -3766,7 +3783,7 @@ static void read_deferred_extent(
     if (body_continues) {
         TSSymbol comment = lexer->result_symbol;
         scan_lambda_body_end(NULL, lexer, NULL, no_close_ahead,
-                             BODY_END_READ);
+                             BODY_END_READ, LAMBDA_BODY_END);
         lexer->result_symbol = comment;
     }
 }
@@ -3844,29 +3861,34 @@ bool tree_sitter_groovy_external_scanner_scan(
     }
 
     // SPECIFICATION.md §6.19 — after the `}` of a lambda's brace body,
-    // the one place LAMBDA_BODY_END is valid. Every token that may follow
-    // there is decided by `scan_lambda_body_end` or read by the in-grammar
-    // lexer, or, once the UNTERMINATED_COMMENT it emitted has set
-    // `lambda_body_continues`, by the branches below, which read it as they
-    // would after any expression; those that might take the word `as` or
-    // `in` for something else are skipped. The flag is set only by a scan
-    // here and read by the next one, at the same position and parse state.
+    // the one place LAMBDA_BODY_END is valid, and §6.22 after the `}` of a
+    // block that opens a statement, the one place STATEMENT_BLOCK_END is;
+    // no state takes both. Every token that may follow there is decided by
+    // `scan_lambda_body_end` or read by the in-grammar lexer, or, once the
+    // UNTERMINATED_COMMENT it emitted has set `lambda_body_continues`, by
+    // the branches below, which read it as they would after any expression;
+    // those that might take the word `as` or `in` for something else are
+    // skipped. The flag is set only by a scan here and read by the next one,
+    // at the same position and parse state.
     //
     // Where the braces may still be a closure that an expression continues,
-    // NOT_IN is valid. Where it is not, only LAMBDA_BODY_END is valid, and
+    // NOT_IN is valid. Where it is not, only the token is valid, and
     // the scan may not defer to a comment (BODY_END_HAND_BACK): a comment
     // shifted after a reused block would stay before the token once the
     // parser broke the block down, and the token be decided after it.
-    if (valid_symbols[LAMBDA_BODY_END] && !valid_symbols[ERROR_SENTINEL]) {
+    if ((valid_symbols[LAMBDA_BODY_END] || valid_symbols[STATEMENT_BLOCK_END])
+        && !valid_symbols[ERROR_SENTINEL]) {
+        enum TokenType end = valid_symbols[STATEMENT_BLOCK_END]
+            ? STATEMENT_BLOCK_END : LAMBDA_BODY_END;
         if (!valid_symbols[NOT_IN]) {
             return scan_lambda_body_end(scanner, lexer, valid_symbols,
                                         no_comment_close_ahead(scanner),
-                                        BODY_END_HAND_BACK);
+                                        BODY_END_HAND_BACK, end);
         }
         if (scanner == NULL || !scanner->lambda_body_continues) {
             return scan_lambda_body_end(scanner, lexer, valid_symbols,
                                         no_comment_close_ahead(scanner),
-                                        BODY_END_DECIDE);
+                                        BODY_END_DECIDE, end);
         }
         scanner->lambda_body_continues = false;
         body_continues = true;

@@ -2,25 +2,30 @@
 Empty closure
 ==================
 
-{ }
+def c = { }
 
 ---
 
 (source_file
-  (expression_statement (closure)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure))))
 
 ==================
 Closure with single statement body
 ==================
 
-{ x }
+def c = { x }
 
 ---
 
 (source_file
-  (expression_statement
-    (closure
-      (expression_statement (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement (identifier))))))
 
 ==================
 Closure with explicit empty parameter list
@@ -71,16 +76,18 @@ Closure with multiple parameters
 Closure with multiple statements in body
 ==================
 
-{ a; b; c }
+def c = { a; b; c }
 
 ---
 
 (source_file
-  (expression_statement
-    (closure
-      (expression_statement (identifier))
-      (expression_statement (identifier))
-      (expression_statement (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement (identifier))
+        (expression_statement (identifier))
+        (expression_statement (identifier))))))
 
 ==================
 Closure as list element

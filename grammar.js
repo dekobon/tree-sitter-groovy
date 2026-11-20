@@ -26,6 +26,8 @@
  *     the parentheses go on as a method's parameters
  *   - The start of a typed declaration without an initializer
  *     (`String s`), which a line break after the name may end
+ *   - The end of a lambda's brace body and of a block that opens a
+ *     statement, at a `}` that no expression continues
  * Inside a string body it emits nothing. See SPECIFICATION.md §6 and
  * the `externals` list below.
  */
@@ -154,13 +156,28 @@ const DOTTED_CAST_TYPE_WEIGHT = 1;
 const LAMBDA_WEIGHT = -(TYPED_LOCAL_WEIGHT + CAST_WEIGHT + 1);
 
 /*
- * How many lambdas, each in a brace body of the one before it, the two
- * weights below rank as Groovy reads them:
- * `x -> { a = b -> { c = d -> e } }` and
- * `if (x) { a = b -> { c = d -> { e = f -> g } } }` hold three. Taking a
- * closure for one of those bodies makes the assignment in it a closure
- * parameter, and so every lambda nested in it, so that reading holds fewer
- * lambdas. Deeper nests read the closures.
+ * The weight of a block where Groovy tries a block before a closure and
+ * the braces end what they open: a `{` that opens a statement (Apache
+ * `statement` lists `block` first), which `_statement_block_end` ends, and
+ * the brace body of a lambda, which `_lambda_body_end` ends (Apache
+ * `lambdaBody`). `{ a = b -> c }` that opens a statement is a block that
+ * assigns a lambda, and also a closure with the parameter `a`, whose
+ * reading holds no lambda: the block must outweigh the lambda in it. A
+ * lambda whose block ends it weighs this and LAMBDA_WEIGHT, one step in
+ * all, so each block of a nest, `if (x) { a = b -> { c = d -> e } }`,
+ * outweighs the closure that would make its assignment a parameter, at any
+ * depth. The weight is on every block rather than summed up at the end: the
+ * parser keeps a few stack versions only, the ones of the highest weight so
+ * far, and a reading that won only at its last `}` was dropped before it.
+ */
+const STATEMENT_BLOCK_WEIGHT = -LAMBDA_WEIGHT + 1;
+
+/*
+ * How many lambdas a lambda whose body is a closure (below) ranks under,
+ * below the other readings of the same braces: a block that holds lambdas,
+ * and a closure that starts the body (`a -> { b -> b } { c }`). It bounds
+ * no nest of blocks that hold lambdas, as each such block outweighs a
+ * closure (STATEMENT_BLOCK_WEIGHT).
  */
 const LAMBDA_NESTING_DEPTH = 10;
 
@@ -169,9 +186,7 @@ const LAMBDA_NESTING_DEPTH = 10;
  * reading of the same tokens holds otherwise. A lambda's body is a block
  * before a closure (Apache `lambdaBody`), so `x -> { a = b -> c }` must
  * rank its block, which holds a lambda, above the closure with the
- * parameter `a`, and a nest of LAMBDA_NESTING_DEPTH lambdas above the
- * lambda whose closure holds none. The weight is below that of
- * LAMBDA_NESTING_DEPTH lambdas.
+ * parameter `a`. The weight is below that of LAMBDA_NESTING_DEPTH lambdas.
  */
 const DEMOTED_LAMBDA_WEIGHT = LAMBDA_NESTING_DEPTH * LAMBDA_WEIGHT - 1;
 
@@ -195,13 +210,8 @@ const PARENTHESIZED_BODY_WEIGHT = LAMBDA_WEIGHT - 1;
  * (Apache `statement` lists `block` first). `if (x) { a = b -> c }` is a
  * block that assigns a lambda, and also a closure with the parameter `a`,
  * whose reading holds no lambda. The block must outweigh what it holds and
- * the closure does not: a nest of LAMBDA_NESTING_DEPTH lambdas, or a
- * lambda whose body is a closure (`if (x) { a = b -> { p -> p } }`), which
- * is demoted. A block in a lambda's body has no weight of its own, so a
- * lambda there whose body is a closure loses to the closure reading:
- * `x -> { a = b -> { p -> p } }` is the closure with the parameter `a`. A
- * weight that outweighed the lambda in such a block would also make
- * `def c = { a = (b) -> { } }` a closure that assigns `a` a lambda.
+ * the closure does not: a lambda whose body is a closure
+ * (`if (x) { a = b -> { p -> p } }`), which is demoted.
  */
 const BODY_BLOCK_WEIGHT = -DEMOTED_LAMBDA_WEIGHT + 1;
 
@@ -605,6 +615,10 @@ function enhancedExpression($) {
  * block's static precedence keeps the block. A lambda without parentheses
  * may not, so its block needs the token.
  *
+ * Each alternative carries the whole weight of the lambda, as a production
+ * takes the largest of the weights in it, not their sum: LAMBDA_WEIGHT, and
+ * for a block that the token ends STATEMENT_BLOCK_WEIGHT as well.
+ *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {boolean} bare Whether the lambda has no parentheses.
  * @returns {ChoiceRule} The body rule, its `body` field on the body alone.
@@ -612,14 +626,51 @@ function enhancedExpression($) {
 function lambdaBody($, bare) {
   const body = (rule) => field('body', rule);
   return choice(
-    seq(body($.block), bare ? $._lambda_body_end : optional($._lambda_body_end)),
+    weighted(
+      LAMBDA_WEIGHT + STATEMENT_BLOCK_WEIGHT,
+      seq(body($.block), $._lambda_body_end),
+    ),
+    ...(bare ? [] : [weighted(LAMBDA_WEIGHT, body($.block))]),
     weighted(DEMOTED_LAMBDA_WEIGHT, seq(body($.closure), $._lambda_body_end)),
     weighted(PARENTHESIZED_BODY_WEIGHT, prec(1, body(alias(
       $._lambda_parenthesized_expression,
       $.parenthesized_expression,
     )))),
-    body(statementExpression($)),
+    weighted(LAMBDA_WEIGHT, body(statementExpression($))),
   );
+}
+
+/**
+ * A block that opens a statement, as Apache's `statement` takes it first:
+ * at the start of a statement in a list of them and after a label. A body
+ * of `if`, `else`, a loop or an arrow case takes its block directly
+ * (BODY_BLOCK_WEIGHT). `_statement_block_end` (§6.22) ends it, which the
+ * scanner emits after the `}` unless an expression continues the braces
+ * there, as it decides `_lambda_body_end` where a statement may follow; where
+ * one does they are a closure: `{ foo() }()`, `{ foo() }.call()`,
+ * `{ foo() } as Runnable` and `{ foo() }` followed by `.call()` on the next
+ * line call and cast it, as in Groovy. A token of its own rather than
+ * `_lambda_body_end` lets the scanner decide it the same in every state
+ * after the `}`, as a statement may follow there in each.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {(rule: RuleOrLiteral) => RuleOrLiteral} [wrap] Wraps the block,
+ *   to put a field on it and not on the token.
+ * @returns {PrecDynamicRule} The block rule.
+ */
+function statementBlock($, wrap = (rule) => rule) {
+  return weighted(STATEMENT_BLOCK_WEIGHT, seq(wrap($.block), $._statement_block_end));
+}
+
+/**
+ * A list of statements and `;`, in a file, a block, a closure and a colon
+ * case: a statement may be a block there.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RepeatRule} The list rule.
+ */
+function statementList($) {
+  return repeat(choice($._statement, statementBlock($), ';'));
 }
 
 /**
@@ -714,7 +765,7 @@ module.exports = grammar({
   // recovery, when tree-sitter marks every external valid. It is kept
   // last here and in the scanner's `TokenType` enum, and the two
   // orders must match. No rule references `_lambda_body_reread` either:
-  // the scanner emits it where no rule takes it (§6.19). The scanner
+  // the scanner emits it where no rule takes it (§6.19, §6.22). The scanner
   // never emits `_string_body` or `_type_start`: a string body and a type
   // reference them so that the scanner can tell it is inside one or where
   // one may start.
@@ -722,8 +773,8 @@ module.exports = grammar({
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
   // label colon via grammar precedence, and statement boundaries
-  // via `repeat(choice($._statement, ';'))` — newline is `extras`
-  // whitespace and `;` is an anonymous list element, see §5.10)
+  // via `statementList` — newline is `extras` whitespace and `;` is an
+  // anonymous list element, see §5.10)
   // are intentionally NOT listed: listing an unwired external token
   // would let dormant scanner branches mis-fire in error-recovery
   // states.
@@ -837,6 +888,11 @@ module.exports = grammar({
     // follows. Listed last but for the sentinel, so that it renumbers no
     // symbol before it.
     $._declaration_start,
+    // §6.22 — empty token after the `}` of a block that opens a statement,
+    // emitted unless what follows continues an expression, so that the
+    // braces are a closure there (`{ foo() }()`). Listed last but for the
+    // sentinel, so that it renumbers no symbol before it.
+    $._statement_block_end,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -960,8 +1016,11 @@ module.exports = grammar({
     // the only one left. And `->` appears at the top level of a closure
     // body only where a reading without it is ranked first: in the
     // arrow forms of `switch`, and in a lambda, whose weight is negative
-    // (LAMBDA_WEIGHT). `{ a = (b) -> c }` holds both: the parameter `a`,
-    // and `a` assigned the lambda `(b) -> c`; Groovy reads the parameter.
+    // (LAMBDA_WEIGHT) but for the block that ends it, which weighs as much
+    // as the block the parameter's reading takes the braces for instead
+    // (STATEMENT_BLOCK_WEIGHT). `{ a = (b) -> c }` holds both: the
+    // parameter `a`, and `a` assigned the lambda `(b) -> c`; Groovy reads
+    // the parameter, and in `{ a = (b) -> { } }` the parameter and a block.
     // On invalid input the parameter reading can win, because a missing
     // `->` is a cheaper repair than an ERROR: `{ x = 1, y }` recovers as
     // two parameters.
@@ -972,7 +1031,7 @@ module.exports = grammar({
     // SPECIFICATION.md §4 (statement and declaration coverage).
     source_file: $ => seq(
       optional($.shebang),
-      repeat(choice($._statement, ';')),
+      statementList($),
     ),
 
     // §4 — `#!/usr/bin/env groovy` line at file start. Single
@@ -981,10 +1040,12 @@ module.exports = grammar({
 
     // §4 — statement-level alternatives. Declarations and the rest
     // of control flow fill out this choice in subsequent iterations.
-    // `block` is intentionally NOT here — a top-level `{ ... }`
-    // continues to parse as an expression_statement-wrapped closure
-    // (the historically intended form for Groovy scripts). Blocks
-    // appear explicitly in the body slot of `if` / `while` / etc.
+    // A `{` that opens a statement is a block (`statementBlock`), which
+    // the lists of statements and a label take besides this choice: a
+    // body of `if`, `else`, a loop or an arrow case takes its block
+    // directly, and through this choice it would reach a second block
+    // that the scanner decides after every such body's `}`, which cost
+    // 13% more instructions on code made of conditions.
     _statement: $ => choice(
       $.expression_statement,
       $.if_statement,
@@ -1162,27 +1223,29 @@ module.exports = grammar({
     // label by its own alternative, and `foo default: 1` stays a
     // statement and a label (spec §6.8). In a switch body a `default`
     // after a case ends the case instead (`switch_case`).
-    labeled_statement: $ => choice(
-      prec(1, seq(
-        field('label', $.identifier),
-        ':',
+    //
+    // A labeled block (`lbl: { … }`) is Groovy's way to make braces a
+    // block, and so it is here (`statementBlock`).
+    labeled_statement: $ => {
+      const statement = choice(
         field('statement', $._statement),
-      )),
-      seq(
-        field('label', alias('default', $.identifier)),
-        ':',
-        field('statement', $._statement),
-      ),
-    ),
+        statementBlock($, (rule) => field('statement', rule)),
+      );
+      return choice(
+        prec(1, seq(field('label', $.identifier), ':', statement)),
+        seq(field('label', alias('default', $.identifier)), ':', statement),
+      );
+    },
 
     // §4 — block of statements: control-flow, method and constructor
-    // bodies, static / instance initializers. Shares `{ ... }` syntax
-    // with closure (§5.8). A `prec(1, …)` keeps block preferred at use
-    // sites where both `block` and a closure-bearing `_statement`
-    // are valid alternatives (e.g. the body slot of `if` / `while`).
+    // bodies, static / instance initializers, and a `{` that opens a
+    // statement (`statementBlock`). Shares `{ ... }` syntax with closure
+    // (§5.8). A `prec(1, …)` keeps block preferred at use sites where
+    // both `block` and a closure-bearing `_statement` are valid
+    // alternatives (e.g. the body slot of `if` / `while`).
     block: $ => prec(1, seq(
       '{',
-      repeat(choice($._statement, ';')),
+      statementList($),
       '}',
     )),
 
@@ -2372,7 +2435,7 @@ module.exports = grammar({
       'case',
       field('value', $._expression),
       ':',
-      repeat(choice($._statement, ';')),
+      statementList($),
     )),
 
     // The arrow body may be terminated by `;` (`case 1 -> foo();`),
@@ -2390,7 +2453,7 @@ module.exports = grammar({
     switch_default: $ => prec.left(seq(
       'default',
       choice(
-        seq(':', repeat(choice($._statement, ';'))),
+        seq(':', statementList($)),
         seq('->', field('body', choice($._body_block, $._statement)), optional(';')),
       ),
     )),
@@ -3094,7 +3157,7 @@ module.exports = grammar({
     closure: $ => seq(
       '{',
       optional($.closure_parameters),
-      repeat(choice($._statement, ';')),
+      statementList($),
       '}',
     ),
 
@@ -3119,13 +3182,14 @@ module.exports = grammar({
     // at the `->`.
     //
     // The body takes all it can, as Apache's greedy `lambdaBody` does:
-    // `(a) -> a + 1 as T` is a lambda whose body is the cast.
-    lambda_expression: $ => weighted(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+    // `(a) -> a + 1 as T` is a lambda whose body is the cast. The weight is
+    // the body's (`lambdaBody`).
+    lambda_expression: $ => prec.right(PREC.LAMBDA, seq(
       $._lambda_start,
       field('parameters', $.formal_parameters),
       '->',
       lambdaBody($, false),
-    ))),
+    )),
 
     // A lambda whose one parameter has no parentheses (`x -> x + 1`),
     // Apache's `standardLambdaExpression` with a `variableDeclaratorId`,
@@ -3136,23 +3200,24 @@ module.exports = grammar({
     // reduction of its own: tree-sitter skips the step from a name to an
     // expression only in a state that has no other action, and a call with
     // names for arguments took a fifth more reductions.
-    _bare_lambda_expression: $ => weighted(LAMBDA_WEIGHT, prec.right(PREC.LAMBDA, seq(
+    _bare_lambda_expression: $ => prec.right(PREC.LAMBDA, seq(
       $._bare_lambda_start,
       field('parameters', $.identifier),
       '->',
       lambdaBody($, true),
-    ))),
+    )),
 
     // The name of a closure parameter's default that `_bare_lambda_start`
     // opens. At the start of a closure the default and the value of a
     // declaration or an assignment share their tokens (`{ a = b -> c }`,
     // `{ String a = b -> c }`), and the scanner reads only the name and the
     // `->`. Where a value is a closure, Groovy reads the parameter; where a
-    // block is possible too, the body of `if` (`if (x) { a = b -> c }`), it
-    // reads a block that assigns a lambda. A static decision would hold in
-    // both, as the states are shared, so the precedence ties with the
-    // lambda's and the `[_bare_lambda_name, _bare_lambda_expression]`
-    // conflict keeps both readings for the weights to rank.
+    // block is possible too, the body of `if` (`if (x) { a = b -> c }`) or a
+    // `{` that opens a statement, it reads a block that assigns a lambda. A
+    // static decision would hold in both, as the states are shared, so the
+    // precedence ties with the lambda's and the
+    // `[_bare_lambda_name, _bare_lambda_expression]` conflict keeps both
+    // readings for the weights to rank.
     _bare_lambda_name: $ => prec(PREC.LAMBDA, seq($._bare_lambda_start, $.identifier)),
 
     // A block as the body of `else`, a loop or an arrow case, ranked above a
