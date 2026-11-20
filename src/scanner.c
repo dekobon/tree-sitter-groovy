@@ -3500,7 +3500,7 @@ static bool lambda_body_continues_with(
     TSLexer *lexer,
     BodyEndScan mode,
     bool comment,
-    enum TokenType token
+    TSSymbol token
 ) {
     if (comment || mode != BODY_END_DECIDE) {
         return lambda_body_continues(scanner, lexer, mode, true);
@@ -3588,7 +3588,7 @@ static bool scan_lambda_body_end(
     const bool *valid_symbols,
     bool no_close_ahead,
     BodyEndScan mode,
-    enum TokenType end
+    TSSymbol end
 ) {
     // A scan that only reads skips nothing either: the token it follows
     // must keep its start.
@@ -3870,7 +3870,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // parser broke the block down, and the token be decided after it.
     if ((valid_symbols[LAMBDA_BODY_END] || valid_symbols[STATEMENT_BLOCK_END])
         && !valid_symbols[ERROR_SENTINEL]) {
-        enum TokenType end = valid_symbols[STATEMENT_BLOCK_END]
+        TSSymbol end = valid_symbols[STATEMENT_BLOCK_END]
             ? STATEMENT_BLOCK_END : LAMBDA_BODY_END;
         if (!valid_symbols[NOT_IN]) {
             return scan_lambda_body_end(scanner, lexer, valid_symbols,
