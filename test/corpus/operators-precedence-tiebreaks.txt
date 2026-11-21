@@ -19,6 +19,67 @@ Range and shift share the same level — left assoc wins
       right: (number_literal))))
 
 ==================
+instanceof and as are tighter than the relational operators
+==================
+
+1 < 2 instanceof Boolean
+1 in [1] as String
+a < b as T < c
+a !in b instanceof T
+a + b as T
+a instanceof T < b
+x as T as U
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (number_literal)
+      right: (instanceof_expression
+        value: (number_literal)
+        type: (type_identifier))))
+  (expression_statement
+    (membership_expression
+      element: (number_literal)
+      collection: (cast_expression
+        value: (list_literal
+          (number_literal))
+        type: (type_identifier))))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (cast_expression
+          value: (identifier)
+          type: (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (instanceof_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (expression_statement
+    (cast_expression
+      value: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (type_identifier))
+      right: (identifier)))
+  (expression_statement
+    (cast_expression
+      value: (cast_expression
+        value: (identifier)
+        type: (type_identifier))
+      type: (type_identifier))))
+
+==================
 Ternary and Elvis share the conditional level
 ==================
 

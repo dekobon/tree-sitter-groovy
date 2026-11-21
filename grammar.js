@@ -59,16 +59,21 @@ const PREC = {
   BITWISE_XOR: 7,             // ^
   BITWISE_AND: 8,             // &
   EQUALITY: 9,                // == != <=> === !== =~ ==~
-  RELATIONAL: 10,             // < <= > >= in !in instanceof !instanceof as
-  SHIFT_OR_RANGE: 11,         // << >> >>> .. ..< <.. <..<
-  ADDITIVE: 12,               // + -
-  MULTIPLICATIVE: 13,         // * / %
-  UNARY: 14,                  // prefix ++ -- + -          (Apache level 3 UNARY_ADD)
-  POWER: 15,                  // **                         (Apache level 2)
-  UNARY_NOT: 16,              // ! ~                        (Apache level 1, tighter than POWER)
-  POSTFIX: 17,                // postfix ++ --, []
-  ACCESS: 18,                 // . ?. ??. *. .& .@ ::
-  PRIMARY: 19,                // literals, identifiers, ()
+  RELATIONAL: 10,             // < <= > >= in !in
+  // Apache level 7 is two alternatives, the first `as`, `instanceof` and
+  // `!instanceof`, and in a left-recursive ANTLR rule an earlier
+  // alternative binds tighter: `a < b instanceof T` is
+  // `a < (b instanceof T)`.
+  TYPE_TEST: 11,              // instanceof !instanceof as
+  SHIFT_OR_RANGE: 12,         // << >> >>> .. ..< <.. <..<
+  ADDITIVE: 13,               // + -
+  MULTIPLICATIVE: 14,         // * / %
+  UNARY: 15,                  // prefix ++ -- + -          (Apache level 3 UNARY_ADD)
+  POWER: 16,                  // **                         (Apache level 2)
+  UNARY_NOT: 17,              // ! ~                        (Apache level 1, tighter than POWER)
+  POSTFIX: 18,                // postfix ++ --, []
+  ACCESS: 19,                 // . ?. ??. *. .& .@ ::
+  PRIMARY: 20,                // literals, identifiers, ()
   // Type-context only — never competes with the expression ladder
   // above. Shares CONDITIONAL's numeric value by accident; the two
   // do not collide because `_type` and `_expression` reach the
@@ -2630,13 +2635,13 @@ module.exports = grammar({
       ),
     )),
 
-    // §3.2 — `x as Type`. RELATIONAL level (10), left-associative.
+    // §3.2 — `x as Type`. TYPE_TEST level, left-associative.
     // RHS is `_cast_type`, a `_type`-shaped sibling that swaps in
     // `_dotted_type` for `qualified_type` so the trailing
     // `.identifier` of `x as java.util.Map` extends the type
     // through every dot segment (instead of being claimed by
     // `field_access` at higher precedence than `cast_expression`).
-    cast_expression: $ => prec.left(PREC.RELATIONAL, seq(
+    cast_expression: $ => prec.left(PREC.TYPE_TEST, seq(
       field('value', $._expression),
       alias($._as_keyword, 'as'),
       field('type', $._cast_type),
@@ -2732,7 +2737,7 @@ module.exports = grammar({
       ))));
     },
 
-    // §3.2 / §3.2.2 — `x instanceof T` and `x !instanceof T`.
+    // §3.2 / §3.2.2 — `x instanceof T` and `x !instanceof T`, at TYPE_TEST.
     // `!instanceof` is a single token whose match requires a
     // trailing whitespace (Apache `NOT_INSTANCEOF` predicate) so
     // `a !instanceofX` does not mis-tokenise as `!instanceof`
@@ -2742,7 +2747,7 @@ module.exports = grammar({
         'instanceof',
         token(prec(1, seq('!instanceof', /[ \t\r\n]/))),
       ];
-      return choice(...ops.map(op => prec.left(PREC.RELATIONAL, seq(
+      return choice(...ops.map(op => prec.left(PREC.TYPE_TEST, seq(
         field('value', $._expression),
         field('operator', op),
         field('type', $._cast_type),

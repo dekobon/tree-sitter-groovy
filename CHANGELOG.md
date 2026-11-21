@@ -241,6 +241,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   generated from `node-types.json` that types either field as one node
   needs a list; `child_by_field_name` returns the first, and a tree
   with one value or index is as before.
+- **BREAKING:** `instanceof`, `!instanceof` and `as` bind tighter than
+  `<`, `<=`, `>`, `>=`, `in` and `!in`, as Apache's level 7 lists them
+  first: a relational operator before one of them now takes its
+  result as the right operand. `a < b instanceof T` is
+  `a < (b instanceof T)` (Groovy 3: `1 < 2 instanceof Boolean` fails
+  comparing `1` with `false`), `a in b as T` is `a in (b as T)`
+  (`1 in [1] as String` is `false`), `a < b as T < c` is
+  `(a < (b as T)) < c` and `a as T < b as U` is `(a as T) < (b as U)`;
+  each was the operator applied to the comparison or the membership
+  test, `(a < b) instanceof T`. Unchanged: `a + b as T`, `a << b as T`,
+  `a..b as T`, `!a as T`, `a ?: b as T`, `a == b as T`,
+  `a instanceof T == b` and `x as T as U`. No corpus, real, Java or
+  shape tree changes (`SPECIFICATION.md` §3.1).
 - **BREAKING:** a dotted name followed on its line by a literal or a
   `name:` key is a `command_chain` (see Added), which changes trees for
   input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,

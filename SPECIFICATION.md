@@ -209,9 +209,11 @@ order).
 This is the precedence ordering encoded in
 `apache/groovy:src/antlr/GroovyParser.g4` (rule `expression`, lines
 797–908). The numbering follows Apache's "level" comments
-(1 = highest, 15 = lowest); the tree-sitter PREC constants we use
-are simply 21 minus this number so higher = tighter — but the
-*relative* order is what matters and it matches Apache exactly.
+(1 = highest, 15 = lowest); the tree-sitter PREC constants run the
+other way, higher = tighter, and only their *relative* order matters.
+Where one of Apache's levels holds several alternatives, the order of
+the alternatives decides: in a left-recursive ANTLR rule an earlier
+alternative binds tighter, so a level splits in two (7a and 7b below).
 
 | Apache level | Name | Operators | Associativity | Notes |
 |---:|---|---|---|---|
@@ -221,7 +223,8 @@ are simply 21 minus this number so higher = tighter — but the
 | 4 | MUL | `*` `/` `%` | left | |
 | 5 | ADD | `+` `-` (binary) | left | |
 | 6 | SHIFT_OR_RANGE | `<<` `>>` `>>>` `..` `..<` `<..` `<..<` | left | **Apache puts ranges and shifts at the same level**, with left-associative resolution. `0..n<<1` parses as `(0..n)<<1`. |
-| 7 | REL | `<` `<=` `>` `>=` `in` `!in` `instanceof` `!instanceof` `as` | left | `as` and `!instanceof` take a *type* on the right (not an expression); `in` / `!in` / `<` etc. take an expression. |
+| 7a | TYPE_TEST | `instanceof` `!instanceof` `as` | left | Apache's level 7 starts with these, ahead of the relational alternative, so they bind tighter: `1 < 2 instanceof Boolean` is `1 < (2 instanceof Boolean)` and `1 in [1] as String` is `1 in ([1] as String)` (observed with Groovy 3); `a + b as T` stays `(a + b) as T`. One alternative, `op=(AS \| INSTANCEOF \| NOT_INSTANCEOF) nls type`, in 3.0.x and 4.0.x; two in 5.0.x (`INSTANCEOF`, then `AS \| NOT_INSTANCEOF`) and three in master and 6.0.x (`INSTANCEOF`, `NOT_INSTANCEOF`, `AS`). Each takes a *type* on the right, not an expression, so their order among themselves changes no tree, and one level holds them. |
+| 7b | REL | `<` `<=` `>` `>=` `in` `!in` | left | Apache's second alternative of level 7, `op=(LE \| GE \| GT \| LT \| IN \| NOT_IN) nls right=expression`; the right operand is an expression. |
 | 8 | EQ | `==` `!=` `<=>` `===` `!==` `=~` `==~` | left | Apache's comment calls regex "level 8.5" but the rule places them in the same alternative as `==` family. We treat them as one level. |
 | 9 | BAND | `&` | left | |
 | 10 | BXOR | `^` | left | |
@@ -266,9 +269,11 @@ Notes on the corrected ordering versus v1 of this spec:
   `<assoc=right>`. v1 was correct on associativity but worth
   emphasising: `a ==> b ==> c` parses as `a ==> (b ==> c)`.
 - **`as` and `!instanceof` take a type, not an expression.** Apache
-  has `op=(AS | NOT_INSTANCEOF) nls coercionType` versus
-  `op=INSTANCEOF nls matchingType` versus
-  `op=(LE | GE | …) nls right=expression`. The grammar must
+  has `op=(AS | INSTANCEOF | NOT_INSTANCEOF) nls type` (4.0.x and
+  later; older drafts split `coercionType` and `matchingType`) versus
+  `op=(LE | GE | …) nls right=expression`, and the first alternative
+  binds tighter (level 7a above): before 0.7.0 the grammar put both
+  at one level, so `a < b instanceof T` was `(a < b) instanceof T`. The grammar must
   thread this through — the RHS of `as` is `_type`, RHS of `<` is
   `_expression`. See §3.2 cast_expression and
   instanceof_expression fields. A dotted name there is one type,
@@ -4994,6 +4999,9 @@ Other per-operator corpus files mandated:
 - `operators-precedence-tiebreaks.txt` — explicit tests that pin
   the Apache precedence ordering on the tie-break cases:
   - `0..n<<1` → `(0..n)<<1` (range/shift same level, left-assoc)
+  - `1 < 2 instanceof Boolean` → `1 < (2 instanceof Boolean)` and
+    `1 in [1] as String` → `1 in ([1] as String)` (type tests and `as`
+    tighter than the relational operators)
   - `a ? b ?: c : d` → `a ? (b ?: c) : d`
     (Elvis nests inside ternary's middle slot)
   - `a ?: b ?: c` → `a ?: (b ?: c)` (right-assoc)
