@@ -3322,8 +3322,11 @@ static const unsigned ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS = 256;
 // reads on from the `(` for a `)` or `]` with none open, which closes
 // brackets around both lines: where one comes before a `}` with none open,
 // which closes a block, and within ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS,
-// the cast stays. It stays too where `->` follows the first parentheses, as
-// only the cast takes that lambda (`(Foo)` then `(x) -> x`).
+// the cast stays. It stays too where `->` follows the first parentheses
+// (`(Foo)` then `(x) -> x`): after an expression the lambda look-ahead does
+// not run (§6.17), so the parentheses would open a call's arguments and the
+// `->` an ERROR. Groovy 3 reads that call, `(Foo)((x) -> x)`, where the cast
+// here takes the lambda (`docs/divergences-from-spec.md` §15).
 //
 // The brackets are counted on Groovy's tokens, read as the other look-aheads
 // read them: strings whole (`skip_string`, a triple-quoted one across lines
