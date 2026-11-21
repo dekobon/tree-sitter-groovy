@@ -803,7 +803,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   string, each without an `ERROR`; `x = a/2 + (s =~ /re/)` and
   `a/b // c` were an `ERROR`. Each is one expression now, as in
   Groovy. `println /abc/`, `foo /a/, 1`, `obj.m /x/` and
-  `(String) /a/`, which Groovy rejects, are an `ERROR`. A slashy string
+  `(String) /a/`, which Groovy rejects, are an `ERROR`; so are
+  `x = A.class /b/` and `x = a as int /b/`, two statements at v0.6.0,
+  as Groovy 6's lexer reads a `/` after `class` and a primitive type as
+  division (`isSlashyForbidden`), where Groovy 3 reads a string there
+  (`A.class("b")`). A slashy string
   still opens a line after an expression (`x = a` and `/re/` on the
   next line), and after an operator, a bracket, a comma or a keyword
   (`foo(/a/)`, `return /a/`, `x in /a/`). No tree of 266 real files

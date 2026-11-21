@@ -705,6 +705,35 @@ obj.m /x/
 ---
 
 ==================
+A slash after class or a primitive type is division, as Groovy 6 reads it
+==================
+
+x = A.class /b/;
+y = a as int /b/;
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (field_access
+          object: (identifier)
+          field: (identifier))
+        right: (identifier))))
+  (ERROR)
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (type_identifier))
+        right: (identifier))))
+  (ERROR))
+
+==================
 A slash after the parentheses of a cast opens no slashy string operand
 :error
 ==================
