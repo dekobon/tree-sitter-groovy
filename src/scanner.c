@@ -5229,8 +5229,15 @@ bool tree_sitter_groovy_external_scanner_scan(
     // array type below as well.
     if (wants_statement_start && !body_continues
         && is_identifier_start(lexer->lookahead)) {
+        // §6.21 — after `def` the token is valid where no call may start,
+        // and the type follows the token rather than standing here, so
+        // TYPE_START is not valid; the type may start all the same
+        // (`def String[] a`).
+        bool declaration_type = type_may_start
+            || (valid_symbols[DECLARATION_START]
+                && !valid_symbols[COMMAND_STATEMENT_START]);
         return scan_statement_start(lexer, valid_symbols, wants_array,
-                                    type_may_start, no_close_ahead);
+                                    declaration_type, no_close_ahead);
     }
     if (lexer->lookahead == 'r' && wants_record) {
         if (!consume_keyword(lexer, "record")

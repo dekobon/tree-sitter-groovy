@@ -3460,6 +3460,27 @@
                       "type": "SYMBOL",
                       "name": "_type"
                     }
+                  },
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "def"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_declaration_start"
+                      },
+                      {
+                        "type": "FIELD",
+                        "name": "type",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "_type"
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -5397,6 +5418,35 @@
                   "type": "SYMBOL",
                   "name": "annotation"
                 }
+              },
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "CHOICE",
+                        "members": [
+                          {
+                            "type": "STRING",
+                            "value": "final"
+                          },
+                          {
+                            "type": "BLANK"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "def"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "BLANK"
+                  }
+                ]
               },
               {
                 "type": "SYMBOL",

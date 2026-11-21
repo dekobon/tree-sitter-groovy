@@ -1173,8 +1173,10 @@ alternative for `seq('*', $.expression)` inside `argument_list`.
 
 `def` can prefix:
 
-- a local variable declaration (`def x = …`),
-- a field (`def x` in a class or enum body),
+- a local variable declaration (`def x = …`), also before a type
+  (`def String s = …`, §6.21),
+- a field (`def x` in a class or enum body), also before a type
+  (`private def Foo foo`, §6.21),
 - a method definition (`def f() { … }`),
 - a method or closure parameter (`def f(def x)`, `{ def x -> … }`),
 - a `for`-in variable, a `catch` parameter and a `try` resource
@@ -4011,9 +4013,32 @@ the loop to the grammar (`for (String s` then `in xs)`). A header still
 being typed (`for (int i` then the next statement) emits nothing, so
 error recovery keeps the statements around it, as before the token
 (`test/corpus/statements-for.txt` pins it). Positions where a type may
-start (TYPE_START) include every one where the token is valid, so the
+start (TYPE_START) include every one where the token is valid but the one
+after `def` below, which the scan counts as one, so the
 array type value (§6.15) is decided in the same branch: `String[] arr` is
 a declaration and `String[].class` a value.
+
+The token is also valid after `def`, alone or after `final`, in that form
+of `local_variable_declaration`, and in the typed form of
+`field_declaration` after its modifiers: Apache's `variableDeclaration` is
+`modifiers nls type? variableDeclarators`, and `def` is a modifier, so
+`def String s = 'a'`, `final def List<String> xs = []` and, in a type
+body, `private def Foo foo = mock(Foo)` declare their names with the
+type, as in Groovy (checked with Groovy 3), with `def` an anonymous child
+of the node. Where the scan does not emit it, `def` takes the name as
+before (`def x = 1`, `def Foo = 1`); a line break after the type ends the
+declaration as after a statement's type (`def String` then `s = 1` on the
+next line is two statements, as in Groovy), and one between `def` and the
+type does not, as in Groovy's `nls` (`def` then `long where = f()`). No
+call may start there, so the scan reads the type by the rule that holds
+after annotations: a lowercase type needs `<` or `[` (`def foo bar` is
+`def foo` and `bar`, where Groovy declares `bar`). Not taken: a modifier
+after `def` (`def final String x`, `def static String x`, Groovy's
+declarations, which stay `def final` and a declaration of `x`), a return
+type after `def` (`def String m() { }`, Groovy's method, which stays
+`def String` and a call, or a field and a constructor in a type body),
+and a parameter's (§5.12, `docs/divergences-from-spec.md` §14). The two
+forms cost 34 parse states.
 
 Trees that change for input that parsed without an `ERROR` are the
 declarations themselves, each a `local_variable_declaration` where the

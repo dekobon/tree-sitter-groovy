@@ -1742,7 +1742,15 @@ module.exports = grammar({
       weighted(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
         repeat($._modifier),
-        choice('def', field('type', $._type)),
+        // `def` is a modifier in Apache's `variableDeclaration`, so a type
+        // may follow it (`private def Foo foo`). The scanner opens that
+        // type as it opens a typed local's (§6.21), so `def x` keeps its
+        // name without a fork at every `def`.
+        choice(
+          'def',
+          field('type', $._type),
+          seq('def', $._declaration_start, field('type', $._type)),
+        ),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
@@ -2167,8 +2175,13 @@ module.exports = grammar({
         repeat1($.annotation),
         alias($._placeholder_declarator, $.variable_declarator),
       )),
+      // `def String s = 'a'`: `def` is a modifier before the type, as in
+      // Apache's `variableDeclaration`, and the scanner decides the type
+      // after it as at a statement's start, so `def String` then `s = 1`
+      // on the next line stays two statements (§6.21).
       seq(
         repeat($.annotation),
+        optional(seq(optional('final'), 'def')),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,

@@ -596,6 +596,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Coverage of Groovy 5 and 6 syntax is incomplete (`async`, `await`,
   `defer` and `val` are names); `docs/divergences-from-spec.md` lists
   the gaps.
+- **BREAKING:** `def` before a type declares a typed local or field, as
+  in Groovy, where `def` is a modifier: `def String s = 'a'`,
+  `final def int a, b = 1`, `@Field def String[] names` and, in a type
+  body, `private def Foo foo = mock(Foo)` are one
+  `local_variable_declaration` (or `field_declaration`) with the `type`
+  field and an anonymous `def`. At v0.6.0 the local was `def String`
+  and the statement `s` or `s = 'a'`, with no `ERROR`; the field, a
+  generic type (`def List<String> xs`) and a second name
+  (`def String a, b`) were an `ERROR`, and so was `def int i = 0` as a
+  `for` init. The scanner decides the type after `def` as it does a
+  statement's (`SPECIFICATION.md` §6.21), so `def String` then `s = 1`
+  on the next line stays two statements. A lowercase type
+  (`def foo bar`), a modifier after `def` (`def final String x`) and a
+  return type after `def` (`def String m() { }`) are read as before.
+  Of 266 real files, one that had an `ERROR` has none.
 
 ### Fixed
 

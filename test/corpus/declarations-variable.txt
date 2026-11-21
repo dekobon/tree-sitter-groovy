@@ -3143,12 +3143,11 @@ x = 1 String t
     name: (identifier)))
 
 ==================
-Method declarations and def are not typed locals without an initializer
+Method declarations are not typed locals without an initializer
 ==================
 
 String f()
 String g() { }
-def String s
 
 ---
 
@@ -3163,12 +3162,121 @@ def String s
     return_type: (type_identifier)
     name: (identifier)
     parameters: (formal_parameters)
-    body: (block))
+    body: (block)))
+
+==================
+A def with a type declares a typed local
+==================
+
+def String s = "a"
+def String t
+def int a, b = 1
+final def List<String> xs = []
+@Field def String[] names
+def RouterConfigurable config = mock(RouterConfigurable)
+def
+String u = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+A line break after the type of a def ends the declaration
+==================
+
+def String
+s = 1
+def x
+y = 1
+
+---
+
+(source_file
   (local_variable_declaration
     (variable_declarator
       name: (identifier)))
   (expression_statement
-    (identifier)))
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A def with a lowercase type, before another modifier or before a method is not a typed declaration (known divergence)
+==================
+
+def foo bar
+def final String x = 1
+def String m() { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure))))
 
 ==================
 Command chains whose first argument is capitalized stay command chains

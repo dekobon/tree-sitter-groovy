@@ -776,3 +776,95 @@ class O {
         body: (enum_body
           (enum_constant
             name: (identifier)))))))
+
+==================
+A def with a type declares a typed field
+==================
+
+class C {
+  def RouterConfigurable config = mock(RouterConfigurable)
+  private def String s = "a"
+  static def int a, b
+  @Inject def Map<String, Object> m
+  def
+  long where = 1
+  def x = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (string_fragment))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+A def before another modifier or a method's return type is not a typed member (known divergence)
+==================
+
+class C {
+  def static String s = 1
+  def String m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

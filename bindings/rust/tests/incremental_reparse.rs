@@ -63,9 +63,12 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// the type again, and the `return` must not end before the token. The
 /// one after it holds a typed declaration with an initializer, which the
 /// token opens too, and a `(` two lines below it, which opens a statement or
-/// a call's arguments (§6.18). The last two hold blocks that open statements,
-/// with a call, a comment and an operator after their `}`, on its line and
-/// the next, in a file, a method, a label and a case (§6.22).
+/// a call's arguments (§6.18). The two after it hold blocks that open
+/// statements, with a call, a comment and an operator after their `}`, on its
+/// line and the next, in a file, a method, a label and a case (§6.22). The
+/// last holds typed declarations after `def`, a local, one with a line break
+/// after `def` and a field, whose start token after `def` depends on the
+/// names after the type (§6.21), so an edit there must lex the type again.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -105,6 +108,7 @@ const TEXTS: &[&str] = &[
     "String s = \"a\"\nprintln x\n(a)\n",
     "{ a }.x()\n{ b } /* c */ + 1;\nlbl: { c }\n(1)\n",
     "def m() {\n  { a }\n  { b }\n  .c()\n}\nswitch (v) { case 1: { d } }\n",
+    "def String s\ndef\nint a, b = 1\nclass C { def Foo f }\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.

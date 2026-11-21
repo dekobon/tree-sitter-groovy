@@ -90,3 +90,14 @@ def maps = x as a.b.Map<K, V>[]
 //                  ^ type
 //                      ^ type
 //                         ^ type
+
+def String typed = "a"
+// <- keyword
+//  ^ type
+
+class Mocks {
+  private def RouterConfigurable config = null
+  //      ^ keyword
+  //          ^ type
+  //                             ^ property
+}
