@@ -1677,8 +1677,9 @@ comment token, and the in-grammar lexer reads `/` and `*` as
 operators, as ANTLR's lexer does. Learning that there is no `*/`
 means reading to the end of input, so a file with N such openers was
 read N times (#75). The scanner now keeps one bit of state, "there is
-no `*/` from here on", which is the only state it has. The bit is a
-property of the input and stays true at every later position, so
+no `*/` from here on"; the only other state it has is the second bit
+described below. The bit is a property of the input and stays true
+at every later position, so
 later `/*` openers, and the block comments the keyword look-aheads
 (§6.7, §6.13) skip, fail at once while it is set.
 
