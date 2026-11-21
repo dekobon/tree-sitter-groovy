@@ -3279,6 +3279,29 @@ def String m() { }
       closure: (closure))))
 
 ==================
+A var with a type is not a typed declaration (known divergence)
+==================
+
+var String s = 'a'
+var String t
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier)))
+
+==================
 Command chains whose first argument is capitalized stay command chains
 ==================
 

@@ -4112,8 +4112,11 @@ after `def` (`def final String x`, `def static String x`, Groovy's
 declarations, which stay `def final` and a declaration of `x`), a return
 type after `def` (`def String m() { }`, Groovy's method, which stays
 `def String` and a call, or a field and a constructor in a type body),
-and a parameter's (§5.12, `docs/divergences-from-spec.md` §14). The two
-forms cost 34 parse states.
+a parameter's (§5.12, `docs/divergences-from-spec.md` §14), and `var`,
+also a modifier in Apache's `modifier` rule, before a type
+(`var String s = 'a'` stays the declaration `var String` and
+`s = 'a'` with no `ERROR`, where Groovy declares `s`; checked with
+Groovy 3). The two forms cost 34 parse states.
 
 Trees that change for input that parsed without an `ERROR` are the
 declarations themselves, each a `local_variable_declaration` where the

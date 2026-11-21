@@ -630,14 +630,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   body, `private def Foo foo = mock(Foo)` are one
   `local_variable_declaration` (or `field_declaration`) with the `type`
   field and an anonymous `def`. At v0.6.0 the local was `def String`
-  and the statement `s` or `s = 'a'`, with no `ERROR`; the field, a
-  generic type (`def List<String> xs`) and a second name
-  (`def String a, b`) were an `ERROR`, and so was `def int i = 0` as a
-  `for` init. The scanner decides the type after `def` as it does a
-  statement's (`SPECIFICATION.md` §6.21), so `def String` then `s = 1`
-  on the next line stays two statements. A lowercase type
-  (`def foo bar`), a modifier after `def` (`def final String x`) and a
-  return type after `def` (`def String m() { }`) are read as before.
+  and the statement `s` or `s = 'a'`, with no `ERROR`, so `def String s`
+  then `-1` on the next line was `s - 1`, and `def String[] a` was
+  `def String`, the list `[]` and `a`. In a type body `def Foo foo`
+  then `def bar() { }` on the next line had no `ERROR` either: it was
+  the field `def Foo`, a field named `def` of type `foo` and a
+  constructor `bar`, and is now the field `foo` and the method `bar`,
+  as Groovy reads it. An initialized field
+  (`private def Foo foo = mock(Foo)`), a generic type
+  (`def List<String> xs`) and a second name (`def String a, b`) were an
+  `ERROR`, and so was `def int i = 0` as a `for` init. `var` before a
+  type is read as before (`var String s = 'a'` is `var String` and
+  `s = 'a'`, where Groovy declares `s`; see
+  `docs/divergences-from-spec.md` §27). The scanner decides the type
+  after `def` as it does a statement's (`SPECIFICATION.md` §6.21), so
+  `def String` then `s = 1` on the next line stays two statements. A
+  lowercase type (`def foo bar`), a modifier after `def`
+  (`def final String x`) and a return type after `def`
+  (`def String m() { }`) are read as before.
   Of 266 real files, one that had an `ERROR` has none.
 - **BREAKING:** a line break after `return`, `break` or `continue` ends
   the statement, as Groovy takes the value or the label only on the
