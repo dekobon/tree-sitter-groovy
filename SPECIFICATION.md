@@ -1869,9 +1869,13 @@ it, which holds for the marker that sets the bit, once per parse path.
 
 The same marker carries a second bit, set after the `}` of a lambda's
 brace body when the scan read past the start of the next token, and
-cleared by the next call, which reads that token (§6.19). Each marker
-that sets it changes the state, so the runtime accepts it too. The state
-is empty while both bits are unset and one byte holding both otherwise.
+cleared by the next call, which reads that token (§6.19), and a third,
+set after `return`, `break` or `continue` when the scan read past a
+block comment and the spaces after it to something other than a line
+break, and cleared by the next call, which reads the comment (§6.23).
+Each marker that sets one changes the state, so the runtime accepts it
+too. The state is empty while every bit is unset and one byte holding
+them otherwise.
 
 An edit does not leave the bit stale. The marker read to the end of
 input, so after any edit behind it the runtime lexes it again, and a
@@ -4598,8 +4602,12 @@ Emits iff (an empty token, ending at the keyword):
     `continue`, and the parser is not recovering from an error
   - past spaces, tabs and line escapes, a line break, the end of input,
     a line comment, or a block comment that a line break or the end of
-    input follows right after its `*/`, follows
+    input follows past spaces and tabs only, follows
 Else: emits nothing; the spaces stay skipped for the branches below.
+Where a block comment, spaces or tabs and then something else follow,
+emits the empty UNTERMINATED_COMMENT at the keyword with
+`jump_continues` set; the next call reads the comment without deciding
+again.
 ```
 
 Apache's `RETURN expression?`, `BREAK identifier?` and
@@ -4628,15 +4636,24 @@ return of the call. Now `return_statement`, `break_statement` and
 §6.18, §6.8), as the first branch that skips spaces: at a line break or
 the end of input it emits the token; at anything else it falls through
 with the spaces skipped. At a comment the comment branch emits the token
-in place of a line comment and of a block comment that the line ends
-right after, and the comment is emitted by the next call, after the
-statement, as at v0.6.0 (`break // c`, `return /* c */` then `x`). A
-block comment that something follows on its line is emitted inside the
-statement and skipped before the label or the value, as Groovy hides
-it (`break /* c */ outer`), and so is one that only spaces follow before
-the line break: telling it from the first would read past the end of the
-comment's token, which a token cannot move back to, so the statement
-then ends at the line break and holds the comment. `throw` and `assert`
+in place of a line comment and of a block comment that only spaces and
+tabs follow before the line break (Apache's `ML_COMMENT` is an `NL` where
+`isFollowedByWhiteSpaces` holds, which only whitespace before the line's
+end makes true), and the comment is emitted by the next call, after the
+statement, as at v0.6.0 (`break // c`, `return /* c */` then `x`,
+`break /**/` and spaces, then `x`). A block comment that something follows on its
+line is emitted inside the statement and skipped before the label or the
+value, as Groovy hides it (`break /* c */ outer`). Telling the two apart
+past spaces reads past the end of the comment's token, which a token
+cannot move back to: where something follows them, the scan emits the
+empty marker of §6.6 at the keyword instead, with a third bit,
+`jump_continues`, set, and the next call, at the same position, reads
+the comment and clears the bit. Without the bit, the statement ended at
+the line break after such a comment and held it, `/**/` included, and a
+reparse that reused a statement lexed with `;` after the keyword
+(`return ;/* c */` and spaces, then the `;` deleted) put the comment outside it:
+of 144,704 reparses of the reviewer's targeted chains, 84 differed from a
+parse from scratch in where the comment sat, none now. `throw` and `assert`
 still take a value on the next line, which Groovy rejects (`throw` then
 `x`).
 

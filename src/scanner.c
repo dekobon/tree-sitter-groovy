@@ -50,7 +50,8 @@
 // `continue` where a line break follows on the keyword's line.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
-// emits it after such a `}` as well, to carry a decision past the token
+// emits it after such a `}` as well, and §6.23 after `return`, `break` or
+// `continue` before a block comment, to carry a decision past the token
 // that follows.
 // STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
 // (§6.21), TYPE_ONLY_CLOSE (§6.11) and BODY_BLOCK_END (§6.17) are never
@@ -73,9 +74,9 @@
 // UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
 // function tries the decisions is described above it.
 //
-// Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
-// `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
-// calls.
+// Three bits of state, `Scanner.no_comment_close_ahead` (§6.6),
+// `Scanner.lambda_body_continues` (§6.19) and `Scanner.jump_continues`
+// (§6.23). Nothing else is kept between calls.
 //
 // Known inconsistencies, kept as they are:
 //   - Form feeds and vertical tabs. The grammar's extras skip them, and so
@@ -174,9 +175,15 @@ enum TokenType {
 // one extra that is no comment, to set `lambda_body_continues`, and the
 // next call, at the same position, reads that token without deciding
 // again and clears the flag.
+//
+// SPECIFICATION.md §6.23 — so does the scan after `return`, `break` or
+// `continue` that read past a block comment and the spaces after it to
+// something other than a line break: the comment's end is passed, and the
+// empty token sets `jump_continues`, which the next call clears.
 typedef struct {
     bool no_comment_close_ahead;
     bool lambda_body_continues;
+    bool jump_continues;
 } Scanner;
 
 // A failed allocation leaves the scanner without its memory, which
@@ -5533,7 +5540,7 @@ void tree_sitter_groovy_external_scanner_destroy(void *payload) {
     ts_free(payload);
 }
 
-// Length of the serialized state while both flags are unset. It must
+// Length of the serialized state while every flag is unset. It must
 // stay 0: the runtime passes that length before the first external
 // token.
 static const unsigned UNSET_STATE_LENGTH = 0;
@@ -5541,10 +5548,12 @@ static const unsigned UNSET_STATE_LENGTH = 0;
 // Length of the serialized state once a flag is set: one byte.
 static const unsigned SET_STATE_LENGTH = 1;
 
-// The bits of that byte: `no_comment_close_ahead` and
-// `lambda_body_continues`. Any other bit is read as unset.
+// The bits of that byte: `no_comment_close_ahead`,
+// `lambda_body_continues` and `jump_continues`. Any other bit is read as
+// unset.
 static const char NO_COMMENT_CLOSE_AHEAD_BIT = 1;
 static const char LAMBDA_BODY_CONTINUES_BIT = 2;
+static const char JUMP_CONTINUES_BIT = 4;
 
 unsigned tree_sitter_groovy_external_scanner_serialize(
     void *payload,
@@ -5553,13 +5562,15 @@ unsigned tree_sitter_groovy_external_scanner_serialize(
     const Scanner *scanner = payload;
     if (scanner == NULL
         || (!scanner->no_comment_close_ahead
-            && !scanner->lambda_body_continues)) {
+            && !scanner->lambda_body_continues
+            && !scanner->jump_continues)) {
         return UNSET_STATE_LENGTH;
     }
     buffer[0] = (char)((scanner->no_comment_close_ahead
                         ? NO_COMMENT_CLOSE_AHEAD_BIT : 0)
                        | (scanner->lambda_body_continues
-                          ? LAMBDA_BODY_CONTINUES_BIT : 0));
+                          ? LAMBDA_BODY_CONTINUES_BIT : 0)
+                       | (scanner->jump_continues ? JUMP_CONTINUES_BIT : 0));
     return SET_STATE_LENGTH;
 }
 
@@ -5575,6 +5586,8 @@ void tree_sitter_groovy_external_scanner_deserialize(
             set && (buffer[0] & NO_COMMENT_CLOSE_AHEAD_BIT) != 0;
         scanner->lambda_body_continues =
             set && (buffer[0] & LAMBDA_BODY_CONTINUES_BIT) != 0;
+        scanner->jump_continues =
+            set && (buffer[0] & JUMP_CONTINUES_BIT) != 0;
     }
 }
 
@@ -5618,6 +5631,15 @@ bool tree_sitter_groovy_external_scanner_scan(
 ) {
     Scanner *scanner = payload;
     bool body_continues = false;
+
+    // SPECIFICATION.md §6.23 — set by the marker emitted at the end of
+    // `return`, `break` or `continue` where a block comment and spaces
+    // follow and then something else on the line. This call, at the same
+    // position, reads the comment; whatever it emits clears the flag.
+    bool jump_continues = scanner != NULL && scanner->jump_continues;
+    if (jump_continues) {
+        scanner->jump_continues = false;
+    }
 
     // SPECIFICATION.md §6.10 — STRING_BODY is valid only between the
     // quotes of a string whose body is lexed in pieces. Comments are
@@ -6104,13 +6126,15 @@ bool tree_sitter_groovy_external_scanner_scan(
     }
 
     // §6.23 — after `return`, `break` or `continue` a line comment, and a
-    // block comment that a line break or the end of input follows, end the
-    // statement before them, as Groovy's lexer reads either as the line
-    // break (`break // c`): JUMP_STATEMENT_END is emitted here, and the
-    // comment by the next call, outside the statement. The token ends at
-    // the keyword, where the branch above marked it.
+    // block comment that only spaces and tabs follow before a line break
+    // or the end of input, end the statement before them, as Groovy's
+    // lexer reads either as the line break (`break // c`):
+    // JUMP_STATEMENT_END is emitted here, and the comment by the next call,
+    // outside the statement. The token ends at the keyword, where the
+    // branch above marked it. After the marker of `jump_continues` the
+    // comment is read without that decision.
     bool jump_end = valid_symbols[JUMP_STATEMENT_END]
-        && !valid_symbols[ERROR_SENTINEL];
+        && !valid_symbols[ERROR_SENTINEL] && !jump_continues;
     // UNTERMINATED_COMMENT is empty and ends here, or after the keyword
     // where JUMP_STATEMENT_END is valid. Every other token of this branch
     // moves the end again.
@@ -6152,59 +6176,71 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         advance(lexer);
         bool is_groovydoc = false;
+        // `/**/` closes at its second `*`, a Groovydoc comment.
+        bool closed = false;
         if (lexer->lookahead == '*') {
             advance(lexer);
             is_groovydoc = true;
             if (lexer->lookahead == '/') {
                 advance(lexer);
-                if (!valid_symbols[GROOVYDOC_COMMENT]) {
-                    return false;
-                }
-                lexer->mark_end(lexer);
-                lexer->result_symbol = GROOVYDOC_COMMENT;
-                read_deferred_extent(lexer, body_continues, no_close_ahead);
-                return true;
+                closed = true;
             }
         }
         // EOF-bounded loop: a `/* …` without a closer terminates
         // here via lexer->eof(), not by going past end-of-input.
-        while (!lexer->eof(lexer)) {
+        while (!closed && !lexer->eof(lexer)) {
             if (lexer->lookahead == '*') {
                 advance(lexer);
                 if (lexer->lookahead == '/') {
                     advance(lexer);
-                    // §6.23 — the end of the token before the comment is
-                    // kept where the line ends right after it. Past spaces
-                    // it could not be told from a comment that a value or a
-                    // label follows, whose own end would be lost, so that
-                    // comment ends the statement after it, at the line
-                    // break, as before.
-                    if (jump_end
-                        && (lexer->eof(lexer)
-                            || is_line_break(lexer->lookahead))) {
-                        read_jump_statement_end_extent(lexer, no_close_ahead);
-                        lexer->result_symbol = JUMP_STATEMENT_END;
-                        return true;
-                    }
-                    lexer->mark_end(lexer);
-                    if (is_groovydoc) {
-                        if (!valid_symbols[GROOVYDOC_COMMENT]) {
-                            return false;
-                        }
-                        lexer->result_symbol = GROOVYDOC_COMMENT;
-                    } else {
-                        if (!valid_symbols[BLOCK_COMMENT]) {
-                            return false;
-                        }
-                        lexer->result_symbol = BLOCK_COMMENT;
-                    }
-                    read_deferred_extent(lexer, body_continues,
-                                         no_close_ahead);
-                    return true;
+                    closed = true;
                 }
             } else {
                 advance(lexer);
             }
+        }
+        if (closed) {
+            // §6.23 — the end of the token before the comment is still at
+            // the keyword. Where only spaces and tabs follow the comment
+            // on its line, Groovy's lexer reads it as the line break
+            // (`isFollowedByWhiteSpaces`), and the statement ends before
+            // it. Where something else follows them, the comment's own
+            // end is passed: the empty marker sets `jump_continues`, and
+            // the next call reads the comment without deciding again.
+            if (jump_end) {
+                bool spaces = false;
+                while (lexer->lookahead == ' ' || lexer->lookahead == '\t') {
+                    advance(lexer);
+                    spaces = true;
+                }
+                if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+                    read_jump_statement_end_extent(lexer, no_close_ahead);
+                    lexer->result_symbol = JUMP_STATEMENT_END;
+                    return true;
+                }
+                // Without the scanner's memory the comment takes the
+                // spaces after it.
+                if (spaces && scanner != NULL
+                    && valid_symbols[UNTERMINATED_COMMENT]) {
+                    scanner->jump_continues = true;
+                    lexer->result_symbol = UNTERMINATED_COMMENT;
+                    return true;
+                }
+            }
+            lexer->mark_end(lexer);
+            if (is_groovydoc) {
+                if (!valid_symbols[GROOVYDOC_COMMENT]) {
+                    return false;
+                }
+                lexer->result_symbol = GROOVYDOC_COMMENT;
+            } else {
+                if (!valid_symbols[BLOCK_COMMENT]) {
+                    return false;
+                }
+                lexer->result_symbol = BLOCK_COMMENT;
+            }
+            read_deferred_extent(lexer, body_continues, no_close_ahead);
+            return true;
         }
         // The runtime drops an empty extra token unless the state
         // changed with it. This one sets the flag, and the check above

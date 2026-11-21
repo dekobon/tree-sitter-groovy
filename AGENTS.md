@@ -137,12 +137,15 @@ The default branch is **`main`**.
   only during error recovery, where the scanner emits only the
   comments, the slashy opener and the contextual keywords.
 
-  Its state is two bits, "no `*/` from here on" and "the body goes on
-  past the token that follows", carried by an empty hidden token
+  Its state is three bits, "no `*/` from here on", "the body goes on
+  past the token that follows" and "a jump statement goes on past the
+  block comment that follows", carried by an empty hidden token
   emitted at the first unterminated `/*` (§6.6) and after the `}` of a
   lambda's body or a statement's block where the body goes on past a
   comment, or past `as` or `in`, which the scanner reads (§6.19,
-  §6.22); the next call clears the second. GString interpolation,
+  §6.22), and after `return`, `break` or `continue` where a block
+  comment, spaces and something else follow on the line (§6.23); the
+  next call clears the second and the third. GString interpolation,
   automatic semicolons and label colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does

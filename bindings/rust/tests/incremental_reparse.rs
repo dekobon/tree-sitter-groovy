@@ -326,7 +326,10 @@ fn reparse_after_edit_sequence_matches_parse_from_scratch() {
 /// the statement, lexed without its token, which must end where a parse from
 /// scratch ends it with the token, at the keyword before the space, and the
 /// comment, which ends the statement as a line break does, must stay outside
-/// it. The token used to follow the space, or the comment.
+/// it. The token used to follow the space, or the comment. The last three
+/// hold a block comment that spaces follow before the line break, `/**/`,
+/// and `/**/` that a line break comes to follow, which the statement held
+/// in one of the two parses.
 const JUMP_STATEMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
     (
         "for (;;) {\n  if (a) break ;// c\n  (x) { }\n}\n",
@@ -340,6 +343,18 @@ const JUMP_STATEMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
         "def f() {\n  (x) { }\n  return ;// c\n  x\n}\n",
         &[(29, 1, "")],
     ),
+    (
+        "def f() {\n  (x) { }\n  return ;/* c */  \n  x\n}\n",
+        &[(29, 1, "")],
+    ),
+    (
+        "for (;;) {\n  (x) { }\n  break ;/**/\n  foo()\n}\n",
+        &[(29, 1, "")],
+    ),
+    (
+        "switch (x) {\n  case 1: (y) { }\n  return /**/  case 2: (y) { }\n}\n",
+        &[(44, 0, "\n")],
+    ),
 ];
 
 #[test]
@@ -352,6 +367,38 @@ fn reparse_after_jump_statement_edits_matches_parse_from_scratch() {
             dumped(&fresh),
             "after the edits of {text:?}: {edited:?}",
         );
+    }
+}
+
+/// A block comment after `break` or `return` that only spaces or tabs
+/// follow before the line break ends the statement before it, as Groovy's
+/// lexer reads it as the line break (§6.23); one that a label follows after
+/// the spaces stays inside, before the label. The corpus cannot hold these:
+/// `.editorconfig` trims trailing whitespace.
+#[test]
+fn a_block_comment_that_spaces_follow_ends_a_jump_statement_before_it() {
+    let mut parser = parser();
+    for (text, expected) in [
+        (
+            "while (a) {\n  break /* c */  \n  x\n}\n",
+            "(source_file (while_statement condition: (identifier) body: (block \
+             (break_statement) (block_comment) (expression_statement (identifier)))))",
+        ),
+        (
+            "def f() {\n  return /**/\t\n  x\n}\n",
+            "(source_file (method_declaration name: (identifier) parameters: \
+             (formal_parameters) body: (block (return_statement) (groovydoc_comment) \
+             (expression_statement (identifier)))))",
+        ),
+        (
+            "l: while (a) {\n  break /* c */  l\n}\n",
+            "(source_file (labeled_statement label: (identifier) statement: \
+             (while_statement condition: (identifier) body: (block (break_statement \
+             (block_comment) label: (identifier))))))",
+        ),
+    ] {
+        let tree = parser.parse(text, None).expect("parse");
+        assert_eq!(tree.root_node().to_sexp(), expected, "{text:?}");
     }
 }
 

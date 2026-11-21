@@ -667,8 +667,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   and `_unterminated_comment` (#75), an empty hidden extra (§6.6). The
   keyword and punctuation tokens are aliased, so the anonymous `trait`,
   `sealed`, `var`, `yield`, `in`, `as`, `(`, `)`, `,` and `<` nodes
-  keep their kinds. The scanner now carries two bits of serialized
-  state, one byte while either is set (§6.6, §6.19). Eight named node
+  keep their kinds. The scanner now carries three bits of serialized
+  state, one byte while any is set (§6.6, §6.19, §6.23). Eight named node
   kinds are added (`array_creation_expression`, `array_initializer`,
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
   `lambda_expression`, `multi_assignment_expression`,
@@ -766,11 +766,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line is a bare `return_statement` and that statement, where v0.6.0
   returned the call, `obj.m`, `String` or the closure; and
   `if (c) break` then `foo = 1`, an `ERROR`, parses. A line comment
-  after the keyword, and a block comment that the line ends right
-  after, end the statement before them, and stay outside it as at
-  v0.6.0; a block comment that something follows on the line keeps the
-  label (`break /* c */ outer`). The statement ends at the keyword, as
-  at v0.6.0, not after trailing spaces. `return` then `foo { }[0]` or
+  after the keyword, and a block comment that only spaces and tabs
+  follow before the line break (`/**/` too), end the statement before
+  them, and stay outside it as at v0.6.0, as Groovy's lexer reads either
+  as the line break; a block comment that something else follows on the
+  line keeps the label (`break /* c */ outer`). The statement ends at
+  the keyword, as at v0.6.0, not after trailing spaces. `return` then
+  `foo { }[0]` or
   `foo { } + 1` on the next line, which v0.6.0 read as the return of the
   subscripted or added call, is a bare `return_statement`, the
   `command_chain` `foo { }` and the statement `[0]` or `+1`, as a
