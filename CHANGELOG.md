@@ -343,10 +343,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   within 256 characters, closes brackets around both lines, so runs of
   lines like `(x)` or `(a) = (b)` parse in linear time (12 ms for 4,000
   lines of `(x)`, where the cast kept alive took 2.1 s). Past the bound
-  a cast inside a call is an `ERROR`: `foo((Foo)` then `(Bar) y, '…')`
-  with the call's `)` more than 256 characters on. The cast of an array
-  or generic type stays (`(List<String>)` then `(x)`); a new external
-  token, `_type_only_close`, which is never emitted, marks it
+  a cast inside a call is an `ERROR` or another reading, with the call's
+  `)` more than 256 characters on: `foo((Foo)` then `(Bar) y, '…')` is
+  an `ERROR`, and `foo((Foo)` then `(bar) + 1, '…')`, the cast of a cast
+  at v0.6.0 as in Groovy, is the sum of the call `(Foo)(bar)` and `1`
+  with no `ERROR` (`(bar)[0]` a subscript of that call). The cast of an
+  array or generic type stays (`(List<String>)` then `(x)`); a new
+  external token, `_type_only_close`, which is never emitted, marks it
   (`SPECIFICATION.md` §6.11, `docs/divergences-from-spec.md` §15).
 - **BREAKING:** after `as`, `instanceof` and `!instanceof` a dotted
   name with array dimensions or type arguments is one type (see Fixed),

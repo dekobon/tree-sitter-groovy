@@ -2076,9 +2076,12 @@ Groovy reads two statements; `docs/divergences-from-spec.md` §15).
 The scanner has no stack of brackets, so inside `(…)` and `[…]` it
 reads on for the bracket that closes them, and the cast stays
 (`foo((Foo)` then `(Bar) y)`, `foo((Foo)` then `(Bar) ')')`). A bracket
-beyond the bound goes unseen, and the cast inside it is turned down:
-`foo((Foo)` then `(Bar) y, '…')`, with the call's `)` more than 256
-characters on, is an `ERROR` where Groovy casts. Counted on characters
+beyond the bound goes unseen, and the cast inside it is turned down,
+which leaves an `ERROR` or another reading where Groovy casts: with the
+call's `)` more than 256 characters on, `foo((Foo)` then
+`(Bar) y, '…')` is an `ERROR`, and `foo((Foo)` then `(bar) + 1, '…')`
+is the sum of the call `(Foo)(bar)` and `1`, with no `ERROR`, and
+`(bar)[0]` there a subscript of that call. Counted on characters
 instead of tokens, a bracket in a string or a comment had kept a cast
 alive or turned a valid one down. The read runs from every `)` that
 ends a line before such a `(`, so in a run of short lines each
