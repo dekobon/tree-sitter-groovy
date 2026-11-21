@@ -471,3 +471,36 @@ return (x) /* a */ as /* b */ Foo
       (block_comment)
       (block_comment)
       type: (type_identifier))))
+
+==================
+A block on the line after an instanceof test or an as cast is a closure of the result (known divergence)
+==================
+
+def b = x instanceof Foo
+{ y }
+c = x as Foo
+{ y }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (instanceof_expression
+          value: (identifier)
+          type: (type_identifier))
+        closure: (closure
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (cast_expression
+          value: (identifier)
+          type: (type_identifier))
+        closure: (closure
+          (expression_statement
+            (identifier)))))))
