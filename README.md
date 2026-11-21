@@ -162,9 +162,9 @@ These are documented in detail in
   are not yet exposed as keyword tokens. They parse as plain
   identifiers, matching Groovy 2.x--5.x compiler behavior.
 - **Typed local declarations without an initializer follow Groovy's
-  rule on the spelling** -- `String x`, `int a, b` and `foo.Bar q`
-  declare, while `foo bar` is a call. A comment between the type and
-  the name (`String /* c */ x`), a lowercase type after annotations
+  rule on the spelling** -- `String x`, `int a, b`, `foo.Bar q` and,
+  with a comment before the name, `String /* c */ x` declare, while
+  `foo bar` is a call. A lowercase type after annotations
   (`@A foo bar`) and a type with a space before `<` (`List <String> x`)
   are not declarations here, and a declaration followed by a line that
   starts with an operator (`String s` then `.trim()`) reads as two

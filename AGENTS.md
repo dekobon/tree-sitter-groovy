@@ -46,8 +46,9 @@ The default branch is **`main`**.
   - the contextual keywords `record` (§6.7), `trait` and `sealed`
     (§6.13), each only before the declaration it opens, and `var`,
     `yield`, `in` and `as` (§6.16), only before a declared name or a
-    multi-assignment's names, an expression, or a type; and such a word
-    as a named argument's key;
+    multi-assignment's names, an expression (for `yield`, one that
+    starts on its line), or a type; and such a word as a named
+    argument's key;
   - the key of a named argument in a parenthesis-free call, on the
     call's line and before a single `:` that only spaces, tabs, line
     escapes and block comments (which may span lines) separate from it
@@ -71,8 +72,11 @@ The default branch is **`main`**.
     which needs `[]` after the name (§6.15);
   - a `)` with something after it on its line, which ranks a cast,
     one before a name there, which ranks it above a member that the
-    name would start, and a `)` that closes no cast (§6.11): before a relational operator
-    that Groovy applies to the parentheses (`(x) instanceof Foo`), and
+    name would start, and a `)` that closes no cast (§6.11): before a
+    relational operator that Groovy applies to the parentheses
+    (`(x) instanceof Foo`, `(x) as Foo`), a division (`(x) / 2`) or a
+    keyword that starts no operand (`if (a) (b) else c`), also where
+    only a cast's type would take the `)`, which ends that reading, and
     at the end of a line before a line that opens with `(`, unless,
     read on Groovy's tokens for at most 256 characters
     (`ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS`), a `)` or `]` closes
@@ -135,7 +139,8 @@ The default branch is **`main`**.
   after it (`if (c) { a() }` then `(x) -> x`) parses the same from
   scratch and after a reparse (§6.17); and `_error_sentinel`, valid
   only during error recovery, where the scanner emits only the
-  comments, the slashy opener and the contextual keywords.
+  comments, the marker of an unterminated `/*`, the slashy opener and
+  the contextual keywords.
 
   Its state is three bits, "no `*/` from here on", "the body goes on
   past the token that follows" and "a jump statement goes on past the
