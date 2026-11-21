@@ -58,22 +58,23 @@ const PREC = {
   BITWISE_OR: 6,              // |
   BITWISE_XOR: 7,             // ^
   BITWISE_AND: 8,             // &
-  EQUALITY: 9,                // == != <=> === !== =~ ==~
-  RELATIONAL: 10,             // < <= > >= in !in
+  REGEX: 9,                   // =~ ==~                     (Apache level 8.5)
+  EQUALITY: 10,               // == != <=> === !==
+  RELATIONAL: 11,             // < <= > >= in !in
   // Apache level 7 is two alternatives, the first `as`, `instanceof` and
   // `!instanceof`, and in a left-recursive ANTLR rule an earlier
   // alternative binds tighter: `a < b instanceof T` is
   // `a < (b instanceof T)`.
-  TYPE_TEST: 11,              // instanceof !instanceof as
-  SHIFT_OR_RANGE: 12,         // << >> >>> .. ..< <.. <..<
-  ADDITIVE: 13,               // + -
-  MULTIPLICATIVE: 14,         // * / %
-  UNARY: 15,                  // prefix ++ -- + -          (Apache level 3 UNARY_ADD)
-  POWER: 16,                  // **                         (Apache level 2)
-  UNARY_NOT: 17,              // ! ~                        (Apache level 1, tighter than POWER)
-  POSTFIX: 18,                // postfix ++ --, []
-  ACCESS: 19,                 // . ?. ??. *. .& .@ ::
-  PRIMARY: 20,                // literals, identifiers, ()
+  TYPE_TEST: 12,              // instanceof !instanceof as
+  SHIFT_OR_RANGE: 13,         // << >> >>> .. ..< <.. <..<
+  ADDITIVE: 14,               // + -
+  MULTIPLICATIVE: 15,         // * / %
+  UNARY: 16,                  // prefix ++ -- + -          (Apache level 3 UNARY_ADD)
+  POWER: 17,                  // **                         (Apache level 2)
+  UNARY_NOT: 18,              // ! ~                        (Apache level 1, tighter than POWER)
+  POSTFIX: 19,                // postfix ++ --, []
+  ACCESS: 20,                 // . ?. ??. *. .& .@ ::
+  PRIMARY: 21,                // literals, identifiers, ()
   // Type-context only — never competes with the expression ladder
   // above. Shares CONDITIONAL's numeric value by accident; the two
   // do not collide because `_type` and `_expression` reach the
@@ -3348,19 +3349,20 @@ module.exports = grammar({
       field('right', $._expression),
     )),
 
-    // §3.2 regex_find_expression — `=~`, EQUALITY level. Matches a
-    // pattern at any position. Fields are `subject` / `pattern` so
-    // downstream tools can tell the regex-bearing operand from the
-    // input expression.
-    regex_find_expression: $ => prec.left(PREC.EQUALITY, seq(
+    // §3.2 regex_find_expression — `=~`, REGEX level, looser than `==`
+    // and tighter than `&`, as Apache's regexExprAlt follows
+    // equalityExprAlt. Matches a pattern at any position. Fields are
+    // `subject` / `pattern` so downstream tools can tell the
+    // regex-bearing operand from the input expression.
+    regex_find_expression: $ => prec.left(PREC.REGEX, seq(
       field('subject', $._expression),
       '=~',
       field('pattern', $._expression),
     )),
 
-    // §3.2 regex_match_expression — `==~`, EQUALITY level. Anchored
+    // §3.2 regex_match_expression — `==~`, REGEX level. Anchored
     // whole-string match. Same field shape as regex_find_expression.
-    regex_match_expression: $ => prec.left(PREC.EQUALITY, seq(
+    regex_match_expression: $ => prec.left(PREC.REGEX, seq(
       field('subject', $._expression),
       '==~',
       field('pattern', $._expression),

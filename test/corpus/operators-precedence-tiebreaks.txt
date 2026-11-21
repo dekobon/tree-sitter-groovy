@@ -80,6 +80,60 @@ x as T as U
       type: (type_identifier))))
 
 ==================
+Regex find and match are looser than equality and tighter than bitwise and
+==================
+
+"x" =~ "x" == 1
+1 == 1 =~ "x"
+a ==~ b != c
+a =~ b <=> c
+a =~ b & c
+a & b ==~ c
+
+---
+
+(source_file
+  (expression_statement
+    (regex_find_expression
+      subject: (string_literal
+        (string_fragment))
+      pattern: (binary_expression
+        left: (string_literal
+          (string_fragment))
+        right: (number_literal))))
+  (expression_statement
+    (regex_find_expression
+      subject: (binary_expression
+        left: (number_literal)
+        right: (number_literal))
+      pattern: (string_literal
+        (string_fragment))))
+  (expression_statement
+    (regex_match_expression
+      subject: (identifier)
+      pattern: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (regex_find_expression
+      subject: (identifier)
+      pattern: (spaceship_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (binary_expression
+      left: (regex_find_expression
+        subject: (identifier)
+        pattern: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (regex_match_expression
+        subject: (identifier)
+        pattern: (identifier)))))
+
+==================
 Ternary and Elvis share the conditional level
 ==================
 

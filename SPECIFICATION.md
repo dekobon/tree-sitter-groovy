@@ -225,7 +225,8 @@ alternative binds tighter, so a level splits in two (7a and 7b below).
 | 6 | SHIFT_OR_RANGE | `<<` `>>` `>>>` `..` `..<` `<..` `<..<` | left | **Apache puts ranges and shifts at the same level**, with left-associative resolution. `0..n<<1` parses as `(0..n)<<1`. |
 | 7a | TYPE_TEST | `instanceof` `!instanceof` `as` | left | Apache's level 7 starts with these, ahead of the relational alternative, so they bind tighter: `1 < 2 instanceof Boolean` is `1 < (2 instanceof Boolean)` and `1 in [1] as String` is `1 in ([1] as String)` (observed with Groovy 3); `a + b as T` stays `(a + b) as T`. One alternative, `op=(AS \| INSTANCEOF \| NOT_INSTANCEOF) nls type`, in 3.0.x and 4.0.x; two in 5.0.x (`INSTANCEOF`, then `AS \| NOT_INSTANCEOF`) and three in master and 6.0.x (`INSTANCEOF`, `NOT_INSTANCEOF`, `AS`). Each takes a *type* on the right, not an expression, so their order among themselves changes no tree, and one level holds them. |
 | 7b | REL | `<` `<=` `>` `>=` `in` `!in` | left | Apache's second alternative of level 7, `op=(LE \| GE \| GT \| LT \| IN \| NOT_IN) nls right=expression`; the right operand is an expression. |
-| 8 | EQ | `==` `!=` `<=>` `===` `!==` `=~` `==~` | left | Apache's comment calls regex "level 8.5" but the rule places them in the same alternative as `==` family. We treat them as one level. |
+| 8 | EQ | `==` `!=` `<=>` `===` `!==` | left | |
+| 8.5 | REGEX | `=~` `==~` | left | Apache's `regexExprAlt`, its own alternative after `equalityExprAlt` and before `andExprAlt` in 3.0.x, 4.0.x, 5.0.x, master and 6.0.x, so looser than `==` and tighter than `&`: `"x" =~ "x" == 1` is `"x" =~ ("x" == 1)` and `1 == 1 =~ "x"` is `(1 == 1) =~ "x"` (observed with Groovy 3). Before 0.7.0 the grammar put both at one level, as the 4.0.x comment's "level 8.5" was read for one. |
 | 9 | BAND | `&` | left | |
 | 10 | BXOR | `^` | left | |
 | 11 | BOR | `\|` | left | |
@@ -5002,6 +5003,8 @@ Other per-operator corpus files mandated:
   - `1 < 2 instanceof Boolean` → `1 < (2 instanceof Boolean)` and
     `1 in [1] as String` → `1 in ([1] as String)` (type tests and `as`
     tighter than the relational operators)
+  - `"x" =~ "x" == 1` → `"x" =~ ("x" == 1)` and `a =~ b & c` →
+    `(a =~ b) & c` (regex operators between equality and `&`)
   - `a ? b ?: c : d` → `a ? (b ?: c) : d`
     (Elvis nests inside ternary's middle slot)
   - `a ?: b ?: c` → `a ?: (b ?: c)` (right-assoc)

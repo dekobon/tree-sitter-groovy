@@ -254,6 +254,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `a..b as T`, `!a as T`, `a ?: b as T`, `a == b as T`,
   `a instanceof T == b` and `x as T as U`. No corpus, real, Java or
   shape tree changes (`SPECIFICATION.md` §3.1).
+- **BREAKING:** `=~` and `==~` bind looser than `==`, `!=`, `<=>`, `===`
+  and `!==`, and still tighter than `&`, as Apache's `regexExprAlt`
+  follows `equalityExprAlt`: an equality operator after a regex
+  operator is now in its pattern, `a =~ b == c` is `a =~ (b == c)`
+  (Groovy 3: `"x" =~ "x" == 1` is a matcher of the pattern `false`),
+  and so are `a ==~ b != c`, `a =~ b <=> c` and `a =~ b === c`; each
+  was the comparison of the regex operation, `(a =~ b) == c`.
+  Unchanged: `a == b =~ c`, which was and is `(a == b) =~ c`, and
+  `a =~ b & c`. No corpus, real, Java or shape tree changes
+  (`SPECIFICATION.md` §3.1).
 - **BREAKING:** a dotted name followed on its line by a literal or a
   `name:` key is a `command_chain` (see Added), which changes trees for
   input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,
