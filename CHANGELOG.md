@@ -52,7 +52,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `@function.call`. The first argument must start on the receiver's
   line, so `result.size` followed by `2` on the next line stays two
   statements. Receivers that end in a call or a subscript
-  (`foo().bar 1`) are not handled. (#52)
+  (`foo().bar 1`) are not handled. Spaces before the first access are
+  read in a declarator's or an assignment's value and in parentheses
+  (`def a = foo .bar 1`), where the first name decides whether a name
+  is a first argument (`docs/divergences-from-spec.md` §19). (#52)
 - An annotation's arguments take annotations, as Apache's
   `elementValue` does: as an argument (`@Foo(@Bar)`), as the value of
   a pair (`@Foo(x = @Bar)`) and in a list (`@Foo([@Bar, @Baz])`),

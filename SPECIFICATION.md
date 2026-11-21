@@ -719,7 +719,8 @@ The resolution we adopt:
    such a statement opens with a third scanner token, emitted before
    the name (§6.14). Not accepted, though Groovy
    takes each as a call (observed): spaces or a line break inside the
-   receiver (`obj . m 1`, `obj` followed by `.m 1` on the next line), a
+   receiver (`obj . m 1`, `obj` followed by `.m 1` on the next line;
+   §6.14 lists two exceptions, `def a = foo .bar 1` among them), a
    receiver not made of names (`foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`,
    `(obj).m 1`), a quoted name (`obj.'name' 1`), `::` (`obj::m 1`), and
    a value whose first name is `new`, `switch`, `true`, `false` or
@@ -2729,7 +2730,26 @@ after a name as division. Known differences from Groovy:
 - The receiver is read without spaces, comments or line breaks inside
   it, so `obj . m 1` and `obj` followed by `.m 1` on the next line are
   not calls; Groovy reads both as `obj.m(1)` (observed). Both read as
-  they did before #52.
+  they did before #52. Two exceptions come from where the look-ahead
+  starts, and are not otherwise intended. In a value where a lambda may
+  start (a declarator's or an assignment's value, parentheses, not an
+  interpolation or the value of `(a, b) =`), the look-ahead for a
+  lambda's arrow (§6.17) has skipped the spaces or tabs after the first
+  name, and a member access after them is read into the receiver:
+  `def a = foo .bar 1` and `x = (foo ?.bar 2)` are calls, as in Groovy.
+  Whether a name is a first argument there is decided by the first name,
+  not the last: `def b = Foo .bar baz` is `Foo .bar` and `baz`, and
+  `def c = foo .Bar y` a call, where Groovy calls both;
+  `def d = foo .new Bar()` calls a method `new` with `Bar()`, where
+  Groovy creates `new Bar(foo)`. The array types of §6.15 are read the
+  same way (`def e = Map .Entry[].class`, as in Groovy). And a
+  statement's receiver may have a comment right before its first
+  access (`foo /* c */.bar 4` is a call, as in Groovy), as the parser
+  skips it before the token of §6.14, but not a space after the comment.
+  Turning each of these down, as the rule says, moves trees that agree
+  with Groovy away from it, and reading the first access after spaces
+  everywhere touches every look-ahead that reads a receiver; neither was
+  done (`docs/divergences-from-spec.md` §19).
 
 A literal as a statement's first argument (§5.5 item 3) needs no change
 to the grammar either: after COMMAND_STATEMENT_START the first argument
@@ -2862,7 +2882,10 @@ before the class), `foo[]` with a lowercase class `foo`, and a generic
 element type are not taken and read as before: the first two are a
 subscript with a missing index, and `List<String>[].class` is a chain
 of comparisons with no error, which is kept. In `.Name` the names are
-read without spaces, as in §6.14.
+read without spaces, as in §6.14, but where a lambda may start the
+spaces or tabs after the first name have been skipped for its arrow,
+so `def e = Map .Entry[].class` and `println(String [].class)` are
+array types, as in Groovy.
 
 The grammar's value rule takes a further `[` after `String[]` as a
 dimension, by precedence, so `int[][]` is two dimensions and

@@ -1701,6 +1701,10 @@ static bool scan_value_start(
         if (read) {
             return false;
         }
+        // The spaces stay skipped, so an access after them joins the
+        // receiver (`def a = foo .bar 1`), as in Groovy, with the name
+        // rule of the first name: turning it down moves more trees away
+        // from Groovy than it fixes (SPECIFICATION.md §6.14).
     }
     int32_t last_name = 0;
     bool nested = false;

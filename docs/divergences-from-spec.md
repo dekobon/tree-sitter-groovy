@@ -1344,6 +1344,11 @@ The Groovy column was observed by running Groovy 3.
 | `x.y /* c */ 1` | a call | `x.y`, the comment and `1`, as before |
 | `x.y` then `/* c */ a.b 'c'` on the next line | two statements, the second a call | the same |
 | `obj . m 1`, `obj` then `.m 1` on the next line | a call | the expression and `1`, as before |
+| `def a = foo .bar 1`, `x = (foo ?.bar 2)`, `def c = foo .Bar y`, also with a tab | a call | a call: where a lambda may start in a value, the spaces after the first name are skipped for the arrow (spec §6.14); not intended, kept as it agrees with Groovy |
+| `def b = Foo .bar baz` | `Foo.bar(baz)` | `Foo .bar` and `baz`: the first name, not the last, decides whether a name is a first argument there |
+| `def d = foo .new Bar()` | `new Bar(foo)` | a call of a method `new` with `Bar()`; without the space, `foo.new` and `Bar()` |
+| `x = "${foo .bar 1}"`, `(p, q) = foo .bar 3`, `def f = foo /* c */.bar 5` | a call | the expression and the number, an `ERROR` in the interpolation |
+| `foo /* c */.bar 4` | a call | a call: the parser skips the comment before the statement's token; with a space after the comment, the expression and `4` |
 | `foo().bar 1`, `foo[0].bar 1`, `'s'.m 1`, `(obj).m 1`, `obj.'name' 1`, `obj::m 1` | a call | the expression and `1`, as before |
 | `true.x 1`, `null.x 2`, `def a = true.x 3` | `true.x(1)`, a call | the field access and the number as two statements, as before: a receiver starts with a name, and `true` and `null` are literals |
 | `a.b c` | `a.b(c)` | `command_chain` (#25 below); before, `a.b` then `c` |
@@ -1362,7 +1367,16 @@ The Groovy column was observed by running Groovy 3.
 
 **Action**: none planned for the spaced and multi-line receivers. A
 receiver that ends in a call or a subscript needs the scanner to read
-balanced brackets.
+balanced brackets. Turning the spaced value receivers above down, as the
+rule says, was tried: of 2,900 inputs (three receivers, no separator,
+a space, a tab or a comment before each of `.`, `?.`, `*.`, `.&`, `::`
+and `.@`, two member names, no first argument or one of three kinds,
+five contexts), 300 trees that
+agreed with Groovy 3 moved away from it and none moved toward it, and
+`Map .Entry[].class` became a subscript with a missing index. Taking
+the name rule from the last name instead moved 30 toward Groovy and 30
+away. The test 'Spaces before the first access of a value's receiver'
+in `test/corpus/expressions-command-chain.txt` pins the trees.
 
 ---
 
