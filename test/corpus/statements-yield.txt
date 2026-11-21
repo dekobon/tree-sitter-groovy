@@ -93,3 +93,60 @@ yield++
   (expression_statement
     (update_expression
       operand: (identifier))))
+
+==================
+A line break after yield makes it a name, as Groovy takes the value only on its line
+==================
+
+def r = switch (v) {
+  case 1 -> {
+    yield
+    x
+  }
+  case 2 -> {
+    yield // c
+    y
+  }
+  case 3 -> {
+    yield \
+      z
+  }
+  default -> {
+    yield /* c */ w
+  }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (number_literal)
+            body: (block
+              (expression_statement
+                (identifier))
+              (expression_statement
+                (identifier))))
+          (switch_arrow_case
+            value: (number_literal)
+            body: (block
+              (expression_statement
+                (identifier))
+              (line_comment)
+              (expression_statement
+                (identifier))))
+          (switch_arrow_case
+            value: (number_literal)
+            body: (block
+              (yield_statement
+                (identifier))))
+          (switch_default
+            body: (block
+              (yield_statement
+                (block_comment)
+                (identifier)))))))))

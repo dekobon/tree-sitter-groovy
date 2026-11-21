@@ -699,6 +699,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `throw` and `assert` still take a value on the next line. No tree of
   266 real files changes; 66 of 24,548 Java files do, each at a
   `return` that ends its line.
+- **BREAKING:** a line break after `yield` makes it a name, as Apache's
+  `yieldStatement` (`YIELD expression`, 4.0.x to master) takes no line
+  break before the value, which Groovy's lexer reads as a newline token
+  there: `yield` then `x` on the next line, also after `// c` or
+  `/* c */` on the line of `yield`, are the names `yield` and `x`, where
+  v0.6.0 read a `yield_statement` of `x`; Groovy 3 reads two names too.
+  A line escape still joins the lines (`SPECIFICATION.md` §6.16). No
+  corpus, real, Java or shape tree changes.
 - **BREAKING:** a `/` after an operand on its line is division, as
   Groovy's lexer reads it after a name, a literal, `this`, `)`, `]`,
   `}`, `++`, `--` or a string. Where the next statement or a call's

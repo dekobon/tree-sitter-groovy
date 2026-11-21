@@ -3129,8 +3129,10 @@ spaces, tabs, line escapes, line breaks, block and line comments:
   VAR_NAMES_KEYWORD  `(` follows, then only names, `,`, `*`, `:`, `.`,
                      `<`, `>`, `?`, `[`, `]` and trivia up to `)`, then
                      `=` that is not `==` or `=~`.
-  YIELD_KEYWORD,     an expression starts: a name other than
-  IN_KEYWORD         `instanceof` followed by a type, a digit, a quote,
+  YIELD_KEYWORD,     an expression starts, for YIELD_KEYWORD on the
+  IN_KEYWORD         word's line (past spaces, tabs, line escapes and
+                     block comments only): a name other than
+                     `instanceof` followed by a type, a digit, a quote,
                      `[`, `{` or `~`; `(` unless `)` follows it; `!`
                      unless `=` or `instanceof`, whitespace and a type
                      follow it; `+` or `-` unless `=` or `>` follows it,
@@ -3158,6 +3160,15 @@ before `->`. `enum E { A(var -> var) }` is still one: the keyword's
 token ends at the word, which the scanner marks before it reads on to
 what follows, and the lambda's token is empty before the word, so one
 scan cannot offer both; `var` is decided as the keyword there.
+
+Apache's `yieldStatement` is `YIELD expression` with no `nls` (4.0.x,
+5.0.x and master), and Groovy's lexer emits `NL` at a line break there,
+so the value of `yield` starts on its line, as that of `return` does
+(§6.23): `yield` then `x` on the next line is the name `yield` and the
+name `x`, as in Groovy 3 too, which has no `yield` statement, and so is
+`yield // c` or `yield /* c */` before the line break. It was a
+`yield_statement` of `x`, at v0.6.0 as well. The binary `in` takes
+`nls` after it, so its operand may start on a later line.
 
 The grammar binds the tokens as `alias($._var_keyword, 'var')` and so
 on, so the anonymous nodes, `node-types.json` and the query captures

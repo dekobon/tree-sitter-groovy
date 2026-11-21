@@ -2096,8 +2096,8 @@ static bool instanceof_test_follows(TSLexer *lexer, bool no_close_ahead) {
 }
 
 // SPECIFICATION.md §6.16 — whether an expression starts here, after
-// Groovy's trivia, line breaks and comments included: what `yield` and
-// `in` need after them to be keywords. The characters are those an
+// Groovy's trivia, line breaks and comments included unless `line` is set:
+// what `in` needs after it to be a keyword, and `yield`, on its line. The characters are those an
 // expression of the grammar can start with, except that `instanceof` or
 // `!instanceof` with a type after it tests the word before it. `!`, `+`
 // and `-` start one unless they are `!=`, `+=`, `-=` or `->`. `++` and
@@ -2108,8 +2108,12 @@ static bool instanceof_test_follows(TSLexer *lexer, bool no_close_ahead) {
 // none, so `yield()` is a call. A `/` starts a slashy string unless a
 // space, `=` or a second `/` (a line comment, read on the line of a `++`)
 // follows it.
-static bool expression_follows(TSLexer *lexer, bool no_close_ahead) {
-    bool same_line = false;
+static bool expression_follows(
+    TSLexer *lexer,
+    bool line,
+    bool no_close_ahead
+) {
+    bool same_line = line;
     for (;;) {
         bool slash = false;
         if (!skip_header_trivia(lexer, !same_line, no_close_ahead, NULL,
@@ -2311,15 +2315,20 @@ static bool scan_contextual_word(
         return (valid_symbols[VAR_KEYWORD] || valid_symbols[VAR_NAMES_KEYWORD])
             && scan_var(lexer, valid_symbols, no_close_ahead);
     }
+    // Apache's `yieldStatement` is `YIELD expression`, with no `nls`, in
+    // 4.0.x to master, so its value starts on the line of `yield`, past
+    // spaces, line escapes and block comments: `yield` then `x` on the next
+    // line are two names, as in Groovy 3, which has no `yield` statement.
+    // The binary `in` takes `nls` after it.
     if (word_is(word, len, "yield")) {
         lexer->result_symbol = YIELD_KEYWORD;
         return valid_symbols[YIELD_KEYWORD]
-            && expression_follows(lexer, no_close_ahead);
+            && expression_follows(lexer, true, no_close_ahead);
     }
     if (word_is(word, len, "in")) {
         lexer->result_symbol = IN_KEYWORD;
         return valid_symbols[IN_KEYWORD]
-            && expression_follows(lexer, no_close_ahead);
+            && expression_follows(lexer, false, no_close_ahead);
     }
     if (word_is(word, len, "as")) {
         lexer->result_symbol = AS_KEYWORD;
@@ -5299,7 +5308,7 @@ static bool scan_lambda_body_end(
             && (as ? skip_header_trivia(lexer, true, no_close_ahead, NULL,
                                         NULL)
                          && is_identifier_start(lexer->lookahead)
-                   : expression_follows(lexer, no_close_ahead))) {
+                   : expression_follows(lexer, false, no_close_ahead))) {
             return lambda_body_continues(scanner, lexer, mode, true);
         }
         lexer->result_symbol = end;
@@ -5998,7 +6007,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // again and break the reused type down. No branch above took the name.
     if (lexer->lookahead == 'i' && !valid_symbols[ERROR_SENTINEL]) {
         if (consume_keyword(lexer, "in")) {
-            expression_follows(lexer, no_close_ahead);
+            expression_follows(lexer, false, no_close_ahead);
         }
         return false;
     }
