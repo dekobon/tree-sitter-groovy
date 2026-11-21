@@ -1167,9 +1167,11 @@ the grammar a statement terminator where a line break is significant
 
 **Spec §6.6**: a `/*` with no `*/` is not a comment, and the first one
 emits an empty hidden extra token, `_unterminated_comment`, that
-carries the scanner's "no `*/` from here on" bit (#75), one of its two
-bits of state; the other is set after the `}` of a lambda's brace body
-or a statement's block (spec §6.19, §6.22). Valid input never sees the
+carries the scanner's "no `*/` from here on" bit (#75), one of its
+three bits of state; the second is set after the `}` of a lambda's
+brace body or a statement's block (spec §6.19, §6.22), and the third
+after `return`, `break` or `continue` before a block comment that
+something follows on the line (spec §6.23). Valid input never sees the
 marker that sets the first. Two effects on other input are accepted.
 
 **Error recovery**: the marker is one more node on the parse stack, so
@@ -1613,6 +1615,7 @@ and later is read off `GroovyParser.g4`.
 | `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | as Groovy: a field `x`, `var` an anonymous modifier as `def` is; `var String s` a field of type `String` |
 | `var m() { }`, `interface I { var m() }` in a type body | rejected (Groovy 3: "var cannot be used for method declarations"; Groovy 6 parses a method and its AST builder rejects it) | a method with the return type `var` | the same as before: before a name and `(`, `var` is no modifier |
 | `var` then `x = 1` on the next line | a declaration of `x` | the same | the same |
+| `var true`, `var super`; `var` then `null` on the next line | the call `var(true)` (Groovy 3), …; the name `var`, then `null` | declarations of locals named `true`, `super` and `null`, with no `ERROR` | the same as before: before a keyword that starts an operand `var` stays the keyword (spec §6.16); `var new Foo()` is an `ERROR` |
 | `return var` then `x = 1` on the next line, `if (c) return var` then `else x`, `break var` then `x` | `return var`, then an assignment; the `if` with its `else`; `break` to the label `var` | `return`, then a declaration of `x`; a declaration of `else`; `break`, then a declaration of `x` | as Groovy: `var` after the keyword on its line is the value or the label |
 | `yield` then `1`, `yield // c` then `1`; `yield` then `-1` on the next line | the name `yield`, then the statement (Groovy 3) | a `yield_statement` of `1` (`-1`), also at v0.6.0 | the `command_chain` `yield 1`; the difference `yield - 1`, with no `ERROR`: a line break after `yield` makes it a name (spec §6.16), and a name takes a literal on the next line as its call's argument (`foo` then `"a" + b`, #25 below) and a sign there as a binary operator (`a` then `+ b`, #3 above). `yield` then `{ }` is the call `yield({ })`, as in Groovy |
 | `yield x`, `yield (x)`, `yield -1`, `yield [1]` outside a switch expression | a call, a call, a subtraction, an index (Groovy 4 and later: the same, read off the `.g4`) | `yield_statement` | the same as before |

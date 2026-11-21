@@ -1038,9 +1038,12 @@ Slashy strings allow GString interpolation. Dollar-slashy strings
 allow interpolation with `$identifier` and `${expr}` — and treat
 `$/` and `$$` as escapes.
 
-In every string a `\` takes the character after it, and a line break
-whole: Apache's `EscapeSequence` includes `LineEscape`, a `\` before
-`\r\n`, `\n` or `\r`, so `'a\` then `b'` on the next line is `'ab'`.
+In every string but a dollar-slashy one a `\` takes the character after
+it, and a line break whole: Apache's `EscapeSequence` includes
+`LineEscape`, a `\` before `\r\n`, `\n` or `\r`, so `'a\` then `b'` on
+the next line is `'ab'`. In a dollar-slashy string a `\` is a character
+of its own, as `$/` and `$$` are its escapes: `$/a\/$` is the string
+`a\` (Groovy 3: two characters).
 The single-line strings (`'…'`, `"…"`, `/…/`) take `\r\n` after the
 `\` as one escape, in the grammar's text tokens and in the scanner's
 look-aheads through strings, so a file with CRLF line endings gives
@@ -1616,56 +1619,52 @@ Each is an `ERROR`, as before lambdas.
 The external scanner is the C file `src/scanner.c`. It exists to
 handle the context-sensitive lexing situations that pure tree-sitter
 grammar rules cannot disambiguate. Each token below has a single
-emit/no-emit decision per call. The implementation exports the
-slashy opener, the three comment tokens, the contextual `record`
-(§6.7), `trait` and `sealed` (§6.13) keywords, the contextual `var`,
-`yield`, `in` and `as` keywords and the key a contextual word makes
-(§6.16), the named-argument key of a parenthesis-free call
-(§6.8), the start of such a call that is a value, a statement
-with a dotted receiver or a statement whose first argument is a `new`,
-an array type, a name or such a call in parentheses (§6.14), the
-same-line subscript opener (§6.9), a `(` that opens a line after an
-expression where it may open a statement (§6.18), the start of an
-array type that is a value (§6.15), the `)` of a cast and the `)`
-before a relational operator that Groovy applies to the parentheses
-(§6.11), the `<` of a cast type's type arguments where they close
-(§3.2.2), the `<` of a generic type's arguments where they close or
-run past the read (§3.2.2), the `!in` operator (§6.12), the empty marker of an
-unterminated block comment (§6.6), the start of a lambda (§6.17),
-the end of a lambda's brace body (§6.19), the first comma of a
-multi-assignment (§6.20), the start of a typed local declaration
-(§6.21), the end of a block that opens a statement (§6.22), the end of
-a `return`, `break` or `continue` at a line break (§6.23),
-`STRING_BODY` (§6.10),
-`TYPE_START` (§6.15), `CLOSURE_PARAMETERS_START` (§6.21),
-`TYPE_ONLY_CLOSE` (§6.11) and `BODY_BLOCK_END` (§6.17), which are
-never emitted and only mark a string body, where a type may start,
-where closure parameters may start, the `)` of a cast of an array or
-generic type whose operand is on a later line, and the end of the
-block that is the body of `if`, `else`, a loop or an arrow case,
-`UNREACHABLE` (§5.2), which is never emitted either and which ends the
-error production for a `case` label outside a switch, so that error
-recovery inserts it as a missing `switch`,
-`LAMBDA_BODY_REREAD` (§6.19, §6.22), which no rule references and which
-makes the parser lex the `}` of a lambda's body or a statement's block
-again, and
-`ERROR_SENTINEL`, which is never emitted either, which no rule
-references and which only signals error recovery; the other tokens
-listed here are met in-grammar, see
-`docs/divergences-from-spec.md`.
+emit/no-emit decision per call. The implementation exports, in the order of grammar.js's `externals`
+array and of `TokenType` in §6.1: the slashy opener (§6.2); the three
+comment tokens (§6.6); the contextual `record` (§6.7), `trait` and
+`sealed` (§6.13) keywords; the contextual `var` before a declared name,
+`var` alone before a multi-assignment's names, `yield`, `in` and `as`
+(§6.16); the named-argument key of a parenthesis-free call (§6.8) and
+the key that a contextual word makes (§6.16); the start of such a call
+that is a value, of a statement's dotted receiver, and of a statement
+whose first argument is a `new`, an array type, a name, such a call in
+parentheses or a literal that the argument goes on past (§6.14); the
+same-line subscript opener (§6.9); the start of an array type that is a
+value (§6.15); the `)` of a cast with something after it on its line
+(§6.11); the `!in` operator (§6.12); the start of a lambda, before its
+parameters in parentheses and before its one name (§6.17); the empty
+marker of an unterminated block comment (§6.6); `STRING_BODY` (§6.10)
+and `TYPE_START` (§6.15), never emitted, which mark a string body and
+where a type may start; a `(` that opens a line after an expression
+where it may open a statement (§6.18); the end of a lambda's brace body
+(§6.19); `LAMBDA_BODY_REREAD` (§6.19, §6.22), which no rule references
+and which makes the parser lex the `}` of a lambda's body or a
+statement's block again; the first comma of a multi-assignment (§6.20);
+the start of a typed local declaration (§6.21); the end of a block that
+opens a statement (§6.22); the `)` before a relational operator that
+Groovy applies to the parentheses (§6.11); the `<` of a cast type's
+type arguments where they close (§3.2.2); `CLOSURE_PARAMETERS_START`
+(§6.21), `TYPE_ONLY_CLOSE` (§6.11) and `BODY_BLOCK_END` (§6.17), never
+emitted, which mark where closure parameters may start, the `)` of a
+cast of an array or generic type whose operand is on a later line, and
+the end of the block that is the body of `if`, `else`, a loop or an
+arrow case; the end of a `return`, `break` or `continue` at a line
+break (§6.23); the start of a statement whose first name a closure on
+its line and a member access follow, and of such a call as the start of
+a parenthesis-free call's receiver (§6.24); `UNREACHABLE` (§5.2), never
+emitted, which ends the error production for a `case` label outside a
+switch, so that error recovery inserts it as a missing `switch`; the
+`<` of a generic type's arguments where they close or run past the
+read (§3.2.2); the `)` of a cast before a name on its line (§6.11); and
+`ERROR_SENTINEL`, never emitted, which no rule references and which
+only signals error recovery. The tokens listed after the enum in §6.1
+are met in-grammar, see `docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
 
 ```c
 enum TokenType {
-  AUTOMATIC_SEMICOLON,    // §5.10 — newline-as-terminator
   SLASHY_STRING_START,    // §5.4 — opening `/` of slashy regex
-  SLASHY_STRING_BODY,     // §5.4 — body (until unescaped `/`)
-  SLASHY_STRING_END,      // §5.4 — closing `/`
-  DOLLAR_SLASHY_STRING,   // §5.7 — single-token `$/.../$` when no interpolation
-  GSTRING_BODY,           // §5.7 — literal fragment of a double-quoted string
-  GSTRING_INTERPOLATION_START, // `${` or `$` followed by identifier
-  LABEL_COLON,            // §5.3 — colon that closes a statement label
   LINE_COMMENT,           // §6.6 — `//` to end of line, single token
   BLOCK_COMMENT,          // single-token block comment incl. /**/ and /***/
   GROOVYDOC_COMMENT,      // single-token /** ... */ comment
@@ -1681,31 +1680,48 @@ enum TokenType {
   CONTEXTUAL_KEY,         // §6.16 — `var`, `yield`, `in` or `as` as such a key, the word itself
   COMMAND_VALUE_START,    // §6.14 — empty; before the receiver of such a call that is a value
   COMMAND_PATH_START,     // §6.14 — empty; after the first name of such a call's dotted receiver in a statement
-  COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new`, an array type, a name or such a call in parentheses
+  COMMAND_STATEMENT_START, // §6.14 — empty; before a statement's one-name receiver whose first argument is a `new`, an array type, a name, such a call in parentheses or a literal the argument goes on past
   SUBSCRIPT_OPEN,         // §6.9 — `[` on the same line as the token before it
-  STATEMENT_PAREN,        // §6.18 — `(` that opens a line after an expression and opens a statement
   ARRAY_VALUE_START,      // §6.15 — empty; before an array type that is a value
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
-  RELATIONAL_CLOSE,       // §6.11 — `)` before a relational operator Groovy applies to the parentheses; closes no cast
-  CAST_TYPE_ARGUMENTS_OPEN, // §3.2.2 — `<` after a cast type's name, where the type arguments close
-  TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   LAMBDA_START,           // §6.17 — empty; before the `(` of a lambda's parameters
   BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses
+  UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
+  STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
+  TYPE_START,             // §6.15 — never emitted; valid only where a type may start
+  STATEMENT_PAREN,        // §6.18 — `(` that opens a line after an expression and opens a statement
   LAMBDA_BODY_END,        // §6.19 — empty; after the `}` of a lambda's brace body that nothing continues
   LAMBDA_BODY_REREAD,     // §6.19 — empty, in no rule; after a block shifted whole that something continues
   MULTI_ASSIGNMENT_COMMA, // §6.20 — the first `,` of `(a, b) = …`, unless the parentheses go on as a method's parameters
   DECLARATION_START,      // §6.21 — empty; before the type of a typed local declaration (`String s`, `int a, b`, `String s = 'a'`)
   STATEMENT_BLOCK_END,    // §6.22 — empty; after the `}` of a block that opens a statement and that nothing continues
+  RELATIONAL_CLOSE,       // §6.11 — `)` before a relational operator Groovy applies to the parentheses; closes no cast
+  CAST_TYPE_ARGUMENTS_OPEN, // §3.2.2 — `<` after a cast type's name, where the type arguments close
+  CLOSURE_PARAMETERS_START, // §6.21 — never emitted; valid only where closure parameters may start
+  TYPE_ONLY_CLOSE,        // §6.11 — never emitted; valid only before the `)` of a cast of an array or generic type whose operand is on a later line
+  BODY_BLOCK_END,         // §6.17 — never emitted; valid only after the `}` of the block that is the body of `if`, `else`, a loop or an arrow case
+  JUMP_STATEMENT_END,     // §6.23 — empty; after `return`, `break` or `continue` where a line break follows on the keyword's line
   CLOSURE_CALL_START,     // §6.24 — empty; before a statement's name whose closure closes on its line and a member access follows
   CLOSURE_COMMAND_START,  // §6.24 — empty; the same where a first argument follows the accesses (`foo { }.bar 1`)
-  UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
-  STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
-  TYPE_START,             // §6.15 — never emitted; valid only where a type may start
-  CLOSURE_PARAMETERS_START, // §6.21 — never emitted; valid only where closure parameters may start
   UNREACHABLE,            // §5.2 — never emitted; ends the error production for a `case` label outside a switch
+  TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
+  CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
+```
+
+Specified in the first design and met in-grammar instead
+(`docs/divergences-from-spec.md`):
+
+```c
+  AUTOMATIC_SEMICOLON,    // §5.10 — newline-as-terminator
+  SLASHY_STRING_BODY,     // §5.4 — body (until unescaped `/`)
+  SLASHY_STRING_END,      // §5.4 — closing `/`
+  DOLLAR_SLASHY_STRING,   // §5.7 — single-token `$/.../$` when no interpolation
+  GSTRING_BODY,           // §5.7 — literal fragment of a double-quoted string
+  GSTRING_INTERPOLATION_START, // `${` or `$` followed by identifier
+  LABEL_COLON,            // §5.3 — colon that closes a statement label
 ```
 
 ### 6.2 SLASHY_STRING — implementation contract
@@ -1881,8 +1897,8 @@ comment token, and the in-grammar lexer reads `/` and `*` as
 operators, as ANTLR's lexer does. Learning that there is no `*/`
 means reading to the end of input, so a file with N such openers was
 read N times (#75). The scanner now keeps one bit of state, "there is
-no `*/` from here on"; the only other state it has is the second bit
-described below. The bit is a property of the input and stays true
+no `*/` from here on"; the only other state it has is the second and
+third bits described below. The bit is a property of the input and stays true
 at every later position, so
 later `/*` openers, and the block comments the keyword look-aheads
 (§6.7, §6.13) skip, fail at once while it is set.
@@ -2199,7 +2215,9 @@ follows:
 ```text
 Emit CAST_WORD_CLOSE for a `)` when it is valid and, after the trivia
 above, the line goes on with a word that is
-  - no keyword of grammar.js, primitive type name or `void`,
+  - no keyword of grammar.js other than `_`, `permits` and
+    `pipeline`, which Groovy takes as names, nor a primitive type name
+    or `void`,
   - not `instanceof`, nor `as` or `in` before what it takes (below),
   - not the `$` that opens a dollar-slashy string (§5.7).
 Emit CAST_CLOSE there when CAST_WORD_CLOSE is not valid.
@@ -2220,7 +2238,8 @@ was a field `x public` and a constructor, which outweighed the cast.
 Where a statement may start, the same split made the name a statement
 of its own on the line: `x = (Foo) y` then `{ -> 1 }` and `{ foo() }`
 was the assignment of `(Foo)`, the call `y { -> 1 }` and a block, where
-Groovy calls `y` with both closures. The penalty is the weight of the
+Groovy calls `y` with both closures; v0.6.0 read the cast there as
+well. The penalty is the weight of the
 typed field that the split adds, so the split weighs less than the cast
 wherever it adds one typed member and the members after it weigh the
 same. Where the name is followed on its line by `as`, `in` or
@@ -2234,8 +2253,10 @@ would need a token of its own for that case (`docs/divergences-from-spec.md`
 §15). Where no cast parses, the
 parenthesized expression is the only reading and keeps it:
 `(c + c) x` is still `(c + c)` and the statement `x` (Groovy calls the
-parentheses with `x`). A keyword after the `)` starts no type and is
-left to CAST_CLOSE. The read stops after the word, or after what follows
+parentheses with `x`). A keyword after the `)` that starts no operand
+closes no cast (RELATIONAL_CLOSE, below), and one that starts an
+operand but no type (`new`, `super`, `switch`, `true`, `false`, `null`,
+`static` before a `.`) is left to CAST_CLOSE. The read stops after the word, or after what follows
 `as` or `in`. Not emitted during error recovery.
 
 Measured against the grammar before: STATE_COUNT 4,777 to 4,789,
@@ -3132,7 +3153,7 @@ interpolation, a lowercase name (`obj.bar`), two accesses (`a.b.Bar`)
 or without the `()` or the closure. A probe of 11.77 million single
 edits of the corpus inputs, each reparsed and then undone, found 17
 that differ this way, all in one input of that shape. A fix would need
-a third bit of scanner state and a token that ends the path, so the
+another bit of scanner state and a token that ends the path, so the
 limit is documented instead (`docs/divergences-from-spec.md` §19), and
 `bindings/rust/tests/incremental_reparse.rs` pins both trees.
 
@@ -3370,10 +3391,13 @@ keyword declared `x`, and `if (c) return var` then `else x` declared a
 local named `else`. A keyword after `var` that names nothing, being no
 modifier and starting no operand, makes it a name too:
 `if (c) var` then `else x` and `var` then `if (a) b` are a name and
-the `else` or the `if`, as in Groovy. Before `new`, `true` or another
-keyword that starts an operand the word stays the keyword, so
-`var new Foo()`, Groovy's `var(new Foo())`, stays an `ERROR` rather than
-two statements.
+the `else` or the `if`, as in Groovy. Before a keyword that starts an
+operand the word stays the keyword, as it was before `var` could be a
+name: `var new Foo()`, Groovy's `var(new Foo())`, stays an `ERROR`
+rather than two statements, and `var true`, `var super` and `var` then
+`null` on the next line declare locals named `true`, `super` and
+`null`, with no `ERROR`, where Groovy calls `var(true)` and reads the
+name `var` and then `null` (`docs/divergences-from-spec.md` §22).
 
 `in++` and `yield++` update a name. After `++` or `--` the look-ahead
 stays on the line, so the operator is the name's postfix update when
@@ -4781,8 +4805,11 @@ in place of a line comment and of a block comment that only spaces and
 tabs follow before the line break (Apache's `ML_COMMENT` is an `NL` where
 `isFollowedByWhiteSpaces` holds, which only whitespace before the line's
 end makes true), and the comment is emitted by the next call, after the
-statement, as at v0.6.0 (`break // c`, `return /* c */` then `x`,
-`break /**/` and spaces, then `x`). A block comment that something follows on its
+statement (`break // c`, `return /* c */` then `x`, `break /**/` and
+spaces, then `x`). v0.6.0 put it there only where nothing followed the
+comment (`break // c`); with a statement on the next line it took that
+statement as the value or the label, with the comment inside
+(`return /* c */` then `x` returned `x`). A block comment that something follows on its
 line is emitted inside the statement and skipped before the label or the
 value, as Groovy hides it (`break /* c */ outer`). Telling the two apart
 past spaces reads past the end of the comment's token, which a token
