@@ -8174,7 +8174,7 @@
           "value": 2,
           "content": {
             "type": "PREC_RIGHT",
-            "value": 16,
+            "value": 18,
             "content": {
               "type": "SEQ",
               "members": [
@@ -8244,7 +8244,7 @@
           "value": -2,
           "content": {
             "type": "PREC_RIGHT",
-            "value": 16,
+            "value": 18,
             "content": {
               "type": "SEQ",
               "members": [
@@ -8295,7 +8295,7 @@
           "value": -2,
           "content": {
             "type": "PREC_RIGHT",
-            "value": 16,
+            "value": 18,
             "content": {
               "type": "SEQ",
               "members": [

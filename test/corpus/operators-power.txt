@@ -120,10 +120,81 @@ f = x ** y * z
         right: (identifier)))))
 
 ==================
-A cast takes the power after its operand, which Groovy applies to the cast (known divergence)
+A power applies to the cast before it, as the cast's operand takes no binary operator
 ==================
 
-(int) a ** b
+x = (int) a ** b
+x = (T) a ** b ** c
+x = -(T) a ** b
+x = a ** (T) b ** c
+x = (T) (U) a ** b
+x = (int) a++ ** b
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (parenthesized_type_cast
+          type: (type_identifier)
+          value: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (power_expression
+          left: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))
+          right: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (power_expression
+          left: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))
+          right: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (power_expression
+          left: (identifier)
+          right: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier)))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier)))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (parenthesized_type_cast
+          type: (type_identifier)
+          value: (update_expression
+            operand: (identifier)))
+        right: (identifier)))))
+
+==================
+A sign in a cast's operand takes the power after it, which Groovy applies to the cast (known divergence)
+==================
+
+(int) -a ** b
 
 ---
 
@@ -131,9 +202,10 @@ A cast takes the power after its operand, which Groovy applies to the cast (know
   (expression_statement
     (parenthesized_type_cast
       type: (type_identifier)
-      value: (power_expression
-        left: (identifier)
-        right: (identifier)))))
+      value: (unary_expression
+        operand: (power_expression
+          left: (identifier)
+          right: (identifier))))))
 
 ==================
 Bitwise complement is tighter than power

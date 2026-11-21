@@ -275,10 +275,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   in a power's right operand too (`-2 ** 2` is `-(2 ** 2)`,
   `2 ** -2 ** 3` is `2 ** (-(2 ** 3))`), and `a ** b * c`,
   `a * b ** c`, `!a ** b`, `a ** b++` and `a **= b ** c` read as
-  before. `(int) a ** b` is still a cast of the power, where Groovy
-  casts `a` (`docs/divergences-from-spec.md` §32). Two corpus trees
-  change, the pinned right-associative chains; no real, Java or shape
-  tree does (`SPECIFICATION.md` §3.1).
+  before. Two corpus trees change, the pinned right-associative chains;
+  no real, Java or shape tree does (`SPECIFICATION.md` §3.1).
+- **BREAKING:** a cast binds tighter than `**`, as Apache's
+  `castOperandExpression` takes no binary operator: `(int) a ** b` is
+  `((int) a) ** b` (Groovy 3: `(int) 2.9 ** 2` is 4), where it was
+  `(int) (a ** b)`, and so are `(T) a.b ** c`, `(T) (U) a ** b`,
+  `-(T) a ** b` (`-(((T) a) ** b)`) and `a ** (T) b ** c`
+  (`(a ** ((T) b)) ** c`). Unchanged: `(T) a++`, `(T) a[0]`,
+  `(T) a.b()`, `(T) a * b`, `(T) a as U` and `(T) () -> x ** 2`. A
+  prefix sign in the operand still takes the power after it,
+  `(int) -a ** b` is `(int) (-(a ** b))`, where Groovy casts `-a`
+  (`docs/divergences-from-spec.md` §32). No parse-state change; the
+  pinned corpus tree changes, and no real, Java or shape tree does
+  (`SPECIFICATION.md` §3.1).
 - **BREAKING:** a dotted name followed on its line by a literal or a
   `name:` key is a `command_chain` (see Added), which changes trees for
   input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,

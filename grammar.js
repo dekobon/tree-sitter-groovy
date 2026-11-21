@@ -72,6 +72,10 @@ const PREC = {
   UNARY: 16,                  // prefix ++ -- + -          (Apache level 3 UNARY_ADD)
   POWER: 17,                  // **                         (Apache level 2)
   UNARY_NOT: 18,              // ! ~                        (Apache level 1, tighter than POWER)
+  // Apache `castExprAlt`, `castParExpression castOperandExpression`: the
+  // operand is a postfix expression or a prefix operator before one, with
+  // no binary operator, so `(int) a ** b` is `((int) a) ** b`.
+  CAST: 18,                   // (T) x
   POSTFIX: 19,                // postfix ++ --, []
   ACCESS: 20,                 // . ?. ??. *. .& .@ ::
   PRIMARY: 21,                // literals, identifiers, ()
@@ -2866,8 +2870,12 @@ module.exports = grammar({
     // §5.15 — C-style cast `(Foo) x`. Distinct from
     // `parenthesized_expression` followed by something (resolved
     // by tree-sitter's GLR; declared as a conflict if needed).
-    // PREC.UNARY right-associative so `(Foo) -x` parses as
-    // `(Foo)(-x)` and the type binds to the rightward expression.
+    // PREC.CAST right-associative so `(Foo) -x` parses as
+    // `(Foo)(-x)` and the type binds to the rightward expression. It is
+    // above POWER, so `**` applies to the cast (`(int) a ** b`); a prefix
+    // `-` in the operand still takes a power after it, so
+    // `(int) -a ** b` is `(int) (-(a ** b))`, where Groovy casts `-a`
+    // (docs/divergences-from-spec.md §32).
     //
     // Two weights rank the cast against the other reading of the same
     // tokens, a parenthesized expression followed by something. Both
@@ -2901,7 +2909,7 @@ module.exports = grammar({
     // Groovy reads no cast of a name `instanceof` there, nor, from
     // Groovy 6.0.0 on (GROOVY-10355), one of `as` or `in` (§6.11).
     parenthesized_type_cast: $ => choice(
-      weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+      weighted(CAST_WEIGHT, prec.right(PREC.CAST, seq(
         statementParen($),
         field('type', $._type),
         choice(alias($._cast_close, ')'), alias($._cast_word_close, ')')),
@@ -2916,13 +2924,13 @@ module.exports = grammar({
       // array or generic type is no expression, and its cast is the only
       // reading of the parentheses: `_type_only_close`, which the scanner
       // never emits, is valid before its `)` and keeps that cast.
-      weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+      weighted(-CAST_WEIGHT, prec.right(PREC.CAST, seq(
         statementParen($),
         field('type', $._cast_name_type),
         ')',
         field('value', $._expression),
       ))),
-      weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+      weighted(-CAST_WEIGHT, prec.right(PREC.CAST, seq(
         statementParen($),
         field('type', choice($.array_type, $.generic_type)),
         choice(')', $._type_only_close),

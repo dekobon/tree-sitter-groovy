@@ -218,7 +218,7 @@ alternative binds tighter, so a level splits in two (7a and 7b below).
 | Apache level | Name | Operators | Associativity | Notes |
 |---:|---|---|---|---|
 | 1 | UNARY_NOT | `~` `!` | right | |
-| 2 | POWER | `**` | left | `2 ** 3 ** 2` → `(2 ** 3) ** 2`, 64 in Groovy 3: `left=expression op=POWER nls right=expression` has no `<assoc=right>` in 3.0.x, 4.0.x, 5.0.x, master or 6.0.x. Before 0.7.0 the grammar read it right-associative. Prefix `+`, `-`, `++` and `--` (level 3) take the powers after them, also in a power's right operand: `-2 ** 2` is `-(2 ** 2)`, `2 ** -2 ** 3` is `2 ** (-(2 ** 3))`, and `++a ** 2` is `++(a ** 2)`, as Groovy 3 reads it. A cast takes them too here, where Groovy's `castOperandExpression` takes no binary operator: `(int) a ** b` is `(int) (a ** b)`, Groovy's `((int) a) ** b` (`docs/divergences-from-spec.md` §32). |
+| 2 | POWER | `**` | left | `2 ** 3 ** 2` → `(2 ** 3) ** 2`, 64 in Groovy 3: `left=expression op=POWER nls right=expression` has no `<assoc=right>` in 3.0.x, 4.0.x, 5.0.x, master or 6.0.x. Before 0.7.0 the grammar read it right-associative. Prefix `+`, `-`, `++` and `--` (level 3) take the powers after them, also in a power's right operand: `-2 ** 2` is `-(2 ** 2)`, `2 ** -2 ** 3` is `2 ** (-(2 ** 3))`, and `++a ** 2` is `++(a ** 2)`, as Groovy 3 reads it. A cast does not: Apache's `castExprAlt` is `castParExpression castOperandExpression`, whose operand is a postfix expression or a prefix operator before one (3.0.x, 4.0.x, 5.0.x, master and 6.0.x), so `(int) a ** b` is `((int) a) ** b` (Groovy 3: `(int) 2.9 ** 2` is 4) and `a ** (T) b ** c` is `(a ** ((T) b)) ** c`; `PREC.CAST` is above POWER. Before 0.7.0 the grammar read `(int) (a ** b)`. A prefix `-` or `+` in the cast's operand still takes the powers after it: `(int) -a ** b` is `(int) (-(a ** b))`, Groovy's `((int) (-a)) ** b` (`docs/divergences-from-spec.md` §32). |
 | 3 | UNARY_ADD | prefix `++` `--`, unary `+` `-` | right | |
 | 4 | MUL | `*` `/` `%` | left | |
 | 5 | ADD | `+` `-` (binary) | left | |
@@ -1330,9 +1330,9 @@ Conflicts with C++ `::`-scoped names are not relevant in Groovy.
 
 ```js
 parenthesized_type_cast: $ => choice(
-  weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+  weighted(CAST_WEIGHT, prec.right(PREC.CAST, seq(
     '(', $._type, alias($._cast_close, ')'), $._expression))),
-  weighted(-CAST_WEIGHT, prec.right(PREC.UNARY, seq(
+  weighted(-CAST_WEIGHT, prec.right(PREC.CAST, seq(
     '(', $._type, ')', $._expression))))
 ```
 

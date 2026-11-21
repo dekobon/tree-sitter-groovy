@@ -2409,7 +2409,7 @@ Groovy column is read off the 4.0.x to master grammars.
 break before the comma to end the case's values and `default` to be
 turned down there, for input that Groovy rejects anyway.
 
-## 32. A cast before a power
+## 32. A sign in a cast's operand before a power
 
 **Apache `GroovyParser.g4`** (3.0.x to master): the cast alternative of
 `expression` is `castParExpression castOperandExpression`, and
@@ -2417,16 +2417,16 @@ turned down there, for input that Groovy rejects anyway.
 `~`, `++`, `--`, `+` or `-` before another `castOperandExpression`: no
 binary operator, so every one applies to the cast.
 
-**Current implementation**: `parenthesized_type_cast` has the
-precedence of the prefix operators (`PREC.UNARY`), so an operator that
-binds tighter than those, `**`, is in its operand.
+**Current implementation**: `parenthesized_type_cast` has a precedence
+above `**` (`PREC.CAST`), so a power after the operand applies to the
+cast, as in Groovy. A prefix `+`, `-`, `++` or `--` in the operand has
+the precedence of those operators elsewhere, below `**`, and takes the
+power after it.
 
 | Input | Groovy | This grammar |
 |---|---|---|
-| `(int) a * b`, `(int) a + b` | the product or sum of the cast | the same |
-| `(int) a ** b` | `((int) a) ** b`; Groovy 3 evaluates `(int) 2.5 ** 2` to 4 | `(int) (a ** b)`, a cast of the power |
-| `(int) -a ** b` | `((int) (-a)) ** b` | `(int) (-(a ** b))` |
+| `(int) a * b`, `(int) a + b`, `(int) a ** b`, `(T) (U) a ** b`, `-(T) a ** b` | the product, sum or power of the cast; Groovy 3 evaluates `(int) 2.9 ** 2` to 4 and `-(int) 2.5 ** 2` to -4 | the same; before 0.7.0 `(int) a ** b` was `(int) (a ** b)` |
+| `(int) -a ** b`, `(int) ++a ** b` | `((int) (-a)) ** b`; Groovy 3 evaluates `(int) -2.9 ** 2` to 4 | `(int) (-(a ** b))` |
 
-**Action**: a precedence tighter than POWER on the cast would take
-`(int) a ** b` as Groovy does, but not `(int) -a ** b`, whose unary
-minus would still take the power; not attempted.
+**Action**: a sign that binds tighter than `**` inside a cast's operand
+only, which needs a second unary rule for that operand; not attempted.
