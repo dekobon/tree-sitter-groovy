@@ -2365,3 +2365,29 @@ an `ERROR` to none.
 the scanner to read on past it as here, at a cost on every statement
 `foo { }`; braces that span lines need the read to go past the line, which
 the bound would then cut on every block.
+
+## 31. Several values in a switch case
+
+**Apache `GroovyParser.g4`** (4.0.x to master): `switchExpressionLabel`
+is `(CASE expressionList[true] | DEFAULT) (ARROW | COLON)`, and
+`expressionList` is `expressionListElement (COMMA nls
+expressionListElement)*`, so a line break may follow a value's comma but
+not come before it, and `default` is no value.
+
+**Current implementation**: a case takes one or more values, a `value`
+field each, separated by commas (spec §4); a line break is whitespace
+there, and `default` after a comma is read as a name.
+
+Groovy 3 has no switch expressions and rejects each input below; the
+Groovy column is read off the 4.0.x to master grammars.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `case 1, 2 -> a`, `case 1, 2: a`, `case 1,` then `2 -> a` on the next line | a case with two values | the same |
+| `case 1` then `, 2 -> a` on the next line | rejected: no `nls` before the comma | a case with two values |
+| `case 1, default -> a`, `case 1, default: a` | rejected: `default` is no expression | a case with the values `1` and the name `default` |
+| `case *xs -> a` | a case with a spread value | an `ERROR` |
+
+**Action**: none planned; rejecting the two accepted forms needs a line
+break before the comma to end the case's values and `default` to be
+turned down there, for input that Groovy rejects anyway.

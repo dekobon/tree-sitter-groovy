@@ -221,6 +221,34 @@ switch (x) {
               arguments: (argument_list))))))))
 
 ==================
+A comma on the next line and default among a case's values are accepted, which Groovy rejects (known divergence)
+==================
+
+switch (x) {
+  case 1
+  , 2 -> a
+  case 3, default -> b
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          value: (number_literal)
+          body: (expression_statement
+            (identifier)))
+        (switch_arrow_case
+          value: (number_literal)
+          value: (identifier)
+          body: (expression_statement
+            (identifier)))))))
+
+==================
 Empty switch body
 ==================
 

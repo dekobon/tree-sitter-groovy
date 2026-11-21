@@ -14,10 +14,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `y[1, *a]`, `x[*a]`, `y?[*a]` and `y[1, 2] = 3` parse, an `index`
   field each, and the spread a `spread_arguments`. Each was an `ERROR`,
   as at v0.6.0. The `index` field of `subscript_expression` and
-  `safe_subscript_expression` may repeat, and is now `multiple` in
-  `node-types.json`; a tree with one index is as before. No real or
-  shape tree changes; 38 Java trees that had an `ERROR` change and still
-  have one (`SPECIFICATION.md` §5.11).
+  `safe_subscript_expression` may repeat (see Changed); a tree with one
+  index is as before. No real or shape tree changes; 38 Java trees that
+  had an `ERROR` change and still have one (`SPECIFICATION.md` §5.11).
+- A list literal takes spread elements (`[*a, *b]`, `[1, *a]`,
+  `[*a, 1]`), a `spread_arguments` node each, as Apache's `list` takes
+  `expressionList[true]`, and an argument list takes a spread map
+  (`foo(*:m, x: 1)`, `foo(a: 1, *:m)`, `foo a: 1, *:m`), a
+  `spread_map_entry`, as Apache's `namedArg` does. Each was an `ERROR`,
+  as at v0.6.0. A spread first in a parenthesis-free call
+  (`foo *a, 1`, `foo *:m`) is still an `ERROR`.
+- A `case` takes several values, a `value` field each:
+  `case 1, 2 -> 'a'`, `case String, Integer -> …` and `case 1, 2:`,
+  as Apache's `switchExpressionLabel` takes `CASE expressionList[true]`
+  before `->` or `:` (4.0.x to master). Each was an `ERROR`, as at
+  v0.6.0. The `value` field of `switch_case` and `switch_arrow_case`
+  may repeat (see Changed). Wider than Groovy: a comma on the next line
+  (`case 1` then `, 2 ->`) and `default` as a value (`case 1, default`)
+  are accepted (`docs/divergences-from-spec.md` §31).
 - `array_creation_expression` for `new T[n][m]`, `new T[n][]` and
   `new T[] { … }`, after Apache `creator`, with `type`, `dimensions`
   (a `dimensions_expr` per `[n]`, one `dimensions` node for the `[]`s)
@@ -220,6 +234,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
+- `node-types.json`: the `value` field of `switch_case` and
+  `switch_arrow_case`, and the `index` field of `subscript_expression`
+  and `safe_subscript_expression`, are `multiple`, as a case may take
+  several values and a subscript several indices (see Added). Code
+  generated from `node-types.json` that types either field as one node
+  needs a list; `child_by_field_name` returns the first, and a tree
+  with one value or index is as before.
 - **BREAKING:** a dotted name followed on its line by a literal or a
   `name:` key is a `command_chain` (see Added), which changes trees for
   input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,
@@ -843,19 +864,6 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   message as a colon does, before or after a line break, as Apache's
   `assertStatement` takes `COLON | COMMA`. It was an `ERROR`, as at
   v0.6.0.
-- A list literal takes spread elements (`[*a, *b]`, `[1, *a]`,
-  `[*a, 1]`), a `spread_arguments` node each, as Apache's `list` takes
-  `expressionList[true]`, and an argument list takes a spread map
-  (`foo(*:m, x: 1)`, `foo(a: 1, *:m)`, `foo a: 1, *:m`), a
-  `spread_map_entry`, as Apache's `namedArg` does. Each was an `ERROR`,
-  as at v0.6.0. A spread first in a parenthesis-free call
-  (`foo *a, 1`, `foo *:m`) is still an `ERROR`.
-- A `case` takes several values, a `value` field each:
-  `case 1, 2 -> 'a'`, `case String, Integer -> …` and `case 1, 2:`,
-  as Apache's `switchExpressionLabel` takes `CASE expressionList[true]`
-  before `->` or `:` (4.0.x to master). Each was an `ERROR`, as at
-  v0.6.0. The `value` field of `switch_case` and `switch_arrow_case` is
-  now `multiple` in `node-types.json`.
 - A statement that calls a name with a closure goes on with a member
   access, as Groovy reads `foo { }.bar()` as `foo({ }).bar()`: the call
   is a `method_invocation`, the object of the access, on the line or on
