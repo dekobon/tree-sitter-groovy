@@ -2782,8 +2782,26 @@ After such a call, or a literal's call with a closure, that ends its
 line (`foo "a" (x)`, `sh "a" { }`), a lambda in parentheses on the next
 line is an `ERROR`, as after a name argument (`sh foo { }`): before `->`
 the `(` stays the call's arguments (§6.18), where Groovy appends the
-lambda. `**` and the assignments start with
-characters that go on, and are accepted where Groovy rejects them.
+lambda. `**` starts with a character that goes on, and opens no line in
+Groovy (Apache's `powerExprAlt` has no `NL*` before the operator), so
+`foo 1` then `** 2` is a call where Groovy rejects it. An assignment does
+open a line in Groovy (`x` then `= 2` is `x = 2`: `assignmentExprAlt` has
+`NL*` before the operator), and the argument goes on there as it does
+in Groovy (`foo "a".b` then `= c`); Groovy rejects `foo "a"` then `= b`
+because a literal is not assignable, which the grammar does not check.
+At a number's `.` that no digit follows (`foo 1..3`, `foo 1.abs()`) the
+argument goes on, and the scanner reads no further: the end of the
+argument is not found without reading the expression, so a later line
+is not looked at, and the argument takes what opens it as after a name
+argument. `++`, `--`, `, b` and `, k: 1` on the next line then go on
+with the call, and `~b` or `!b` after `foo 1..3` on its line is a
+statement of its own, where Groovy rejects all of them, as it does
+`foo a..b` then `++`, which the grammar reads the same way. The words
+that Groovy reserves and does not use, `goto`, `const` and
+`threadsafe`, are names in this grammar wherever a name may be
+(`goto x`, `def y = goto`), so as a receiver each takes a literal that
+the argument goes on past (`goto "a" + b`), where Groovy rejects every
+use of the word.
 
 Measured against the grammar before: STATE_COUNT, LARGE_STATE_COUNT,
 SYMBOL_COUNT and EXTERNAL_TOKEN_COUNT are unchanged (4658, 1789, 408 and

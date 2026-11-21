@@ -353,9 +353,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Groovy lets open a line within an expression (`foo "a"` then
   `.trim()`, `?: b`, `* 2`), which were an `ERROR`; `+`, `-`, `~`, `(`,
   `[`, a name and a literal there open the next statement, as before
-  (`foo 1` then `-x`). Of 266 real files, 11 that had an `ERROR` have
-  none (`assertEquals "a " +` then `"b", x, y` in tests,
-  `timeOutInMs 30 * 60 * 1000` in Gradle files). Read otherwise than
+  (`foo 1` then `-x`). A script-level generic method on the next line
+  (`println "a"` then `<T> void m(T t) { }`), which Groovy 3 rejects as
+  well, was the call and a `method_declaration`, and is an `ERROR`, as
+  after `println("a")`: the `<` goes on with the argument. Of 266 real
+  files, 11 that had an `ERROR` have none (`assertEquals "a " +` then
+  `"b", x, y` in tests, `timeOutInMs 30 * 60 * 1000` in Gradle files).
+  Read otherwise than
   Groovy: an expression that goes on past the literal and ends its line
   takes a next line that opens with `+` or `-` (`foo "a" + b` then `-c`
   is one call), as after a name argument; a comment between the receiver
@@ -366,8 +370,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   passes the lambda to a call of the literal) keep the literal alone.
   An assignment after the literal
   (`foo "a" = b`, `foo "a" += b`), and `= b` or `** b` on the next line,
-  which Groovy rejects, are a call with no `ERROR` (`SPECIFICATION.md`
-  §5.5 item 3, §6.14).
+  which Groovy rejects, are a call with no `ERROR`, as are a number's
+  range or member access followed by `++`, `--` or `, b` on the next
+  line (`foo 1..3` then `++`), and the receivers `goto`, `const` and
+  `threadsafe`, which Groovy reserves (`goto "a" + b`)
+  (`SPECIFICATION.md` §5.5 item 3, §6.14).
 - **BREAKING:** the body of `if`, `else`, a loop or an arrow case that
   holds the assignment of a lambda is a `block` that holds the lambda
   (see Added), as in Groovy, which changes trees for input that parsed

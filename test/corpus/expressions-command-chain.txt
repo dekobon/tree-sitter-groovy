@@ -6537,6 +6537,75 @@ sh "a" { }
     (identifier)))
 
 ==================
+A first argument goes on with an assignment on the next line
+==================
+
+foo x
+= 2
+foo "a".b
+= c
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (assignment_expression
+      left: (field_access
+        object: (string_literal
+          (string_fragment))
+        field: (identifier))
+      right: (identifier))))
+
+==================
+A literal first argument past a number's dot or after goto takes what Groovy rejects (known divergence)
+==================
+
+foo 1..3
+++
+foo 1.abs()
+, b
+foo 1..3 ~b
+goto "a" + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (range_expression
+      start: (number_literal)
+      end: (update_expression
+        operand: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (number_literal)
+        field: (identifier))
+      arguments: (argument_list))
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (range_expression
+      start: (number_literal)
+      end: (number_literal)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier))))
+
+==================
 A literal first argument takes what Groovy rejects (known divergence)
 ==================
 

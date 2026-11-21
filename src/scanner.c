@@ -2457,7 +2457,10 @@ static RelationalWord read_relational_word(TSLexer *lexer) {
 // that a digit follows (`1.5`) and the sign of a decimal exponent (`1e-5`,
 // but not the `-` of `0xE-1`). Returns true at a `.` of a decimal number
 // that no digit follows, which it consumes: a member access or a range
-// (`1.m()`, `1..3`), which the argument goes on with.
+// (`1.m()`, `1..3`), which the argument goes on with. No caller reads past
+// that `.` to the end of the argument, so what a later line opens with is
+// not checked there, and the argument takes it as after a name argument
+// (`foo 1..3` then `++`, as `foo a..b` then `++`, which Groovy rejects).
 static bool skip_number(TSLexer *lexer) {
     bool hex = false;
     int32_t first = lexer->lookahead;
@@ -2500,8 +2503,10 @@ static bool skip_number(TSLexer *lexer) {
 // `%`, `=`, `!`, `<`, `>`, `&`, `|`, `^` or `:` (`::`), a closure's `{`,
 // `as`, `in` or `instanceof` (`foo "a"` then `.trim()` or `?: b`); a name, a
 // literal, `(`, `[`, `+`, `-` and `~` open the next statement (`foo 1` then
-// `-x`). Of the operators let in, `**` and the assignments open no line in
-// Groovy, and the grammar ends the argument before a `!` that negates. Where
+// `-x`). Of the operators let in, `**` opens no line in Groovy; an
+// assignment does (`x` then `= 2`), but Groovy assigns to no literal, so it
+// rejects `foo "a"` then `= b`, which is a call here. The grammar ends the
+// argument before a `!` that negates. Where
 // the argument is the literal alone, the grammar's literal form reads the
 // same tree without the token, in fewer steps: with the token, code made
 // only of `foo "a"` lines took about a quarter longer to parse.
