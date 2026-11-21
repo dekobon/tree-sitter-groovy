@@ -57,6 +57,11 @@ x.add(foo 'a')
 println x
 // <- function.call
 
+println "a" as String
+// <- function.call
+//          ^ keyword.operator
+//             ^ type
+
 assertEquals expected, actual
 // <- function.call
 

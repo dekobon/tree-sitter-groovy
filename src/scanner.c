@@ -16,7 +16,8 @@
 // COMMAND_PATH_START, one between the first name of a dotted receiver
 // and its first member access, and COMMAND_STATEMENT_START, one before
 // a statement's one-name receiver whose first argument is a `new`, an
-// array type, such a call in parentheses or a name;
+// array type, such a call in parentheses, a name or a literal that the
+// argument goes on past;
 // §6.9 SUBSCRIPT_OPEN, a `[` on
 // the same line as the token before it; §6.18 STATEMENT_PAREN, a `(`
 // that starts a line after an expression where a statement may start
@@ -2410,20 +2411,132 @@ static bool is_reserved_bare_lambda_name(const char *word, unsigned len) {
     return is_reserved_lambda_name(word, len) || word_is(word, len, "this");
 }
 
+// The relational operators that a name can spell (§6.11).
+typedef enum {
+    NO_RELATIONAL_WORD,
+    AS_WORD,
+    IN_WORD,
+    INSTANCEOF_WORD,
+} RelationalWord;
+
+// Consumes the word that starts here for as long as it can still be `as`,
+// `in` or `instanceof`, and returns which of them it is. At most the ten
+// characters of `instanceof` and the one after them are read.
+static RelationalWord read_relational_word(TSLexer *lexer) {
+    if (lexer->lookahead == 'a') {
+        return consume_keyword(lexer, "as") ? AS_WORD : NO_RELATIONAL_WORD;
+    }
+    if (lexer->lookahead != 'i') {
+        return NO_RELATIONAL_WORD;
+    }
+    advance(lexer);
+    if (lexer->lookahead != 'n') {
+        return NO_RELATIONAL_WORD;
+    }
+    advance(lexer);
+    if (lexer->lookahead == 's') {
+        return consume_keyword(lexer, "stanceof") ? INSTANCEOF_WORD
+                                                  : NO_RELATIONAL_WORD;
+    }
+    return is_identifier_char(lexer->lookahead) ? NO_RELATIONAL_WORD
+                                                : IN_WORD;
+}
+
+// SPECIFICATION.md §6.14 — consumes a number from its first digit: digits,
+// letters and `_` (a radix prefix, a type suffix, an exponent's `e`), a `.`
+// that a digit follows (`1.5`) and the sign of a decimal exponent (`1e-5`,
+// but not the `-` of `0xE-1`). Returns true at a `.` of a decimal number
+// that no digit follows, which it consumes: a member access or a range
+// (`1.m()`, `1..3`), which the argument goes on with.
+static bool skip_number(TSLexer *lexer) {
+    bool hex = false;
+    int32_t first = lexer->lookahead;
+    advance(lexer);
+    if (first == '0' && (lexer->lookahead == 'x' || lexer->lookahead == 'X')) {
+        hex = true;
+    }
+    int32_t last = first;
+    // EOF-bounded: lookahead is 0 at end of input, which no branch takes.
+    for (;;) {
+        int32_t c = lexer->lookahead;
+        if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')
+            || (c >= 'A' && c <= 'Z') || c == '_') {
+            last = c;
+            advance(lexer);
+        } else if (!hex && (c == '+' || c == '-')
+                   && (last == 'e' || last == 'E')) {
+            last = c;
+            advance(lexer);
+        } else if (c == '.' && !hex) {
+            advance(lexer);
+            if (lexer->lookahead < '0' || lexer->lookahead > '9') {
+                return true;
+            }
+            last = '.';
+        } else {
+            return false;
+        }
+    }
+}
+
+// SPECIFICATION.md §6.14 — after a literal that is the first argument of a
+// statement's call, read to its end: whether the argument goes on past it,
+// so that the call opens with COMMAND_STATEMENT_START and the argument is a
+// whole expression (`println "a" + b`, `timeout 30 * 60`). On the literal's
+// line it does unless a `,`, `;` or `}` or the end of input follows. On a
+// later line only what Groovy lets go on with an expression across a line
+// break goes on with it: an operator that starts with `.`, `?`, `*`, `/`,
+// `%`, `=`, `!`, `<`, `>`, `&`, `|`, `^` or `:` (`::`), a closure's `{`,
+// `as`, `in` or `instanceof` (`foo "a"` then `.trim()` or `?: b`); a name, a
+// literal, `(`, `[`, `+`, `-` and `~` open the next statement (`foo 1` then
+// `-x`). Of the operators let in, `**` and the assignments open no line in
+// Groovy, and the grammar ends the argument before a `!` that negates. Where
+// the argument is the literal alone, the grammar's literal form reads the
+// same tree without the token, in fewer steps: with the token, code made
+// only of `foo "a"` lines took about a quarter longer to parse.
+static bool literal_argument_goes_on(TSLexer *lexer, bool no_close_ahead) {
+    bool crossed_line = false;
+    bool slash = false;
+    if (!skip_header_trivia(lexer, true, no_close_ahead, &crossed_line,
+                            &slash)) {
+        return false;
+    }
+    if (slash) {
+        return true;
+    }
+    int32_t c = lexer->lookahead;
+    if (lexer->eof(lexer) || c == ',' || c == ';' || c == '}') {
+        return false;
+    }
+    if (!crossed_line) {
+        return true;
+    }
+    if (is_identifier_start(c)) {
+        return read_relational_word(lexer) != NO_RELATIONAL_WORD;
+    }
+    return c == '.' || c == '?' || c == '*' || c == '%' || c == '='
+        || c == '!' || c == '<' || c == '>' || c == '&' || c == '|'
+        || c == '^' || c == ':' || c == '{';
+}
+
 // Whether the first argument of a statement's parenthesis-free call that
 // opens with COMMAND_STATEMENT_START starts here, after the spaces after
 // the receiver: an object or array creation, an array type that is a
-// value, or such a call in parentheses (`println(foo 1)`); and, when the
-// receiver takes `names`, a name, a negation or `~` as
-// `first_argument_follows` takes them in a statement (`println x`,
-// `foo !x`). A literal and the key of a named argument (`foo 1`,
-// `foo a: 1`, `foo new: 1`) are not: the grammar's form takes them. A
-// dollar-slashy string after a receiver that takes `names` is one all the
-// same, as it was while its `$` passed for a name: the token makes the
-// argument a whole expression (`println $/a/$ + b`), which the grammar's
-// form does not. Without
-// `names`, a lowercase name is read only while it can still be `new` or a
-// primitive type name.
+// value, such a call in parentheses (`println(foo 1)`), or a number, a
+// quoted string, `true`, `false` or `null` that the argument goes on past
+// (`literal_argument_goes_on`), which the token makes a whole expression
+// (`println "a" + b`); and, when the receiver takes `names`, a name, a
+// negation or `~` as `first_argument_follows` takes them in a statement
+// (`println x`, `foo !x`). The key of a named argument (`foo a: 1`,
+// `foo true: 1`) and a literal that is the whole argument are not: the
+// grammar's form takes them. After a receiver that may name a type, a
+// string before `(` names a method (`String 'foo'() { }`), as
+// `scan_command_path_start` tells for a dotted one, and the grammar's form
+// reads it as before. A dollar-slashy string after a receiver that takes
+// `names` is a first argument all the same, as it was while its `$` passed
+// for a name: the token makes the argument a whole expression
+// (`println $/a/$ + b`). Without `names`, a capitalized name is read with
+// any nested type names after it, and a lowercase one whole.
 static bool statement_argument_follows(
     TSLexer *lexer,
     bool names,
@@ -2433,12 +2546,33 @@ static bool statement_argument_follows(
     if (c == '(') {
         return parenthesized_command_follows(lexer, no_close_ahead);
     }
-    if (!names) {
-        if (c == 'n') {
-            return consume_keyword(lexer, "new")
-                && creation_follows(lexer, no_close_ahead);
+    if (c >= '0' && c <= '9') {
+        return skip_number(lexer)
+            || literal_argument_goes_on(lexer, no_close_ahead);
+    }
+    if (c == '"' || c == '\'') {
+        if (!skip_string(lexer)
+            || (!names && (!skip_same_line_space(lexer, false)
+                           || lexer->lookahead == '('))) {
+            return false;
         }
-        return read_element_type_name(lexer)
+        return literal_argument_goes_on(lexer, no_close_ahead);
+    }
+    if (!names) {
+        if (is_capital(c)) {
+            return read_element_type_name(lexer)
+                && array_dimensions_follow(lexer, true, no_close_ahead);
+        }
+        char type_word[sizeof "synchronized"];
+        unsigned type_len = read_word(lexer, type_word, sizeof type_word);
+        if (word_is(type_word, type_len, "new")) {
+            return creation_follows(lexer, no_close_ahead);
+        }
+        if (is_literal_word(type_word, type_len)) {
+            return !key_colon_follows(lexer, type_word, type_len)
+                && literal_argument_goes_on(lexer, no_close_ahead);
+        }
+        return is_primitive_type(type_word, type_len)
             && array_dimensions_follow(lexer, true, no_close_ahead);
     }
     if (c == '!') {
@@ -2457,6 +2591,10 @@ static bool statement_argument_follows(
     }
     if (opens_dollar_slashy(word, len, lexer)) {
         return true;
+    }
+    if (is_literal_word(word, len)) {
+        return !key_colon_follows(lexer, word, len)
+            && literal_argument_goes_on(lexer, no_close_ahead);
     }
     int32_t next = lexer->lookahead;
     if (next == '.' || next == '[') {
@@ -2916,9 +3054,11 @@ static bool scan_dotted_statement_start(
 // SPECIFICATION.md §6.14, §6.21 — after the first name of a statement that
 // may name a type by Apache's isInvalidLocalVariableDeclaration, a
 // capitalized or a primitive type name, and the spaces after it, at a name:
-// a call whose first argument starts with `new` or is an array type value
-// (`Foo new Bar()`, `Foo String[].class`, COMMAND_STATEMENT_START), or a
-// declaration (`String s`, `String s = 'a'`, DECLARATION_START). Such a
+// a call whose first argument starts with `new`, is an array type value or
+// is `true`, `false` or `null` that the argument goes on past
+// (`Foo new Bar()`, `Foo String[].class`, `Foo true + 1`,
+// COMMAND_STATEMENT_START), or a declaration (`String s`,
+// `String s = 'a'`, DECLARATION_START). Such a
 // receiver takes no other name as an argument (`may_name_type`), so each
 // statement that starts with two names is a call, a declaration or neither,
 // and never both.
@@ -2938,6 +3078,12 @@ static bool scan_typed_statement_start(
     // `String $/a/$` is a call with a string, which the grammar's form takes.
     if (opens_dollar_slashy(name, len, lexer)) {
         return false;
+    }
+    if (is_literal_word(name, len)) {
+        lexer->result_symbol = COMMAND_STATEMENT_START;
+        return valid_symbols[COMMAND_STATEMENT_START]
+            && !key_colon_follows(lexer, name, len)
+            && literal_argument_goes_on(lexer, no_close_ahead);
     }
     bool keyword = is_reserved_variable_name(name, len);
     if (lexer->lookahead == '.') {
@@ -2966,11 +3112,12 @@ static bool scan_typed_statement_start(
 // SPECIFICATION.md §6.14 — decides at the first name of a statement,
 // before it, whether the statement is a parenthesis-free call whose
 // receiver is that name and whose first argument starts with `new`, is
-// an array type that is a value (`foo new Bar()`, `foo String[].class`) or
-// is a name (`println x`), on the receiver's line. A name is one only after
+// an array type that is a value (`foo new Bar()`, `foo String[].class`), is
+// a name (`println x`) or is a literal that the argument goes on past
+// (`println "a" + b`), on the receiver's line. A name is one only after
 // a receiver that may not name a type (`may_name_type`) and is no
-// contextual word. Literal and key arguments are matched in the
-// grammar instead (§5.5 item 3), and a dotted receiver by
+// contextual word. A key argument and a literal that is the whole argument
+// are matched in the grammar instead (§5.5 item 3), and a dotted receiver by
 // COMMAND_PATH_START. The token is empty and the in-grammar lexer reads
 // the name. Deciding here rather than after the name keeps a comment
 // that opens the next line from hiding the line break: after `foo` and
@@ -3084,37 +3231,6 @@ static bool scan_statement_start(
     }
     lexer->result_symbol = COMMAND_STATEMENT_START;
     return true;
-}
-
-// The relational operators that a name can spell (§6.11).
-typedef enum {
-    NO_RELATIONAL_WORD,
-    AS_WORD,
-    IN_WORD,
-    INSTANCEOF_WORD,
-} RelationalWord;
-
-// Consumes the word that starts here for as long as it can still be `as`,
-// `in` or `instanceof`, and returns which of them it is. At most the ten
-// characters of `instanceof` and the one after them are read.
-static RelationalWord read_relational_word(TSLexer *lexer) {
-    if (lexer->lookahead == 'a') {
-        return consume_keyword(lexer, "as") ? AS_WORD : NO_RELATIONAL_WORD;
-    }
-    if (lexer->lookahead != 'i') {
-        return NO_RELATIONAL_WORD;
-    }
-    advance(lexer);
-    if (lexer->lookahead != 'n') {
-        return NO_RELATIONAL_WORD;
-    }
-    advance(lexer);
-    if (lexer->lookahead == 's') {
-        return consume_keyword(lexer, "stanceof") ? INSTANCEOF_WORD
-                                                  : NO_RELATIONAL_WORD;
-    }
-    return is_identifier_char(lexer->lookahead) ? NO_RELATIONAL_WORD
-                                                : IN_WORD;
 }
 
 // SPECIFICATION.md §6.11 — skips spaces, tabs, line escapes and block

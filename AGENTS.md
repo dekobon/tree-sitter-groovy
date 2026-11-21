@@ -59,7 +59,9 @@ The default branch is **`main`**.
     call in parentheses or a name (`foo new Bar()`, `println x`), each
     with its first argument on the receiver's line; a name is a first
     argument only where Apache's isInvalidLocalVariableDeclaration
-    makes the statement no declaration (`foo bar`, not `String s`)
+    makes the statement no declaration (`foo bar`, not `String s`),
+    and a literal only where the argument goes on past it
+    (`println "a" + b`, not `foo 1` then `-x` on the next line)
     (§6.14);
   - a subscript `[` on the same line as the expression before it
     (§6.9), a `(` that opens a line after an expression where a

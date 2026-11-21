@@ -5615,7 +5615,7 @@ def t = this.new Inner()
       arguments: (argument_list))))
 
 ==================
-A literal first argument of a statement is not a whole expression (known divergence)
+A literal first argument of a statement is a whole expression
 ==================
 
 foo true + 1
@@ -5626,16 +5626,797 @@ foo 1 + 2
 (source_file
   (command_chain
     receiver: (identifier)
-    argument: (boolean_literal))
+    argument: (binary_expression
+      left: (boolean_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal))))
+
+==================
+A literal first argument goes on with an operator, a subscript or a member access on its line
+==================
+
+println "a" + b
+foo 30 - 60
+println "a" as T
+println "a"[0]
+println "a" * 3
+println "a" ?: b
+println "a" == b
+println "a".size()
+timeOutInMs 30 * 60 * 1000
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (cast_expression
+      value: (string_literal
+        (string_fragment))
+      type: (type_identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (subscript_expression
+      object: (string_literal
+        (string_fragment))
+      index: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (elvis_expression
+      value: (string_literal
+        (string_fragment))
+      default: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (string_literal
+          (string_fragment))
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (binary_expression
+        left: (number_literal)
+        right: (number_literal))
+      right: (number_literal))))
+
+==================
+A literal first argument goes on with a relational word, a closure or parentheses on its line
+==================
+
+foo "a" in b
+foo "a" !in b
+foo "a" instanceof T
+foo "a" { }
+foo "a"(b)
+foo 'a' + b, c
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (membership_expression
+      element: (string_literal
+        (string_fragment))
+      collection: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (membership_expression
+      element: (string_literal
+        (string_fragment))
+      collection: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (instanceof_expression
+      value: (string_literal
+        (string_fragment))
+      type: (type_identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (string_literal
+        (string_fragment))
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (string_literal
+        (string_fragment))
+      arguments: (argument_list
+        (identifier))))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal)
+      right: (identifier))
+    argument: (identifier)))
+
+==================
+A number as the first argument of a statement
+==================
+
+foo 1_000 * 2
+foo 0x1F + 1
+foo 1.5e3 - 1
+foo 10G * 2
+foo 1e-5 * 2
+foo 0xE-1
+foo 1L + 2
+foo 1..3
+foo 1.method()
+foo 1.
+  m()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (range_expression
+      start: (number_literal)
+      end: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (number_literal)
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (number_literal)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A string as the first argument of a statement
+==================
+
+foo "a${b}" + c
+foo "${"}"}" + c
+foo """a
+b""" + c
+foo '''a''' * 2
+foo "a\"b" + c
+foo '' + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier)))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (gstring_brace_interpolation
+          value: (string_literal
+            (string_fragment))))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal)
+      right: (identifier))))
+
+==================
+Comments and a line escape after a literal first argument
+==================
+
+foo 1 /* c */ + 2
+foo "a" /* c
+*/ + b
+foo 1 \
++ b
+foo "a" // c
++ b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      (block_comment)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      (block_comment)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (line_comment)
   (expression_statement
     (unary_expression
-      operand: (number_literal)))
+      operand: (identifier))))
+
+==================
+A line that opens with a sign, a bracket, a name or a literal ends a literal first argument
+==================
+
+foo "a"
++ b
+foo 1
+- b
+foo 1
+++b
+foo "a"
+--b
+foo "a"
+(b)
+foo 1
+[0]
+foo "a"
+bar
+foo 1
+"b"
+foo "a"
+2
+foo "a"
+// c
+- b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
   (command_chain
     receiver: (identifier)
     argument: (number_literal))
   (expression_statement
     (unary_expression
-      operand: (number_literal))))
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (unary_update_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_update_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (list_literal
+      (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (line_comment)
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
+A line that opens with an operator continues a literal first argument
+==================
+
+foo "a"
+* b
+foo 1
+/ b
+foo "a"
+?: b
+foo 1
+== b
+foo "a"
+< b
+foo 1
+<< b
+foo "a"
+&& b
+foo 1
+|| b
+foo "a"
+.size()
+foo 1
+?.size()
+foo "a"
+? b : c
+foo "a"
+// c
+.trim()
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (elvis_expression
+      value: (string_literal
+        (string_fragment))
+      default: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (string_literal
+          (string_fragment))
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (safe_navigation_expression
+        object: (number_literal)
+        property: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (ternary_expression
+      condition: (string_literal
+        (string_fragment))
+      consequence: (identifier)
+      alternative: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (field_access
+        object: (string_literal
+          (string_fragment))
+        (line_comment)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A line that opens with a closure, as, in or instanceof continues a literal first argument
+==================
+
+foo "a"
+{ }
+foo 1
+as T
+foo "a"
+in b
+foo "a"
+!in b
+foo 1
+instanceof T
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (string_literal
+        (string_fragment))
+      closure: (closure)))
+  (command_chain
+    receiver: (identifier)
+    argument: (cast_expression
+      value: (number_literal)
+      type: (type_identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (membership_expression
+      element: (string_literal
+        (string_fragment))
+      collection: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (membership_expression
+      element: (string_literal
+        (string_fragment))
+      collection: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (instanceof_expression
+      value: (number_literal)
+      type: (type_identifier))))
+
+==================
+Calls with a literal first argument that keep their trees
+==================
+
+{ foo "a" }
+foo "a"
+foo 1, k: v
+foo "a", -1
+foo 'a', 'b'
+foo true: 1
+foo "a" bar "b"
+foo -1
+foo (x)
+foo [1]
+String s
+int a, b
+String s = 'a'
+
+---
+
+(source_file
+  (block
+    (command_chain
+      receiver: (identifier)
+      argument: (string_literal
+        (string_fragment))))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (named_argument
+      key: (identifier)
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment))
+    argument: (unary_expression
+      operand: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (string_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+A literal first argument read apart from the call (known divergence)
+==================
+
+foo
+"a" + b
+foo /* c */ "a" + b
+var "a" + b
+record "a" + b
+trait "a" + b
+sealed "a" + b
+permits "a" + b
+super "a" + b
+_ "a" + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    (block_comment)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
+A literal first argument before a line that opens with a sign or a lambda (known divergence)
+==================
+
+foo "a" + b
+-c
+foo "a"
+(x) -> x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (binary_expression
+        left: (string_literal
+          (string_fragment))
+        right: (identifier))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier))))
+
+==================
+A literal first argument takes what Groovy rejects (known divergence)
+==================
+
+foo "a" = b
+foo "a" += b
+foo "a"
+= b
+foo 1
+** 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (assignment_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (assignment_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (assignment_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (power_expression
+      left: (number_literal)
+      right: (number_literal))))
 
 ==================
 Comments after a name argument are trivia (known divergence)

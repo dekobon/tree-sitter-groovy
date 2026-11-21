@@ -1122,12 +1122,13 @@ module.exports = grammar({
     // §5.5 — command_chain is the parenthesis-free method-call
     // form (`println 'hello'`, `events 'a', 'b', 'c'`). This rule is the
     // statement whose receiver is one name and whose first argument is
-    // a literal, a closure or a named argument, which no other statement
-    // starts with, so it needs no scanner token. The other forms are
-    // aliased to it: a dotted receiver, and a first argument that is a
-    // `new`, an array type, a name or such a call in parentheses, in
-    // `_path_command_chain`, and a call that is a value in
-    // `_value_command_chain`. After a comma an argument is a named
+    // a literal that is the whole argument, a closure or a named argument,
+    // which no other statement starts with, so it needs no scanner token.
+    // The other forms are aliased to it: a dotted receiver, and a first
+    // argument that is a `new`, an array type, a name, such a call in
+    // parentheses or a literal that the argument goes on past
+    // (`println 'a' + b`), in `_path_command_chain`, and a call that is a
+    // value in `_value_command_chain`. After a comma an argument is a named
     // argument or any expression: Apache's `argumentListElement` without
     // spread arguments (`foo 'a', *args` is an ERROR). The continuations
     // of a chain (`foo a bar`) are not taken. Closes a subset of
@@ -1188,7 +1189,9 @@ module.exports = grammar({
     // grammar cannot read it from the name alone: `foo` followed by
     // `new Bar()` or `x` on the next line is two statements, and the
     // scanner decides before the name, where no comment can hide that line
-    // break.
+    // break. So does one whose first argument is a literal that the
+    // argument goes on past (`println 'a' + b`, `foo 1` then `.m()` on the
+    // next line), while `foo 1` then `-x` stays two statements (§6.14).
     _path_command_chain: $ => seq(
       choice(
         field('receiver', $._statement_command_path),

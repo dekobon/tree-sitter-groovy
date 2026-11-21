@@ -231,3 +231,35 @@ Foo()
     argument: (object_creation_expression
       type: (type_identifier)
       arguments: (argument_list))))
+
+==================
+A literal first argument across a line break (CRLF)
+==================
+
+foo 1
+- 2
+foo 1
+* 2
+foo "a" \
+- b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier))))

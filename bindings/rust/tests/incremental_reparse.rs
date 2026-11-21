@@ -462,6 +462,57 @@ fn reparse_after_statement_block_edits_matches_parse_from_scratch() {
     }
 }
 
+/// Texts with a literal first argument of a statement's call (§6.14), each
+/// with a sequence of edits: an operator typed after the literal one
+/// character at a time and deleted again, the sign that opens the next line
+/// turned into `*` and back, a `.` and a closure typed at the start of the
+/// next line, and a name argument turned into a string and a number. The
+/// scanner decides the token before the receiver from the literal and what
+/// follows it, on its line or at the start of the next, so each edit there
+/// must lex that token again.
+const LITERAL_ARGUMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "println \"a\"\nfoo()\n",
+        &[
+            (11, 0, " "),
+            (12, 0, "+"),
+            (13, 0, " "),
+            (14, 0, "b"),
+            (14, 1, ""),
+            (13, 1, ""),
+            (12, 1, ""),
+            (11, 1, ""),
+        ],
+    ),
+    (
+        "timeOutInMs 30\n",
+        &[
+            (14, 0, " "),
+            (15, 0, "*"),
+            (16, 0, " "),
+            (17, 0, "6"),
+            (18, 0, "0"),
+        ],
+    ),
+    ("foo 1\n- x\n", &[(6, 1, "*"), (6, 1, "-")]),
+    ("foo 'a'\nbar()\n", &[(8, 0, "."), (8, 1, "")]),
+    ("sh 'ls'\nx\n", &[(8, 1, "{ }"), (8, 3, "x")]),
+    ("foo x + 1\n", &[(4, 1, "'a'"), (4, 3, "1"), (4, 1, "x")]),
+];
+
+#[test]
+fn reparse_after_literal_argument_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in LITERAL_ARGUMENT_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
 /// Texts with the names of a multi-assignment, or a script method's untyped
 /// parameters, in parentheses (§6.20), each with a sequence of edits after
 /// the first `,`: the method's body turned into `= l` and back, a name

@@ -754,6 +754,27 @@ The resolution we adopt:
    `foo new Foo().bar()` passes the result of `bar()`, as Groovy does
    (observed with Groovy 3). `foo` followed by `new Foo()` on the next
    line, also with a comment opening that line, stays two statements.
+   A literal first argument (a number, a quoted string, `true`, `false`
+   or `null`) is the start of a whole expression too: `println "a" + b`
+   passes the sum, `timeOutInMs 30 * 60 * 1000` the product,
+   `foo "a".trim()` the call's result and `foo 1..3` the range, and
+   `foo "a" { }` is `foo("a"({ }))`, a call of the method named `a` with
+   the closure (observed with Groovy 3). On the line after the literal the
+   argument goes on only where Groovy lets an expression go on across a
+   line break: at an operator other than `+`, `-` and `~`, a closure's
+   `{`, `as`, `in` or `instanceof` (`foo "a"` then `.trim()`, `?: b` or
+   `{ }`). `foo 1` followed by `-x`, `++x`, `(x)`, `[0]`, a name or a
+   literal on the next line stays two statements; Groovy's grammar lets no
+   such token open a line within an expression (`additiveExprAlt` has no
+   `nls` before its operator). The scanner decides it before the receiver
+   (§6.14). A literal is no such argument after a comment between it and
+   the receiver (`foo /* c */ "a" + b`), after the receivers `var`,
+   `record`, `trait` and `sealed`, whose own keywords the scanner decides
+   there, and after `super`, `permits` and `_`, keywords of the grammar:
+   each is the call of the literal alone and `+b`, where Groovy passes the
+   sum. Nor is a literal on the line after the receiver: `foo` followed by
+   `"a" + b` is the call `foo "a"` and `+b`, where Groovy reads `foo` and
+   the sum, as before.
    The first argument may also start with a name, `!` or `~`
    (`println x`, `foo !x`, `obj.m arg`, `def r = foo bar`), which is
    Apache's `argumentList` after a receiver that the name cannot
@@ -821,7 +842,8 @@ The resolution we adopt:
    object or array creation, an array type value, a command chain in
    parentheses or a name, as in Apache's `argumentList`:
    `def x = foo 'a' + b` and
-   `log.info 'x: ' + y` pass the sum. Neither takes a closure as the
+   `log.info 'x: ' + y` pass the sum, as `println 'a' + b` does with a
+   one-name receiver (above). Neither takes a closure as the
    first argument: `def c = foo { }` and `list.each { }` stay a
    `method_invocation`, which is how Apache reads a closure after a
    name. `def x = foo bar` and `a.b c` are calls (`a.b.C x = 1`
@@ -2245,9 +2267,14 @@ argument starts with `new`, is an array type that is a value, is a
 call in parentheses or starts with a name (§5.5 item 3): `foo` followed
 by `new Bar()` or `bar` on the next line is two statements in Groovy,
 and the grammar, which matches a literal after such a receiver itself,
-cannot tell. Nor can the grammar tell `println(foo 1)` from
-`println(x)` at the `(`, where it must already have made `println` the
-receiver or an expression, nor `foo bar` from `String s` at `bar`.
+cannot tell. A literal that the argument goes on past opens with the
+same token (`println "a" + b`): the grammar's literal form takes the
+literal alone, and a form that took an expression there would read
+`foo 1` followed by `-x` on the next line as one call, where Groovy ends
+the statement at the line break. Nor can the grammar tell
+`println(foo 1)` from `println(x)` at the `(`, where it must already
+have made `println` the receiver or an expression, nor `foo bar` from
+`String s` at `bar`.
 
 ```text
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
@@ -2285,9 +2312,12 @@ when:
     or `as` and its own token (§6.7, §6.13, §6.16) is valid there; the
     scanner decides that token instead; and
   - a creation, an array type value or a call in parentheses follows,
-    as below; or the receiver takes a name argument, which is not
-    `var`, `yield`, `in` or `as`, and a name argument follows with the
-    rules of a statement.
+    as below; or a literal follows that the argument goes on past, as
+    below, a quoted string after a receiver that takes no name argument
+    only when no `(` follows it on its line (`String 'foo'() { }`); or
+    the receiver takes a name argument, which is not `var`, `yield`,
+    `in` or `as`, and a name argument follows with the rules of a
+    statement.
 The token ends before the name.
 
 A value keyword: a keyword of grammar.js that Groovy reserves, which
@@ -2367,6 +2397,19 @@ A name argument: after spaces, tabs and line escapes, on the line:
   after a lowercase-typed first closure parameter is a call's arguments.
   Inside the parentheses that a call in parentheses or parameters are
   read from, a `(` after the name is not read into.
+A literal that the argument goes on past: after spaces, tabs and line
+escapes, but no line break and no comment, a number, a quoted string,
+or the word `true`, `false` or `null` that is no key, read whole: a
+number's digits, letters and `_`, a `.` before a digit and the sign of
+a decimal exponent (`1e-5`); a string to its closing quote, on its line
+unless triple-quoted, a `\` taking the character after it, with each
+`${…}` read as code to its `}`, braces counted and strings in it read
+whole, at most 8 strings deep. Then the argument goes on at once at a
+number's `.` that no digit follows (`1.m()`, `1..3`), and otherwise
+after Groovy's trivia at the first token: on the literal's line at any
+but `,`, `;`, `}` and the end of input, and on a later line at a `/`
+that opens no comment, at `.`, `?`, `*`, `%`, `=`, `!`, `<`, `>`, `&`,
+`|`, `^`, `:` and `{`, and at the word `as`, `in` or `instanceof`.
 A creation: the word `new`, then, after Groovy's trivia (whitespace,
 line breaks, line escapes and comments), a name. The key `new:` is
 not one.
@@ -2469,9 +2512,10 @@ by a call's first argument is turned down at the character after it
 after the next name once that one can no longer be `new`, a primitive
 type name or a capitalized class name (`String name`); after any other
 the next name is read whole, as it may be the first argument
-(`println x`). The same name may be
-`record`, `trait`, `sealed`, `var`, `yield`, `in`, `as` or the start of
-an array type value, whose tokens are valid at a statement start too;
+(`println x`). A literal after the name is read whole, with the trivia
+and the first token after it (`println "a"`, below). The same name may
+be `record`, `trait`, `sealed`, `var`, `yield`, `in`, `as` or the start
+of an array type value, whose tokens are valid at a statement start too;
 the scanner reads it once and decides each of them there, as its other
 branches decide them where no statement may start. A keyword of
 grammar.js is turned down as soon as it is read, because after the
@@ -2686,6 +2730,80 @@ after a name as division. Known differences from Groovy:
   it, so `obj . m 1` and `obj` followed by `.m 1` on the next line are
   not calls; Groovy reads both as `obj.m(1)` (observed). Both read as
   they did before #52.
+
+A literal as a statement's first argument (§5.5 item 3) needs no change
+to the grammar either: after COMMAND_STATEMENT_START the first argument
+is any expression. The scanner reads the literal after the receiver
+whole, as the in-grammar lexer does next, then the trivia and the first
+token after it, as above. It emits the token only where the argument
+goes on past the literal, and leaves a literal that is the whole
+argument to the grammar's literal form, `command_chain`, which gives the
+same tree. That split saves time, not trees: with the token before every
+literal, code made only of `foo "a"` lines took about 23% longer to
+parse, as the token and the reductions of an expression cost the parser
+more than the literal form does, while the look-ahead itself costs about
+1%. On a later line the tokens that go on are those that Groovy's
+grammar lets open a line within an expression, with `NL*` (`nls` in
+4.0.x) before the operator in Apache's `expression` alternatives or
+before a `pathElement`: the binary operators but `+`, `-` and `**`, the
+ternary and Elvis operators, `as`, `in` and `instanceof`, `.`, `?.`,
+`*.`, `.&`, `::` and a closure (GroovyParser.g4 of 4.0.x, 6 and master).
+There `+` and `-` open a unary expression, and `(` and `[` the next
+statement (§6.9, §6.18), so the scanner leaves the literal alone before
+them, as before. Before a `(` that also keeps `foo "a"` followed by
+`(x) -> x` the call and a lambda statement, as before, where Groovy
+passes the lambda to a call of the method `a`; an argument that took the
+`(` would leave the `->` an `ERROR`. `**` and the assignments start with
+characters that go on, and are accepted where Groovy rejects them.
+
+Measured against the grammar before: STATE_COUNT, LARGE_STATE_COUNT,
+SYMBOL_COUNT and EXTERNAL_TOKEN_COUNT are unchanged (4658, 1789, 408 and
+38), as is `parser.c`. Read one byte per call, the lexer reads 8% more
+of the real files concatenated (1.95 bytes per byte, 1.80 before) and
+the same of the Java files; neither set takes measurably more time (the
+266 real files 51.6 ms against 51.7 ms, the fastest of 40 runs; the
+24,548 Java files 14.8 s in two orders of five runs, against 14.7 s and
+15.1 s). At 1,000, 4,000 and 16,000 lines the bytes read per byte stay the
+same on runs of literal arguments and of input meant to defeat the
+look-ahead: strings, triple-quoted strings, interpolations and comments
+that do not close after the receiver, literals of 2,000 characters, and
+50 blank or comment lines after a literal. A run of `foo "${ {` lines,
+a nest of strings that does not close, reads 11.4 bytes per byte (2.4
+before) at each length; read whole, each of its strings would make it
+quadratic (`bindings/rust/tests/literal_argument_cost.rs`).
+
+Of 266 real files, 12 change their trees: 11 that had an `ERROR` have
+none, and the 35 calls that changed in them read as Groovy 3 reads them;
+one without an `ERROR` passes a sum (`src "${MODEL_URL}/" + f`). No Java
+file changes, one corpus test does, and 17 of 4,000 generated statement
+sequences (`sh 'ls'` followed by `{ ->` or `{ foo() }` on the next line,
+Groovy's `sh('ls'({ … }))`). Trees that change for input that parsed
+without an `ERROR`, each a call where Groovy reads one (observed with
+Groovy 3):
+`+ b`, `- b`, `[0]`, `(b)`, `as T`, `in b`, `!in b`, `instanceof T` and
+`!instanceof T` after the literal on its line were the call of the
+literal and statements of their own; `{ }` on its line or the next was
+the call and a block, and is a call of the literal with the closure,
+Groovy's call of the method a string names; and `as T`, `in b`, `!in b`,
+`instanceof T` and `!instanceof T` on the next line go on with the
+argument. Over 13,792 edits of texts with literal arguments, a reparse
+gives the tree of a parse from scratch.
+
+Known differences from Groovy, besides those above:
+
+- An argument that goes on past the literal and ends its line takes a
+  next line that starts with `+` or `-`: `foo "a" + b` followed by `-c`
+  passes `"a" + b - c`, as `println x` followed by `-y` passes `x - y`.
+  Only a literal that ends its line is decided at the line break.
+- `foo` followed by `"a" + b` on the next line is the call `foo "a"` and
+  `+b`: the literal form takes a literal on the line after the receiver,
+  as before (Groovy reads `foo` and the sum).
+- The receivers `var`, `record`, `trait` and `sealed`, whose own
+  keywords the scanner decides at the same name, and `super`, `permits`
+  and `_`, keywords of the grammar, keep the literal alone:
+  `super "a" + b` is `super "a"` and `+b`. So does a comment between the
+  receiver and the literal (`foo /* c */ "a" + b`), as for every first
+  argument.
 
 ### 6.15 ARRAY_VALUE_START and TYPE_START — implementation contract
 

@@ -91,6 +91,10 @@ path = "bindings/rust/tests/dollar_slashy_string_cost.rs"
 name = "next_line_cast_cost"
 path = "bindings/rust/tests/next_line_cast_cost.rs"
 
+[[test]]
+name = "literal_argument_cost"
+path = "bindings/rust/tests/literal_argument_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 

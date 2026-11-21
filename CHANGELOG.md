@@ -317,6 +317,36 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   one across lines, `{ foo a, b = '''x` then `y''' -> a }`), so 128 or
   more names after the first (`{ foo a, b0, …, b127 -> a }`) are an
   `ERROR`.
+- **BREAKING:** a literal first argument of a statement whose receiver is
+  one name (a number, a quoted string, `true`, `false` or `null`) is the
+  start of a whole expression, as in Groovy, which changes trees for
+  input that parsed without an `ERROR` at v0.6.0. After the receiver and
+  the literal, `+ b`, `- b`, `[0]`, `(b)`, `as T`, `in b`, `!in b`,
+  `instanceof T` and `!instanceof T` on the literal's line, also past a
+  block comment or a line escape, were the call and separate statements,
+  and are one argument expression (`println "a" + b`,
+  `src "${url}/" + f`); `foo 'a' ++b` was `foo 'a'` and `++b`, and is
+  `foo('a'++)` and `b`, where Groovy goes on with `.b`. `{ }` on the
+  literal's line was the call and a closure statement, a `block` since
+  the change above, and is a call of the literal with the closure
+  (`foo("a"({ }))`, Groovy's call of a method named `a`). On the next
+  line `{ }`, `as T`, `in b`, `!in b`, `instanceof T` and
+  `!instanceof T` now continue the argument, as do the operators that
+  Groovy lets open a line within an expression (`foo "a"` then
+  `.trim()`, `?: b`, `* 2`), which were an `ERROR`; `+`, `-`, `~`, `(`,
+  `[`, a name and a literal there open the next statement, as before
+  (`foo 1` then `-x`). Of 266 real files, 11 that had an `ERROR` have
+  none (`assertEquals "a " +` then `"b", x, y` in tests,
+  `timeOutInMs 30 * 60 * 1000` in Gradle files). Read otherwise than
+  Groovy: an expression that goes on past the literal and ends its line
+  takes a next line that opens with `+` or `-` (`foo "a" + b` then `-c`
+  is one call), as after a name argument; a comment between the receiver
+  and the literal, the receivers `var`, `record`, `trait`, `sealed`,
+  `permits`, `super` and `_`, and a literal on the line after the
+  receiver keep the literal alone. An assignment after the literal
+  (`foo "a" = b`, `foo "a" += b`), and `= b` or `** b` on the next line,
+  which Groovy rejects, are a call with no `ERROR` (`SPECIFICATION.md`
+  §5.5 item 3, §6.14).
 - **BREAKING:** the body of `if`, `else`, a loop or an arrow case that
   holds the assignment of a lambda is a `block` that holds the lambda
   (see Added), as in Groovy, which changes trees for input that parsed
