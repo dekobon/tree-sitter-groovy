@@ -2945,19 +2945,17 @@ followed by a word reads as a test even where Groovy rejects it as
 anything: `@A` followed by `var instanceof T`, `var instanceof new
 Foo()`.
 
-An incremental reparse can differ from a parse from scratch, as in
-§6.6. Whether the word is a keyword depends on what follows it, but a
-finished node that ends before the word is reused when an edit changes
-only those later bytes. `x = a` followed by `in = 1` on the next line
-is an assignment and a second statement; editing the second line to
-`in y = 12` makes the text, parsed from scratch, the assignment
-`x = ((a in y) = 12)`, while a reparse keeps `x = a` and reads the
-declaration `in y = 12`. Both trees have no `ERROR`. In the same way
-`import a.B` followed by `as = C`, edited to `as l= Cx`, keeps the
-import without an alias on reparse. The runtime counts the scanner's
-look-ahead past the word against the word's own token only, so no
-token the scanner emits can mark the node before it; the next edit
-inside that node corrects it.
+Whether the word is a keyword depends on what follows it, and the
+runtime counts the scanner's look-ahead past the word against the
+word's own token only, so an edit after the word could leave a
+finished node before it in place on reparse. No such reparse is
+known. `x = a` followed by `in = 1` on the next line is an assignment
+and a second statement; editing the second line to `in y = 12` makes
+the text the assignment `x = ((a in y) = 12)`, on reparse as from
+scratch, and `import a.B` followed by `as = C`, edited to `as l= Cx`,
+gets the alias `l` both ways (`bindings/rust/tests/incremental_reparse.rs`
+holds both). No reparse differed over 32,033 single edits of 24 texts
+that hold the four words, nor over 175,077 pairs of edits of those two.
 
 Measured against the grammar before: STATE_COUNT 4179 to 4249,
 LARGE_STATE_COUNT 1555 to 1565, six external tokens and no conflict

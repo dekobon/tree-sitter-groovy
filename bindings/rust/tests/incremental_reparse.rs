@@ -647,6 +647,29 @@ fn reparse_after_edits_past_a_reused_node_matches_parse_from_scratch() {
     }
 }
 
+/// Texts with `in` or `as` on the line after a statement (§6.16), whose
+/// token depends on what follows the word, each with edits after the word
+/// that make it the keyword: `x = a` then `in y = 12` is the assignment
+/// `x = ((a in y) = 12)`, and `as l= Cx` makes `l` the import's alias.
+/// The reparse must not keep the statement before the word as it was.
+const CONTEXTUAL_KEYWORD_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    ("x = a\nin = 1\n", &[(8, 4, " y = 12")]),
+    ("import a.B\nas = C\n", &[(14, 0, "l"), (18, 0, "x")]),
+];
+
+#[test]
+fn reparse_after_contextual_keyword_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in CONTEXTUAL_KEYWORD_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
 /// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks
 /// before its `(` (after `final g`), the method's version reads the `(` of
 /// its parameters on its own, with none of the look-ahead for a lambda that

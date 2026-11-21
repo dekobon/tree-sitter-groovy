@@ -505,11 +505,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   initializer (`String s = 'a'`) takes 42% fewer. The compiled parser
   is about 30% larger.
 - A few edit sequences still reparse incrementally to a tree that
-  differs from a parse from scratch; each kind is described in
-  `SPECIFICATION.md` §6.16 to §6.22, or for an edit of a `default`
-  modifier after a field with modifiers only in
-  `docs/divergences-from-spec.md` §20, and pinned in
-  `bindings/rust/tests/incremental_reparse.rs`.
+  differs from a parse from scratch. `SPECIFICATION.md` §6.17 to §6.22,
+  and `docs/divergences-from-spec.md` §20 for an edit of a `default`
+  modifier after a field with modifiers only, give an example of each
+  kind known but one, a closure whose two readings weigh the same
+  (§6.22), and `bindings/rust/tests/incremental_reparse.rs` pins each
+  example. Random edits find more, most of them in text with an `ERROR`
+  both ways, which those sections count.
 - `SPECIFICATION.md` targets the Groovy 6.x grammar (6.0.0 at the time
   of writing) instead of 4.x: earlier versions parse where their syntax
   is a subset, and where versions read the same text differently the
