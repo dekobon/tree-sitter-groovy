@@ -1,6 +1,6 @@
 //! Cost ceilings for shapes of input that this grammar rejects and parses in
 //! time above linear in its length (`docs/divergences-from-spec.md` §29), and
-//! linear bounds for two inputs that were among them. At v0.6.0 each was
+//! linear bounds for inputs that were among them. At v0.6.0 each was
 //! linear. The rejected shapes left are not fixed: these tests pin today's
 //! cost so that it does not grow further.
 //!
@@ -23,9 +23,25 @@
 //! - Lines of `case 1:` outside a `switch`, which Groovy rejects. While
 //!   `case` was a name, a version nested the lines as labels and closed the
 //!   whole nest at each line (measured: 5,151, 20,301 and 80,601 reductions
-//!   at 100, 200 and 400 lines; v0.6.0 401 at 400). `case` is reserved now,
-//!   and the reductions are linear in the lines (measured: 797 and 6,397 at
-//!   200 and 1,600 lines, at most 2 versions).
+//!   at 100, 200 and 400 lines; v0.6.0 401 at 400). Reserving `case` moved
+//!   that cost to lines of `case A:`, whose `A:` recovery read as a label,
+//!   and to lines of `x = case` (20,302 reductions at 200 lines and
+//!   1,282,402 at 1,600 for both). A `case` label where a statement starts
+//!   is an error production now (`_stray_case`), which recovery completes
+//!   with a missing `switch`, so each line recovers on its own: the lines,
+//!   with a name or a literal, alone or under a header that is no `switch`,
+//!   take about 1 reduction and 11 `process version` messages a line (one
+//!   for each step of a stack version) and at most 4 versions. Recovery
+//!   that inserts a missing token logs none of the reductions it makes, so
+//!   the steps are bounded as well.
+//! - The reserved `case` where an expression goes on, which that production
+//!   does not reach: `foo(case, ` repeated, whose counts are linear
+//!   (measured: 297, 597 and 1,497 reductions at 100, 200 and 500, at most 5
+//!   versions) and whose time is not, as for the annotations, and `x ? y :`
+//!   followed by a line of `case`, repeated, whose reductions grow with the
+//!   square of the lines (measured: 443, 8,393 and 92,243 at 100, 200 and
+//!   500 lines, at most 4 versions). While `case` was a name both parsed in
+//!   linear time.
 //!
 //! The counts come from the parser's log, which is deterministic where time
 //! is not.
@@ -69,16 +85,60 @@ const MAX_ANNOTATION_REDUCTIONS: usize = 4_000;
 /// Most stack versions at once for `ANNOTATIONS` annotations: 6 measured.
 const MAX_ANNOTATION_VERSIONS: usize = 10;
 
-/// Lines of `case 1:` in the shorter run; the longer one has `SCALE` times
-/// as many.
+/// Case lines in the shorter run; the longer one has `SCALE` times as many.
 const CASE_LINES: usize = 200;
 
-/// Most reductions per line of `case 1:`: 4 measured at both lengths (797
-/// and 6,397), where a `case` that was a name made 20,301 at 200 lines.
-const MAX_CASE_REDUCTIONS_PER_LINE: usize = 6;
+/// The lines that are repeated: a case label with a literal, which no label
+/// starts with, with a name, which recovery read as a label nested in the
+/// line before, that name before a comment and before an empty statement,
+/// and an assignment of the reserved word.
+const CASE_LINE_SHAPES: [&str; 5] = [
+    "case 1:\n",
+    "case A:\n",
+    "case A: // c\n",
+    "case A: ;\n",
+    "x = case\n",
+];
 
-/// Most stack versions at once for the lines of `case 1:`: 2 measured.
-const MAX_CASE_VERSIONS: usize = 3;
+/// What the lines stand in: nothing, and the braces of a mistyped `switch`
+/// header, in a file and in a method.
+const CASE_LINE_FRAMES: [(&str, &str); 3] = [
+    ("", ""),
+    ("swit (x) {\n", "}\n"),
+    ("def m() {\nswit (x) {\n", "}\n}\n"),
+];
+
+/// Most reductions per line: at most 1.01 measured (1,616 for 1,600 lines
+/// of `case A: ;` in a method), where the lines of `case A:` made 20,302 at
+/// 200 lines while recovery read `A:` as a label.
+const MAX_CASE_REDUCTIONS_PER_LINE: usize = 2;
+
+/// Most steps of a stack version per line: 11 measured for the lines with a
+/// comment, 9 for the others, at both lengths.
+const MAX_CASE_STEPS_PER_LINE: usize = 14;
+
+/// Most stack versions at once for the lines: 4 measured. It was 2 for the
+/// lines of `case 1:` before the error production; the versions that
+/// recovery keeps for the missing `switch` raise it.
+const MAX_CASE_VERSIONS: usize = 6;
+
+/// Calls in the run of `foo(case, `.
+const STRAY_CASE_CALLS: usize = 500;
+
+/// Most reductions for `STRAY_CASE_CALLS` calls: 1,497 measured.
+const MAX_STRAY_CASE_CALL_REDUCTIONS: usize = 2_500;
+
+/// Most stack versions at once for `STRAY_CASE_CALLS` calls: 5 measured.
+const MAX_STRAY_CASE_CALL_VERSIONS: usize = 8;
+
+/// Repeats of `x ? y :` and a line of `case`.
+const TERNARY_CASE_LINES: usize = 200;
+
+/// Most reductions for `TERNARY_CASE_LINES` repeats: 8,393 measured.
+const MAX_TERNARY_CASE_REDUCTIONS: usize = 12_000;
+
+/// Most stack versions at once for `TERNARY_CASE_LINES` repeats: 4 measured.
+const MAX_TERNARY_CASE_VERSIONS: usize = 6;
 
 /// The key of the version count in the parser's `process version` messages.
 const VERSION_COUNT_KEY: &str = "version_count:";
@@ -87,11 +147,12 @@ const VERSION_COUNT_KEY: &str = "version_count:";
 struct Cost {
     reductions: usize,
     most_versions: usize,
+    steps: usize,
 }
 
 /// Parses `source`, which must hold an `ERROR` exactly when `rejected`, and
-/// counts the reductions and the most stack versions at once in the parser's
-/// log.
+/// counts the reductions, the steps of stack versions (its `process version`
+/// messages) and the most stack versions at once in the parser's log.
 fn cost(source: &str, rejected: bool) -> Cost {
     let mut parser = Parser::new();
     parser
@@ -99,7 +160,12 @@ fn cost(source: &str, rejected: bool) -> Cost {
         .expect("load Groovy grammar");
     let reductions = Arc::new(AtomicUsize::new(0));
     let most_versions = Arc::new(AtomicUsize::new(0));
-    let (reduced, seen) = (Arc::clone(&reductions), Arc::clone(&most_versions));
+    let steps = Arc::new(AtomicUsize::new(0));
+    let (reduced, seen, stepped) = (
+        Arc::clone(&reductions),
+        Arc::clone(&most_versions),
+        Arc::clone(&steps),
+    );
     parser.set_logger(Some(Box::new(move |log_type, message| {
         if log_type != LogType::Parse {
             return;
@@ -107,6 +173,7 @@ fn cost(source: &str, rejected: bool) -> Cost {
         if message.starts_with("reduce") {
             reduced.fetch_add(1, Ordering::Relaxed);
         } else if message.starts_with("process version") {
+            stepped.fetch_add(1, Ordering::Relaxed);
             let count = message
                 .split_once(VERSION_COUNT_KEY)
                 .and_then(|(_, rest)| rest.split(',').next())
@@ -125,6 +192,7 @@ fn cost(source: &str, rejected: bool) -> Cost {
     let cost = Cost {
         reductions: reductions.load(Ordering::Relaxed),
         most_versions: most_versions.load(Ordering::Relaxed),
+        steps: steps.load(Ordering::Relaxed),
     };
     assert!(
         cost.reductions > 0 && cost.most_versions > 0,
@@ -184,17 +252,53 @@ fn runs_of_unfinished_annotations_stay_under_the_measured_cost() {
 
 #[test]
 fn case_lines_outside_a_switch_parse_in_linear_cost() {
-    for lines in [CASE_LINES, CASE_LINES * SCALE] {
-        let cost = cost(&"case 1:\n".repeat(lines), true);
-        assert!(
-            cost.reductions <= MAX_CASE_REDUCTIONS_PER_LINE * lines,
-            "{} reductions for {lines} lines",
-            cost.reductions,
-        );
-        assert!(
-            cost.most_versions <= MAX_CASE_VERSIONS,
-            "{} stack versions for {lines} lines",
-            cost.most_versions,
-        );
+    for (before, after) in CASE_LINE_FRAMES {
+        for line in CASE_LINE_SHAPES {
+            for lines in [CASE_LINES, CASE_LINES * SCALE] {
+                let source = format!("{before}{}{after}", line.repeat(lines));
+                let cost = cost(&source, true);
+                assert!(
+                    cost.reductions <= MAX_CASE_REDUCTIONS_PER_LINE * lines,
+                    "{} reductions for {lines} lines of {line:?} after {before:?}",
+                    cost.reductions,
+                );
+                assert!(
+                    cost.steps <= MAX_CASE_STEPS_PER_LINE * lines,
+                    "{} version steps for {lines} lines of {line:?} after {before:?}",
+                    cost.steps,
+                );
+                assert!(
+                    cost.most_versions <= MAX_CASE_VERSIONS,
+                    "{} stack versions for {lines} lines of {line:?} after {before:?}",
+                    cost.most_versions,
+                );
+            }
+        }
     }
+}
+
+#[test]
+fn a_reserved_case_in_expressions_stays_under_the_measured_cost() {
+    let calls = cost(&"foo(case, ".repeat(STRAY_CASE_CALLS), true);
+    assert!(
+        calls.reductions <= MAX_STRAY_CASE_CALL_REDUCTIONS,
+        "{} reductions for {STRAY_CASE_CALLS} calls",
+        calls.reductions,
+    );
+    assert!(
+        calls.most_versions <= MAX_STRAY_CASE_CALL_VERSIONS,
+        "{} stack versions for {STRAY_CASE_CALLS} calls",
+        calls.most_versions,
+    );
+    let ternaries = cost(&"x ? y :\ncase\n".repeat(TERNARY_CASE_LINES), true);
+    assert!(
+        ternaries.reductions <= MAX_TERNARY_CASE_REDUCTIONS,
+        "{} reductions for {TERNARY_CASE_LINES} repeats",
+        ternaries.reductions,
+    );
+    assert!(
+        ternaries.most_versions <= MAX_TERNARY_CASE_VERSIONS,
+        "{} stack versions for {TERNARY_CASE_LINES} repeats",
+        ternaries.most_versions,
+    );
 }

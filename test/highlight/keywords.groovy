@@ -244,3 +244,11 @@ for (var v in vs) { }
 
 switch (x) { case 1 -> yield 2 }
 //                     ^ keyword.control
+
+// A `case` label outside a switch, which Groovy rejects, is a statement that
+// misses its `switch`; `case` keeps its capture, and the line after it its own.
+case A:
+// <- keyword.control
+//   ^ variable
+foo()
+// <- function.call

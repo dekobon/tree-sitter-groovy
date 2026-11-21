@@ -112,7 +112,11 @@ The default branch is **`main`**.
     accesses, which makes them a call's receiver (`foo { }.bar 1`)
     (§6.24).
 
-  Six externals are never emitted. Rules make them valid where the
+  Seven externals are never emitted. `_unreachable` ends
+  `_stray_case`, the error production for a `case` label where a
+  statement starts, so that error recovery inserts it as a missing
+  `switch` and each such line recovers on its own (§5.2); the scanner
+  never reads it. Rules make the others valid where the
   scanner needs to know where it is: `_string_body` inside a string
   body, where the scanner emits nothing outside error recovery
   (§6.10); `_type_start` where a type may start (§6.15);

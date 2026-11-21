@@ -449,3 +449,139 @@ switch (x) {
               function: (identifier)
               arguments: (argument_list))))
         (MISSING "}")))))
+
+==================
+Case labels outside a switch are statements that miss a switch
+==================
+
+case A:
+case B:
+  foo()
+  break
+case 1: bar()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier)
+    (MISSING "switch"))
+  (expression_statement
+    (identifier)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (break_statement)
+  (expression_statement
+    (number_literal)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Case labels under a broken switch header keep the statements after them
+==================
+
+def m() {
+  swit (x) {
+    case A:
+    case B: {
+      foo 1
+    }
+    default:
+      bar()
+  }
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier))
+          closure: (closure
+            (expression_statement
+              (identifier)
+              (MISSING "switch"))
+            (expression_statement
+              (identifier)
+              (MISSING "switch"))
+            (block
+              (command_chain
+                receiver: (identifier)
+                argument: (number_literal)))
+            (labeled_statement
+              label: (identifier)
+              statement: (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list))))))))))
+
+==================
+A case label in a block inside a case misses a switch and the next case goes on
+==================
+
+switch (x) {
+  case 1:
+    if (y) {
+      case 2:
+        foo()
+    }
+  case 3: bar()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (if_statement
+            condition: (identifier)
+            consequence: (block
+              (expression_statement
+                (number_literal)
+                (MISSING "switch"))
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list))))))
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+A case label with several values outside a switch misses a switch
+==================
+
+case 1, 2:
+foo()
+
+---
+
+(source_file
+  (expression_statement
+    (ERROR
+      (number_literal))
+    (number_literal)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))

@@ -201,6 +201,41 @@
           },
           "named": true,
           "value": "command_chain"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_stray_case"
+          },
+          "named": true,
+          "value": "expression_statement"
+        }
+      ]
+    },
+    "_stray_case": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "case"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_expression"
+        },
+        {
+          "type": "STRING",
+          "value": ":"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_unreachable"
+          },
+          "named": false,
+          "value": "switch"
         }
       ]
     },
@@ -13137,6 +13172,10 @@
     {
       "type": "SYMBOL",
       "name": "_closure_command_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_unreachable"
     },
     {
       "type": "SYMBOL",

@@ -55,7 +55,9 @@
 // emits nothing, where a type may start, where closure parameters may
 // start, before the `)` of a cast of an array or generic type whose operand
 // is on a later line and after the `}` of the block that is the body of
-// `if`, `else`, a loop or an arrow case. ERROR_SENTINEL is never emitted either;
+// `if`, `else`, a loop or an arrow case. UNREACHABLE is never emitted and
+// never read: it ends the grammar's error production for a `case` label
+// outside a switch (§5.2). ERROR_SENTINEL is never emitted either;
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
@@ -141,6 +143,7 @@ enum TokenType {
     JUMP_STATEMENT_END,
     CLOSURE_CALL_START,
     CLOSURE_COMMAND_START,
+    UNREACHABLE,
     ERROR_SENTINEL,
 };
 

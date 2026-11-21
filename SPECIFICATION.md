@@ -550,7 +550,23 @@ keyed multi-assignment pair takes neither as its key
 (`def (case: n) = m` is an `ERROR`; Groovy 6's `keyedPair` takes an
 `identifier`). `case` is reserved because, as a name, error recovery
 on `case 1:` lines outside a switch read each line as a label nested in
-the one before, in time quadratic in the lines (§13).
+the one before, in time quadratic in the lines (§13). Reserved, it can
+be shifted only in a switch body, and recovery skipped it: `A:` of
+`case A:` became that label instead, which made `case A:` lines and
+`x = case` lines quadratic. So a `case` label where a statement starts
+is an error production (`_stray_case`), `case`, an expression and `:`
+before `UNREACHABLE`, a token the scanner never emits (§6). Recovery
+inserts that token as a missing `switch`, and each line is an
+`expression_statement` of its own, with the value and
+`(MISSING "switch")`: `case A:` and `case 1:` outside a switch, under a
+header that is no `switch` (`swit (x) {`) and in a block inside a case.
+In a switch body a `case` after a case's statements still ends the case
+(`switch_case` is left-associative), so no valid tree changes. A label
+with several values (`case 1, 2:`) takes the last one; those before it
+are an `ERROR` in the same statement. In expression position the
+production does not apply, and runs of `foo(case,` and a space and of
+`x ? y :` followed by a line with `case` still take time above linear
+in their length (`docs/divergences-from-spec.md` §29).
 
 **Contextual keywords** (keywords only in specific syntactic
 positions, identifiers elsewhere): `as`, `in`, `var`, `record`,
@@ -1565,6 +1581,9 @@ never emitted and only mark a string body, where a type may start,
 where closure parameters may start, the `)` of a cast of an array or
 generic type whose operand is on a later line, and the end of the
 block that is the body of `if`, `else`, a loop or an arrow case,
+`UNREACHABLE` (§5.2), which is never emitted either and which ends the
+error production for a `case` label outside a switch, so that error
+recovery inserts it as a missing `switch`,
 `LAMBDA_BODY_REREAD` (§6.19, §6.22), which no rule references and which
 makes the parser lex the `}` of a lambda's body or a statement's block
 again, and
@@ -1621,6 +1640,7 @@ enum TokenType {
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
   CLOSURE_PARAMETERS_START, // §6.21 — never emitted; valid only where closure parameters may start
+  UNREACHABLE,            // §5.2 — never emitted; ends the error production for a `case` label outside a switch
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -5215,13 +5235,19 @@ on dekobon's side is a follow-up.
 - **Performance budget**: parsing the Apache Groovy codebase
   (~250k LOC of `.groovy` test files) under 5 seconds on a modern
   laptop is the target. Tree-sitter's incremental nature makes
-  steady-state editing free. Two shapes of input that parse with an
-  `ERROR` take time above linear in their length: nested
-  `foo 1, %a = …` calls (400 levels take about 3 seconds) and runs of
-  `@C(,` and a space; `docs/divergences-from-spec.md` §29 has the
-  measurements, and `bindings/rust/tests/error_recovery_cost.rs` pins
-  their cost. `case 1:` lines outside a `switch` were a third until
-  `case` was reserved (§5.2); they are linear.
+  steady-state editing free. Four shapes of input that parse with an
+  `ERROR` take time above linear in their length, where v0.6.0 was
+  linear: nested `foo 1, %a = …` calls (400 levels take about 3
+  seconds), runs of `@C(,` and a space, of `foo(case,` and a space and
+  `x ? y :` followed by a line with `case`, repeated, the last two with
+  the reserved `case` in expression position;
+  `docs/divergences-from-spec.md` §29 has the measurements, and
+  `bindings/rust/tests/error_recovery_cost.rs` pins their cost.
+  `case 1:` lines outside a `switch` were another. They are
+  linear, and so are `case A:` and `x = case` lines, with `case`
+  reserved and a `case` label where a statement starts an error
+  production (§5.2); reserving `case` alone made the last two
+  quadratic.
 
 ---
 

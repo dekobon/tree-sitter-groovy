@@ -294,16 +294,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   switch. An arrow case or an empty switch body still gets the missing
   `}`. It came with the `default` keyword above
   (`docs/divergences-from-spec.md` §20).
-- Two shapes of input that parse with an `ERROR`, here and at v0.6.0,
-  take time above linear in their length, where v0.6.0 was linear:
-  nested `foo 1, %a = …` calls (3.0 s for 400 levels, 4.8 KB) and runs
-  of `@C(,` and a space (3.6 s for 4,000). They came with the call as a
-  value and annotations as annotation values. The new
+- Four shapes of input that parse with an `ERROR` take time above
+  linear in their length, where v0.6.0 was linear: nested
+  `foo 1, %a = …` calls (3.0 s for 400 levels, 4.8 KB) and runs of
+  `@C(,` and a space (3.6 s for 4,000), which came with the call as a
+  value and annotations as annotation values, and, with the reserved
+  `case` (below) where an expression goes on, runs of `foo(case,` and
+  a space (2.9 s for 4,000) and of `x ? y :` followed by a line of
+  `case` (10.7 s for 4,000, no `ERROR` at v0.6.0). The new
   `bindings/rust/tests/error_recovery_cost.rs` pins their cost
   (`docs/divergences-from-spec.md` §29). The same nest with `*`, which
   Groovy takes, is linear (see Added), and so are `case 1:` lines
   outside a `switch`, which took 3.9 s for 4,000 after the `default`
-  modifier until `case` was reserved (below): 25 ms.
+  modifier, and `case A:` lines, which reserving `case` alone made take
+  11.9 s for 4,000, as it did `x = case` lines (9.3 s) and `case A:`
+  lines under a mistyped `switch` header (12.2 s): with `case` reserved
+  and a `case` label where a statement starts read as a statement that
+  misses its `switch` (below), 12 to 17 ms.
 - **BREAKING:** `case` is a reserved word, as in Groovy, and no longer a
   name. Input that parsed without an `ERROR` at v0.6.0 and that Groovy
   rejects is an `ERROR`: `case = 1`, `foo(case)`, `x = case`,
@@ -317,6 +324,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   value, after a dotted receiver and on a `switch` case's line
   (`case 1: foo case: 2`). Still wider than Groovy: `def case = 1`,
   `def case() { }` and `class C { int case }` parse
+  (`SPECIFICATION.md` §5.2).
+- **BREAKING:** a `case` label where a statement starts, outside a
+  switch, which Groovy rejects, is an `expression_statement` of its own
+  that holds the label's value and a missing `switch`, one for each
+  line: `case A:` and `case 1:` in a file, under a header that is no
+  `switch` (`swit (x) {`) and in a block inside a case. The statements
+  after the label keep their own trees. At v0.6.0, with `case` a name,
+  such lines were calls with a named argument and labels (`case A:`
+  above `case B:` was `case(A: case)` and the label `B:`), without an
+  `ERROR` where the lines held names; with `case` reserved (above) and
+  without this rule, recovery read `A:` as a label and the next line as
+  its statement, in time quadratic in the lines (see above). A label
+  with several values (`case 1, 2:`) holds the values before the last
+  in an `ERROR`. Trees in a switch body do not change
   (`SPECIFICATION.md` §5.2).
 - **BREAKING:** a line that ends in parentheses around a name, a dotted
   name or a primitive type (`def y = (x)`, `return (x)`), followed on

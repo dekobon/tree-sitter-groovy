@@ -976,6 +976,9 @@ module.exports = grammar({
     // the receiver of a parenthesis-free call (`foo { }.bar 1`).
     $._closure_call_start,
     $._closure_command_start,
+    // §5.2 — never emitted: ends `_stray_case`, the error production for a
+    // `case` label outside a switch, so that the label is never accepted.
+    $._unreachable,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1153,6 +1156,25 @@ module.exports = grammar({
       $.labeled_statement,
       $.command_chain,
       alias($._path_command_chain, $.command_chain),
+      alias($._stray_case, $.expression_statement),
+    ),
+
+    // §5.2 — a `case` label where a statement starts and no switch body
+    // goes on: an error production. `$._unreachable` never comes, so the
+    // label is always an error, and recovery inserts it as a missing
+    // `switch` after the `:`. Without this rule the reserved `case` cannot
+    // be shifted there, although every statement before it is reduced on
+    // it (inside a switch it ends a case). Recovery then skipped it, read
+    // `A:` of `case A:` as a label and the next line as that label's
+    // statement, and at each further `case` a version closed the whole
+    // nest of labels before it failed: time quadratic in the lines. In a
+    // switch body a `case` after a case's statements still ends that case
+    // (`switch_case` is left-associative), so no valid tree changes.
+    _stray_case: $ => seq(
+      'case',
+      $._expression,
+      ':',
+      alias($._unreachable, 'switch'),
     ),
 
     // §5.5 — command_chain is the parenthesis-free method-call

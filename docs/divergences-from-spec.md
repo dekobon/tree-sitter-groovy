@@ -2260,17 +2260,20 @@ per byte of input on runs of 255 comments, against 1.2 (spec §6.22).
 
 ## 29. Parse time on input this grammar rejects
 
-Two shapes of input that parse with an `ERROR`, here and at v0.6.0,
-take time above linear in their length, where v0.6.0 was linear. Each
-appeared with a feature of this release. The times are the minimum of three parses, without a logger, by
-the runtime of `tree-sitter` 0.27.2; the counts are from its log.
+Four shapes of input that parse with an `ERROR` take time above linear
+in their length, where v0.6.0 was linear. Each appeared with a feature
+of this release. The times are the minimum of three parses, without a
+logger, by the runtime of `tree-sitter` 0.27.2; the counts are from its
+log.
 
 | Input | Groovy 3 | Here | v0.6.0 | From |
 |---|---|---|---|---|
 | `foo 1, %a = ` repeated, then `1` | rejected | 71, 416 and 2,970 ms at 100, 200 and 400 levels; reductions grow with the square of the levels and stack versions linearly (213 at 100) | 0.6, 1.2 and 2.4 ms; 4 versions | a call as a value (849c0ab): each level keeps a version alive past the `ERROR` of its argument |
 | `@C(, ` repeated | rejected | 214, 845 and 3,625 ms at 1,000, 2,000 and 4,000; reductions and log messages linear | 2.0, 4.1 and 8.3 ms | annotations as annotation values (d23d53f): recovery inserts a missing name, which nests each `@C(` in the one before, and the runtime rebuilds the growing `ERROR` node, work its log does not show |
+| `foo(case, ` repeated | rejected | 177, 694 and 2,892 ms at 1,000, 2,000 and 4,000; reductions linear (2,997 at 1,000), at most 5 versions | 0.55, 1.09 and 2.16 ms | the reserved `case` (36aaef8): no argument starts with it, and the run costs what `foo(], ` repeated costs, here and at v0.6.0 (below) |
+| `x ? y :`, a line of `case`, repeated | rejected | 529, 2,493 and 10,694 ms at 1,000, 2,000 and 4,000; about n²/2 reductions (431,993 at 1,000), at most 4 versions | 0.94, 1.95 and 3.82 ms, without an `ERROR` (`case` was a name) | the reserved `case` (36aaef8): no ternary's alternative starts with it |
 
-Two more shapes were in this table. `foo 1, *a = ` repeated, which
+Three more shapes were in this table. `foo 1, *a = ` repeated, which
 Groovy reads as `foo(1, *(a = foo(…)))`, cost as much as the first row
 while a command chain took no spread argument after a comma. It takes
 one now, and that nest parses without an `ERROR` in one stack version:
@@ -2279,15 +2282,38 @@ outside a `switch`, which Groovy rejects, took 237, 963 and 3,873 ms at
 1,000, 2,000 and 4,000 lines (about n²/2 reductions) after the
 `default` modifier (fa9986c, §20): while `case` was a name, one version
 nested the lines as labels and closed the whole nest at each line.
-`case` is reserved now, as in Groovy, and stays a key and a member name
-(spec §5.2): 6.3, 12.7 and 24.9 ms, against 5.7, 11.7 and 23.0 ms at
-v0.6.0.
+Reserving `case` (36aaef8), as in Groovy, made those lines linear but
+not `case A:` lines: recovery skipped the reserved word, read `A:` as
+the label, and the same nest formed (743, 3,013 and 11,890 ms), as it
+did for `x = case` lines (554, 2,246 and 9,291 ms), `case A: // c`,
+`case A: ;`, `if (x)` or `A:` before `case B:`, and `case A:` lines
+under a mistyped `switch` header (`swit (x) {`: 724, 2,910 and
+12,160 ms). A `case` label where a statement starts is now an error
+production that recovery completes with a missing `switch` (spec §5.2),
+so each line recovers on its own: 3.1, 6.3 and 12.3 ms for `case A:`
+lines, 3.0, 6.1 and 12.4 ms for `case 1:` lines (5.9, 11.5 and 23.3 ms
+at v0.6.0), 4.2, 8.5 and 16.6 ms for `x = case` lines and 3.2, 6.3 and
+13.0 ms under the mistyped header. In a switch body the lines cost what
+they did: the reductions of `case A:` and `case 1:` lines there are the
+same before and after the production at 1,000, 2,000 and 4,000 lines.
+
+The production does not reach a `case` where an expression goes on,
+which leaves the last two rows of the table. Runs of the same kind are
+quadratic at v0.6.0 as well, and unchanged here: `A:` followed by a
+line of `}`, repeated (727, 2,939 and 12,224 ms at 1,000, 2,000 and
+4,000 repeats here; 760, 3,045 and 11,829 ms at v0.6.0), `x =` followed
+by a line of `}`, repeated (543, 2,121 and 8,865 ms; 543, 2,174 and
+8,789 ms), and `foo(], ` repeated (166, 653 and 2,721 ms; 168, 651 and
+2,757 ms).
 
 **Action**: none planned. `bindings/rust/tests/error_recovery_cost.rs`
 pins today's reductions and stack versions of each row, so that they
-grow no further, and bounds those of the spread nest and the `case 1:`
-lines linearly; for the second row those counts are linear and its time
-is not pinned.
+grow no further, and bounds those of the spread nest and of the case
+lines linearly (`case 1:`, `case A:` with and without a comment or an
+empty statement after it, and `x = case`, alone and under a mistyped
+header, with the steps of the stack versions as well, as recovery that
+inserts a missing token logs none of its reductions); for the second
+and third rows those counts are linear and their time is not pinned.
 
 ---
 
