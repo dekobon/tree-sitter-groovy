@@ -1098,6 +1098,7 @@ line, below every other complete reading when it is not.
 | `foo((Foo)` then `(bar) + 1, '…')` or `(bar)[0], '…')`, the call's `)` more than 256 characters after the `(` | cast of the cast (Groovy 3), as at v0.6.0 | with no `ERROR`, the sum of the call `(Foo)(bar)` and `1`, or a subscript of that call: the cast is turned down as in the row above, and the rest of the line goes on from the call |
 | `(List<String>)` then `(x)` | `List`, then `x` (Groovy 3) | the cast `(List<String>) (x)`, as before: an array or generic type is no expression, and the cast is the only reading of its parentheses |
 | `(Foo)` then `(x) -> x` | the call `(Foo)((x) -> x)` (Groovy 3) | the cast of the lambda: the scanner keeps the cast where `->` follows the next line's parentheses (spec §6.11), as after an expression the lambda look-ahead does not run (spec §6.17) and the call would end in an `ERROR` at `->`; at v0.6.0 a cast of a cast with an `ERROR` at `->` |
+| `class C { def k = (Foo) x as Bar` then `def m() { } }`; `… (Foo) x in y` then `private int z` | one field with the cast, and a method (a field) (Groovy 3) | the field `k = (Foo)`, the fields `x as` (`x in`) and `Bar def` (`y private`), and a constructor `m` (the field `int z`), with no `ERROR`, in every build since v0.6.0: see the type-body paragraph below |
 | `"${(Foo)` then `(Bar) y}"` | two statements in the interpolation's closure, `(Foo)` and the cast `(Bar) y` (Groovy 3) | an `ERROR`: the interpolation's `}` comes before any bracket around both lines, so the `)` after `Foo` closes no cast (spec §6.11), and `(Foo)` calls `(Bar)` before an `ERROR` at `y`; at v0.6.0 the cast of a cast, with no `ERROR` |
 
 At v0.5.0 the two readings were unranked and the stack order decided:
@@ -1115,7 +1116,17 @@ step). Parentheses that hold no type keep the split where a name
 follows: `def k = (1) x` then `def m() { }` is still the field `k = (1)`,
 a field `x def` and a constructor, where Groovy calls `(1)` with `x`
 (a command expression whose receiver is in parentheses, which this
-grammar does not read).
+grammar does not read). Where the name is followed on its line by `as`,
+`in` or `instanceof` and another name, the split stays, in every build
+since v0.6.0: `def k = (Foo) x as Bar` then `def m() { }` is the field
+`k = (Foo)`, the fields `x as` and `Bar def` and a constructor `m`, and
+`def k = (Foo) x in y` then `private int z` the fields `x in`,
+`y private` and `int z`, with no `ERROR`, where Groovy 3 reads one field
+and a method (a field). The split holds two typed fields there, and the
+penalty of `_cast_word_close` offsets one (`TYPED_FIELD_WEIGHT`); the
+scanner decides on the same tokens either way, so a larger penalty for
+that case would need a token of its own. A `;` after the value, or the
+`}` of the body after it, keeps the cast.
 
 A multi-assignment declaration on the next line is a case where only
 one reading used to be complete. After a line that ends in a

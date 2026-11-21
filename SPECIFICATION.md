@@ -2222,7 +2222,16 @@ of its own on the line: `x = (Foo) y` then `{ -> 1 }` and `{ foo() }`
 was the assignment of `(Foo)`, the call `y { -> 1 }` and a block, where
 Groovy calls `y` with both closures. The penalty is the weight of the
 typed field that the split adds, so the split weighs less than the cast
-wherever the members after it weigh the same. Where no cast parses, the
+wherever it adds one typed member and the members after it weigh the
+same. Where the name is followed on its line by `as`, `in` or
+`instanceof` and another name, the split adds two, as each word is a
+name to a member's start: `def k = (Foo) x as Bar` then `def m() { }`
+is the field `k = (Foo)`, the fields `x as` and `Bar def` and a
+constructor `m`, and `def k = (Foo) x in y` then `private int z` the
+fields `x in`, `y private` and `int z`, in every build since v0.6.0,
+where Groovy reads one field and a method or a field. A larger penalty
+would need a token of its own for that case (`docs/divergences-from-spec.md`
+§15). Where no cast parses, the
 parenthesized expression is the only reading and keeps it:
 `(c + c) x` is still `(c + c)` and the statement `x` (Groovy calls the
 parentheses with `x`). A keyword after the `)` starts no type and is

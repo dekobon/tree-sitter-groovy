@@ -305,6 +305,58 @@ class C {
           name: (identifier))))))
 
 ==================
+A cast of a name that as or in follows in a field's value splits into members (known divergence)
+==================
+
+class C {
+  def k = (Foo) x as Bar
+  def m() { }
+  def n = (Foo) x in y
+  private int z
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
 A cast of a name before closures on the next lines takes them
 ==================
 
