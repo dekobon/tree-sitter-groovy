@@ -796,11 +796,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Apache's `modifier` rule lists it, no longer a type name: `var x = 1`
   is a `field_declaration` with an anonymous `var` and no `type` field,
   where it had `type: (type_identifier)`, and `var String s = 'a'`,
-  `var String s, t` and `private var List<String> xs` are fields of
-  that type, where they were a field `String` of type `var` and a field
-  named `s` with its name missing, or an `ERROR`. `highlights.scm`
-  captures that `var` as a keyword, no longer a type. No real, Java or
-  shape tree changes; one corpus tree does (`SPECIFICATION.md` §6.21).
+  `var String s, t`, `var String s` and `private var List<String> xs`
+  are fields of that type. At v0.6.0 the first two were an `ERROR`,
+  `var String s` a field `String` of type `var` followed by a field of
+  type `s` with a `MISSING` name, and `private var List<String> xs` a
+  field named `var`, with no `ERROR`, followed by a field `xs`.
+  `highlights.scm` captures that `var` as a keyword, no longer a type.
+  Before a method's name and its `(`, `var` stays the return type, as
+  at v0.6.0 (`var m() { }`, `static var m(int a)` in any type body),
+  which Groovy 3 rejects ("var cannot be used for method declarations")
+  and Groovy 6 parses as a method and rejects after parsing. No real,
+  Java or shape tree changes; one corpus tree does
+  (`SPECIFICATION.md` §6.16, §6.21).
 - **BREAKING:** `var` right after `return`, `break` or `continue` on
   their line is the value or the label, as Groovy takes no declaration
   there: `return var` then `x` on the next line is the return of `var`

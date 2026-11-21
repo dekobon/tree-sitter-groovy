@@ -30,6 +30,9 @@ class F { var f = 1; var String g }
 //                   ^ keyword
 //                       ^ type
 
+class G { var m() { } }
+//        ^ type
+
 sealed class S { }
 // <- keyword
 

@@ -853,6 +853,100 @@ class A {
           name: (identifier))))))
 
 ==================
+A var return type in a type body
+==================
+
+class A {
+  var m() { }
+  @Deprecated
+  static final var n(int a) { a }
+  var o()
+  def p() { }
+}
+interface I { var m() }
+trait T { private var m() { } }
+enum E { X; var m() { } }
+record R() { var m() { } }
+new Object() { var m() { } }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body
+        (method_declaration
+          return_type: (type_identifier)
+          name: (identifier)
+          parameters: (formal_parameters)
+          body: (block))))))
+
+==================
 Multi-assignment mixing names and keyed pairs is not accepted
 :error
 ==================

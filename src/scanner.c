@@ -2266,6 +2266,13 @@ static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
 // line returns `var`. Before `(` it opens a multi-assignment: where `var`
 // alone may open one (VAR_NAMES_KEYWORD valid), only when the names, `)`
 // and `=` follow; after `final`, always. Anywhere else the word is a name.
+// In a type body a name and `(` after `var` make it a method's return type,
+// as at v0.6.0 (`var m() { }`): Groovy 6's `methodDeclaration` takes the
+// modifier and its AST builder rejects the method, so the field the keyword
+// opens would only be an `ERROR`. A type body is where `var` alone may open
+// a multi-assignment but no typed local starts (DECLARATION_START, §6.21);
+// no member starts with `(`, so the look-ahead crosses line breaks, as the
+// grammar does between a method's name and its parameters.
 static bool scan_var(
     TSLexer *lexer,
     const bool *valid_symbols,
@@ -2287,6 +2294,12 @@ static bool scan_var(
                    && !is_modifier_word(word, len)
                    && !word_is(word, len, "def")
                    && !keyword_starts_operand(word, len, lexer->lookahead)) {
+            return false;
+        } else if (valid_symbols[VAR_NAMES_KEYWORD]
+                   && !valid_symbols[DECLARATION_START]
+                   && skip_header_trivia(lexer, true, no_close_ahead, NULL,
+                                         NULL)
+                   && lexer->lookahead == '(') {
             return false;
         }
         lexer->result_symbol = VAR_KEYWORD;
