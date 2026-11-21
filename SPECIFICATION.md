@@ -2364,7 +2364,18 @@ which leaves an `ERROR` or another reading where Groovy casts: with the
 call's `)` more than 256 characters on, `foo((Foo)` then
 `(Bar) y, '…')` is an `ERROR`, and `foo((Foo)` then `(bar) + 1, '…')`
 is the sum of the call `(Foo)(bar)` and `1`, with no `ERROR`, and
-`(bar)[0]` there a subscript of that call. Counted on characters
+`(bar)[0]` there a subscript of that call. Kept alive, the cast still
+ranks below every other reading, so `foo((a)` then `(b))` is the call
+`(a)(b)`. Where its operand is a cast on its own line, `[(Foo)` then
+`(y)(z)]`, the two weights cancel and the readings tie: a list's first
+element is the cast of the cast, as in Groovy and at v0.6.0, and a
+subscript's index, a later element, a map value or an argument is the
+call `(Foo)(y)(z)`. Two such trees of one hidden rule between the same
+stack nodes are merged before the rule's parent is reduced, and the
+runtime keeps the first; the list's element is inlined into the list
+(grammar.js `inline`) so that its trees are compared instead, which
+costs 3 parse states, where the subscript's indices would cost about
+40 (`docs/divergences-from-spec.md` §15). Counted on characters
 instead of tokens, a bracket in a string or a comment had kept a cast
 alive or turned a valid one down. The read runs from every `)` that
 ends a line before such a `(`, so in a run of short lines each

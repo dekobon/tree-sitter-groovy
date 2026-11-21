@@ -13349,7 +13349,9 @@
       "name": "_error_sentinel"
     }
   ],
-  "inline": [],
+  "inline": [
+    "_list_element"
+  ],
   "supertypes": [],
   "reserved": {
     "global": [

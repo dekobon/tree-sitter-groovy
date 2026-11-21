@@ -794,3 +794,72 @@ A lambda on the line after a parenthesized name is the operand of a cast, where 
           (formal_parameter
             name: (identifier)))
         body: (identifier)))))
+
+==================
+A cast of a cast on the next line as a list's first element
+==================
+
+[(Foo)
+  (y)(z)]
+x = [(int)
+  (a)(b), 1]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (parenthesized_type_cast
+        type: (type_identifier)
+        value: (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_expression
+            (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (parenthesized_expression
+              (identifier))))
+        (number_literal)))))
+
+==================
+A cast of a cast on the next line as a subscript's index reads as calls (known divergence)
+==================
+
+a[(Foo)
+  (y)(z)]
+x = a?[(int)
+  (a)(b)]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (method_invocation
+        function: (method_invocation
+          function: (parenthesized_expression
+            (identifier))
+          arguments: (argument_list
+            (identifier)))
+        arguments: (argument_list
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (safe_subscript_expression
+        object: (identifier)
+        index: (method_invocation
+          function: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          arguments: (argument_list
+            (identifier)))))))

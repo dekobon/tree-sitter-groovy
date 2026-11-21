@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   field each, and the spread a `spread_arguments`. Each was an `ERROR`,
   as at v0.6.0. The `index` field of `subscript_expression` and
   `safe_subscript_expression` may repeat (see Changed); a tree with one
-  index is as before. No real or shape tree changes; 38 Java trees that
+  index is as before, but for a cast of a cast on the next line (see
+  Changed). No real or shape tree changes; 38 Java trees that
   had an `ERROR` change and still have one (`SPECIFICATION.md` §5.11).
 - A list literal takes spread elements (`[*a, *b]`, `[1, *a]`,
   `[*a, 1]`), a `spread_arguments` node each, as Apache's `list` takes
@@ -255,6 +256,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as before, and of the corpus, real, Java and shape inputs none that
   parsed without an `ERROR` at v0.6.0 changes, so it is not marked
   breaking for trees.
+- **BREAKING:** a subscript's index that is a cast of a cast on the next
+  line, `a[(Foo)` then `(y)(z)]` or `a?[(int)` then `(a)(b)]`, is the
+  call `(Foo)(y)(z)`, where v0.6.0 read the cast of the cast
+  `(Foo) ((y) (z))` with no `ERROR`, as Groovy 3 does. The two readings
+  weigh the same, and the hidden rule that now holds a subscript's
+  indices (see Added) makes the runtime keep the call; keeping the cast
+  would cost about 40 parse states. A list's first element keeps the
+  cast, as at v0.6.0, and a later element, a map value or a call's
+  argument is the call, as at v0.6.0. Of 6,048 inputs made of a
+  parenthesized line, a line break and parentheses, 15 change this way;
+  no corpus, real, Java or shape tree does
+  (`docs/divergences-from-spec.md` §15).
 - **BREAKING:** `instanceof`, `!instanceof` and `as` bind tighter than
   `<`, `<=`, `>`, `>=`, `in` and `!in`, as Apache's level 7 lists them
   first: a relational operator before one of them now takes its

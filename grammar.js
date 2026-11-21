@@ -792,6 +792,15 @@ module.exports = grammar({
   // `identifier`. Several comments in this file depend on that.
   word: $ => $.identifier,
 
+  // A rule listed here adds no node of its own: its body is copied into
+  // each rule that uses it. `[(Foo)` then `(y)(z)]` has two readings of
+  // equal weight, the cast of the cast `(y)(z)` (the later-line cast's
+  // -CAST_WEIGHT and the same-line cast's +CAST_WEIGHT cancel) and the
+  // call `(Foo)(y)(z)`. With the element directly in the list the cast
+  // wins, as at v0.6.0 and as in Groovy; a hidden `_list_element` node
+  // made the runtime keep the call. Inlined, it costs 3 parse states.
+  inline: $ => [$._list_element],
+
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
   // lexes it as `identifier` wherever the keyword has no action,
   // which let `def f = (Foo) new T()` after another member split
@@ -3593,6 +3602,7 @@ module.exports = grammar({
 
     // Apache `list: LBRACK expressionList[true]? COMMA? RBRACK`: an element
     // may be a spread (`[*a, 1]`), the `spread_arguments` of a call.
+    // Inlined (see `inline` above).
     _list_element: $ => choice($._expression, $.spread_arguments),
 
     // §3.2 PRIMARY / §5.3 — map literal. `[:]` is the empty map;
