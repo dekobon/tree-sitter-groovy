@@ -3775,6 +3775,8 @@ static bool skip_closure_tokens(
     // Whether the last token was a member access, after which a keyword is
     // a name.
     bool member = false;
+    // Whether the last token was the word `yield`, not after an access.
+    bool yield = false;
     while (depth > 0) {
         bool slash = false;
         if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
@@ -3792,18 +3794,26 @@ static bool skip_closure_tokens(
                 }
                 operand = true;
             } else if (operand && input->lookahead != '=') {
-                if (!slashy_body_follows(input)) {
+                if (slashy_body_follows(input)) {
+                    advance(input);
+                    operand = false;
+                } else if (yield && is_whitespace(input->lookahead)) {
+                    // No slashy string opens after `yield` here, so the
+                    // grammar reads `yield` as a name and the `/` as
+                    // division (§6.16): `foo { yield / 2 }.bar()`.
+                    operand = true;
+                } else {
                     return false;
                 }
-                advance(input);
-                operand = false;
             } else {
                 operand = true;
             }
             member = false;
+            yield = false;
             continue;
         }
         int32_t c = input->lookahead;
+        yield = false;
         if (c == '\'' || c == '"') {
             if (!skip_string(input)) {
                 return false;
@@ -3822,6 +3832,7 @@ static bool skip_closure_tokens(
                 operand = false;
             } else {
                 operand = slashy_may_follow_word(word, len, !operand, member);
+                yield = !member && word_is(word, len, "yield");
             }
             member = false;
             continue;
@@ -3836,7 +3847,9 @@ static bool skip_closure_tokens(
             continue;
         }
         operand = c != ')' && c != ']' && c != '}' && c != '.';
-        member = c == '.' || (member && (c == '&' || c == '@'));
+        // `::` is an access too (`x::return / 2`), as `.&` and `.@` are.
+        member = c == '.' || (c == ':' && input->lookahead == ':')
+            || (member && (c == '&' || c == '@' || c == ':'));
         if (c == '{' || c == '(' || c == '[') {
             depth++;
         } else if (c == '}' || c == ')' || c == ']') {

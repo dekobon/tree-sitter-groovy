@@ -1802,6 +1802,43 @@ foo { x++ / 2 }.bar()
 
 
 ==================
+The braces of a call with a closure take a division after yield as a name and after a keyword after a method reference
+==================
+
+foo { yield / 2 }.bar()
+foo { x::return / 2 }.bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (binary_expression
+                left: (identifier)
+                right: (number_literal)))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (binary_expression
+                left: (method_reference_expression
+                  target: (identifier)
+                  name: (identifier))
+                right: (number_literal)))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
 A slashy string after a keyword in a call's closure that no member access follows keeps the command chain
 ==================
 

@@ -4789,7 +4789,11 @@ operand (GroovyLexer.g4 `isRegexAllowed`: a name, a number, a string,
 keyword a `/` opens a string (`foo { return /}/ }.bar()`, `assert`,
 `case`, `throw`, `yield`, `else`, `do`); `in` and `as` are the operators
 after an operand and names elsewhere, and a keyword after a member
-access is a name, as Groovy 6 reads them (`isSlashyForbidden`). The
+access, `::` included, is a name, as Groovy 6 reads them
+(`isSlashyForbidden`): `foo { x::return / 2 }.bar()` divides. After
+`yield` a `/` that whitespace follows opens no string, as the grammar
+then reads `yield` as a name (§6.16), so `foo { yield / 2 }.bar()`
+divides too; both were an `ERROR` before. The
 words that the grammar reserves and Groovy does not (`_`, `permits`,
 `pipeline`), and `super`, end an operand. Read as a division,
 `foo { return /}.x 1/ }` was an `ERROR` and `foo { assert /}.x/ }` a

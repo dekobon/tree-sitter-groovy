@@ -947,7 +947,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`pom {}.writeTo(…)`) has none, and no tree without an `ERROR`
   changes. The scanner decides before the name, reading the braces on
   their line on Groovy's tokens for at most 128 characters, a slashy
-  string after a keyword included (`foo { return /}/ }.bar()`), so
+  string after a keyword included (`foo { return /}/ }.bar()`), and a
+  division after `yield` as a name and after a keyword that `::`
+  names (`foo { yield / 2 }.bar()`, `foo { x::return / 2 }.bar()`), so
   braces that span lines (`foo {` then `}.bar()`) stay an `ERROR`, and
   an operator other than an access after the `}` (`foo { }[0]`,
   `foo { } + 1`) is read as before. Where a first argument follows
