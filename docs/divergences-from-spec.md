@@ -1445,6 +1445,23 @@ In an `@interface` body a `default` after the `()` is the element's
 default, by a static precedence on `_annotation_type_element`, so a
 line break before it is accepted, as before (§5.9 row above).
 
+Error recovery changed at an unclosed `switch` whose last branch is a
+colon case at the end of the input (`switch (x) {`, `case 1:` and
+`foo()`): the whole input is one `ERROR`, where v0.6.0 inserted the
+missing `}`. At the end of the input the runtime inserts the first
+missing token, in token order, after which the parser can reduce, and
+`identifier` comes before `}`. Before this rule the state after a name
+in a case body had no action at the end of the input, so a missing
+name was turned down and `}` was taken; since this rule the table
+shares that state with the one a name reaches in a script, where the
+input may end, so a missing name is inserted and the parse stops
+there. An arrow case and an empty switch body still get the missing
+`}`. `if (x) {` followed by `foo()` was such an `ERROR` at v0.6.0
+already. Giving the case body a state of its own would take a token
+that acts differently there than in a script, and was not tried; the
+corpus test 'An unclosed switch with a colon case at the end of the
+input' pins the tree.
+
 The Groovy column was observed by running Groovy 3, which does not
 parse records; the rows marked `.g4` are read off the grammar.
 
@@ -1473,6 +1490,8 @@ parse records; the rows marked `.g4` are read off the grammar.
 | `foo.default`, `[default: 1]`, `foo(default: 1)`, `foo 'a', default: 1` | a property, a key | the same, as before |
 | `foo default: 1`, `x = foo default: 1`, `a.b default: 1` | a call with the named argument `default` | the statement, then the label `default:`, as before (spec §6.8) |
 | `switch (x) { case 1: foo()` then `default: bar() }` on the next line, `case 1: default: c()`, and the other switch forms | the switch | the same tree as before |
+| `switch (x) { case 1:` or `default:`, with or without statements after it, at the end of the input, also inside a method | rejected | an `ERROR` over the input; before, the switch with a missing `}`, inside a method the method and an `ERROR` around the switch |
+| `switch (x) {` or `switch (x) { case 1 -> foo()` at the end of the input | rejected | the switch with a missing `}`, as before |
 | `lbl: default void b() { }`, `if (x) default void b() { }` | rejected | a label or an `if` around a `method_declaration`; before, around the expression `default`, then a method |
 | `private String y`, `default void a() { }`, `static count` and `default void b() { }` in a class, then the `lt` of the second `default` deleted | rejected (`defau void b()`) | from scratch the field `y`, the method `a`, a field `defau` of type `count` and the method `void b() { }`; a reparse after the edit reads `private String`, a field `y default` and `void a() { }` instead, neither with an `ERROR`: the runtime checks a reused member only while one stack version exists (spec §6.18), and `static count` is reused though a name follows it now. The next edit of the word heals it; `bindings/rust/tests/incremental_reparse.rs` pins it |
 

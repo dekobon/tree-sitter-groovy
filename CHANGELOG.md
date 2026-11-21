@@ -272,6 +272,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   block, a field and a local variable in Groovy. After `=`, in arguments
   and after `def` it is still a name (`x = default`, `foo(default)`,
   `def default = 1`).
+- An unclosed `switch` whose last branch is a colon case
+  (`switch (x) {`, `case 1:` and `foo()` at the end of the input) is
+  an `ERROR` over the whole input; v0.6.0 inserted the missing `}`, and
+  inside a method kept the method and put the `ERROR` around the
+  switch. An arrow case or an empty switch body still gets the missing
+  `}`. It came with the `default` keyword above
+  (`docs/divergences-from-spec.md` §20).
 - **BREAKING:** a line that ends in parentheses around a name, a dotted
   name or a primitive type (`def y = (x)`, `return (x)`), followed on
   the next line by a multi-assignment declaration that starts with
