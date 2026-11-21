@@ -13834,7 +13834,7 @@
     "named": true,
     "fields": {
       "index": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
@@ -13975,6 +13975,10 @@
           },
           {
             "type": "spaceship_expression",
+            "named": true
+          },
+          {
+            "type": "spread_arguments",
             "named": true
           },
           {
@@ -15295,7 +15299,7 @@
     "named": true,
     "fields": {
       "index": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
@@ -15436,6 +15440,10 @@
           },
           {
             "type": "spaceship_expression",
+            "named": true
+          },
+          {
+            "type": "spread_arguments",
             "named": true
           },
           {

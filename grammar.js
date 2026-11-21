@@ -3160,7 +3160,8 @@ module.exports = grammar({
       $.spread_map_entry,
     ),
 
-    // §5.11 — `*expr` only inside argument list / list literal.
+    // §5.11 — `*expr` only inside an argument list, a list literal or a
+    // subscript.
     // Distinct from a binary `*` because the LHS is absent.
     spread_arguments: $ => seq(
       '*',
@@ -3178,7 +3179,7 @@ module.exports = grammar({
     subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
       alias($._subscript_open, '['),
-      field('index', $._expression),
+      $._indices,
       ']',
     )),
 
@@ -3191,9 +3192,20 @@ module.exports = grammar({
     safe_subscript_expression: $ => prec.left(PREC.POSTFIX, seq(
       field('object', $._expression),
       '?[',
-      field('index', $._expression),
+      $._indices,
       ']',
     )),
+
+    // Apache `indexPropertyArgs: (SAFE_INDEX | LBRACK) expressionList[true]?
+    // RBRACK`: several indices, any of them a spread (`y[1, *a]`), an
+    // `index` field each. One rule for both subscripts shares the states of
+    // the list: 6 more in all, where a list in each cost 20.
+    _indices: $ => seq(
+      field('index', $._index_element),
+      repeat(seq(',', field('index', $._index_element))),
+    ),
+
+    _index_element: $ => choice($._expression, $.spread_arguments),
 
     // §3.1 level 2 / §3.2 — `**`. Distinct node kind so metric tools
     // count power separately from multiplicative ops. Right-assoc

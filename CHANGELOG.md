@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- A subscript takes several indices, any of them a spread, as Apache's
+  `indexPropertyArgs` takes `expressionList[true]`: `y[1, 2]`,
+  `y[1, *a]`, `x[*a]`, `y?[*a]` and `y[1, 2] = 3` parse, an `index`
+  field each, and the spread a `spread_arguments`. Each was an `ERROR`,
+  as at v0.6.0. The `index` field of `subscript_expression` and
+  `safe_subscript_expression` may repeat, and is now `multiple` in
+  `node-types.json`; a tree with one index is as before. No real or
+  shape tree changes; 38 Java trees that had an `ERROR` change and still
+  have one (`SPECIFICATION.md` §5.11).
 - `array_creation_expression` for `new T[n][m]`, `new T[n][]` and
   `new T[] { … }`, after Apache `creator`, with `type`, `dimensions`
   (a `dimensions_expr` per `[n]`, one `dimensions` node for the `[]`s)

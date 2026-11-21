@@ -320,10 +320,10 @@ issue #246's "Suggested fix" path 1.
 | `.&` | `method_pointer_expression` | `object`, `method` | Distinct kind. |
 | `.@` | `direct_field_access_expression` | `object`, `field` | Distinct kind. |
 | `*.` | `spread_dot_expression` | `object`, `property` | Property/method access. |
-| `*` (prefix in arg) | `spread_arguments` | `value` | Only valid inside argument lists / list literals. |
+| `*` (prefix in arg) | `spread_arguments` | `value` | Only valid inside argument lists, list literals and subscripts. |
 | `*:` (prefix in map) | `spread_map_entry` | `value` | Only valid inside map literals. |
-| `?[]` | `safe_subscript_expression` | `object`, `index` | Distinct from regular `subscript`. |
-| `[]` | `subscript_expression` | `object`, `index` | |
+| `?[]` | `safe_subscript_expression` | `object`, `index` | Distinct from regular `subscript`. `index` repeats, as for `[]`. |
+| `[]` | `subscript_expression` | `object`, `index` | After Apache `indexPropertyArgs` (`expressionList[true]`): one `index` per element, any of them a `spread_arguments` (`y[1, *a]`, `x[*a]`), so `index` is `multiple` in `node-types.json`. No empty or trailing-comma index (`y[]` is an array type where one may stand). |
 | `T[]` as a value | `array_type` | none | `String[].class`, `int[]::new`, `@A(String[])`: the `array_type` of a declaration, with `type_identifier` or `qualified_type` inside, under the `field_access`, `method_reference_expression` or `method_pointer_expression` that `String.class`, `Foo::new` and `String.&new` have. Groovy reads `a[]` with any `a` as an index with no arguments and makes it a class when `a` names one; here only a primitive or capitalized name is taken (§6.15). |
 | `::` | `method_reference_expression` | `target`, `name` | Groovy 3+. |
 | `++` / `--` (prefix) | `unary_update_expression` | `operator`, `operand` | |
@@ -1248,13 +1248,18 @@ two statements), which the structural-newline approach sidesteps.
 |---|---|---|
 | Argument list | `*expr` | `spread_arguments` |
 | List literal element | `*expr` | `spread_arguments` |
+| Subscript index | `*expr` | `spread_arguments` |
 | Member access | `recv*.prop` / `recv*.method(args)` | `spread_dot_expression` |
 | Map literal entry | `*: expr` | `spread_map_entry` |
 | Argument list | `*: expr` | `spread_map_entry` |
 
 A list literal takes a spread element anywhere, as Apache's
 `list: LBRACK expressionList[true]? COMMA? RBRACK` does (`[*a, 1, *b]`),
-and an argument list takes a spread map anywhere among its arguments,
+a subscript takes several indices, any of them a spread, as
+`indexPropertyArgs: (SAFE_INDEX | LBRACK) expressionList[true]? RBRACK`
+does (`y[1, *a]`, `x[*a]`, `y?[1, 2]`; in 4.0.x to master, and Groovy 3,
+whose rule is `QUESTION? LBRACK expressionList[true]? RBRACK`, reads
+them alike), and an argument list takes a spread map anywhere among its arguments,
 as Apache's `namedArg` and `namedPropertyArg` have the alternative
 `MUL COLON nls expression` (`foo(*:m, x: 1)`, `foo(a: 1, *:m)`, and after
 a comma in a parenthesis-free call, `foo a: 1, *:m`). Neither is the
