@@ -228,6 +228,9 @@
 (lambda_expression parameters: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)
 (variable_declarator name: (identifier) @variable)
+; The key of a keyed pair names the entry or property it takes from the
+; value, not a variable: `def (name: n, age: int a) = person`.
+(variable_declarator key: (identifier) @property)
 (rest_declarator name: (identifier) @variable)
 (field_declaration (variable_declarator name: (identifier) @property))
 

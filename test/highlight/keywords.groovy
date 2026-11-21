@@ -164,6 +164,13 @@ def (h, List<Integer> *t) = l
 //                    ^ operator
 //                     ^ variable
 
+def (name: n, age: int a) = m
+//   ^ property
+//         ^ variable
+//            ^ property
+//                 ^ type.builtin
+//                     ^ variable
+
 int var = yield
 //  ^ variable
 //        ^ variable

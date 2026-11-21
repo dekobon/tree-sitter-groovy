@@ -98,8 +98,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`def (h, List<Integer> *t) = list`), and keyed pairs,
   `def (name: n, age: int a) = map`, with the key in a `key` field; a
   list holds names or pairs, not both. A rest binding's name is a local
-  definition and `@variable`, as the other names are. Each was an
-  `ERROR`.
+  definition and `@variable`, as the other names are; a key is
+  `@property`. Each was an `ERROR`.
   Annotations alone (`@A (a, b) = l`) and modifiers other than `final`
   where a statement starts (`static def (a, b) = l`) are still one.
 - A parenthesis-free call takes more first arguments on the receiver's
