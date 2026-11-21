@@ -813,7 +813,18 @@ arguments it is a block as well (`foo 1` then `{ y }`), where Groovy
 calls the last argument with it, and after a postfix update, an
 `instanceof` test or an `as` cast it joins the expression (`x++`,
 `x instanceof Foo` or `x as Foo`, then `{ y }`, calls the result with a
-closure), where Groovy reads a block. In a class body the same holds after a field
+closure), where Groovy reads a block. Groovy 3 runs the block after
+`def b = x instanceof String`, `x as String`, `x as List<String>` and
+`[1] as int[]`, as a type takes no closure (Apache `matchingType`,
+`coercionType`), and calls `foo(x)` or a name with it; a `{ -> … }`,
+`{ a, b -> … }` or `{ … }()` there is a closure statement. A scanner
+token for a `{` that opens such a line after the name of a cast's type,
+taken by a block where a statement may start, cost 4 states but turned
+42 of 4,000 shape inputs (`z = (x) as Foo` then `{ -> … }`) into an
+`ERROR`; reading the closure statement as well cost 32 states, and a
+type that ends in `>` or `]` needs a marker of its own, 8 more. The
+corpus test "A block on the line after an instanceof test or an as cast
+is a closure of the result" pins today's reading. In a class body the same holds after a field
 initialiser:
 
 ```groovy
