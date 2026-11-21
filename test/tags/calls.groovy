@@ -84,3 +84,11 @@ new Foo(z())
 
 new Box<String>(z())
 //  ^ reference.class
+
+pom { }.writeTo(x)
+// <- reference.call
+//      ^ reference.call
+
+foo { }.bar 1
+// <- reference.call
+//      ^ reference.call

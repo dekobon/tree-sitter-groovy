@@ -781,6 +781,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   before `->` or `:` (4.0.x to master). Each was an `ERROR`, as at
   v0.6.0. The `value` field of `switch_case` and `switch_arrow_case` is
   now `multiple` in `node-types.json`.
+- A statement that calls a name with a closure goes on with a member
+  access, as Groovy reads `foo { }.bar()` as `foo({ }).bar()`: the call
+  is a `method_invocation`, the object of the access, on the line or on
+  a later one (`foo { }` then `.bar()`), with any access (`?.`, `*.`,
+  `??.`, `.&`, `.@`, `::`). Where a first argument follows the accesses
+  they are the receiver of a `command_chain` (`foo { }.bar 1`,
+  `foo { }.bar x: 1`). Each was an `ERROR`, as at v0.6.0; of 266 real
+  files one that had an `ERROR` (`pom {}.writeTo(…)`) has none, and no
+  tree without an `ERROR` changes. The scanner decides before the name,
+  reading the braces on their line on Groovy's tokens for at most 128
+  characters, so braces that span lines (`foo {` then `}.bar()`) stay
+  an `ERROR`, and an operator other than an access after the `}`
+  (`foo { }[0]`, `foo { } + 1`) is read as before
+  (`SPECIFICATION.md` §6.24, `docs/divergences-from-spec.md` §30).
 
 ## [0.6.0] - 2026-11-12
 

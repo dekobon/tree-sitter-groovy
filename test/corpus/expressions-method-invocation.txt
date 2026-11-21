@@ -1099,3 +1099,522 @@ def d = {
                 (identifier)))))
         (expression_statement
           (identifier))))))
+
+==================
+A call with a closure that a member access follows is the object of the access
+==================
+
+foo { }.bar()
+foo { a } .bar(1)
+pom {}.writeTo("x")
+foo { }
+.bar()
+foo { }
+// c
+.bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (identifier))))
+        field: (identifier))
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list
+        (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        (line_comment)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+Every member access goes on with a call with a closure
+==================
+
+foo { }?.bar()
+foo { }*.bar()
+foo { }??.bar()
+foo { }.&bar
+foo { }.@bar
+foo { }::bar
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (safe_navigation_expression
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        property: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (spread_dot_expression
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        property: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (safe_chain_dot_expression
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        property: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_pointer_expression
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      method: (identifier)))
+  (expression_statement
+    (direct_field_access_expression
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier)))
+  (expression_statement
+    (method_reference_expression
+      target: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      name: (identifier))))
+
+==================
+A call with a closure and a member access in statement positions and chains
+==================
+
+l: foo { }.bar()
+if (c) foo { }.bar() else baz { }
+a { }.b { }.c()
+foo { }.bar = 1
+foo { }.bar + 1
+foo { }.bar[1]
+foo { }.bar
+baz()
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (expression_statement
+      (method_invocation
+        function: (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier))
+        arguments: (argument_list))))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (method_invocation
+        function: (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier))
+        arguments: (argument_list)))
+    alternative: (command_chain
+      receiver: (identifier)
+      argument: (closure)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (field_access
+            object: (method_invocation
+              function: (identifier)
+              closure: (closure))
+            field: (identifier))
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      right: (number_literal)))
+  (expression_statement
+    (binary_expression
+      left: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      right: (number_literal)))
+  (expression_statement
+    (subscript_expression
+      object: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      index: (number_literal)))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A call with a closure and member accesses is the receiver of a parenthesis-free call
+==================
+
+foo { }.bar 1
+foo { }.bar "a" + b
+foo { }.bar x: 1
+foo { }.bar x
+foo { }?.bar.baz 1
+foo { }.Bar x
+foo { }
+.bar 1
+foo { }.bar
+1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (safe_navigation_expression
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        property: (identifier))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (number_literal))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
+The braces of a call with a closure are read on Groovy's tokens before a member access
+==================
+
+foo { '}' }.bar()
+foo { "${x}" }.bar()
+foo { /}/ }.bar()
+foo { $/}/$ }.bar()
+foo { /* } */ }.bar()
+foo { a / 2 }.bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (string_literal))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (string_literal
+                (gstring_brace_interpolation
+                  value: (identifier))))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (string_literal
+                (string_fragment)))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (string_literal
+                (string_fragment)))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (block_comment)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (binary_expression
+                left: (identifier)
+                right: (number_literal)))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A call with a closure that ends after a member access in brackets is not a receiver (known divergence)
+==================
+
+foo { }.bar().baz 1
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier))
+        arguments: (argument_list))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
+A call with a closure that an operator other than a member access follows stays a command chain (known divergence)
+==================
+
+foo { } as X
+foo { }[0]
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (expression_statement
+    (list_literal
+      (number_literal))))
+
+==================
+A call with a closure that spans lines before a member access is unsupported
+:error
+==================
+
+foo {
+}.bar()
+
+---
+
+==================
+A call with a closure past the look-ahead bound before a member access is unsupported
+:error
+==================
+
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar()
+
+---
+
+==================
+A call with a closure whose first argument after the accesses passes the look-ahead bound is unsupported
+:error
+==================
+
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar 1
+
+---
+
+==================
+A range after a call with a closure is unsupported
+:error
+==================
+
+foo { }..x
+
+---
+
+==================
+A call with a closure whose slashy string follows a keyword before a member access is unsupported
+:error
+==================
+
+foo { return /}/ }.bar()
+
+---
+
+==================
+A contextual keyword with a closure before a member access is unsupported
+:error
+==================
+
+record { }.bar()
+
+---
+
+==================
+A method reference as the receiver of a parenthesis-free call after a closure is unsupported
+:error
+==================
+
+foo { }::bar 1
+
+---
+
+==================
+A quoted name as the receiver of a parenthesis-free call after a closure is unsupported
+:error
+==================
+
+foo { }.'bar' 1
+
+---
+
+==================
+After return or break on its line a call with a closure and a member access stays the value or the label, which Groovy rejects
+==================
+
+for (;;) {
+  return foo { }.bar 1
+  break foo { }.bar()
+}
+
+---
+
+(source_file
+  (for_statement
+    body: (block
+      (return_statement
+        (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier)))
+      (expression_statement
+        (number_literal))
+      (break_statement
+        label: (identifier))
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (closure)
+            field: (identifier))
+          arguments: (argument_list))))))

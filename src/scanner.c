@@ -139,6 +139,8 @@ enum TokenType {
     TYPE_ONLY_CLOSE,
     BODY_BLOCK_END,
     JUMP_STATEMENT_END,
+    CLOSURE_CALL_START,
+    CLOSURE_COMMAND_START,
     ERROR_SENTINEL,
 };
 
@@ -3141,6 +3143,47 @@ static bool scan_typed_statement_start(
                                    no_close_ahead);
 }
 
+// What `read_closure_call` found after a statement's first name.
+typedef enum {
+    // No such call: the statement is read as before.
+    NO_CLOSURE_CALL,
+    // A call with a closure that an expression's member access goes on with:
+    // CLOSURE_CALL_START.
+    CLOSURE_CALL,
+    // The same call as the start of the receiver of a parenthesis-free call:
+    // CLOSURE_COMMAND_START.
+    CLOSURE_COMMAND,
+} ClosureCall;
+
+// Defined after BoundedLexer, which it reads through.
+static ClosureCall read_closure_call(TSLexer *lexer, bool no_close_ahead);
+
+// SPECIFICATION.md §6.24 — at the `{` after a statement's first name, which
+// the caller has read with the spaces after it. The token is empty, before
+// the name.
+static bool scan_closure_call_start(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool no_close_ahead
+) {
+    // After `return`, `break` or `continue` on its line the name is the
+    // value or the label, as before `new` (§5.5 item 2): `return` takes the
+    // call as an expression without the token.
+    if (valid_symbols[JUMP_STATEMENT_END]) {
+        return false;
+    }
+    switch (read_closure_call(lexer, no_close_ahead)) {
+        case CLOSURE_CALL:
+            lexer->result_symbol = CLOSURE_CALL_START;
+            return valid_symbols[CLOSURE_CALL_START];
+        case CLOSURE_COMMAND:
+            lexer->result_symbol = CLOSURE_COMMAND_START;
+            return valid_symbols[CLOSURE_COMMAND_START];
+        default:
+            return false;
+    }
+}
+
 // SPECIFICATION.md §6.14 — decides at the first name of a statement,
 // before it, whether the statement is a parenthesis-free call whose
 // receiver is that name and whose first argument starts with `new`, is
@@ -3239,6 +3282,10 @@ static bool scan_statement_start(
     }
     if (!skip_same_line_space(lexer, false)) {
         return false;
+    }
+    // §6.24 — a call with a closure that a member access goes on with.
+    if (lexer->lookahead == '{') {
+        return scan_closure_call_start(lexer, valid_symbols, no_close_ahead);
     }
     if (lexer->lookahead == '[') {
         return type_word
@@ -3379,11 +3426,12 @@ static ParenClose read_relational_operator(TSLexer *lexer) {
     }
 }
 
-// A view of a lexer whose input ends `left` characters on. The readers above
-// stop at the end of their input, and answer there as for text that ends too
-// soon: a string that does not close, a bracket that is never matched. Through
-// the view each stops at its bound as well, so a look-ahead made of them reads
-// no further than a fixed number of characters, whatever it reads. Nothing is
+// A view of a lexer whose input ends `left` characters on, and with `line`
+// set at the next line break as well. The readers above stop at the end of
+// their input, and answer there as for text that ends too soon: a string that
+// does not close, a bracket that is never matched. Through the view each stops
+// at its bound as well, so a look-ahead made of them reads no further than a
+// fixed number of characters, or than the line, whatever it reads. Nothing is
 // emitted through the view: its `mark_end` and `log` are never called and do
 // nothing.
 typedef struct {
@@ -3391,16 +3439,28 @@ typedef struct {
     TSLexer lexer;
     TSLexer *input;
     unsigned left;
+    bool line;
 } BoundedLexer;
+
+static inline bool bounded_at_end(const BoundedLexer *view) {
+    return view->left == 0
+        || (view->line && is_line_break(view->input->lookahead));
+}
+
+// Sets the view's lookahead from its input's, after the view or its `line`
+// changed.
+static inline void bounded_refresh(BoundedLexer *view) {
+    view->lexer.lookahead = bounded_at_end(view) ? 0 : view->input->lookahead;
+}
 
 static void bounded_advance(TSLexer *lexer, bool skip) {
     BoundedLexer *view = (BoundedLexer *)lexer;
-    if (view->left == 0) {
+    if (bounded_at_end(view)) {
         return;
     }
     view->left--;
     view->input->advance(view->input, skip);
-    view->lexer.lookahead = view->left == 0 ? 0 : view->input->lookahead;
+    bounded_refresh(view);
 }
 
 static void bounded_mark_end(TSLexer *lexer) {
@@ -3419,7 +3479,7 @@ static bool bounded_is_at_included_range_start(const TSLexer *lexer) {
 
 static bool bounded_eof(const TSLexer *lexer) {
     const BoundedLexer *view = (const BoundedLexer *)lexer;
-    return view->left == 0 || view->input->eof(view->input);
+    return bounded_at_end(view) || view->input->eof(view->input);
 }
 
 static void bounded_log(const TSLexer *lexer, const char *format, ...) {
@@ -3441,6 +3501,7 @@ static BoundedLexer bounded_lexer(TSLexer *input, unsigned characters) {
         },
         .input = input,
         .left = characters,
+        .line = false,
     };
     return view;
 }
@@ -3558,6 +3619,205 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
             }
         }
     }
+}
+
+// SPECIFICATION.md §6.24 — the most characters `read_closure_call` reads from
+// the `{` after a statement's first name: the closure, which must close on
+// the name's line, what follows its `}` up to the member access, and the
+// receiver and first argument of a call that the access starts. The read runs
+// at every `name {` that opens a statement and ends at the end of the line,
+// so a block whose `{` ends its line costs a character. A line of nested calls
+// with closures (`a { a { a { … `) is read from each `{` to the end of its
+// braces or of the line, and the bound keeps that to this many characters
+// from each `{` rather than the rest of the line: such a line is read about
+// a quarter of this many times per character (measured: 35 times at 128, 65
+// at 256, 3 before the read). A file of short lines of nested closures
+// (`a { b { c { } } }`) is read 4.6 times per character, 2.9 before. A
+// closure and its access that span more than this from
+// the `{` are read as before; this covers a line of 120 columns, and the
+// longest closure that opens and closes a statement's line in the real files
+// measured is 66 characters.
+static const unsigned CLOSURE_CALL_LOOKAHEAD_CHARACTERS = 128;
+
+// SPECIFICATION.md §6.24 — from the `{` after a statement's first name,
+// through a view that ends at the line break: whether the braces close there.
+// They are counted on Groovy's tokens, as `next_line_paren_ends_cast` counts
+// brackets: strings whole (`skip_string`, a `${…}` with the strings in it), a
+// slashy string where an operand may start (`slashy_body_follows`), a
+// dollar-slashy string (`skip_dollar_slashy_string`) and block comments as
+// trivia. A string, a comment or an interpolation that runs past the line
+// ends the read as an unclosed brace does, and so does a line comment.
+static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
+    advance(input);
+    unsigned depth = 1;
+    // Whether an operand may start here, as in `next_line_paren_ends_cast`:
+    // a `/` there opens a slashy string.
+    bool operand = true;
+    while (depth > 0) {
+        bool slash = false;
+        if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
+            || input->eof(input)) {
+            return false;
+        }
+        if (slash) {
+            if (input->lookahead == '/') {
+                return false;
+            }
+            if (operand && input->lookahead != '=') {
+                if (!slashy_body_follows(input)) {
+                    return false;
+                }
+                advance(input);
+                operand = false;
+            } else {
+                operand = true;
+            }
+            continue;
+        }
+        int32_t c = input->lookahead;
+        operand = !is_identifier_char(c) && c != '\'' && c != '"'
+            && c != ')' && c != ']' && c != '}' && c != '.';
+        if (c == '\'' || c == '"') {
+            if (!skip_string(input)) {
+                return false;
+            }
+            continue;
+        }
+        if (is_identifier_char(c)) {
+            if (read_dollar_slashy_open(input)
+                && !skip_dollar_slashy_string(input, NULL)) {
+                return false;
+            }
+            continue;
+        }
+        advance(input);
+        if (c == '{') {
+            depth++;
+        } else if (c == '}') {
+            depth--;
+        }
+    }
+    return true;
+}
+
+// SPECIFICATION.md §6.24 — consumes a member access that may follow the `}`
+// of a closure or a name after it: `.` other than `..`, `?.`, `??.`, `*.`,
+// `.&`, `.@` and `::`. `*receiver` is cleared at `::`, which
+// `_closure_command_path` does not take.
+static bool read_closure_access(TSLexer *lexer, bool *receiver) {
+    if (lexer->lookahead == ':') {
+        advance(lexer);
+        if (lexer->lookahead != ':') {
+            return false;
+        }
+        advance(lexer);
+        *receiver = false;
+        return true;
+    }
+    bool dot = true;
+    return is_member_access_start(lexer->lookahead)
+        && read_member_access(lexer, &dot)
+        && !(dot && lexer->lookahead == '.');
+}
+
+// SPECIFICATION.md §6.24 — after the `}` of a statement's closure that closed
+// on its line: whether a member access follows, past line breaks and
+// comments, which Groovy's lexer hides there (Apache's `pathElement` takes
+// `nls` before and after each access), and whether the accesses are the
+// receiver of a parenthesis-free call (`foo { }.bar 1` is
+// `foo({ }).bar(1)`). They are when each takes a name of the grammar's
+// receiver (`_closure_command_path`: no quoted name, no `::`) and a first
+// argument that `obj.m 1` takes (`first_argument_follows`, as
+// `scan_command_path_start` reads it) follows the last name on its line.
+// Where such an argument follows another receiver (`foo { }::bar 1`,
+// `foo { }.'bar' 1`), no token is emitted, as no rule reads that call, and
+// the statement stays the ERROR it was: the call alone would leave the
+// argument a statement of its own. An access that brackets follow
+// (`foo { }.bar().baz 1`) ends the read: what follows them is read as after
+// `foo().baz 1` (§5.5 item 2).
+static ClosureCall read_closure_accesses(TSLexer *input, bool no_close_ahead) {
+    if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
+        return NO_CLOSURE_CALL;
+    }
+    bool receiver = true;
+    if (!read_closure_access(input, &receiver)) {
+        return NO_CLOSURE_CALL;
+    }
+    bool ends_in_new = false;
+    for (;;) {
+        if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
+            return CLOSURE_CALL;
+        }
+        if (input->lookahead == '\'' || input->lookahead == '"') {
+            if (!skip_string(input)) {
+                return CLOSURE_CALL;
+            }
+            receiver = false;
+            ends_in_new = false;
+        } else if (is_identifier_start(input->lookahead)) {
+            char name[sizeof "new"];
+            ends_in_new =
+                word_is(name, read_word(input, name, sizeof name), "new");
+        } else {
+            return CLOSURE_CALL;
+        }
+        bool slash = false;
+        if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
+            || (slash && input->lookahead != '/')) {
+            return CLOSURE_CALL;
+        }
+        if (slash || input->eof(input) || is_line_break(input->lookahead)) {
+            // No argument on the line: only an access that opens a later
+            // line goes on with the name.
+            while (!input->eof(input) && !is_line_break(input->lookahead)) {
+                advance(input);
+            }
+            if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)
+                || !read_closure_access(input, &receiver)) {
+                return CLOSURE_CALL;
+            }
+            continue;
+        }
+        if (input->lookahead != ':'
+            && !is_member_access_start(input->lookahead)) {
+            break;
+        }
+        if (!read_closure_access(input, &receiver)) {
+            return CLOSURE_CALL;
+        }
+    }
+    // A receiver that starts with a call names no type, so a capitalized
+    // last name takes a name too (`foo { }.Bar x` is `foo({ }).Bar(x)`),
+    // where `foo.Bar x` declares `x`. After `new` the name is the created
+    // type, as after `this.new`.
+    if (!first_argument_follows(input, true, !ends_in_new, true,
+                                no_close_ahead)) {
+        return CLOSURE_CALL;
+    }
+    return receiver ? CLOSURE_COMMAND : NO_CLOSURE_CALL;
+}
+
+// SPECIFICATION.md §6.24 — at the `{` after the first name of a statement,
+// which the caller has read: whether the braces close on this line and a
+// member access follows them (`closure_closes_on_line`,
+// `read_closure_accesses`). Groovy reads `foo { }.bar()` as
+// `foo({ }).bar()`, where `command_chain` would take `foo { }` as the whole
+// statement. The read goes through a BoundedLexer, which ends at the line
+// break until the `}`. One that reaches the bound answers NO_CLOSURE_CALL
+// whatever it read, so that an argument the bound cuts off never leaves the
+// call and a statement of its own.
+static ClosureCall read_closure_call(TSLexer *lexer, bool no_close_ahead) {
+    BoundedLexer view =
+        bounded_lexer(lexer, CLOSURE_CALL_LOOKAHEAD_CHARACTERS);
+    view.line = true;
+    bounded_refresh(&view);
+    if (!closure_closes_on_line(&view.lexer, no_close_ahead)) {
+        return NO_CLOSURE_CALL;
+    }
+    view.line = false;
+    bounded_refresh(&view);
+    ClosureCall call = read_closure_accesses(&view.lexer, no_close_ahead);
+    return view.left == 0 ? NO_CLOSURE_CALL : call;
 }
 
 // SPECIFICATION.md §6.11 — what follows a `)` on its line. The `)` is

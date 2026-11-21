@@ -146,3 +146,11 @@ foo(item -> item.name)
 def c = { a = b -> a }
 //        ^ variable.parameter
 //            ^ variable
+
+foo { }.bar()
+// <- function.call
+//      ^ function.call
+
+foo { }.bar 1
+// <- function.call
+//      ^ function.call

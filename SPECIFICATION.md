@@ -468,7 +468,7 @@ fix relative to *both* parent grammars.
 | `assert e`, `assert e : msg` and `assert e, msg` | port from murtaza64 + fix | power-assertion shape; the message's separator is `:` or `,`, on either line, as Apache's `assertStatement` takes `NL* (COLON \| COMMA) NL*`. |
 | Labeled statement | port from murtaza64 | `name: statement`. Disambiguation vs. map literal in §5.3. |
 | Block statement | **new** | A `{ … }` that opens a statement, in a file, a block, a closure or a colon case, or after a label, is a `block`, as Apache's `statement` lists `block` first: `{ int x = 1; foo(x) }` in a method, `lbl: { … }`, `case 1: { … }`. Where an expression continues the braces, on their line or the next, they are a closure, as in Groovy: `{ foo() }()`, `{ foo() }.call()`, `{ foo() } as Runnable`, `{ } + 1`, `{ }` followed by `.call()` on the next line. Braces with parameters (`{ a -> }`, `{ -> }`) are a closure, and a `{` after an expression, on its line or the next, is that expression's trailing closure (`foo()` followed by `{ x }`). The scanner decides at the `}` (§6.22). Groovy 2's parser, which Groovy 3 still runs with `-Dgroovy.antlr4=false`, rejects an unlabeled block there ("Ambiguous expression could be either a parameterless closure expression or an isolated open code block"); the parser of Groovy 3 accepts it as a block through class generation (observed), and the grammars of 4.0.x to 6.0.x take it the same way. |
-| Command chain (`juxt_function_call`) | port from murtaza64 + §5.5 | |
+| Command chain (`juxt_function_call`) | port from murtaza64 + §5.5 | A statement's call of a name with a closure that closes on its line is the object of a member access that follows it, on the line or a later one (`foo { }.bar()`), and the receiver of a parenthesis-free call where a first argument follows the accesses (`foo { }.bar 1`), as in Groovy (§6.24). |
 | `pipeline { … }` followed by anything | port + fix | Promote `pipeline` to a regular statement, drop `optional($.pipeline)`-at-EOF. Closes #37. |
 | Annotation usage `@Foo(args)` | port | including `@Foo` and `@Foo.Bar(x = 1)`. |
 | Shebang line | port from amaanq | `#! …\n` at start of file. |
@@ -748,7 +748,14 @@ The resolution we adopt:
    `(obj).m 1`), a quoted name (`obj.'name' 1`), `::` (`obj::m 1`), and
    a value whose first name is `new`, `switch`, `true`, `false` or
    `null` (`def x = true.x 1`). Each parses as before, as the
-   expression followed by the argument.
+   expression followed by the argument. A statement's receiver may start
+   with a call of its first name with a closure that closes on the
+   name's line, its accesses on that line or later ones
+   (`foo { }.bar 1`, `foo { }` then `.bar x` on the next line, Groovy's
+   `foo({ }).bar(1)`): the scanner reads the braces, the accesses and the
+   first argument before the name (§6.24). Without an argument the call
+   is the object of the accesses (`foo { }.bar()`), where the statement
+   `foo { }` alone is a `command_chain`.
    A dotted receiver that starts a statement is a call also after
    another statement on the same line: `x.y a.b 'c'`, `foo a.b 'x'` and
    `foo 1 a.b 'c'` are the first statement followed by the call
@@ -1608,6 +1615,8 @@ enum TokenType {
   MULTI_ASSIGNMENT_COMMA, // §6.20 — the first `,` of `(a, b) = …`, unless the parentheses go on as a method's parameters
   DECLARATION_START,      // §6.21 — empty; before the type of a typed local declaration (`String s`, `int a, b`, `String s = 'a'`)
   STATEMENT_BLOCK_END,    // §6.22 — empty; after the `}` of a block that opens a statement and that nothing continues
+  CLOSURE_CALL_START,     // §6.24 — empty; before a statement's name whose closure closes on its line and a member access follows
+  CLOSURE_COMMAND_START,  // §6.24 — empty; the same where a first argument follows the accesses (`foo { }.bar 1`)
   UNTERMINATED_COMMENT,   // §6.6 — empty; at the first `/*` with no `*/` after it
   STRING_BODY,            // §6.10 — never emitted; valid only inside a string body
   TYPE_START,             // §6.15 — never emitted; valid only where a type may start
@@ -4474,6 +4483,160 @@ changes; three corpus trees change, each a pinned divergence that now
 reads as Groovy does, and 66 Java files, 42 of them without an `ERROR`,
 each at a `return` that ends its line before its value, which Java
 continues and Groovy does not.
+
+---
+
+### 6.24 CLOSURE_CALL_START and CLOSURE_COMMAND_START — implementation contract
+
+```text
+At the first name of a statement (COMMAND_STATEMENT_START or
+DECLARATION_START valid, JUMP_STATEMENT_END not, no error recovery) that
+is no keyword of the grammar and no contextual word whose own token the
+scanner decides there, and that `{` follows on its line:
+  read on Groovy's tokens from the `{`, within
+  CLOSURE_CALL_LOOKAHEAD_CHARACTERS (128) characters:
+  - the braces must close on the name's line;
+  - past spaces, line breaks and comments a member access must follow
+    the `}`: `.` other than `..`, `?.`, `??.`, `*.`, `.&`, `.@` or `::`;
+  - then each access's name (trivia and line breaks between them), and
+    after the last on its line what follows it.
+Emits CLOSURE_COMMAND_START, empty and before the name, iff a first
+argument that `obj.m 1` takes (§6.14, any name included) follows the
+last name on its line and every access is one of `.`, `?.`, `??.`,
+`*.`, `.&`, `.@` with a plain name.
+Emits CLOSURE_CALL_START, empty and before the name, iff no such argument
+follows.
+Else, and wherever the read reaches the bound: emits nothing.
+```
+
+Groovy reads `foo { }.bar()` as `foo({ }).bar()`. Apache's
+`pathExpression` is `primary (pathElement)*`, and a `pathElement` is a
+`closureOrLambdaExpression` or an access, each with `nls` before it, and
+after the operator too. In 4.0.x and 5.0.x an access to a name is
+
+```antlr
+nls ((DOT | SPREAD_DOT | SAFE_DOT | SAFE_CHAIN_DOT) nls
+        (AT | nonWildcardTypeArguments)?
+    | METHOD_POINTER nls
+    | METHOD_REFERENCE nls) namePart
+```
+
+and in 6.0.x and master the same with `NL*` for `nls`, the type
+arguments of `::` aside. `commandExpression` is, in all three,
+
+```antlr
+expression
+    ({ !SemanticPredicates.isFollowingArgumentsOrClosure($expression.ctx) }?
+        argumentList
+    | /* if pathExpression is a method call, no need to have any more arguments */)
+    commandArgument*
+```
+
+so `foo { }` takes no argument list after it, being a call with a
+closure, while `foo { }.bar 1`, whose path ends in a name,
+is `foo({ }).bar(1)` (observed with Groovy 3, as are the other readings
+here). In this grammar the statement `foo { }` is a `command_chain`
+whose first argument is the closure (§5.5 item 3), and nothing went on
+with it: `foo { }.bar()` was that chain, an `ERROR` and the call
+`bar()`, here and at v0.6.0, and `foo { }.&bar` the chain and a method
+pointer with a missing object. A value takes the call already
+(`x = foo { }.bar()`, `return foo { }.bar()`), as `method_invocation`.
+An alternative of `_expression` that started with the name and the
+closure would let no state after a name in a value be a lone unit
+reduction; the scanner decides before the name instead, as for §6.14.
+
+The braces are counted on Groovy's tokens, as §6.11 counts brackets
+before a cast: strings whole, a `${…}` with the strings in it, a slashy
+string where an operand may start, a dollar-slashy string and block
+comments, through a `BoundedLexer` that ends at the line break until the
+`}`. A string, a comment or an interpolation that runs past the line, a
+line comment and a line escape end the read as a brace that does not
+close does, and so does the bound. After the `}` the view reads on past
+line breaks and comments, which Groovy's lexer hides before an access.
+
+`CLOSURE_CALL_START` opens an alternative of `method_invocation` that
+holds the name and the closure, which the access then takes as its
+object like any other expression: `foo { }.bar()`, `foo { } .bar(1)`,
+`foo { }` then `.bar()` or `// c` and `.bar()` on later lines,
+`foo { }?.bar()`, `*.`, `??.`, `.&bar`, `.@bar`, `::bar`,
+`l: foo { }.bar()`, `if (c) foo { }.bar() else baz { }`,
+`a { }.b { }.c()`, `foo { }.bar { }`, `foo { }.bar = 1`,
+`foo { }.bar + 1`, `foo { }.bar[1]`, and `foo { }.bar` then `1` on the
+next line, which stays two statements. Without an argument after them
+the accesses are an expression, so the statement ends where an
+expression does.
+
+Where a first argument follows the accesses on the last name's line the
+accesses are a parenthesis-free call's receiver, and the call alone
+would leave the argument a statement of its own (`foo { }.bar` and `1`,
+with no `ERROR`). `CLOSURE_COMMAND_START` opens the receiver instead:
+`_statement_command_path`, whose first object is now one rule,
+`_statement_command_object`, a statement's first name before
+`_command_path_start` or the name and its closure after the token,
+aliased to `method_invocation`. So `foo { }.bar 1`, `foo { }.bar "a" + b`,
+`foo { }.bar x: 1`, `foo { }.bar x`, `foo { }?.bar.baz 1` and `foo { }`
+then `.bar 1` on the next line are a `command_chain` whose receiver is
+the access of the call, as Groovy reads them. The argument is the one the
+scanner reads after a statement's dotted receiver (§6.14), but for a name
+after a capitalized last name: a receiver that starts with a call names
+no type, so `foo { }.Bar x` calls, as in Groovy, where `foo.Bar x`
+declares `x`. Where the accesses hold `::` or a quoted name, which the
+receiver rule does not take, no token is emitted when an argument
+follows, and `foo { }::bar 1` and `foo { }.'bar' 1` stay the `ERROR` they
+were. Brackets after an access end the read of the accesses there:
+`foo { }.bar().baz 1` and `a { }.b { }.c 1` are the call's accesses and
+then `1`, which Groovy passes to `baz` and to `c`, as `foo().baz 1` is
+read (§5.5 item 2); both were an `ERROR` before.
+
+After `return`, `break` and `continue` on their line neither token is
+emitted, so that `return foo { }.bar 1` stays the return of
+`foo { }.bar` followed by `1` and `break foo { }.bar()` the `break` of
+the label `foo`, as `return obj.m 'x'` and `return foo new Foo()` are
+(§5.5 item 2); Groovy rejects all three. A value of `return` takes the
+call without the token.
+
+Not read: braces that span lines (`foo {` then `}.bar()`), braces and
+accesses past the bound, a slashy string after a keyword, which the read
+takes for a division (`foo { return /}/ }.bar()`), and the names whose own
+tokens the scanner decides at a statement's start (`record`, `trait`,
+`sealed`, `var`, `yield`, `in` and `as` where valid) and the grammar's
+keywords (`super { }.bar()`). Each stays as before, an `ERROR` but for
+`yield { }.bar()`, a `yield_statement`. An operator other than a member
+access after the `}` is read as before, as a statement of its own or an
+`ERROR` (`foo { }[0]`, `foo { } + 1`, `foo { } as X`, `foo { }()`,
+`foo { } ? a : b`), where Groovy applies it to the call;
+`docs/divergences-from-spec.md` §30 lists the trees.
+
+The bound counts from the `{`. It keeps the read linear on a line of
+nested calls with closures, which is read from each `{`: a line of 1,000
+to 16,000 `a {` is read 35 times per character at 128 (about 19 at 64,
+66 at 256 and 130 at 512), against 3 before, and closed (`a { … } }`) 28 times; a
+file of short lines (`a { b { c { } } }`) 4.6 times per character, 2.9
+before, and one of `foo { a }.bar()` lines 3.1, where it was an `ERROR`
+read 4.9 times. 128 characters cover a statement's closure and access on
+a line of 120 columns; the longest closure that opens and closes on a
+statement's line in the 266 real files is 66 characters. A line of 16,000
+unclosed `a {` parses in 24 ms, 10 ms before (37 ms at 256).
+`bindings/rust/tests/closure_call_cost.rs` pins the bytes served per
+byte at two lengths, which grow eightfold without the bound.
+
+Each token is the statement's first, so the runtime counts what the
+scanner read for it against the statement, and an edit in the braces,
+after the `}` or in the argument lexes the name again;
+`bindings/rust/tests/incremental_reparse.rs` checks every single edit of
+ten such texts and four sequences against a parse from scratch.
+
+Measured against the grammar before: STATE_COUNT 4754 to 4759,
+LARGE_STATE_COUNT 1828 to 1832, SYMBOL_COUNT 412 to 416, two external
+tokens and no conflict or precedence added. The `method_invocation`
+alternative alone cost 12 states; with the receiver form, and the first
+object of a statement's receiver folded into one rule, the total is 5.
+No corpus, Java or shape tree changes; of the 266 real files one
+changes, from an `ERROR` to no `ERROR`
+(`pom {}.writeTo("${projectDir}/pom.xml")`). Parse time, the minimum of
+30 runs (5 for the Java files): unchanged on the real files, 0.6% more
+on the Java files and on Gradle- and Jenkins-style files, 0.7% more on a
+file of nested empty blocks.
 
 ---
 

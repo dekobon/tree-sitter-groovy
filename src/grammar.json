@@ -924,21 +924,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -975,21 +966,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -1026,21 +1008,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -1077,21 +1050,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -1128,21 +1092,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -1179,21 +1134,12 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "SEQ",
-              "members": [
-                {
-                  "type": "FIELD",
-                  "name": "object",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "identifier"
-                  }
-                },
-                {
-                  "type": "SYMBOL",
-                  "name": "_command_path_start"
-                }
-              ]
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
             },
             {
               "type": "FIELD",
@@ -1219,6 +1165,58 @@
               "name": "identifier"
             },
             "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_statement_command_object": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "_command_path_start"
+            }
+          ]
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_closure_command_call"
+          },
+          "named": true,
+          "value": "method_invocation"
+        }
+      ]
+    },
+    "_closure_command_call": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_closure_command_start"
+        },
+        {
+          "type": "FIELD",
+          "name": "function",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "closure",
+          "content": {
+            "type": "SYMBOL",
+            "name": "closure"
           }
         }
       ]
@@ -9014,6 +9012,31 @@
               }
             ]
           }
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_closure_call_start"
+            },
+            {
+              "type": "FIELD",
+              "name": "function",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "closure",
+              "content": {
+                "type": "SYMBOL",
+                "name": "closure"
+              }
+            }
+          ]
         }
       ]
     },
@@ -13106,6 +13129,14 @@
     {
       "type": "SYMBOL",
       "name": "_jump_statement_end"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closure_call_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closure_command_start"
     },
     {
       "type": "SYMBOL",

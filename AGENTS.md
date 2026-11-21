@@ -103,7 +103,14 @@ The default branch is **`main`**.
     (§6.21);
   - an empty token after `return`, `break` or `continue` where a line
     break follows on the keyword's line, which ends the statement there,
-    as Groovy takes the value or the label only on that line (§6.23).
+    as Groovy takes the value or the label only on that line (§6.23);
+  - an empty token before a statement's first name whose closure closes
+    on the name's line, read on Groovy's tokens for at most 128
+    characters (`CLOSURE_CALL_LOOKAHEAD_CHARACTERS`), and that a member
+    access follows, so that the call is the access's object
+    (`foo { }.bar()`), and another where a first argument follows the
+    accesses, which makes them a call's receiver (`foo { }.bar 1`)
+    (§6.24).
 
   Six externals are never emitted. Rules make them valid where the
   scanner needs to know where it is: `_string_body` inside a string

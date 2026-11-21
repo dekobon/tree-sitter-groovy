@@ -970,6 +970,12 @@ module.exports = grammar({
     // ends the statement: Groovy takes the value or the label only on the
     // keyword's line.
     $._jump_statement_end,
+    // §6.24 — empty tokens before the first name of a statement that calls
+    // it with a closure that closes on the name's line and that a member
+    // access follows (`foo { }.bar()`); the second where the accesses are
+    // the receiver of a parenthesis-free call (`foo { }.bar 1`).
+    $._closure_call_start,
+    $._closure_command_start,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1230,12 +1236,27 @@ module.exports = grammar({
     ),
 
     // The receivers with member accesses of a value and of a statement.
-    // The scanner reads them (§6.14), so they are built of names only.
+    // The scanner reads them (§6.14, §6.24), so their accesses take names
+    // only.
     ...commandPathRules('_command_path', $ => field('object', $.identifier)),
-    ...commandPathRules('_statement_command_path', $ => seq(
-      field('object', $.identifier),
-      $._command_path_start,
-    )),
+    ...commandPathRules('_statement_command_path', $ => field('object',
+      $._statement_command_object)),
+
+    // The object of a statement receiver's first access: its first name,
+    // or (§6.24) a call of that name with a closure (`foo { }.bar 1`, Groovy's
+    // `foo({ }).bar(1)`), which `_closure_command_start` opens where the
+    // scanner has read the accesses and a first argument after them. One
+    // rule for both keeps the states of the accesses shared.
+    _statement_command_object: $ => choice(
+      seq($.identifier, $._command_path_start),
+      alias($._closure_command_call, $.method_invocation),
+    ),
+
+    _closure_command_call: $ => seq(
+      $._closure_command_start,
+      field('function', $.identifier),
+      field('closure', $.closure),
+    ),
 
     // §5.5 item 3 — named arguments in a parenthesis-free call:
     // `exclude group: 'a', module: 'b'`, `archiveArtifacts artifacts: 'x'`,
@@ -3070,6 +3091,18 @@ module.exports = grammar({
         field('function', $._expression),
         field('closure', $.closure),
       )),
+      // A statement that calls a name with only a closure and goes on with
+      // a member access (`foo { }.bar()`), which `command_chain` would
+      // take as a whole statement. The scanner emits `_closure_call_start`
+      // before the name only where the closure closes on the name's line
+      // and an access follows it (§6.24). An alternative that started with
+      // the name itself would keep the state after every name in a value
+      // from being a lone unit reduction.
+      seq(
+        $._closure_call_start,
+        field('function', $.identifier),
+        field('closure', $.closure),
+      ),
     ),
 
     // §3.2 / §5.11 — argument list. Positional args are `_expression`;

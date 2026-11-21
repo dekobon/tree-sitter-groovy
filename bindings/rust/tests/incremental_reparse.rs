@@ -31,6 +31,11 @@
 //! A line break after `return`, `break` or `continue` ends the statement
 //! (§6.23), so edits between the keyword and the next token must make the
 //! statement parse again.
+//!
+//! A statement's call with a closure is the object of a member access that
+//! follows it (§6.24) by what the scanner reads from the `{` to the first
+//! argument after the accesses, so edits there must lex the start of the
+//! statement again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -959,4 +964,107 @@ fn deleting_a_def_before_a_dotted_call_of_a_string_reads_a_method_on_reparse() {
         REPARSED,
         "the reparse changed; if it matches the parse from scratch, the limitation is gone",
     );
+}
+
+/// Texts around a statement that calls a name with a closure and goes on
+/// with a member access (§6.24), as an expression or as the receiver of a
+/// parenthesis-free call. The scanner decides the token before the name
+/// from the line up to the `}`, the trivia and accesses after it and the
+/// first argument after them, so each edit there must lex that token again.
+const CLOSURE_CALL_TEXTS: &[&str] = &[
+    "foo { }.bar()\n",
+    "foo { a }\n.bar()\nx = 1\n",
+    "if (c) foo { 'a' }.bar() else baz { }\n",
+    "foo { b { } }.c { }.d()\nfoo { }\n",
+    "foo { }\nbar { }.x\n",
+    "l: foo { \"}\" }?.bar\n",
+    "foo {\n}.bar()\n",
+    "a { b { c { } }.d() }.e()\n",
+    "foo { }.bar 1\nbaz()\n",
+    "foo { }\n.bar x: 1\n",
+];
+
+#[test]
+fn reparse_after_closure_call_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        CLOSURE_CALL_TEXTS,
+        &[
+            "", ".", "}", "{", "\n", " ", "'", "\"", "$", "/", "?", "*", ":", "x", "1", "//", "/*",
+            "*/", "(", ")", ",", "..", "?.", "\\",
+        ],
+    );
+}
+
+/// `.bar()` typed after a closure one character at a time and deleted
+/// again, then `?.b`; the closure split over two lines and joined, and a `$`
+/// and a `/` typed into it and removed; an argument typed after an access
+/// and deleted, which turns the call into a receiver and back; and a
+/// comment between the closure and an access on the next line.
+#[test]
+fn reparse_after_closure_call_edit_sequences_matches_parse_from_scratch() {
+    let mut parser = parser();
+    let sequences: &[(&str, &[Edit])] = &[
+        (
+            "foo { }\nx = 1\n",
+            &[
+                (7, 0, "."),
+                (8, 0, "b"),
+                (9, 0, "("),
+                (10, 0, ")"),
+                (9, 2, ""),
+                (8, 1, ""),
+                (7, 1, ""),
+                (7, 0, "?"),
+                (8, 0, "."),
+                (9, 0, "b"),
+                (7, 3, ""),
+            ],
+        ),
+        (
+            "foo { a }.bar()\nbaz { }\n",
+            &[
+                (5, 0, "\n"),
+                (5, 1, ""),
+                (6, 0, "$"),
+                (6, 1, ""),
+                (6, 0, "/"),
+                (6, 1, ""),
+                (9, 1, ""),
+                (9, 0, "."),
+                (0, 0, "x = "),
+                (0, 4, ""),
+                (3, 1, ""),
+                (3, 0, " "),
+            ],
+        ),
+        (
+            "foo { }.bar\nbaz()\n",
+            &[
+                (11, 0, " 1"),
+                (11, 2, ""),
+                (11, 0, " x"),
+                (11, 2, ""),
+                (11, 0, " {"),
+            ],
+        ),
+        (
+            "foo { }\n.bar()\n",
+            &[
+                (7, 1, ""),
+                (7, 0, "\n"),
+                (8, 0, "// c\n"),
+                (8, 5, ""),
+                (8, 1, ""),
+                (8, 0, "."),
+            ],
+        ),
+    ];
+    for &(text, edits) in sequences {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
 }
