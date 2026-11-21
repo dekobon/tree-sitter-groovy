@@ -76,6 +76,10 @@ switch (x) { case 1 -> y }
 switch (x) { default -> y }
 //           ^ keyword.control
 
+switch (x) { case 1, y -> z }
+//           ^ keyword.control
+//                   ^ variable
+
 @interface Tag { String value() default 'x' }
 //                              ^ keyword
 

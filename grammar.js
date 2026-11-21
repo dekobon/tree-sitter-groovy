@@ -482,6 +482,19 @@ function parameter($, value = $._expression) {
 }
 
 /**
+ * The values of a `case`, a `value` field each, separated by commas.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} The value list rule.
+ */
+function caseValues($) {
+  return seq(
+    field('value', $._expression),
+    repeat(seq(',', field('value', $._expression))),
+  );
+}
+
+/**
  * The arguments of a parenthesis-free call after its first: after each
  * comma a named argument, any expression or a spread argument, Apache's
  * `argumentListElement` (`expressionListElement[true]` takes `*`).
@@ -2524,9 +2537,15 @@ module.exports = grammar({
     // `default:`. Left associativity ends the case there, so it is the
     // next branch, as Groovy reads it: no statement in a switch body
     // starts with `default`. `switch_default` ends the same way.
+    //
+    // A case takes several values, a `value` field each (`case 1, 2 ->`,
+    // `case 1, 2:`): Apache's `switchExpressionLabel` is
+    // `CASE expressionList[true]` before `->` or `:` in 4.0.x to master.
+    // Its `switchLabel`, a switch statement's, takes one expression, but a
+    // statement may be a switch expression, which takes the list.
     switch_case: $ => prec.left(seq(
       'case',
-      field('value', $._expression),
+      caseValues($),
       ':',
       statementList($),
     )),
@@ -2537,7 +2556,7 @@ module.exports = grammar({
     // which has no statement-list of its own.
     switch_arrow_case: $ => seq(
       'case',
-      field('value', $._expression),
+      caseValues($),
       '->',
       field('body', choice($._body_block, $._statement)),
       optional(';'),

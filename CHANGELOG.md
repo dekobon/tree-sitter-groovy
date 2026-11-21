@@ -760,6 +760,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `spread_map_entry`, as Apache's `namedArg` does. Each was an `ERROR`,
   as at v0.6.0. A spread first in a parenthesis-free call
   (`foo *a, 1`, `foo *:m`) is still an `ERROR`.
+- A `case` takes several values, a `value` field each:
+  `case 1, 2 -> 'a'`, `case String, Integer -> …` and `case 1, 2:`,
+  as Apache's `switchExpressionLabel` takes `CASE expressionList[true]`
+  before `->` or `:` (4.0.x to master). Each was an `ERROR`, as at
+  v0.6.0. The `value` field of `switch_case` and `switch_arrow_case` is
+  now `multiple` in `node-types.json`.
 
 ## [0.6.0] - 2026-11-12
 

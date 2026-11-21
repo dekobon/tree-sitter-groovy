@@ -458,8 +458,8 @@ fix relative to *both* parent grammars.
 | `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`), a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators) or a `multi_assignment_declaration` (`def (i, n) = [0, 5]`). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`). |
-| `switch` with `case … :` | port | |
-| `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). |
+| `switch` with `case … :` | port | A case takes several values (`case 1, 2:`), as below. |
+| `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). A case takes several values, a `value` field each (`case 1, 2 ->`, `case String, Integer ->`), as Apache's `switchExpressionLabel` is `CASE expressionList[true]` before `->` or `:` (4.0.x to master; master also takes a pattern). Its `switchLabel`, a switch statement's, takes one expression, but a statement may be a switch expression; Groovy 3 has no switch expressions and rejects both. A spread value (`case *xs ->`, which `expressionList[true]` allows) is not taken. |
 | `try` / `catch` / `finally` | port | |
 | Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. A catch parameter takes `final` and `def`, `var` or a type. |
 | Try-with-resources | **new** | `try (Foo f = …) { … }`; a resource takes `final` and `def`, `var` or a type. |

@@ -15833,7 +15833,7 @@
         ]
       },
       "value": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
@@ -16040,7 +16040,7 @@
     "named": true,
     "fields": {
       "value": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
