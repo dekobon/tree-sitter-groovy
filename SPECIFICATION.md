@@ -4283,11 +4283,20 @@ after `def` (`def final String x`, `def static String x`, Groovy's
 declarations, which stay `def final` and a declaration of `x`), a return
 type after `def` (`def String m() { }`, Groovy's method, which stays
 `def String` and a call, or a field and a constructor in a type body),
-a parameter's (§5.12, `docs/divergences-from-spec.md` §14), and `var`,
-also a modifier in Apache's `modifier` rule, before a type
-(`var String s = 'a'` stays the declaration `var String` and
-`s = 'a'` with no `ERROR`, where Groovy declares `s`; checked with
-Groovy 3). The two forms cost 34 parse states.
+and a parameter's (§5.12, `docs/divergences-from-spec.md` §14). The two
+forms cost 34 parse states. `var`, also a modifier in Apache's `modifier`
+rule, and `final var` take the local's form as `def` does: where the
+scanner emits `var` (§6.16) and then the token,
+`var String s = 'a'`, `var String t`, `final var List<String> xs = []`
+and `var` then `String u = 1` on the next line declare their names with
+the type, with `var` an anonymous child of the node, as in Groovy 3,
+where they were `var String` and the statement `s = 'a'` (`t`) with no
+`ERROR`. `var String` then `v = 1` on the next line stays two
+statements, as in Groovy, and `var var = 1`, `var x = 1`, `var(1)` and
+`var.x` read as before. That cost no parse state: STATE_COUNT went from
+4,789 to 4,781, as the two keywords now share the states after them.
+In a type body `var` stays a type name, as before (`var x = 1` is a
+field of type `var`).
 
 Trees that change for input that parsed without an `ERROR` are the
 declarations themselves, each a `local_variable_declaration` where the

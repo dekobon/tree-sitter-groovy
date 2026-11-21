@@ -5544,8 +5544,22 @@
                         ]
                       },
                       {
-                        "type": "STRING",
-                        "value": "def"
+                        "type": "CHOICE",
+                        "members": [
+                          {
+                            "type": "STRING",
+                            "value": "def"
+                          },
+                          {
+                            "type": "ALIAS",
+                            "content": {
+                              "type": "SYMBOL",
+                              "name": "_var_keyword"
+                            },
+                            "named": false,
+                            "value": "var"
+                          }
+                        ]
                       }
                     ]
                   },

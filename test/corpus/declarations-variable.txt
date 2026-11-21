@@ -3279,27 +3279,61 @@ def String m() { }
       closure: (closure))))
 
 ==================
-A var with a type is not a typed declaration (known divergence)
+A var before a type declares a typed local, as def does
 ==================
 
 var String s = 'a'
 var String t
+final var List<String> xs = []
+var
+String u = 1
+var String
+v = 1
+var var = 1
+var(1)
+var.x
 
 ---
 
 (source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
   (local_variable_declaration
     (variable_declarator
       name: (identifier)))
   (expression_statement
     (assignment_expression
       left: (identifier)
-      right: (string_literal)))
+      right: (number_literal)))
   (local_variable_declaration
     (variable_declarator
-      name: (identifier)))
+      name: (identifier)
+      value: (number_literal)))
   (expression_statement
-    (identifier)))
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))
 
 ==================
 Command chains whose first argument is capitalized stay command chains

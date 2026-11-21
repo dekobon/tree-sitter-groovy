@@ -743,10 +743,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as Groovy reads it. An initialized field
   (`private def Foo foo = mock(Foo)`), a generic type
   (`def List<String> xs`) and a second name (`def String a, b`) were an
-  `ERROR`, and so was `def int i = 0` as a `for` init. `var` before a
-  type is read as before (`var String s = 'a'` is `var String` and
-  `s = 'a'`, where Groovy declares `s`; see
-  `docs/divergences-from-spec.md` §27). The scanner decides the type
+  `ERROR`, and so was `def int i = 0` as a `for` init. `var` and
+  `final var` before a type declare the same way (`var String s = 'a'`,
+  `var String t`, `final var List<String> xs = []`), as `var` is a
+  modifier in Apache's `modifier` rule; at v0.6.0 they were
+  `var String` and the statement `s = 'a'` (`t`) with no `ERROR`, and a
+  generic type an `ERROR`. In a type body `var` is still a type name. The
+  scanner decides the type
   after `def` as it does a statement's (`SPECIFICATION.md` §6.21), so
   `def String` then `s = 1` on the next line stays two statements. A
   lowercase type (`def foo bar`), a modifier after `def`

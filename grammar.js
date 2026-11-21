@@ -2295,10 +2295,11 @@ module.exports = grammar({
       // `def String s = 'a'`: `def` is a modifier before the type, as in
       // Apache's `variableDeclaration`, and the scanner decides the type
       // after it as at a statement's start, so `def String` then `s = 1`
-      // on the next line stays two statements (§6.21).
+      // on the next line stays two statements (§6.21). `var` is one too
+      // (Apache's `modifier` lists `VAR`): `var String s = 'a'`.
       seq(
         repeat($.annotation),
-        optional(seq(optional('final'), 'def')),
+        optional(seq(optional('final'), choice('def', varKeyword($)))),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,
