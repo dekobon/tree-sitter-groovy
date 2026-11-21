@@ -1034,6 +1034,15 @@ Slashy strings allow GString interpolation. Dollar-slashy strings
 allow interpolation with `$identifier` and `${expr}` — and treat
 `$/` and `$$` as escapes.
 
+In every string a `\` takes the character after it, and a line break
+whole: Apache's `EscapeSequence` includes `LineEscape`, a `\` before
+`\r\n`, `\n` or `\r`, so `'a\` then `b'` on the next line is `'ab'`.
+The single-line strings (`'…'`, `"…"`, `/…/`) take `\r\n` after the
+`\` as one escape, in the grammar's text tokens and in the scanner's
+look-aheads through strings, so a file with CRLF line endings gives
+the tree of the same file with LF; before, the `\n` after the escaped
+`\r` ended the string, an `ERROR`.
+
 The lexer state machine for interpolation lives in the external
 scanner (§6.3). This avoids tree-sitter's "ambiguity over the entire
 file" trap when a stray `"` mid-source could otherwise re-anchor the

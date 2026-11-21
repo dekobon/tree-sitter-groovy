@@ -846,6 +846,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A line escape before a CRLF line break continues a single-quoted,
+  double-quoted or slashy string, as before an LF one: `'a\` then `b'`
+  on the next line in a CRLF file is one string, as Groovy reads it
+  (`LineEscape` takes `\r\n`), where the `\n` after the escaped `\r`
+  ended the string, an `ERROR`, also at v0.6.0; so is the same string
+  as a call's first argument (`foo 'a\` then `b', 1`). No corpus, real,
+  Java or shape tree changes (`SPECIFICATION.md` §5.7).
 - A `<` with no space before it, right after a name in parentheses or
   where a statement starts, is a comparison where no type arguments
   close, as in Groovy: `(i<n)`, `(i<n) ? a : b`, `if ((i<n && j>m))`,

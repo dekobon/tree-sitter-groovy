@@ -3717,16 +3717,20 @@ module.exports = grammar({
       token.immediate('/'),
     ),
 
+    // A `\` takes the character after it, and a line break whole, `\r\n`
+    // too, as Groovy's LineEscape does (`'a\` then `b'` on the next line is
+    // `'ab'`): without the pair a CRLF file left the `\n` after the
+    // escaped `\r` to end the string.
     _slashy_text: _ => token.immediate(repeat1(choice(
       /[^\/\\$\n\r]/,
-      /\\[\s\S]/,
+      /\\(\r\n|[\s\S])/,
     ))),
 
     _single_quoted_string: _ => token(seq(
       '\'',
       repeat(choice(
         /[^'\\\n\r]/,
-        /\\[\s\S]/,
+        /\\(\r\n|[\s\S])/,
       )),
       '\'',
     )),
@@ -3756,7 +3760,7 @@ module.exports = grammar({
 
     _gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$\n\r]/,
-      /\\[\s\S]/,
+      /\\(\r\n|[\s\S])/,
     ))),
 
     // Bare `$` inside a GString body that does not start a valid

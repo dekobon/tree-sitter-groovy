@@ -1647,6 +1647,21 @@ static bool scan_bare_lambda_start(
     return true;
 }
 
+// After a `\` in a string: consumes the character it escapes, a line
+// break whole, `\r\n` included, as Groovy's LineEscape takes `\r\n`, `\n`
+// or `\r`. Returns false at the end of input.
+static bool skip_escaped_character(TSLexer *lexer) {
+    if (lexer->eof(lexer)) {
+        return false;
+    }
+    int32_t c = lexer->lookahead;
+    advance(lexer);
+    if (c == '\r' && lexer->lookahead == '\n') {
+        advance(lexer);
+    }
+    return true;
+}
+
 // SPECIFICATION.md §6.14 — whether the quoted string that starts here, the
 // first argument of a call that is a value, closes on its line. One that
 // does not is still being typed, and taking it for an argument commits the
@@ -1671,13 +1686,9 @@ static bool string_closes_on_line(TSLexer *lexer) {
         int32_t c = lexer->lookahead;
         advance(lexer);
         if (c == '\\') {
-            if (lexer->lookahead == '\r') {
-                advance(lexer);
-            }
-            if (lexer->eof(lexer)) {
+            if (!skip_escaped_character(lexer)) {
                 return false;
             }
-            advance(lexer);
         } else if (c == quote
                    || (quote == '"' && c == '$' && lexer->lookahead == '{')) {
             return true;
@@ -4754,13 +4765,9 @@ static bool skip_string_at_depth(TSLexer *lexer, unsigned depth) {
         int32_t c = lexer->lookahead;
         advance(lexer);
         if (c == '\\') {
-            if (lexer->lookahead == '\r') {
-                advance(lexer);
-            }
-            if (lexer->eof(lexer)) {
+            if (!skip_escaped_character(lexer)) {
                 return false;
             }
-            advance(lexer);
             closing = 0;
         } else if (quote == '"' && c == '$' && lexer->lookahead == '{') {
             advance(lexer);
@@ -5186,13 +5193,11 @@ static bool slashy_body_follows(TSLexer *lexer) {
     while (!lexer->eof(lexer)) {
         if (lexer->lookahead == '\\') {
             advance(lexer);
-            if (!lexer->eof(lexer)) {
-                if (lexer->lookahead == '/'
-                    && ++escaped_slashes == SLASHY_LOOKAHEAD_ESCAPED_SLASHES) {
-                    return true;
-                }
-                advance(lexer);
+            if (lexer->lookahead == '/'
+                && ++escaped_slashes == SLASHY_LOOKAHEAD_ESCAPED_SLASHES) {
+                return true;
             }
+            skip_escaped_character(lexer);
             continue;
         }
         if (lexer->lookahead == '/') {
