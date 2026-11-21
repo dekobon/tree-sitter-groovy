@@ -627,3 +627,22 @@ foo((Foo)
               (identifier)))
           index: (number_literal))
         (string_literal)))))
+
+==================
+A lambda on the line after a parenthesized name is the operand of a cast, where Groovy calls (known divergence)
+==================
+
+(Foo)
+(x) -> x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
