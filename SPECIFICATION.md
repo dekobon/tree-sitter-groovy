@@ -1480,14 +1480,18 @@ the end of a lambda's brace body (§6.19), the first comma of a
 multi-assignment (§6.20), the start of a typed local declaration
 (§6.21), the end of a block that opens a statement (§6.22),
 `STRING_BODY` (§6.10),
-`TYPE_START` (§6.15) and `CLOSURE_PARAMETERS_START` (§6.21), which are
-never emitted and only mark a string body, where a type may start and
-where closure parameters may start,
+`TYPE_START` (§6.15), `CLOSURE_PARAMETERS_START` (§6.21),
+`TYPE_ONLY_CLOSE` (§6.11) and `BODY_BLOCK_END` (§6.17), which are
+never emitted and only mark a string body, where a type may start,
+where closure parameters may start, the `)` of a cast of an array or
+generic type whose operand is on a later line, and the end of the
+block that is the body of `if`, `else`, a loop or an arrow case,
 `LAMBDA_BODY_REREAD` (§6.19, §6.22), which no rule references and which
 makes the parser lex the `}` of a lambda's body or a statement's block
 again, and
-`ERROR_SENTINEL`, which no rule references and which only signals
-error recovery; the other tokens listed here are met in-grammar, see
+`ERROR_SENTINEL`, which is never emitted either, which no rule
+references and which only signals error recovery; the other tokens
+listed here are met in-grammar, see
 `docs/divergences-from-spec.md`.
 
 ### 6.1 Tokens exported
@@ -3079,7 +3083,8 @@ a `}` (`_body_block` in `grammar.js`), and there the scanner reads the
 parses read the lambda statement, as Groovy does on the next line. On
 the line of the `}` too: `if (c) { a() } (x) -> x` is the `if` and a
 lambda statement, where Groovy reads one `if` statement. The token
-costs two states (STATE_COUNT 4,656 to 4,658); no tree changes for
+costs two states (STATE_COUNT 4,656 to 4,658, LARGE_STATE_COUNT
+1,788 to 1,789); no tree changes for
 input that parsed without an `ERROR` (`docs/divergences-from-spec.md`
 §26), and `bindings/rust/tests/incremental_reparse.rs` pins the
 reparse.

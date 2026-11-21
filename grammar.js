@@ -791,9 +791,16 @@ module.exports = grammar({
   // last here and in the scanner's `TokenType` enum, and the two
   // orders must match. No rule references `_lambda_body_reread` either:
   // the scanner emits it where no rule takes it (§6.19, §6.22). The scanner
-  // never emits `_string_body`, `_type_start` or `_closure_parameters_start`:
-  // a string body, a type and closure parameters reference them so that the
-  // scanner can tell it is inside one or where one may start.
+  // never emits `_string_body`, `_type_start`, `_closure_parameters_start`,
+  // `_type_only_close` or `_body_block_end`, nor `_error_sentinel`: a string
+  // body, a type, closure parameters, the cast of an array or generic type
+  // whose operand is on a later line and the block that is the body of `if`,
+  // `else`, a loop or an arrow case reference the first five so that the
+  // scanner can tell it is inside one or where one may start or end.
+  // New tokens go last but for the sentinel, so that they renumber no
+  // symbol before them: `_statement_paren`, first listed after
+  // `_subscript_open`, renumbered the symbols after it there, which changed
+  // error recovery (`enum E<T> { A }` lost its `enum_declaration`).
   // Tokens the spec §6 proposes as external scanner branches but
   // that this grammar implements in-grammar (GString interpolation
   // via regex tokens, slashy body via in-grammar `_slashy_text`,
@@ -885,15 +892,10 @@ module.exports = grammar({
     // §6.18 — a `(` that starts a line after an expression, where a
     // statement may start and the parentheses can open one. Groovy ends
     // the statement at that line break, so the `(` opens the next
-    // statement rather than a call's arguments of the line above. Last but
-    // for the sentinel: listed after `_subscript_open` it renumbered the
-    // symbols after it, which changed error recovery (`enum E<T> { A }`
-    // lost its `enum_declaration`).
+    // statement rather than a call's arguments of the line above.
     $._statement_paren,
     // §6.19 — empty token after the `}` of a lambda's brace body that is
     // its whole body: emitted unless what follows continues an expression.
-    // Listed last but for the sentinel too, so that it renumbers no symbol
-    // before it.
     $._lambda_body_end,
     // §6.19 — empty, and like `_error_sentinel` taken by no rule: emitted
     // after a lambda's block that the parser shifted whole where an
@@ -904,47 +906,39 @@ module.exports = grammar({
     // §6.20 — the first `,` of `(a, b) = …`, emitted unless the parentheses
     // go on as a method's parameters (`def f(a, b) { }`). Without it the
     // reading in which the `(` after `def f` opens the next statement held
-    // `def f(a, b)` to the token after the `)`. Listed last but for the
-    // sentinel, so that it renumbers no symbol before it.
+    // `def f(a, b)` to the token after the `)`.
     $._multi_assignment_comma,
     // §6.21 — empty token before the type of a typed local declaration
     // (`String s`, `int a, b`, `String s = 'a'`), emitted when the
     // declaration ends on the name's line, an initializer or a list of names
-    // follows. Listed last but for the sentinel, so that it renumbers no
-    // symbol before it.
+    // follows.
     $._declaration_start,
     // §6.22 — empty token after the `}` of a block that opens a statement,
     // emitted unless what follows continues an expression, so that the
-    // braces are a closure there (`{ foo() }()`). Listed last but for the
-    // sentinel, so that it renumbers no symbol before it.
+    // braces are a closure there (`{ foo() }()`).
     $._statement_block_end,
     // §6.11 — a `)` before a relational operator that Groovy applies to the
     // parentheses (`(x) instanceof Foo`, `(x) !in y`, `(x) as Foo`), which
     // closes no cast. The scanner also emits it where only a cast's type
     // takes the `)`, where no rule takes it, so that the cast reading ends
-    // there. Listed last but for the sentinel, so that it renumbers no
-    // symbol before it.
+    // there.
     $._relational_close,
     // §3.2.2 — the `<` of a cast type's type arguments, emitted only where
     // they close (`x as List<String>`), so that `x as a.B<c` compares the
-    // cast with `c`. Listed last but for the sentinel, so that it renumbers
-    // no symbol before it.
+    // cast with `c`.
     $._cast_type_arguments_open,
     // §6.21 — never emitted: valid where closure parameters may start, so
     // that the scanner can tell `{ String a = b -> c }`, whose `->` may end
-    // a parameter list, from a typed local's lambda value elsewhere. Listed
-    // last but for the sentinel, so that it renumbers no symbol before it.
+    // a parameter list, from a typed local's lambda value elsewhere.
     $._closure_parameters_start,
     // §6.11 — never emitted: valid before the `)` of a cast whose operand
     // is on a later line and whose type is an array or generic type, which
-    // no expression is, so that the scanner keeps that cast. Listed last
-    // but for the sentinel, so that it renumbers no symbol before it.
+    // no expression is, so that the scanner keeps that cast.
     $._type_only_close,
     // §6.17 — never emitted: valid after the `}` of the block that is the
     // body of `if`, `else`, a loop or an arrow case, where a `(` opens the
     // next statement on any line, so that the scanner decides a lambda there
-    // although the braces may be a closure too. Listed last but for the
-    // sentinel, so that it renumbers no symbol before it.
+    // although the braces may be a closure too.
     $._body_block_end,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
