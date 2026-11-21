@@ -157,17 +157,24 @@ fn steps_with_more_than_one_version(source: &str) -> usize {
 
     let steps = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&steps);
+    // Steps whose version count the log gave: none means the log's format
+    // changed, and every count of forked steps would read as zero.
+    let logged = Arc::new(AtomicUsize::new(0));
+    let read = Arc::clone(&logged);
     let mut parser = parser();
     parser.set_logger(Some(Box::new(move |log_type, message| {
         if log_type != LogType::Parse || !message.starts_with(STEP) {
             return;
         }
-        let versions = message
+        let Some(versions) = message
             .split(VERSIONS)
             .nth(1)
             .and_then(|rest| rest.split(',').next())
             .and_then(|count| count.trim().parse::<usize>().ok())
-            .unwrap_or(1);
+        else {
+            return;
+        };
+        read.fetch_add(1, Ordering::Relaxed);
         if versions > 1 {
             counted.fetch_add(1, Ordering::Relaxed);
         }
@@ -175,6 +182,10 @@ fn steps_with_more_than_one_version(source: &str) -> usize {
     let tree = parser.parse(source, None).expect("parse");
     assert!(!tree.root_node().has_error(), "{source:?}");
     parser.set_logger(None);
+    assert!(
+        logged.load(Ordering::Relaxed) > 0,
+        "no `{STEP} … {VERSIONS}` line in the parser's log for {source:?}",
+    );
     steps.load(Ordering::Relaxed)
 }
 

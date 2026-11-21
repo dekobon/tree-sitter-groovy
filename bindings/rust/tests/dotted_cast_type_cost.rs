@@ -49,6 +49,10 @@ fn most_stack_versions(line: &str, count: usize) -> usize {
         .expect("load Groovy grammar");
     let most = Arc::new(AtomicUsize::new(0));
     let seen = Arc::clone(&most);
+    // Messages whose version count was read: none means the log's format
+    // changed, and the most versions would read as zero.
+    let logged = Arc::new(AtomicUsize::new(0));
+    let read = Arc::clone(&logged);
     parser.set_logger(Some(Box::new(move |log_type, message| {
         if log_type != LogType::Parse || !message.starts_with("process version") {
             return;
@@ -58,10 +62,15 @@ fn most_stack_versions(line: &str, count: usize) -> usize {
             .and_then(|(_, rest)| rest.split(',').next())
             .and_then(|digits| digits.trim().parse::<usize>().ok())
             .expect("version count in a process message");
+        read.fetch_add(1, Ordering::Relaxed);
         seen.fetch_max(count, Ordering::Relaxed);
     })));
     let tree = parser.parse(line.repeat(count), None).expect("parse");
     assert!(!tree.root_node().has_error(), "{line:?}");
+    assert!(
+        logged.load(Ordering::Relaxed) > 0,
+        "no `process version` message in the parser's log for {line:?}",
+    );
     most.load(Ordering::Relaxed)
 }
 
