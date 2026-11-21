@@ -438,7 +438,7 @@ default: { d }
               (identifier))))))))
 
 ==================
-An unclosed switch with a colon case at the end of the input (known divergence)
+An unclosed switch with a colon case at the end of the input recovers as one ERROR
 ==================
 
 switch (x) {

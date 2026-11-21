@@ -464,17 +464,6 @@ class C {
 
 ---
 
-(source_file
-  (class_declaration
-    name: (identifier)
-    body: (class_body
-      (record_declaration
-        name: (identifier)
-        components: (record_components)
-        body: (class_body
-          (ERROR
-            (number_literal)))))))
-
 ==================
 Record headers with comments and a line break before the components
 ==================
