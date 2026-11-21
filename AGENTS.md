@@ -36,62 +36,95 @@ The default branch is **`main`**.
   statement listed in `SPECIFICATION.md` §3 and §4.
 - `src/parser.c`, `src/grammar.json`, `src/node-types.json` — generated
   by `tree-sitter generate`. Treat as build outputs; do not hand-edit.
-- `src/scanner.c` — hand-written external scanner. Handles the
-  context-sensitive lexing situations from `SPECIFICATION.md` §6 that
-  the grammar cannot: slashy-vs-division, the line / block / Groovydoc
-  comment single-token emit, the contextual `record`, `trait` and
-  `sealed` keywords, each emitted only before the declaration it
-  opens (§6.7, §6.13), the contextual `var`, `yield`, `in` and `as`
-  keywords, emitted only before a declared name or a multi-assignment's
-  names, an expression, or a type, and such a word as a named
-  argument's key (§6.16), the key of a named
-  argument in a parenthesis-free call, which needs `:` on the same
-  line (§6.8), the start of such a call that is a value (of a
-  declaration or an assignment, or in parentheses or an
-  interpolation), a statement whose receiver has a member access
-  (`obj.method 1`), or a statement whose first argument is a `new`, an
-  array type, such a call in parentheses or a name (`foo new Bar()`,
-  `println(foo 1)`, `println x`), each of which needs its first
-  argument on the receiver's line (§6.14); a name is a first argument
-  only where Apache's isInvalidLocalVariableDeclaration makes the
-  statement no declaration (`foo bar`, not `String s`), a subscript `[`
-  on the same line as the
-  expression before it (§6.9), a `(` that opens a line after an
-  expression where a statement may start and the parentheses can open
-  one, so that it opens that statement rather than a call's arguments
-  (§6.18), the start of an array type that is a
-  value (`String[].class`), which needs `[]` after the name (§6.15),
-  a `)` with something after it on its
-  line, which ranks a cast, and a `)` before a relational operator
-  that Groovy applies to the parentheses (`(x) instanceof Foo`),
-  which closes none (§6.11), the `<` after the name of a cast's type
-  where its type arguments close, so that `x as a.B<c` compares
-  (§3.2.2), the `!in` operator, which
-  needs whitespace or a bracket after it (§6.12), the start of a
-  lambda, before its parameters in parentheses or its one name, when
-  `->` follows (§6.17), an empty token after the `}` of a lambda's
-  brace body that no expression continues, which ends the body there
-  (§6.19), another after the `}` of a block that opens a statement,
-  decided the same way, so that braces an expression continues
-  (`{ foo() }()`) stay a closure (§6.22), the first `,` of
-  `(a, b) = …`, turned down where the
-  parentheses go on as a method's parameters, which ends the reading of
-  `def f(a, b) { }` as `def f` and a multi-assignment there (§6.20), and
-  an empty token before the type of a typed local declaration
-  (`String s`, `int a, b`, `String s = 'a'`), emitted when the
-  declaration ends on its line, the next line does not go on with it,
-  or an initializer follows, which the same reading of a statement's
-  first name decides by Apache's isInvalidLocalVariableDeclaration, so
-  `foo bar` stays a call (§6.21).
-  Inside a string body
-  it emits nothing (§6.10). Its state is two bits, "no `*/` from
-  here on" and "the body goes on past the token that follows", carried
-  by an empty hidden token emitted at the first unterminated `/*` (§6.6)
-  and after such a `}` where the body goes on past a comment, or past
-  `as` or `in`, which the scanner reads (§6.19, §6.22); the next call
-  clears the second.
-  GString interpolation, automatic semicolons and label
-  colons are handled in-grammar
+- `src/scanner.c` — hand-written external scanner for the
+  context-sensitive lexing from `SPECIFICATION.md` §6 that the grammar
+  cannot express. The `externals` list in `grammar.js` and the scanner's
+  `TokenType` enum must stay in the same order. It emits:
+  - the slashy-string opener, which tells a regex from division
+    (§6.2), and line, block and Groovydoc comments as single tokens
+    (§6.6);
+  - the contextual keywords `record` (§6.7), `trait` and `sealed`
+    (§6.13), each only before the declaration it opens, and `var`,
+    `yield`, `in` and `as` (§6.16), only before a declared name or a
+    multi-assignment's names, an expression, or a type; and such a word
+    as a named argument's key;
+  - the key of a named argument in a parenthesis-free call, on the
+    call's line and before a single `:` that only spaces, tabs, line
+    escapes and block comments (which may span lines) separate from it
+    (§6.8);
+  - the start of such a call that is a value (of a declaration or an
+    assignment, or in parentheses or an interpolation), of a statement
+    whose receiver has a member access (`obj.method 1`), or of a
+    statement whose first argument is a `new`, an array type, such a
+    call in parentheses or a name (`foo new Bar()`, `println x`), each
+    with its first argument on the receiver's line; a name is a first
+    argument only where Apache's isInvalidLocalVariableDeclaration
+    makes the statement no declaration (`foo bar`, not `String s`)
+    (§6.14);
+  - a subscript `[` on the same line as the expression before it
+    (§6.9), a `(` that opens a line after an expression where a
+    statement may start and the parentheses can open one, so that it
+    opens that statement rather than a call's arguments (§6.18), and
+    the start of an array type that is a value (`String[].class`),
+    which needs `[]` after the name (§6.15);
+  - a `)` with something after it on its line, which ranks a cast, and
+    a `)` that closes no cast (§6.11): before a relational operator
+    that Groovy applies to the parentheses (`(x) instanceof Foo`), and
+    at the end of a line before a line that opens with `(`, unless,
+    read on Groovy's tokens for at most 256 characters
+    (`ENCLOSING_BRACKET_LOOKAHEAD_CHARACTERS`), a `)` or `]` closes
+    brackets around both lines or `->` follows the first parentheses.
+    Outside brackets Groovy ends the statement at that line break and
+    the `(` opens the next one (§6.18); the reading of a cast whose
+    operand is on the later line, kept alive there, made a run of `(x)`
+    lines quadratic;
+  - the `<` of a cast type's type arguments where they close, so that
+    `x as a.B<c` compares (§3.2.2), and the `!in` operator, which needs
+    whitespace or a bracket after it (§6.12);
+  - the start of a lambda, before its parameters in parentheses or its
+    one name, when `->` follows (§6.17);
+  - an empty token after the `}` of a lambda's brace body that no
+    expression continues, which ends the body there (§6.19), another
+    after the `}` of a block that opens a statement, decided the same
+    way, so that braces an expression continues (`{ foo() }()`) stay a
+    closure (§6.22), and `_lambda_body_reread`, which no rule takes, so
+    that the parser breaks down a reused block and lexes its `}` again
+    (§6.19, §6.22);
+  - the first `,` of `(a, b) = …`, turned down where the parentheses go
+    on as a method's parameters, which ends the reading of
+    `def f(a, b) { }` as `def f` and a multi-assignment there (§6.20);
+  - an empty token before the type of a typed local declaration
+    (`String s`, `int a, b`, `String s = 'a'`), emitted when the
+    declaration ends on its line, the next line does not go on with it,
+    or a list of names or an initializer follows, which the same reading
+    of a statement's first name decides, so `foo bar` stays a call
+    (§6.21).
+
+  Six externals are never emitted. Rules make them valid where the
+  scanner needs to know where it is: `_string_body` inside a string
+  body, where the scanner emits nothing outside error recovery
+  (§6.10); `_type_start` where a type may start (§6.15);
+  `_closure_parameters_start` where closure parameters may start, the
+  one place a `->` after an initializer ends a parameter list
+  (`{ String a = 1 -> }`) rather than belonging to a lambda in the
+  value (§6.21); `_type_only_close` before the `)` of a cast of an
+  array or generic type, which no expression is, so that the rule above
+  keeps that cast across the line break (`(List<String>)` then `(x)`)
+  (§6.11); `_body_block_end` after the `}` of the block that is the
+  body of `if`, `else`, a loop or an arrow case, where the scanner
+  reads a `(` as at a statement's start, so that a lambda statement
+  after it (`if (c) { a() }` then `(x) -> x`) parses the same from
+  scratch and after a reparse (§6.17); and `_error_sentinel`, valid
+  only during error recovery, where the scanner emits only the
+  comments, the slashy opener and the contextual keywords.
+
+  Its state is two bits, "no `*/` from here on" and "the body goes on
+  past the token that follows", carried by an empty hidden token
+  emitted at the first unterminated `/*` (§6.6) and after the `}` of a
+  lambda's body or a statement's block where the body goes on past a
+  comment, or past `as` or `in`, which the scanner reads (§6.19,
+  §6.22); the next call clears the second. GString interpolation,
+  automatic semicolons and label colons are handled in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does
   NOT rewrite `scanner.c`, so these symbols are stable across
