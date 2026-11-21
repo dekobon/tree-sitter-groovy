@@ -3937,6 +3937,20 @@ stays, with no `ERROR`. It is the same at v0.6.0; the fuzz seed
 4420640461419634763 found it on a record's corpus test, and
 `bindings/rust/tests/incremental_reparse.rs` pins it.
 
+A statement that forks in two readings until a later token decides
+shows it too: `(a) { }` is the cast of the closure or the call of `(a)`
+with it, and the two stay alive past the statement after it. In
+`(a) { }` then `foo { yield / 2 }.bar()` then `(b) { }`, deleting `b`
+leaves `()`, which opens no statement and goes on with the call before
+it; the reparse reuses that call whole at the fork and keeps the call
+reading of `(a) { }`, where a parse from scratch keeps the cast, both
+with no `ERROR` (`x++ / 2` in the closure does the same; at v0.6.0
+neither text parses without an `ERROR`). The class is a fork that a later line decides, such as
+`(x) { }`, a `return`, `throw` or `assert` before it (§6.2), or a typed
+declaration after `final`, followed by a statement that is reused whole
+while both readings are alive; `bindings/rust/tests/incremental_reparse.rs`
+pins this one with the others.
+
 Trees that change for input that parsed without an `ERROR`: a `(` that
 opens a line after an expression where a statement may start, and that
 can open one, was the arguments of a call of that expression, and opens

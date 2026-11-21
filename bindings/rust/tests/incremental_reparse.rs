@@ -1225,3 +1225,41 @@ fn reparse_after_closure_call_edit_sequences_matches_parse_from_scratch() {
         );
     }
 }
+
+/// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a node
+/// only while one stack version exists. `(a) { }` keeps two alive past the
+/// statement after it, the cast of the closure and the call of `(a)` with
+/// it, so `foo { yield / 2 }.bar()` after it is reused whole at the fork.
+/// Deleting the `b` of `(b) { }` on the next line leaves `()`, which opens
+/// no statement and goes on with the call before it (§6.18). From scratch
+/// `(a) { }` is the cast, as before the edit; the reparse keeps the call
+/// reading of it, with no `ERROR`. `x++ / 2` in the closure does the same.
+/// This test pins the difference. If it fails, the two parses agree again:
+/// remove the limitation from §6.18.
+#[test]
+fn deleting_a_name_after_a_forked_call_flips_the_cast_before_it() {
+    for text in [
+        "(a) { }\nfoo { yield / 2 }.bar()\n(b) { }\n",
+        "(x) { }\nfoo { x++ / 2 }.bar()\n(b) { }\n",
+    ] {
+        let at = text.rfind('b').expect("the name on the last line");
+        let mut parser = parser();
+        let (edited, incremental, fresh) = reparse(&mut parser, text, at, at + 1, "");
+        assert!(edited.ends_with("\n() { }\n"), "{edited:?}");
+        assert!(!incremental.root_node().has_error());
+        assert!(!fresh.root_node().has_error());
+
+        let first = |tree: &Tree| {
+            let statement = tree.root_node().named_child(0);
+            statement
+                .and_then(|s| s.named_child(0))
+                .map(|n| n.kind().to_owned())
+        };
+        assert_eq!(first(&fresh).as_deref(), Some("parenthesized_type_cast"));
+        assert_eq!(
+            first(&incremental).as_deref(),
+            Some("method_invocation"),
+            "the reparse now matches the parse from scratch: {edited:?}",
+        );
+    }
+}
