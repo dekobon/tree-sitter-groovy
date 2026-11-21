@@ -4498,11 +4498,12 @@ declarations in 144, 150 before, each with an `ERROR`.
 ### 6.23 JUMP_STATEMENT_END — implementation contract
 
 ```text
-Emits iff (an empty token):
+Emits iff (an empty token, ending at the keyword):
   - it is valid, which it is only right after `return`, `break` or
     `continue`, and the parser is not recovering from an error
-  - past spaces, tabs and line escapes, a line break or the end of
-    input follows
+  - past spaces, tabs and line escapes, a line break, the end of input,
+    a line comment, or a block comment that a line break or the end of
+    input follows right after its `*/`, follows
 Else: emits nothing; the spaces stay skipped for the branches below.
 ```
 
@@ -4531,12 +4532,31 @@ return of the call. Now `return_statement`, `break_statement` and
 `continue_statement` may end with the token. The scanner decides it before the same-line tokens (§6.9,
 §6.18, §6.8), as the first branch that skips spaces: at a line break or
 the end of input it emits the token; at anything else it falls through
-with the spaces skipped, and a comment is emitted by the comment branch
-and decided at its end by the next call, which is valid in the same
-parse state. So `break // c` holds its comment and ends after it, and a
-block comment on the line is skipped before the label or the value, as
-Groovy hides it. `throw` and `assert` still take a value on the next
-line, which Groovy rejects (`throw` then `x`).
+with the spaces skipped. At a comment the comment branch emits the token
+in place of a line comment and of a block comment that the line ends
+right after, and the comment is emitted by the next call, after the
+statement, as at v0.6.0 (`break // c`, `return /* c */` then `x`). A
+block comment that something follows on its line is emitted inside the
+statement and skipped before the label or the value, as Groovy hides
+it (`break /* c */ outer`), and so is one that only spaces follow before
+the line break: telling it from the first would read past the end of the
+comment's token, which a token cannot move back to, so the statement
+then ends at the line break and holds the comment. `throw` and `assert`
+still take a value on the next line, which Groovy rejects (`throw` then
+`x`).
+
+The token ends at the keyword, before the spaces: the branch marks its end
+there before it skips them, and every token that a later branch emits
+past them marks its own end (`SUBSCRIPT_OPEN` too, which needed no mark
+before). Where it followed the spaces, the statement and the statement
+around it (an `if`, a label, a case) ended after trailing spaces, and after
+a comment, where at v0.6.0 they end at the keyword; and a reparse that
+reused a statement lexed without the token (`continue ;` then `/* d */`,
+with the `;` deleted) ended it at the keyword where a parse from scratch
+ended it past the space or the comment: of 35,238 reparses of the single
+edits of four texts with such statements and an undo of each, 93 differed
+from a parse from scratch in where the statement ended or the comment sat,
+none now.
 
 The token is empty and the statement's own last token, so the runtime
 counts the text the scanner read for it against the statement, and an

@@ -5410,6 +5410,22 @@ static void read_lambda_body_end_extent(TSLexer *lexer, bool no_close_ahead) {
 // as far as the decision after the `}` read, so that the comment, which a
 // reparse may reuse in the state that decides, is lexed again when the
 // text after it changes.
+// SPECIFICATION.md §6.23 — past JUMP_STATEMENT_END, whose end the caller
+// has marked: reads on over line breaks and comments to the first
+// character of the next token, so that the runtime counts that text
+// against the statement too and an edit there parses it again. A reparse
+// that reused the ended statement in one of two stack versions (after
+// `(a) { }`, a cast or a call) let that version reach an error in the next
+// line before the other, and kept the other reading, where a parse from
+// scratch keeps the first.
+static void read_jump_statement_end_extent(
+    TSLexer *lexer,
+    bool no_close_ahead
+) {
+    bool slash = false;
+    skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash);
+}
+
 static void read_deferred_extent(
     TSLexer *lexer,
     bool body_continues,
@@ -5619,26 +5635,26 @@ bool tree_sitter_groovy_external_scanner_scan(
     // Groovy's parser takes the value or the label only on the keyword's
     // line. The token is empty and the statement's own, so the runtime
     // counts the line break against the statement. Anything else falls
-    // through with the spaces skipped: a comment is emitted below, and the
-    // next call, after it, decides at its end, as Groovy's lexer reads a
-    // comment that the line ends after as the line break.
+    // through with the spaces skipped: a line comment, and a block comment
+    // that the line ends right after, which Groovy's lexer reads as the line
+    // break, end the statement before them in the comment branch below.
+    // Past the token the scan reads on to the next token
+    // (`read_jump_statement_end_extent`).
     //
-    // Past the token the scan reads on over line breaks and comments to the
-    // first character of the next token, so that the runtime counts that
-    // text against the statement too and an edit there parses it again. A
-    // reparse that reused the ended statement in one of two stack versions
-    // (after `(a) { }`, a cast or a call) let that version reach an error in
-    // the next line before the other, and kept the other reading, where a
-    // parse from scratch keeps the first.
+    // The token ends at the keyword, before the spaces, so that the
+    // statement ends where it does without the token (`continue;`): a
+    // reparse that reuses a statement lexed without it, where the edit
+    // follows the spaces, gives the same range as a parse from scratch.
+    // Every token that a branch below emits after the spaces marks its own
+    // end.
     if (valid_symbols[JUMP_STATEMENT_END] && !valid_symbols[ERROR_SENTINEL]) {
+        lexer->mark_end(lexer);
         if (!skip_same_line_space(lexer, true)) {
             return false;
         }
         if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
-            lexer->mark_end(lexer);
-            bool slash = false;
-            skip_header_trivia(lexer, true, no_comment_close_ahead(scanner),
-                               NULL, &slash);
+            read_jump_statement_end_extent(lexer,
+                                           no_comment_close_ahead(scanner));
             lexer->result_symbol = JUMP_STATEMENT_END;
             return true;
         }
@@ -5688,6 +5704,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         // in-grammar `[` starts a list or map literal instead.
         if (wants_subscript && lexer->lookahead == '[') {
             lexer->advance(lexer, false);
+            // §6.23 — the end is marked, as the branch above may have
+            // marked one before the spaces.
+            lexer->mark_end(lexer);
             lexer->result_symbol = SUBSCRIPT_OPEN;
             return true;
         }
@@ -5993,9 +6012,20 @@ bool tree_sitter_groovy_external_scanner_scan(
             && scan_multi_assignment_comma(lexer, no_close_ahead);
     }
 
-    // UNTERMINATED_COMMENT is empty and ends here. Every other token
-    // of this branch moves the end again.
-    lexer->mark_end(lexer);
+    // §6.23 — after `return`, `break` or `continue` a line comment, and a
+    // block comment that a line break or the end of input follows, end the
+    // statement before them, as Groovy's lexer reads either as the line
+    // break (`break // c`): JUMP_STATEMENT_END is emitted here, and the
+    // comment by the next call, outside the statement. The token ends at
+    // the keyword, where the branch above marked it.
+    bool jump_end = valid_symbols[JUMP_STATEMENT_END]
+        && !valid_symbols[ERROR_SENTINEL];
+    // UNTERMINATED_COMMENT is empty and ends here, or after the keyword
+    // where JUMP_STATEMENT_END is valid. Every other token of this branch
+    // moves the end again.
+    if (!jump_end) {
+        lexer->mark_end(lexer);
+    }
     advance(lexer);
     // Dispatch on the char after `/`:
     //   `/`  → line comment
@@ -6014,6 +6044,11 @@ bool tree_sitter_groovy_external_scanner_scan(
         // lexer (`LineTerminator`), so the comment stops before it.
         while (!lexer->eof(lexer) && !is_line_break(lexer->lookahead)) {
             advance(lexer);
+        }
+        if (jump_end) {
+            read_jump_statement_end_extent(lexer, no_close_ahead);
+            lexer->result_symbol = JUMP_STATEMENT_END;
+            return true;
         }
         lexer->mark_end(lexer);
         lexer->result_symbol = LINE_COMMENT;
@@ -6047,6 +6082,19 @@ bool tree_sitter_groovy_external_scanner_scan(
                 advance(lexer);
                 if (lexer->lookahead == '/') {
                     advance(lexer);
+                    // §6.23 — the end of the token before the comment is
+                    // kept where the line ends right after it. Past spaces
+                    // it could not be told from a comment that a value or a
+                    // label follows, whose own end would be lost, so that
+                    // comment ends the statement after it, at the line
+                    // break, as before.
+                    if (jump_end
+                        && (lexer->eof(lexer)
+                            || is_line_break(lexer->lookahead))) {
+                        read_jump_statement_end_extent(lexer, no_close_ahead);
+                        lexer->result_symbol = JUMP_STATEMENT_END;
+                        return true;
+                    }
                     lexer->mark_end(lexer);
                     if (is_groovydoc) {
                         if (!valid_symbols[GROOVYDOC_COMMENT]) {

@@ -124,12 +124,12 @@ foo()
       (continue_statement)
       (expression_statement
         (identifier))
-      (break_statement
-        (line_comment))
+      (break_statement)
+      (line_comment)
       (expression_statement
         (identifier))
-      (break_statement
-        (block_comment))
+      (break_statement)
+      (block_comment)
       (expression_statement
         (identifier))))
   (while_statement
@@ -346,8 +346,8 @@ def k() {
     name: (identifier)
     parameters: (formal_parameters)
     body: (block
-      (return_statement
-        (line_comment))
+      (return_statement)
+      (line_comment)
       (expression_statement
         (identifier))))
   (method_declaration

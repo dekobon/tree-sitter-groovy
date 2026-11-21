@@ -321,6 +321,40 @@ fn reparse_after_edit_sequence_matches_parse_from_scratch() {
     }
 }
 
+/// Texts with `break`, `continue` or `return` that a `;` and then a comment
+/// follow on the line (§6.23), each with the `;` removed: the reparse reuses
+/// the statement, lexed without its token, which must end where a parse from
+/// scratch ends it with the token, at the keyword before the space, and the
+/// comment, which ends the statement as a line break does, must stay outside
+/// it. The token used to follow the space, or the comment.
+const JUMP_STATEMENT_EDIT_SEQUENCES: &[(&str, &[Edit])] = &[
+    (
+        "for (;;) {\n  if (a) break ;// c\n  (x) { }\n}\n",
+        &[(26, 1, "")],
+    ),
+    (
+        "for (;;) {\n  (x) { }\n  continue ;/* d */\n  foo()\n}\n",
+        &[(32, 1, "")],
+    ),
+    (
+        "def f() {\n  (x) { }\n  return ;// c\n  x\n}\n",
+        &[(29, 1, "")],
+    ),
+];
+
+#[test]
+fn reparse_after_jump_statement_edits_matches_parse_from_scratch() {
+    let mut parser = parser();
+    for &(text, edits) in JUMP_STATEMENT_EDIT_SEQUENCES {
+        let (edited, incremental, fresh) = reparse_sequence(&mut parser, text, edits);
+        assert_eq!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "after the edits of {text:?}: {edited:?}",
+        );
+    }
+}
+
 /// Texts with a lambda whose body is in braces (§6.19), each with a sequence
 /// of edits after the `}`: inserting and removing a call, a subscript, an
 /// operator, a closure argument or a line break, and removing a call after

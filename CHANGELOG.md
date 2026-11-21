@@ -685,12 +685,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   line is a bare `return_statement` and that statement, where v0.6.0
   returned the call, `obj.m`, `String` or the closure; and
   `if (c) break` then `foo = 1`, an `ERROR`, parses. A line comment
-  after the keyword ends the statement inside it, and a block comment
-  on the line keeps the label (`break /* c */ outer`). A new external
-  token, `_jump_statement_end`, ends the statement
-  (`SPECIFICATION.md` §6.23). `throw` and `assert` still take a value
-  on the next line. No tree of 266 real files changes; 66 of 24,548
-  Java files do, each at a `return` that ends its line.
+  after the keyword, and a block comment that the line ends right
+  after, end the statement before them, and stay outside it as at
+  v0.6.0; a block comment that something follows on the line keeps the
+  label (`break /* c */ outer`). The statement ends at the keyword, as
+  at v0.6.0, not after trailing spaces. `return` then `foo { }[0]` or
+  `foo { } + 1` on the next line, which v0.6.0 read as the return of the
+  subscripted or added call, is a bare `return_statement`, the
+  `command_chain` `foo { }` and the statement `[0]` or `+1`, as a
+  statement `foo { }[0]` is read (`docs/divergences-from-spec.md` §30),
+  where Groovy subscripts or adds the call. A new external token,
+  `_jump_statement_end`, ends the statement (`SPECIFICATION.md` §6.23).
+  `throw` and `assert` still take a value on the next line. No tree of
+  266 real files changes; 66 of 24,548 Java files do, each at a
+  `return` that ends its line.
 - **BREAKING:** a `/` after an operand on its line is division, as
   Groovy's lexer reads it after a name, a literal, `this`, `)`, `]`,
   `}`, `++`, `--` or a string. Where the next statement or a call's
