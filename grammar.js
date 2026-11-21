@@ -3423,17 +3423,19 @@ module.exports = grammar({
         ['<<',  PREC.SHIFT_OR_RANGE],
         ['>>',  PREC.SHIFT_OR_RANGE],
         ['>>>', PREC.SHIFT_OR_RANGE],
-        // RELATIONAL — §3.1 level 7. `in`, `!in`, `instanceof`,
-        // `!instanceof`, and `as` share this level but emit
-        // distinct node kinds (`membership_expression`,
-        // `instanceof_expression`, `cast_expression`), so they
-        // land in their own rules later.
+        // RELATIONAL — §3.1 level 7. `in` and `!in` share this level
+        // but emit a distinct node kind (`membership_expression`), so
+        // they land in a rule of their own. `instanceof`,
+        // `!instanceof` and `as` bind tighter (TYPE_TEST, the first
+        // alternative of Apache's level 7) and have rules of their
+        // own too (`instanceof_expression`, `cast_expression`).
         ['<',   PREC.RELATIONAL],
         ['<=',  PREC.RELATIONAL],
         ['>',   PREC.RELATIONAL],
         ['>=',  PREC.RELATIONAL],
-        // EQUALITY — §3.1 level 8. `===`, `!==`, `<=>`, `=~`,
-        // `==~` share this level but emit distinct node kinds.
+        // EQUALITY — §3.1 level 8. `===`, `!==` and `<=>` share this
+        // level but emit distinct node kinds. `=~` and `==~` bind
+        // looser (REGEX, Apache's regexExprAlt after equalityExprAlt).
         ['==',  PREC.EQUALITY],
         ['!=',  PREC.EQUALITY],
         // BITWISE — §3.1 levels 9, 10, 11 (each tighter than the
@@ -3672,9 +3674,9 @@ module.exports = grammar({
 
     // §3.2 — single `unary_expression` node kind but two precedence
     // alternatives, matching Apache §3.1:
-    //   UNARY_NOT (`!` `~`)  — level 16, tighter than POWER (15),
+    //   UNARY_NOT (`!` `~`)  — level 18, tighter than POWER (17),
     //                          so `~2 ** 3` parses as `(~2) ** 3`.
-    //   UNARY     (`+` `-`)  — level 14, looser than POWER (15),
+    //   UNARY     (`+` `-`)  — level 16, looser than POWER (17),
     //                          so `-2 ** 3` parses as `-(2 ** 3)`.
     // Both alternatives produce the same node kind, so downstream
     // tools see one consistent shape and discriminate by operator.
