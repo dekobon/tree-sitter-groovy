@@ -6484,6 +6484,59 @@ foo "a"
       body: (identifier))))
 
 ==================
+A literal first argument before a lambda on its line (known divergence)
+==================
+
+foo "a" (x) -> x
+foo 1 (x) -> x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal))
+  (expression_statement
+    (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier))))
+
+==================
+A call of a literal first argument before a lambda on the next line (known divergence)
+==================
+
+sh "a" { }
+(x) -> x
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (method_invocation
+      function: (method_invocation
+        function: (string_literal
+          (string_fragment))
+        closure: (closure))
+      arguments: (argument_list
+        (identifier))))
+  (ERROR)
+  (expression_statement
+    (identifier)))
+
+==================
 A literal first argument takes what Groovy rejects (known divergence)
 ==================
 

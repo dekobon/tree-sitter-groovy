@@ -2773,7 +2773,16 @@ statement (§6.9, §6.18), so the scanner leaves the literal alone before
 them, as before. Before a `(` that also keeps `foo "a"` followed by
 `(x) -> x` the call and a lambda statement, as before, where Groovy
 passes the lambda to a call of the method `a`; an argument that took the
-`(` would leave the `->` an `ERROR`. `**` and the assignments start with
+`(` would leave the `->` an `ERROR`. On the literal's line the scanner
+leaves the literal alone for the same reason before a `(` that the
+look-ahead of §6.17 reads as a lambda's parameters (`foo "a" (x) -> x`,
+`foo 1 (x) -> x`: the call and a lambda statement); any other `(` there
+opens the literal's call (`foo "a" (x)`, `foo("a"(x))` as in Groovy).
+After such a call, or a literal's call with a closure, that ends its
+line (`foo "a" (x)`, `sh "a" { }`), a lambda in parentheses on the next
+line is an `ERROR`, as after a name argument (`sh foo { }`): before `->`
+the `(` stays the call's arguments (§6.18), where Groovy appends the
+lambda. `**` and the assignments start with
 characters that go on, and are accepted where Groovy rejects them.
 
 Measured against the grammar before: STATE_COUNT, LARGE_STATE_COUNT,

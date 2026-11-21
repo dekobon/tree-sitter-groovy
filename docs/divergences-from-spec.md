@@ -1896,6 +1896,8 @@ The Groovy column was observed by running Groovy 3.
 | `foo "a"` then `.trim()`, `?: b`, `* 2`, `{ }`, `as T`, `in b` or `instanceof T` on the next line | one call whose argument goes on | the same; before, an `ERROR`, or the call and statements for the last four |
 | `foo "a" + b` then `-c` on the next line | `foo("a" + b)`, then `-c` | one call with the argument `"a" + b - c`, as after a name argument (the `foo bar` then `-1` row) |
 | `foo "a"` then `(x) -> x` on the next line | `foo("a"((x) -> x))` | the call and a lambda statement, as before: the `(` opens the next statement |
+| `foo "a" (x) -> x`, `foo 1 (x) -> x` | `foo("a"((x) -> x))`, `foo(1((x) -> x))` | the call and a lambda statement, as before: the scanner leaves the literal alone before a lambda's parameters (spec §6.14) |
+| `sh "a" { }` or `foo "a" (x)`, then `(x) -> x` on the next line | the lambda one more argument of the call of `a` | an `ERROR`, as in 0.6.0 and as after a name argument (`sh foo { }` then `(x) -> x`): the `(` stays the call's arguments (spec §6.18) |
 | `foo` then `"a" + b` on the next line, `foo /* c */ "a" + b`, `var "a" + b`, `record "a" + b`, `trait "a" + b`, `sealed "a" + b`, `permits "a" + b`, `super "a" + b`, `_ "a" + b` | `foo`, then the sum; a call with the sum | the call of the literal and `+b`, as before: the scanner reads no literal after a line break or a comment, nor after a word whose own keyword it decides there or a keyword of the grammar |
 | `foo "a" = b`, `foo "a" += b`, `foo "a"` then `= b` or `** b` on the next line | rejected | a call whose argument is the assignment or the power, with no `ERROR` |
 

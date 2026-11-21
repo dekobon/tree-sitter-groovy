@@ -360,8 +360,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   takes a next line that opens with `+` or `-` (`foo "a" + b` then `-c`
   is one call), as after a name argument; a comment between the receiver
   and the literal, the receivers `var`, `record`, `trait`, `sealed`,
-  `permits`, `super` and `_`, and a literal on the line after the
-  receiver keep the literal alone. An assignment after the literal
+  `permits`, `super` and `_`, a literal on the line after the
+  receiver, and a lambda in parentheses after the literal on its line
+  (`foo "a" (x) -> x`, the call and a lambda statement, where Groovy
+  passes the lambda to a call of the literal) keep the literal alone.
+  An assignment after the literal
   (`foo "a" = b`, `foo "a" += b`), and `= b` or `** b` on the next line,
   which Groovy rejects, are a call with no `ERROR` (`SPECIFICATION.md`
   §5.5 item 3, §6.14).

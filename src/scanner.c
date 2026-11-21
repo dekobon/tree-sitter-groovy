@@ -489,6 +489,12 @@ static inline bool contextual_word_may_start(
 );
 static bool slashy_body_follows(TSLexer *lexer);
 static bool skip_string(TSLexer *lexer);
+static bool lambda_parameters_follow(
+    TSLexer *lexer,
+    bool no_close_ahead,
+    bool *closed,
+    bool *in_string
+);
 static bool scan_contextual_word(
     TSLexer *lexer,
     const char *word,
@@ -2487,7 +2493,8 @@ static bool skip_number(TSLexer *lexer) {
 // statement's call, read to its end: whether the argument goes on past it,
 // so that the call opens with COMMAND_STATEMENT_START and the argument is a
 // whole expression (`println "a" + b`, `timeout 30 * 60`). On the literal's
-// line it does unless a `,`, `;` or `}` or the end of input follows. On a
+// line it does unless a `,`, `;` or `}`, the end of input or a lambda's
+// parameters in parentheses (`foo "a" (x) -> x`) follow. On a
 // later line only what Groovy lets go on with an expression across a line
 // break goes on with it: an operator that starts with `.`, `?`, `*`, `/`,
 // `%`, `=`, `!`, `<`, `>`, `&`, `|`, `^` or `:` (`::`), a closure's `{`,
@@ -2513,6 +2520,18 @@ static bool literal_argument_goes_on(TSLexer *lexer, bool no_close_ahead) {
         return false;
     }
     if (!crossed_line) {
+        // Groovy appends a lambda to the literal as it does a closure
+        // (`pathElement`'s `closureOrLambdaExpression`, `"a"((x) -> x)`),
+        // which the grammar does not: the argument would take `(x)` as the
+        // literal's arguments and leave the `->` an ERROR. The literal's
+        // own form keeps the call and a lambda statement, as on the next
+        // line.
+        if (c == '(') {
+            bool closed = false;
+            bool in_string = false;
+            return !lambda_parameters_follow(lexer, no_close_ahead, &closed,
+                                             &in_string);
+        }
         return true;
     }
     if (is_identifier_start(c)) {
