@@ -712,6 +712,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A `<` with no space before it, right after a name in parentheses or
+  where a statement starts, is a comparison where no type arguments
+  close, as in Groovy: `(i<n)`, `(i<n) ? a : b`, `if ((i<n && j>m))`,
+  `x = (i<n)`, `(i<-1)`, `i<n` and `{ it<2 }` parse. Each read type
+  arguments that never closed and was an `ERROR`, as the name could be
+  a cast's type or a declaration's. Type arguments that close there, or
+  run past the scanner's read, still make a type: `(List<String>) x`,
+  `List<String> xs = []`. No tree of 266 real files changes; 6 of
+  24,548 Java files parse without an `ERROR` (`(len<min)?min:len`,
+  `if((load<0.0 || load>1.0) && …)`), and every tree that changes had
+  an `ERROR` before (`SPECIFICATION.md` §3.2.2).
 - `trait` and `sealed` are names wherever they do not open a
   declaration, as in Groovy: `private String trait`,
   `private boolean sealed = true`, `static trait = 1`, `return trait`,

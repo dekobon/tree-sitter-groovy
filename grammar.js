@@ -236,6 +236,19 @@ const PARENTHESIZED_BODY_WEIGHT = LAMBDA_WEIGHT - 1;
 const BODY_BLOCK_WEIGHT = -DEMOTED_LAMBDA_WEIGHT + 1;
 
 /*
+ * The in-grammar `<` that opens type arguments, a diamond or type
+ * parameters right after a name (§3.2.2). Where a comparison may follow
+ * the same name, after `(i` or at a statement's start, both `<` tokens
+ * match, and the lexer took this one, so `(i<n)` and `{ it<2 }` read
+ * type arguments that never closed: an `ERROR`. The lower precedence makes
+ * the comparison's `<` win there. Type arguments that close, or that run
+ * past what the scanner reads, still open there with the scanner's
+ * `_type_arguments_open`, which the lexer meets first; where only a type
+ * may follow, this `<` is the only one.
+ */
+const TYPE_ARGUMENTS_LT = token.immediate(prec(-1, '<'));
+
+/*
  * Identifier characters, after GroovyLexer.g4 `JavaLetter` and
  * `JavaLetterOrDigit`: Java's `Character.isJavaIdentifierStart` and
  * `isJavaIdentifierPart` without the identifier-ignorable characters.
@@ -979,6 +992,10 @@ module.exports = grammar({
     // §5.2 — never emitted: ends `_stray_case`, the error production for a
     // `case` label outside a switch, so that the label is never accepted.
     $._unreachable,
+    // §3.2.2 — the `<` of a generic type's arguments where they close or
+    // run past the scanner's read, so that `(i<n)` compares and
+    // `(List<String>) x` casts.
+    $._type_arguments_open,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1635,7 +1652,7 @@ module.exports = grammar({
     // parameter opener when it follows the declaration name with
     // no intervening whitespace.
     type_parameters: $ => seq(
-      token.immediate('<'),
+      TYPE_ARGUMENTS_LT,
       $.type_parameter,
       repeat(seq(',', $.type_parameter)),
       '>',
@@ -2781,7 +2798,7 @@ module.exports = grammar({
       field('arguments', alias($._diamond_type_arguments, $.type_arguments)),
     )),
 
-    _diamond_type_arguments: _ => seq(token.immediate('<'), '>'),
+    _diamond_type_arguments: _ => seq(TYPE_ARGUMENTS_LT, '>'),
 
     // §3.2 — `new int[n][m]`, `new int[n][]` and `new int[] { … }`,
     // after Apache `creator`: sized dimensions and then empty ones, or
@@ -2961,10 +2978,12 @@ module.exports = grammar({
 
     // §4 / §5.14 — Java-style generic type arguments. Allows nested
     // generics (`Map<String, List<Integer>>`) and bounded wildcards
-    // (`? extends Foo`, `? super Bar`). The `<` is `token.immediate`
-    // so it only matches when the angle bracket directly follows the
-    // base name with no intervening whitespace — `a < b` still parses
-    // as a binary expression because of the space before `<`.
+    // (`? extends Foo`, `? super Bar`). The `<` only matches when the
+    // angle bracket directly follows the base name with no intervening
+    // whitespace — `a < b` still parses as a binary expression because of
+    // the space before `<` — and is the scanner's where the arguments close
+    // or run past its read, so that it is no comparison's
+    // (`TYPE_ARGUMENTS_LT`).
     generic_type: $ => prec.right(PREC.ARRAY_TYPE, seq(
       field('base', choice(
         alias($.identifier, $.type_identifier),
@@ -2974,7 +2993,7 @@ module.exports = grammar({
     )),
 
     type_arguments: $ => seq(
-      token.immediate('<'),
+      choice(TYPE_ARGUMENTS_LT, alias($._type_arguments_open, '<')),
       $._type_argument,
       repeat(seq(',', $._type_argument)),
       '>',

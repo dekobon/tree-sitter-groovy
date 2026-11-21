@@ -81,8 +81,10 @@ The default branch is **`main`**.
     operand is on the later line, kept alive there, made a run of `(x)`
     lines quadratic;
   - the `<` of a cast type's type arguments where they close, so that
-    `x as a.B<c` compares (§3.2.2), and the `!in` operator, which needs
-    whitespace or a bracket after it (§6.12);
+    `x as a.B<c` compares, and of another generic type's where they
+    close or run past the read, so that `(i<n)` and `{ it<2 }` compare
+    and `(List<String>) x` casts (§3.2.2), and the `!in` operator,
+    which needs whitespace or a bracket after it (§6.12);
   - the start of a lambda, before its parameters in parentheses or its
     one name, when `->` follows (§6.17);
   - an empty token after the `}` of a lambda's brace body that no

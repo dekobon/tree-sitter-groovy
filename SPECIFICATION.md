@@ -432,6 +432,40 @@ edit that closes the type arguments makes the runtime lex the `<` again
 where the token is valid (`bindings/rust/tests/incremental_reparse.rs`
 pins it). It is not emitted during error recovery.
 
+The `<` of any other generic type's arguments (`type_arguments`) is
+either the in-grammar `<` right after the name, which a diamond
+(`new Foo<>()`) and type parameters share, or the external
+TYPE_ARGUMENTS_OPEN, which the same read decides. The in-grammar one
+has the lower lexical precedence of the two in-grammar `<` tokens.
+Where a comparison may follow the name as well as type arguments,
+after a name in parentheses, which may be a cast's type, and where a
+statement starts, which may be a declaration, both match. The lexer
+took the type arguments' there, so `(i<n)`, `(i<n && j>m)`, `i<n` and
+`{ it<2 }` read type arguments that never closed, an `ERROR`, where
+Groovy compares (Groovy 3; Apache's `castParExpression` takes a type
+and then an operand after the `)`, and `localVariableDeclaration` a
+type and then a name). Now the comparison's `<` wins there, and type
+arguments open with TYPE_ARGUMENTS_OPEN:
+
+```text
+Emit TYPE_ARGUMENTS_OPEN for a `<` that is the first character the
+scanner sees, where it is valid and CAST_TYPE_ARGUMENTS_OPEN is not
+emitted, when the `>` does not follow at once (a diamond) and the read
+above finds type arguments that close or reaches its bound.
+```
+
+So `(List<String>) x`, `List<String> xs = []` and type arguments past
+the bound (more than about 85 arguments with a space after each comma)
+read as before. Where only a type may follow, the in-grammar `<` is the
+only one, and the token changes no tree there. A chain of comparisons
+past the bound, `(a<a<a<…<1)` with more than about 128 of them, reads
+as type arguments and is an `ERROR`, as it was. Type arguments that
+close and that Groovy reads otherwise stay an `ERROR`: `(a<b>c)`, which
+Groovy 3 reads as the call `a.call(c)`, and `(i<n>>1)`. A `<` after a
+name, of every generic type and of every comparison without a space
+before it, starts the bounded read: `dotted_cast_type_cost.rs` checks
+nests of generic types and chains of comparisons.
+
 ---
 
 ## 4. Statement and declaration coverage
@@ -1568,7 +1602,8 @@ expression where it may open a statement (§6.18), the start of an
 array type that is a value (§6.15), the `)` of a cast and the `)`
 before a relational operator that Groovy applies to the parentheses
 (§6.11), the `<` of a cast type's type arguments where they close
-(§3.2.2), the `!in` operator (§6.12), the empty marker of an
+(§3.2.2), the `<` of a generic type's arguments where they close or
+run past the read (§3.2.2), the `!in` operator (§6.12), the empty marker of an
 unterminated block comment (§6.6), the start of a lambda (§6.17),
 the end of a lambda's brace body (§6.19), the first comma of a
 multi-assignment (§6.20), the start of a typed local declaration
@@ -1626,6 +1661,7 @@ enum TokenType {
   CAST_CLOSE,             // §6.11 — `)` with something after it on its line
   RELATIONAL_CLOSE,       // §6.11 — `)` before a relational operator Groovy applies to the parentheses; closes no cast
   CAST_TYPE_ARGUMENTS_OPEN, // §3.2.2 — `<` after a cast type's name, where the type arguments close
+  TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   NOT_IN,                 // §6.12 — `!in` before whitespace or an opening bracket
   LAMBDA_START,           // §6.17 — empty; before the `(` of a lambda's parameters
   BARE_LAMBDA_START,      // §6.17 — empty; before a lambda's one name without parentheses

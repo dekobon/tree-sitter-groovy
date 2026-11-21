@@ -29,7 +29,9 @@
 // instanceof Foo`) or one that ends its line before a line that opens with
 // `(` where no bracket holds both lines, neither of which closes a cast;
 // §3.2.2 CAST_TYPE_ARGUMENTS_OPEN, the `<` of a cast
-// type's type arguments where they close; §6.12 NOT_IN, the `!in`
+// type's type arguments where they close, and TYPE_ARGUMENTS_OPEN, that of
+// another generic type's where they close or run past the read; §6.12
+// NOT_IN, the `!in`
 // operator; §6.17 LAMBDA_START and BARE_LAMBDA_START, empty tokens
 // before a lambda's parameters in parentheses and before its one name
 // without them, when `->` follows; and §6.19 LAMBDA_BODY_END, an empty
@@ -62,8 +64,8 @@
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, CAST_TYPE_ARGUMENTS_OPEN,
-// NOT_IN, LAMBDA_START, BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
-// MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
+// TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
+// LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
 // JUMP_STATEMENT_END and the STRING_BODY check are suppressed. The keywords
 // `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
 // decided there, by the same look-aheads, as are the comments,
@@ -144,6 +146,7 @@ enum TokenType {
     CLOSURE_CALL_START,
     CLOSURE_COMMAND_START,
     UNREACHABLE,
+    TYPE_ARGUMENTS_OPEN,
     ERROR_SENTINEL,
 };
 
@@ -3878,14 +3881,24 @@ static ParenClose read_paren_close(TSLexer *lexer) {
     }
 }
 
-// SPECIFICATION.md §3.2.2 — whether the type arguments of a cast's type,
-// whose `<` the caller consumed, close with their `>`: names, dots, commas,
-// `?`, `[`, `]` and a nested `<` right after a name, with Groovy's trivia,
-// line breaks and comments included, between them. Anything else, an
-// operator or a literal, makes the `<` a comparison: Groovy reads
-// `x as a.B<c` as `(x as a.B) < c`. At most DECLARATION_LOOKAHEAD_ITEMS
-// items are read; longer arguments are compared.
-static bool cast_type_arguments_close(TSLexer *lexer, bool no_close_ahead) {
+// What follows the `<` after the name of a type, as `read_type_arguments`
+// reads it.
+typedef enum {
+    // Type arguments that close with their `>`.
+    ARGUMENTS_CLOSE,
+    // Something no type argument holds: the `<` is a comparison's.
+    ARGUMENTS_COMPARE,
+    // Type arguments longer than the read.
+    ARGUMENTS_UNREAD,
+} TypeArguments;
+
+// SPECIFICATION.md §3.2.2 — whether the type arguments of a type, whose
+// `<` the caller consumed, close with their `>`: names, dots, commas, `?`,
+// `[`, `]` and a nested `<` right after a name, with Groovy's trivia, line
+// breaks and comments included, between them. Anything else, an operator
+// or a literal, makes the `<` a comparison: Groovy reads `x as a.B<c` as
+// `(x as a.B) < c`. At most DECLARATION_LOOKAHEAD_ITEMS items are read.
+static TypeArguments read_type_arguments(TSLexer *lexer, bool no_close_ahead) {
     unsigned depth = 1;
     // Whether a name ends right before the lookahead.
     bool after_name = false;
@@ -3895,7 +3908,7 @@ static bool cast_type_arguments_close(TSLexer *lexer, bool no_close_ahead) {
             bool slash = false;
             if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)
                 || slash) {
-                return false;
+                return ARGUMENTS_COMPARE;
             }
             after_name = false;
             continue;
@@ -3903,28 +3916,28 @@ static bool cast_type_arguments_close(TSLexer *lexer, bool no_close_ahead) {
         if (is_identifier_start(c)) {
             // A string is a literal: `x as a.B<$/c/$` compares.
             if (read_dollar_slashy_open(lexer)) {
-                return false;
+                return ARGUMENTS_COMPARE;
             }
             after_name = true;
             continue;
         }
         if (c == '<') {
             if (!after_name) {
-                return false;
+                return ARGUMENTS_COMPARE;
             }
             depth++;
         } else if (c == '>') {
             depth--;
             if (depth == 0) {
-                return true;
+                return ARGUMENTS_CLOSE;
             }
         } else if (c != ',' && c != '?' && c != '.' && c != '[' && c != ']') {
-            return false;
+            return ARGUMENTS_COMPARE;
         }
         advance(lexer);
         after_name = false;
     }
-    return false;
+    return ARGUMENTS_UNREAD;
 }
 
 // SPECIFICATION.md §6.17 — the most the look-ahead for a lambda's
@@ -5250,7 +5263,8 @@ void tree_sitter_groovy_external_scanner_deserialize(
 //      LAMBDA_BODY_END or STATEMENT_BLOCK_END (`scan_lambda_body_end`,
 //      §6.19, §6.22), unless the previous call set `lambda_body_continues`,
 //      which this one clears before reading on as after an expression.
-//   3. At `<` after a cast type's name, CAST_TYPE_ARGUMENTS_OPEN (§3.2.2).
+//   3. At `<` after a cast type's name, CAST_TYPE_ARGUMENTS_OPEN, and after
+//      another generic type's, TYPE_ARGUMENTS_OPEN (§3.2.2).
 //   4. At a member access after a statement's first name,
 //      COMMAND_PATH_START (§6.14).
 //   4a. After `return`, `break` or `continue`, past spaces, tabs and line
@@ -5329,9 +5343,15 @@ bool tree_sitter_groovy_external_scanner_scan(
     }
 
     // SPECIFICATION.md §3.2.2 — the `<` right after the name of a cast's
-    // type, where type arguments that close follow it. On false the
-    // runtime rewinds and the in-grammar lexer reads the `<` of a
-    // comparison; after whitespace the `<` is never one of type arguments.
+    // type, where type arguments that close follow it, and of any other
+    // generic type, where they close or run past the read. On false the
+    // runtime rewinds and the in-grammar lexer reads the `<`: a
+    // comparison's where one may follow the name (`(i<n)`, whose `i` may
+    // also be a cast's type), as the grammar ranks it above the `<` of type
+    // arguments, and else the type arguments'. Past the read a cast's type
+    // compares (`f(x as B<c, …`), and another type keeps its arguments, as
+    // it did before a comparison could follow its name. After whitespace
+    // the `<` is never one of type arguments.
     //
     // The same read runs where the token is not valid but an expression has
     // ended (NOT_IN is valid): a reparse that reuses the cast, or its type,
@@ -5341,16 +5361,28 @@ bool tree_sitter_groovy_external_scanner_scan(
     // (`y = foo as List<String`, then `>`) breaks the cast down and lexes the
     // `<` again where the token is valid. No other scanner token starts with
     // `<`.
-    if ((valid_symbols[CAST_TYPE_ARGUMENTS_OPEN] || valid_symbols[NOT_IN])
+    if ((valid_symbols[CAST_TYPE_ARGUMENTS_OPEN]
+         || valid_symbols[TYPE_ARGUMENTS_OPEN] || valid_symbols[NOT_IN])
         && !valid_symbols[ERROR_SENTINEL] && lexer->lookahead == '<') {
         advance(lexer);
         lexer->mark_end(lexer);
-        if (!cast_type_arguments_close(lexer, no_comment_close_ahead(scanner))
-            || !valid_symbols[CAST_TYPE_ARGUMENTS_OPEN]) {
+        // `<>` is a diamond, whose `<` the in-grammar lexer reads.
+        if (lexer->lookahead == '>') {
             return false;
         }
-        lexer->result_symbol = CAST_TYPE_ARGUMENTS_OPEN;
-        return true;
+        TypeArguments arguments =
+            read_type_arguments(lexer, no_comment_close_ahead(scanner));
+        if (arguments == ARGUMENTS_CLOSE
+            && valid_symbols[CAST_TYPE_ARGUMENTS_OPEN]) {
+            lexer->result_symbol = CAST_TYPE_ARGUMENTS_OPEN;
+            return true;
+        }
+        if (arguments != ARGUMENTS_COMPARE
+            && valid_symbols[TYPE_ARGUMENTS_OPEN]) {
+            lexer->result_symbol = TYPE_ARGUMENTS_OPEN;
+            return true;
+        }
+        return false;
     }
 
     // SPECIFICATION.md §6.14 — a member access directly after the first
