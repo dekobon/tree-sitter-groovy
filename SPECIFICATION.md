@@ -4842,7 +4842,12 @@ on dekobon's side is a follow-up.
 - **Performance budget**: parsing the Apache Groovy codebase
   (~250k LOC of `.groovy` test files) under 5 seconds on a modern
   laptop is the target. Tree-sitter's incremental nature makes
-  steady-state editing free.
+  steady-state editing free. Three shapes of input that parse with an
+  `ERROR` take time above linear in their length: nested
+  `foo 1, *a = …` calls, runs of `@C(,` and a space, and `case 1:`
+  lines outside a `switch` (4,000 lines take about 4 seconds);
+  `docs/divergences-from-spec.md` §29 has the measurements, and
+  `bindings/rust/tests/error_recovery_cost.rs` pins their cost.
 
 ---
 

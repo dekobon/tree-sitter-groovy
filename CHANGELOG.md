@@ -279,6 +279,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   switch. An arrow case or an empty switch body still gets the missing
   `}`. It came with the `default` keyword above
   (`docs/divergences-from-spec.md` §20).
+- Three shapes of input that parse with an `ERROR`, here and at v0.6.0,
+  take time above linear in their length, where v0.6.0 was linear:
+  nested `foo 1, *a = …` calls (3.1 s for 400 levels, 4.8 KB), runs of
+  `@C(,` and a space (3.6 s for 4,000) and `case 1:` lines outside a `switch`
+  (4.2 s for 4,000). They came with the call as a value, annotations as
+  annotation values and the `default` modifier. The new
+  `bindings/rust/tests/error_recovery_cost.rs` pins their cost
+  (`docs/divergences-from-spec.md` §29).
 - **BREAKING:** a line that ends in parentheses around a name, a dotted
   name or a primitive type (`def y = (x)`, `return (x)`), followed on
   the next line by a multi-assignment declaration that starts with
