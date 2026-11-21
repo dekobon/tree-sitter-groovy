@@ -534,8 +534,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `foo { a } { b }`, is a call and a block, where Groovy passes `{ b }`
   as one more argument; `{ } foo` is a block and a statement, where
   Groovy calls the closure; `{ a = b -> { p -> p } }` stays the closure
-  with the parameter `a`; `return` followed by `{ }` returns a closure;
-  and `as` or `in` on the next line casts or tests it. Now an `ERROR`:
+  with the parameter `a`; and `as` or `in` on the next line casts or
+  tests it. Now an `ERROR`:
   `{ }` followed by `()`, `(a, b)` or a bare `++` on the next line,
   which Groovy rejects, and `{ }` followed by nine or more comments and
   `.call()`, as the scanner reads at most eight comments after the `}`
@@ -639,6 +639,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`def foo bar`), a modifier after `def` (`def final String x`) and a
   return type after `def` (`def String m() { }`) are read as before.
   Of 266 real files, one that had an `ERROR` has none.
+- **BREAKING:** a line break after `return`, `break` or `continue` ends
+  the statement, as Groovy takes the value or the label only on the
+  keyword's line (Apache `RETURN expression?`, `BREAK identifier?`):
+  `if (c) continue` then `process(f)` on the next line is a bare
+  `continue_statement` and the call, where v0.6.0 read
+  `continue process` and the parenthesized `(f)` with no `ERROR`;
+  `return` then `foo()`, `obj.m 'x'`, `String s` or `{ }` on the next
+  line is a bare `return_statement` and that statement, where v0.6.0
+  returned the call, `obj.m`, `String` or the closure; and
+  `if (c) break` then `foo = 1`, an `ERROR`, parses. A line comment
+  after the keyword ends the statement inside it, and a block comment
+  on the line keeps the label (`break /* c */ outer`). A new external
+  token, `_jump_statement_end`, ends the statement
+  (`SPECIFICATION.md` §6.23). `throw` and `assert` still take a value
+  on the next line. No tree of 266 real files changes; 66 of 24,548
+  Java files do, each at a `return` that ends its line.
 
 ### Fixed
 

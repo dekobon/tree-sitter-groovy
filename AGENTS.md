@@ -100,7 +100,10 @@ The default branch is **`main`**.
     declaration ends on its line, the next line does not go on with it,
     or a list of names or an initializer follows, which the same reading
     of a statement's first name decides, so `foo bar` stays a call
-    (§6.21).
+    (§6.21);
+  - an empty token after `return`, `break` or `continue` where a line
+    break follows on the keyword's line, which ends the statement there,
+    as Groovy takes the value or the label only on that line (§6.23).
 
   Six externals are never emitted. Rules make them valid where the
   scanner needs to know where it is: `_string_body` inside a string

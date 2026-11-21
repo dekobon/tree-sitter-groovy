@@ -463,7 +463,7 @@ fix relative to *both* parent grammars.
 | `try` / `catch` / `finally` | port | |
 | Multi-catch | **new** | `catch (Foo \| Bar e)`. Closes murtaza64 #39. A catch parameter takes `final` and `def`, `var` or a type. |
 | Try-with-resources | **new** | `try (Foo f = …) { … }`; a resource takes `final` and `def`, `var` or a type. |
-| `return`, `break`, `continue`, `yield` | port | break/continue accept an optional label. `yield` is a keyword before an expression wherever a statement starts, not only in a switch expression, and a name elsewhere (§6.16). |
+| `return`, `break`, `continue`, `yield` | port + fix | break/continue accept an optional label. The value of `return` and the label must start on the keyword's line, as in Groovy: a line break after the keyword ends the statement (§6.23). `yield` is a keyword before an expression wherever a statement starts, not only in a switch expression, and a name elsewhere (§6.16). |
 | `throw` | port | |
 | `assert e`, `assert e : msg` and `assert e, msg` | port from murtaza64 + fix | power-assertion shape; the message's separator is `:` or `,`, on either line, as Apache's `assertStatement` takes `NL* (COLON \| COMMA) NL*`. |
 | Labeled statement | port from murtaza64 | `name: statement`. Disambiguation vs. map literal in §5.3. |
@@ -753,15 +753,16 @@ The resolution we adopt:
    another statement on the same line: `x.y a.b 'c'`, `foo a.b 'x'` and
    `foo 1 a.b 'c'` are the first statement followed by the call
    `a.b 'c'`. Groovy continues the first statement there instead
-   (`x.y(a.b).c`, item 4). After `return`, on its line or the next one,
-   the name is the returned value, so `return obj.m 'x'` is `return
-   obj.m` followed by `'x'`, as before #52; Groovy rejects the first and
-   reads the second as a `return` and a call. The same holds for a name
-   before `new`, an array type value or a command chain in parentheses
-   after `return`, and for a label after `break` or `continue`: `return foo new Foo()` is `return foo`
-   followed by the creation, and so is `return` followed by
-   `foo new Foo()` on the next line, which Groovy reads as `return null`
-   and the call `foo(new Foo())` (observed with Groovy 3).
+   (`x.y(a.b).c`, item 4). After `return` on its line the name is the
+   returned value, so `return obj.m 'x'` is `return obj.m` followed by
+   `'x'`, as before #52, where Groovy rejects it. The same holds for a
+   name before `new`, an array type value or a command chain in
+   parentheses after `return`, and for a label after `break` or
+   `continue`: `return foo new Foo()` is `return foo` followed by the
+   creation. On the next line the call is a statement of its own after a
+   bare `return`, as Groovy reads `return` followed by `obj.m 'x'` or
+   `foo new Foo()` on the next line: `return null` and the call (observed
+   with Groovy 3; §6.23).
    A capitalized last name before a quoted name and `(` is the return
    type of a method, as in Groovy at script and class level:
    `java.util.List 'foo'() { }` declares `foo`, while `obj.m 'a'() { }` passes `'a'({ })` to `m`. Groovy
@@ -1146,6 +1147,10 @@ scanner branches are avoided):
   of a lambda's brace body and of a block that opens a statement the
   scanner decides as Groovy does instead (§6.19, §6.22): there `(`, `+`,
   `-`, `{`, `[` and a slashy string on the next line start a statement.
+- **A line break after `return`, `break` or `continue`** ends the
+  statement, as Groovy takes their value or label only on the keyword's
+  line: `return` followed by `foo()` on the next line is a bare `return`
+  and the call. The scanner emits an empty token there (§6.23).
 - **Semicolon** `;` is an optional, anonymous element of every
   statement list (`repeat(choice($._statement, statementBlock($), ';'))`,
   `statementList` in `grammar.js`) and member list
@@ -1531,7 +1536,8 @@ before a relational operator that Groovy applies to the parentheses
 unterminated block comment (§6.6), the start of a lambda (§6.17),
 the end of a lambda's brace body (§6.19), the first comma of a
 multi-assignment (§6.20), the start of a typed local declaration
-(§6.21), the end of a block that opens a statement (§6.22),
+(§6.21), the end of a block that opens a statement (§6.22), the end of
+a `return`, `break` or `continue` at a line break (§6.23),
 `STRING_BODY` (§6.10),
 `TYPE_START` (§6.15), `CLOSURE_PARAMETERS_START` (§6.21),
 `TYPE_ONLY_CLOSE` (§6.11) and `BODY_BLOCK_END` (§6.17), which are
@@ -4050,10 +4056,11 @@ take declarators without an initializer after their first
 no weight. As the token opens the typed form with an initializer as well,
 the declaration and the two statements no longer fork at its type; the
 fork is left after `final` and other modifiers. `return`, `break` and
-`continue` take the token before their operand or label, as they take
-COMMAND_STATEMENT_START, so `return` then `String s` on the next line is
-the return of `String` followed by `s`, as before; Groovy reads `return`
-and the declaration. A statement that ends
+`continue` take the token before their operand or label on their line, as
+they take COMMAND_STATEMENT_START, so `return String s` is the return of
+`String` followed by `s`, as before; `return` then `String s` on the next
+line is a bare `return` and the declaration, as Groovy reads it, since a
+line break ends the `return` (§6.23). A statement that ends
 at a token only this look-ahead decides has an extent that depends on text
 past its own tokens, which a reparse that reuses the statement does not
 read again: with the token ending the `return`, `(a) { }`, `return`,
@@ -4314,9 +4321,7 @@ the line after the `}` continue the braces, as after a lambda's body
 (§6.19); a word or a literal on the line of the `}` ends the block, where
 Groovy calls the closure with it; a `{` on the line after `println 1`
 or `foo { a }` opens a block, where Groovy adds it to the call's
-arguments; `return` followed by `{ … }` on the next line returns the
-closure, where Groovy reads `return` and a block, as a line break is
-whitespace here (§5.10); a block that holds a lambda whose body is a
+arguments; a block that holds a lambda whose body is a
 closure is the closure with the lambda's assignment for a parameter, and
 `{ a = b -> c` followed by two lines of braces is too (§5.16); and more
 than eight comments between the `}`
@@ -4372,6 +4377,77 @@ tree-sitter's last resort. The lambda and declaration sequences of §6.19
 and §6.21 differ in 0, 11, 0 and 10 reparses, 0, 13, 0 and 10 before,
 with the same one without an `ERROR`, and 702,863 edits of typed
 declarations in 144, 150 before, each with an `ERROR`.
+
+### 6.23 JUMP_STATEMENT_END — implementation contract
+
+```text
+Emits iff (an empty token):
+  - it is valid, which it is only right after `return`, `break` or
+    `continue`, and the parser is not recovering from an error
+  - past spaces, tabs and line escapes, a line break or the end of
+    input follows
+Else: emits nothing; the spaces stay skipped for the branches below.
+```
+
+Apache's `RETURN expression?`, `BREAK identifier?` and
+`CONTINUE identifier?` take no `NL` before the value or the label, and
+Groovy's lexer emits `NL` at a line break outside parentheses and
+brackets, which is everywhere these statements may stand. So the value
+or the label must start on the keyword's line, and a line break after
+the keyword ends the statement. Observed with Groovy 3: `if (c) continue`
+then `process(f)` on the next line is a `continue` and the call;
+`break` then `label`, `break // c` then `label` and `break /* c */` then
+`label` are a `break` and the statement `label`; `continue label`,
+`break /* c */ label`, `break /* c` then `*/ label` and `break \` then
+`label` take the label; `return` then `foo()`, `x`, `{ foo() }`,
+`obj.m 'x'`, `foo new Foo()` or `String s` on the next line is
+`return null` and that statement. A line comment is an `NL` to Groovy's
+lexer, and so is a block comment that only whitespace follows on its
+line; one that something follows on its line is hidden, also when it
+spans lines.
+
+The grammar reads a line break as whitespace (§5.10), so the statements
+took the next line: `if (c) continue` then `process(f)` was
+`continue process` and the parenthesized `(f)`, with no `ERROR`,
+`if (c) break` then `foo = 1` an `ERROR`, and `return` then `foo()` the
+return of the call. Now `return_statement`, `break_statement` and
+`continue_statement` may end with the token. The scanner decides it before the same-line tokens (§6.9,
+§6.18, §6.8), as the first branch that skips spaces: at a line break or
+the end of input it emits the token; at anything else it falls through
+with the spaces skipped, and a comment is emitted by the comment branch
+and decided at its end by the next call, which is valid in the same
+parse state. So `break // c` holds its comment and ends after it, and a
+block comment on the line is skipped before the label or the value, as
+Groovy hides it. `throw` and `assert` still take a value on the next
+line, which Groovy rejects (`throw` then `x`).
+
+The token is empty and the statement's own last token, so the runtime
+counts the text the scanner read for it against the statement, and an
+edit that removes the line break parses the statement again. Past the
+token the scan reads on over line breaks and comments to the first
+character of the next token, which a parse from scratch does not need:
+without it, a reparse that reused the ended statement in one of two
+stack versions, after a statement that forks such as `(a) { }`, a cast
+or a call, let that version reach an `ERROR` on the next line before
+the other version did and kept the other reading, where a parse from
+scratch keeps the first. That happened in 36 of the 91,199 single edits
+of the texts in `bindings/rust/tests/incremental_reparse.rs`, each at
+the start of the line after `return` and each with an `ERROR`; with the
+read, none. Over 47,472 reparses of every single edit (and its undo) of
+nine texts with such forks before `return`, `break` and `continue`,
+none differs from a parse from scratch, where the grammar before
+differed in 128, 126 of them without an `ERROR`, each the undo of an
+edit near a `return` that took its value from a later line.
+
+Measured against the grammar before: STATE_COUNT 4726 to 4732,
+LARGE_STATE_COUNT 1815 to 1818, SYMBOL_COUNT 408 to 409, one external
+token and no conflict or precedence added. The lexer is served 20 more
+bytes over the 266 real files (1,433,325 before) and 121 more over
+2,046 of the Java files (27,451,125 before). No tree of the real files
+changes; three corpus trees change, each a pinned divergence that now
+reads as Groovy does, and 66 Java files, 42 of them without an `ERROR`,
+each at a `return` that ends its line before its value, which Java
+continues and Groovy does not.
 
 ---
 

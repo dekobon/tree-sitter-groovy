@@ -56,6 +56,17 @@ assert x == 1, 'x must be one'
 // <- keyword.control
 //             ^ string
 
+// A label is on the line of `break` or `continue`; a name on the next line
+// is the next statement.
+while (x) {
+    break outer
+    //    ^ label
+    continue
+    outer
+//  ^ variable
+//  ^ !label
+}
+
 try { x }
 // <- keyword.control
 

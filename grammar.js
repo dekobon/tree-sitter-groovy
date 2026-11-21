@@ -951,6 +951,11 @@ module.exports = grammar({
     // next statement on any line, so that the scanner decides a lambda there
     // although the braces may be a closure too.
     $._body_block_end,
+    // §6.23 — empty token after `return`, `break` or `continue` where a
+    // line break or the end of input comes before the next token, which
+    // ends the statement: Groovy takes the value or the label only on the
+    // keyword's line.
+    $._jump_statement_end,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1378,10 +1383,13 @@ module.exports = grammar({
       ')',
     ),
 
-    // §4 — return / break / continue / throw / assert. Until
-    // AUTOMATIC_SEMICOLON lands the parser will greedily consume
-    // a trailing expression onto `return` / `throw` / `assert`;
-    // explicit `;` or statement boundary is recommended in source.
+    // §4 — return / break / continue / throw / assert. A line break
+    // right after `return`, `break` or `continue` ends the statement, as
+    // Apache's `RETURN expression?` and `BREAK identifier?` take no NL
+    // before the value or the label: the scanner emits
+    // `_jump_statement_end` there (§6.23), so `return` followed by `foo()`
+    // on the next line is a bare `return` and a call. `throw` and `assert`
+    // still take a value on the next line, which Groovy rejects.
     // A statement may follow a bare `return`, `break` or `continue`, so
     // the scanner offers `_command_statement_start` and
     // `_declaration_start` before a name there (§6.14, §6.21). Taking them
@@ -1391,10 +1399,12 @@ module.exports = grammar({
     // for the name itself. Ending the statement at a token that only the
     // scanner's look-ahead decides would make its extent depend on text
     // past its own tokens, which a reparse that reuses it does not read
-    // again.
+    // again; `_jump_statement_end` is the statement's own token, so what
+    // the scanner read for it counts against the statement.
     return_statement: $ => prec.right(seq(
       'return',
       optional(choice(
+        $._jump_statement_end,
         $._expression,
         seq($._command_statement_start, $.identifier),
         seq($._declaration_start, $._expression),
@@ -1403,17 +1413,23 @@ module.exports = grammar({
 
     break_statement: $ => prec.right(seq(
       'break',
-      optional(seq(
-        optional(choice($._command_statement_start, $._declaration_start)),
-        field('label', $.identifier),
+      optional(choice(
+        $._jump_statement_end,
+        seq(
+          optional(choice($._command_statement_start, $._declaration_start)),
+          field('label', $.identifier),
+        ),
       )),
     )),
 
     continue_statement: $ => prec.right(seq(
       'continue',
-      optional(seq(
-        optional(choice($._command_statement_start, $._declaration_start)),
-        field('label', $.identifier),
+      optional(choice(
+        $._jump_statement_end,
+        seq(
+          optional(choice($._command_statement_start, $._declaration_start)),
+          field('label', $.identifier),
+        ),
       )),
     )),
 

@@ -3416,7 +3416,7 @@ def f() {
         (string_literal)))))
 
 ==================
-Return followed by a dotted call on the next line returns the receiver (known divergence)
+Return followed by a dotted call on the next line is a bare return and the call
 ==================
 
 def f() {
@@ -3431,12 +3431,12 @@ def f() {
     name: (identifier)
     parameters: (formal_parameters)
     body: (block
-      (return_statement
-        (field_access
+      (return_statement)
+      (command_chain
+        receiver: (field_access
           object: (identifier)
-          field: (identifier)))
-      (expression_statement
-        (string_literal)))))
+          field: (identifier))
+        argument: (string_literal)))))
 
 ==================
 A dotted call after a comment on the line after a statement is a command chain
@@ -4396,10 +4396,10 @@ final String s new Foo()
       object: (array_type
         (type_identifier))
       field: (identifier)))
-  (return_statement
-    (identifier))
-  (expression_statement
-    (object_creation_expression
+  (return_statement)
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
       type: (type_identifier)
       arguments: (argument_list)))
   (while_statement

@@ -27,6 +27,10 @@
 //! A `)` before a relational operator that Groovy applies to the
 //! parentheses closes no cast (§6.11), which the scanner decides from the
 //! word after it, so edits there must lex the `)` again.
+//!
+//! A line break after `return`, `break` or `continue` ends the statement
+//! (§6.23), so edits between the keyword and the next token must make the
+//! statement parse again.
 
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
@@ -57,18 +61,21 @@ use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 /// after it (§6.20), so an edit there must lex the `,` again. The four after
 /// it hold typed declarations without an initializer (§6.21), with a list, an
 /// annotation, a generic type, closure parameters that share their start,
-/// a line that goes on with the name, and a `return` before one after a
-/// statement that forks (`(a) { }`), whose start token depends on what
-/// follows the name on its line and the next, so an edit there must lex
-/// the type again, and the `return` must not end before the token. The
+/// a line that goes on with the name, and a `return` on the line before one
+/// after a statement that forks (`(a) { }`), whose start token depends on
+/// what follows the name on its line and the next, so an edit there must lex
+/// the type again. The
 /// one after it holds a typed declaration with an initializer, which the
 /// token opens too, and a `(` two lines below it, which opens a statement or
 /// a call's arguments (§6.18). The two after it hold blocks that open
 /// statements, with a call, a comment and an operator after their `}`, on its
 /// line and the next, in a file, a method, a label and a case (§6.22). The
-/// last holds typed declarations after `def`, a local, one with a line break
-/// after `def` and a field, whose start token after `def` depends on the
-/// names after the type (§6.21), so an edit there must lex the type again.
+/// one after it holds typed declarations after `def`, a local, one with a
+/// line break after `def` and a field, whose start token after `def` depends
+/// on the names after the type (§6.21), so an edit there must lex the type
+/// again. The last holds `return`, `break` and `continue` before a line
+/// break, a comment and a name, where a line break after the keyword ends
+/// the statement (§6.23), so an edit there must parse the statement again.
 const TEXTS: &[&str] = &[
     "",
     "a = 1\nb = 2\n",
@@ -109,6 +116,7 @@ const TEXTS: &[&str] = &[
     "{ a }.x()\n{ b } /* c */ + 1;\nlbl: { c }\n(1)\n",
     "def m() {\n  { a }\n  { b }\n  .c()\n}\nswitch (v) { case 1: { d } }\n",
     "def String s\ndef\nint a, b = 1\nclass C { def Foo f }\n",
+    "while (c) {\n  if (a) continue\n  f(x)\n  break l\n  break // c\n  y\n}\nreturn\nfoo()\n",
 ];
 
 /// Replacement texts for an edit. An empty one makes it a deletion.

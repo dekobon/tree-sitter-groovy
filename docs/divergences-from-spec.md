@@ -53,7 +53,8 @@ reasoning here.
 | §6.19 LAMBDA_BODY_END | **Mostly done** | an empty token after the `}` of a lambda's brace body that no expression continues, so that braces an expression goes on with are a closure that starts the body (`def v = a -> { y -> y }()`); `_lambda_body_reread`, which no rule takes, makes a reparse decide a reused body's `}` again. The scan reads at most eight comments after the `}`, and an assignment of a lambda that an operator follows reads otherwise than Groovy (see #26 below). |
 | §6.20 MULTI_ASSIGNMENT_COMMA | **Done** | the first `,` of a multi-assignment without `def` (`(a, b) = l`), turned down where the parentheses go on as a method's parameters (`def f(a, b) { }`), reading at most 16 names, so that a script method's head parses its untyped parameters once. |
 | §6.21 DECLARATION_START | **Mostly done** | an empty token before the type of a statement that is a typed declaration by Apache's `isInvalidLocalVariableDeclaration` (`String s`, `foo.Bar q`, `foo<T> x`, `int a, b`, `String s = 'a'`), emitted where a statement starts, after annotations and as a `for` init, when the declaration ends on the line, the next line does not go on with it, or an initializer follows. Decided from the same reading of the first name as `_command_statement_start`, so `foo bar` stays a call. See #27 below. |
-| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, `return` then a brace on the next line, a brace that holds a lambda whose body is a closure, and two lines of braces after a lambda where the readings differ by a step (`def c = { a = (b) -> (d) -> e` then `{ z }` twice); see #28 below. |
+| §6.22 STATEMENT_BLOCK_END | **Mostly done** | an empty token after the `}` of a block that opens a statement, in a file, a block, a closure, a colon case or after a label, decided by the scan of §6.19, so that braces an expression continues are a closure (`{ foo() }()`, `{ foo() }.call()`, `{ }` then `.call()` on the next line). Read otherwise than Groovy: a word or a literal after the `}` on its line, `as` or `in` on the next line, a brace on the line after a command with arguments, a brace that holds a lambda whose body is a closure, and two lines of braces after a lambda where the readings differ by a step (`def c = { a = (b) -> (d) -> e` then `{ z }` twice); see #28 below. |
+| §6.23 JUMP_STATEMENT_END | **Done** | an empty token after `return`, `break` or `continue` where a line break or the end of input follows on the keyword's line, so that the value or the label must start on that line, as in Groovy: `if (c) continue` then `process(f)` is a `continue` and the call. A comment on the line is skipped before the label or the value, or ends the statement where only whitespace follows it. `throw` and `assert` still take a value on the next line, which Groovy rejects. |
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | keywords (the contextual ones included), operators, literals, comments, annotations, labels, types and the names of declarations, calls, fields and parameters have captures; structural nodes (statements, blocks, argument lists, expressions as such) have none. |
@@ -169,6 +170,7 @@ calls out:
 |-----------------|---------------|
 | `pipeline {}\ndef foo = 5` (murtaza64 #37) | parses as two statements; pinned in `test/corpus/regressions.txt` |
 | `return foo\nbar` | parses as `return foo` then `bar` |
+| `return\nfoo()`, `break\nlabel`, `continue\nlabel` | parse as a bare `return`, `break` or `continue` then the next statement, as in Groovy; the scanner ends the statement at the line break (spec §6.23) |
 | `a\nb` | parses as two expression statements |
 | `foo()\n.bar()` (leading-dot chain) | parses as one method invocation (line-continuation) |
 | `a\n+ b` (leading-operator) | currently parses as one binary expression — see edge case below |
@@ -1357,7 +1359,7 @@ The Groovy column was observed by running Groovy 3.
 | `obj.m 'a' other 'b'` | `obj.m('a').other('b')` | the chains `obj.m 'a'` and `other 'b'` (spec §5.5 item 4) |
 | `x.y a.b 'c'`, `foo a.b 'x'`, `foo 1 a.b 'c'`, `foo 'a' obj.m 'b'`, `x() a.b 'c'` | a chain continuation (`x.y(a.b).c`) | the first statement and the call `a.b 'c'`; before, the first statement, `a.b` and `'c'` |
 | `return obj.m 'x'` | rejected | `return obj.m` and `'x'`, as before |
-| `return` then `obj.m 'x'` on the next line | `return`, then a call | `return obj.m` and `'x'`, as before |
+| `return` then `obj.m 'x'` on the next line | `return`, then a call | `return obj.m` and `'x'`, as before; since spec §6.23 a bare `return` and the call |
 | `java.util.List 'foo'() { }`, `java.util.List '''foo''' () { }` | a method | a method, as before |
 | `obj.m 'a'() { }`, `obj.m 'a'(b)`, `java.util.list 'a'() { }`, `java.util.List "$x"() { }` | a call with the argument `'a'(…)` | the same; before, a method declaration, or `obj.m` and `'a'(b)` |
 | `java.util.List 'foo'(1)` | a call | `java.util.List` and `'foo'(1)`, as before |
@@ -1652,7 +1654,7 @@ The Groovy column was observed by running Groovy 3.
 | `return new Foo()`, `throw new Foo()`, `assert new Foo()` | the statement | the same: a keyword of the grammar is not a receiver |
 | `return foo new Foo()`, `return foo String[].class`, `break l new X()`, `continue l new X()` | rejected | `return foo` (`break l`, `continue l`), then the argument as a statement, as before and as `return foo 1` |
 | `final String s new Foo()` | rejected | a declaration of `s`, then the creation, as before |
-| `return` then `foo new Foo()` on the next line | `return null`, then a call | `return foo`, then the creation, as before (spec §5.5 item 2) |
+| `return` then `foo new Foo()` on the next line | `return null`, then a call | `return foo`, then the creation, as before (spec §5.5 item 2); since spec §6.23 a bare `return` and the call |
 | `this new Foo()`, `it new Foo()`, `String new Foo()`, `int new Foo()` | calls (`this.this(new Foo())`) | calls; `this` is a name in this grammar |
 | `super new Foo()`, `permits new Foo()`, `record new Foo()`, `trait new Foo()`, `sealed new Foo()` | calls | the name, then the creation, as before |
 | `var new Foo()` | a call | `ERROR`, as before: `var` before a name is the keyword (spec §6.16) |
@@ -2116,7 +2118,7 @@ The Groovy column was observed by running Groovy 3.
 | `{ String a, b }`, `{ String a = 1, b }` | declarations | the same; before, closure parameters with a missing `->` |
 | `for (int i; i < n; i++)`, `for (int i, j; …)` | a declaration as the init | the same; before, an `ERROR` |
 | `for (String s : xs)`, `for (String s` then `: xs)`, `for (String s in xs)` | a for-in loop | the same, as before |
-| `return` then `String s` on the next line | `return`, then the declaration | `return String` and `s`, as before: `return`, `break` and `continue` take the token |
+| `return` then `String s` on the next line | `return`, then the declaration | `return String` and `s`, as before: `return`, `break` and `continue` take the token; since spec §6.23 a bare `return` and the declaration |
 | `return String s`; `return java.util.List<String> s` | rejected; `return` with comparisons | `return String` and `s`; `return` with comparisons, as before |
 | `foo() String s`, `x = 1 Foo bar`, `move left By steps`, `Foo T name` | `foo().String(s)`, `x = 1(Foo).bar`, `move(left).By(steps)`, `Foo(T).name` | the statement and the declaration; before, three statements, or `move left` and two |
 | `final x` then `String s` or `String s = 'a'`; `String s = y -> z`, `Runnable r = () -> { }` | two declarations | the same; before, the blank final `final x String` and `s` or `s = 'a'`; a lambda value kept that reading until the scanner told closure parameters apart (spec §6.21) |
@@ -2192,7 +2194,7 @@ The Groovy column was observed by running Groovy 3.
 | `{ a = b -> { p -> p } }` that opens a statement, also after a label and in a colon case | a block that holds the lambda | the closure with the parameter `a`, as before: a statement block's step does not make up a lambda whose body is a closure (spec §5.16) |
 | `def c = { a = b -> { p -> p }` or `if (x) { a = (b) -> { }` then eight lines of `{ z }` and `}` | the parameter `a` and the closure called with each `{ z }`; the block of the `if` and the lambda called with each `{ z }` | the same, up to 75 such lines (`LAMBDA_NESTING_DEPTH` 100); at a depth of 10 eight lines read the lambda and a block per line, or a closure for the `if`'s body |
 | `{ }` then `as T` or `in l` on the next line | a block and `as(T)`, `in(l)` | the closure cast or tested, as before |
-| `return` then `{ }` on the next line | `return`, then a block | `return { }`, as before: a line break is whitespace |
+| `return` then `{ }` on the next line | `return`, then a block | `return { }`, as before: a line break is whitespace; since spec §6.23 a bare `return` and the block |
 | `{ }` then `()`, `(a, b)` or `++` on the next line | rejected | a block and an `ERROR`; before, the closure called or incremented |
 | `{ }` then nine comments and `.call()` | the closure called | a block, then an `ERROR`: the scanner reads at most eight comments after the `}` (spec §6.19); before, the closure called |
 | `def c = { a = a -> { foo() }` then `+ 1 }` on the next line | the parameter `a`, a block and the statement `+1` | the same; before, the parameter `a` and the closure plus one |

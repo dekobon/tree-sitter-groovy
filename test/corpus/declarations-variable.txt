@@ -3086,7 +3086,7 @@ String s
     name: (identifier)))
 
 ==================
-A type after return, break and continue is their operand before a declared name too (known divergence)
+A typed local on the line after return, break and continue is a declaration
 ==================
 
 return
@@ -3101,21 +3101,21 @@ while (c) {
 ---
 
 (source_file
-  (return_statement
-    (identifier))
-  (expression_statement
-    (identifier))
+  (return_statement)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
   (while_statement
     condition: (identifier)
     body: (block
-      (break_statement
-        label: (identifier))
-      (expression_statement
-        (identifier))
-      (continue_statement
-        label: (identifier))
-      (expression_statement
-        (identifier)))))
+      (break_statement)
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (continue_statement)
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)))))
 
 ==================
 Typed local without an initializer after a statement on its line (known divergence)

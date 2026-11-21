@@ -40,9 +40,11 @@
 // unless the parentheses go on as a method's parameters; §6.21
 // DECLARATION_START, an empty token before the type of a statement's typed
 // local declaration (`String s`, `int a, b`, `String s = 'a'`), which the
-// statement's first name decides with COMMAND_STATEMENT_START; and §6.22
+// statement's first name decides with COMMAND_STATEMENT_START; §6.22
 // STATEMENT_BLOCK_END, an empty token after the `}` of a block that opens a
-// statement, decided as LAMBDA_BODY_END is where a statement may follow.
+// statement, decided as LAMBDA_BODY_END is where a statement may follow;
+// and §6.23 JUMP_STATEMENT_END, an empty token after `return`, `break` or
+// `continue` where a line break follows on the keyword's line.
 // UNTERMINATED_COMMENT (§6.6) is an empty token at the
 // first `/*` that has no `*/`, and carries the scanner's state; §6.19
 // emits it after such a `}` as well, to carry a decision past the token
@@ -59,12 +61,12 @@
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, CAST_TYPE_ARGUMENTS_OPEN,
 // NOT_IN, LAMBDA_START, BARE_LAMBDA_START, LAMBDA_BODY_END, LAMBDA_BODY_REREAD,
-// MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END and the
-// STRING_BODY check are suppressed. The keywords `record`, `trait`,
-// `sealed`, `var`, `yield`, `in` and `as` are still decided there, by the
-// same look-aheads, as are the comments, UNTERMINATED_COMMENT and
-// SLASHY_STRING_START. The order in which the scan function tries the
-// decisions is described above it.
+// MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
+// JUMP_STATEMENT_END and the STRING_BODY check are suppressed. The keywords
+// `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
+// decided there, by the same look-aheads, as are the comments,
+// UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
+// function tries the decisions is described above it.
 //
 // Two bits of state, `Scanner.no_comment_close_ahead` (§6.6) and
 // `Scanner.lambda_body_continues` (§6.19). Nothing else is kept between
@@ -136,6 +138,7 @@ enum TokenType {
     CLOSURE_PARAMETERS_START,
     TYPE_ONLY_CLOSE,
     BODY_BLOCK_END,
+    JUMP_STATEMENT_END,
     ERROR_SENTINEL,
 };
 
@@ -4983,6 +4986,9 @@ void tree_sitter_groovy_external_scanner_deserialize(
 //   3. At `<` after a cast type's name, CAST_TYPE_ARGUMENTS_OPEN (§3.2.2).
 //   4. At a member access after a statement's first name,
 //      COMMAND_PATH_START (§6.14).
+//   4a. After `return`, `break` or `continue`, past spaces, tabs and line
+//      escapes, at a line break or the end of input, JUMP_STATEMENT_END
+//      (§6.23); else on, with the spaces skipped.
 //   5. Past spaces, tabs and line escapes only: SUBSCRIPT_OPEN at `[`
 //      (§6.9); a `(` on the line where STATEMENT_PAREN is valid turned down
 //      (§6.18); at a name, COMMAND_NAMED_KEY or CONTEXTUAL_KEY (§6.8,
@@ -5086,6 +5092,37 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (valid_symbols[COMMAND_PATH_START] && !valid_symbols[ERROR_SENTINEL]
         && is_member_access_start(lexer->lookahead)) {
         return scan_command_path_start(lexer, no_comment_close_ahead(scanner));
+    }
+
+    // SPECIFICATION.md §6.23 — after `return`, `break` or `continue`, the
+    // only place JUMP_STATEMENT_END is valid, a line break or the end of
+    // input past spaces, tabs and line escapes ends the statement, as
+    // Groovy's parser takes the value or the label only on the keyword's
+    // line. The token is empty and the statement's own, so the runtime
+    // counts the line break against the statement. Anything else falls
+    // through with the spaces skipped: a comment is emitted below, and the
+    // next call, after it, decides at its end, as Groovy's lexer reads a
+    // comment that the line ends after as the line break.
+    //
+    // Past the token the scan reads on over line breaks and comments to the
+    // first character of the next token, so that the runtime counts that
+    // text against the statement too and an edit there parses it again. A
+    // reparse that reused the ended statement in one of two stack versions
+    // (after `(a) { }`, a cast or a call) let that version reach an error in
+    // the next line before the other, and kept the other reading, where a
+    // parse from scratch keeps the first.
+    if (valid_symbols[JUMP_STATEMENT_END] && !valid_symbols[ERROR_SENTINEL]) {
+        if (!skip_same_line_space(lexer, true)) {
+            return false;
+        }
+        if (lexer->eof(lexer) || is_line_break(lexer->lookahead)) {
+            lexer->mark_end(lexer);
+            bool slash = false;
+            skip_header_trivia(lexer, true, no_comment_close_ahead(scanner),
+                               NULL, &slash);
+            lexer->result_symbol = JUMP_STATEMENT_END;
+            return true;
+        }
     }
 
     // Same-line tokens: SUBSCRIPT_OPEN (§5.10) and COMMAND_NAMED_KEY
