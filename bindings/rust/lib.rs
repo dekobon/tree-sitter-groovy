@@ -52,4 +52,50 @@ mod tests {
             .set_language(&super::LANGUAGE.into())
             .expect("Error loading Groovy parser");
     }
+
+    /// The `*` of a rest binding is the `rest` field of its declarator
+    /// (`SPECIFICATION.md` §4, multi-assignment). The field is on an
+    /// anonymous node, which no output of `tree-sitter parse` labels, so the
+    /// corpus tests cannot pin it.
+    #[test]
+    fn a_rest_binding_has_its_star_in_the_rest_field() {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&super::LANGUAGE.into())
+            .expect("Error loading Groovy parser");
+        for (source, rest_index) in [
+            ("def (h, List<Integer> *t) = l\n", 1),
+            ("final (*init, last) = l\n", 0),
+        ] {
+            let tree = parser.parse(source, None).expect("parse");
+            let declaration = tree.root_node().named_child(0).expect("a statement");
+            assert_eq!(
+                declaration.kind(),
+                "multi_assignment_declaration",
+                "{source:?}"
+            );
+            let mut cursor = declaration.walk();
+            let declarators: Vec<_> = declaration
+                .named_children(&mut cursor)
+                .filter(|child| child.kind() == "variable_declarator")
+                .collect();
+            assert_eq!(declarators.len(), 2, "{source:?}");
+            for (index, declarator) in declarators.iter().enumerate() {
+                let rest = declarator.child_by_field_name("rest");
+                if index == rest_index {
+                    let star = rest.expect("a rest field");
+                    assert_eq!(star.kind(), "*", "{source:?}");
+                    assert_eq!(
+                        declarator
+                            .child_by_field_name("name")
+                            .map(|n| n.start_byte()),
+                        Some(star.end_byte()),
+                        "{source:?}",
+                    );
+                } else {
+                    assert_eq!(rest, None, "{source:?}");
+                }
+            }
+        }
+    }
 }
