@@ -973,6 +973,38 @@ fn a_comment_on_the_line_after_a_labeled_block_moves_into_it_on_reparse() {
     );
 }
 
+/// A known limitation (`SPECIFICATION.md` §6.2): the runtime reuses a node
+/// only while one stack version exists, and breaks a reused node down for a
+/// changed token after it only then. `(x) { }` keeps two alive past the
+/// statement after it, so `return x` is reused whole at the fork, and the
+/// `/` after it is lexed where a statement may start, which opens a slashy
+/// string, where a parse from scratch reads the `/` after the operand as
+/// division. `throw x` and `assert x` do the same. This test pins the
+/// difference. If it fails, the two parses agree again: remove the
+/// limitation from §6.2.
+#[test]
+fn a_slash_after_a_return_value_after_a_fork_opens_a_string_on_reparse() {
+    const TEXT: &str = "def f() {\n  (x) { }\n  return x // c\n  x\n}\n";
+    /// The offset between the slashes of `// c`, where `x` is inserted.
+    const INSERT_AT: usize = 32;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, "x");
+    assert_eq!(edited, "def f() {\n  (x) { }\n  return x /x/ c\n  x\n}\n");
+    assert!(!incremental.root_node().has_error());
+    assert!(!fresh.root_node().has_error());
+
+    let divided = "(return_statement (binary_expression left: (binary_expression";
+    let fresh = fresh.root_node().to_sexp();
+    let incremental = incremental.root_node().to_sexp();
+    assert!(fresh.contains(divided), "{fresh}");
+    assert!(
+        incremental
+            .contains("(return_statement (identifier)) (expression_statement (string_literal"),
+        "the reparse now matches the parse from scratch: {incremental}",
+    );
+}
+
 /// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a
 /// node only while one stack version exists. A typed declaration after
 /// `final` keeps two alive to its end, so the statement after it is reused

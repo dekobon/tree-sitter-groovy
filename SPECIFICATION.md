@@ -1776,6 +1776,18 @@ closure in a statement (`foo { }/2`) the statement still ends, as a
 call with a closure is a command chain there, and a slashy string
 opens the next; Groovy reads `foo({ }) / 2`.
 
+One reparse differs from a parse from scratch, by the runtime's limit
+that §6.18 records: a node is reused, and broken down for a changed
+token after it, only while one stack version exists. After a statement
+that keeps two alive, such as `(x) { }`, a `return`, `throw` or
+`assert` statement is reused whole at the fork, and the token after it
+is lexed in the state after a statement, where a slashy string may
+open. So `return x // c` edited into `return x /x/ c` reparses to
+`return x`, the string `/x/` and `c`, where a parse from scratch reads
+`return (x / x) / c`; before the change above both read the string. A
+statement that starts with a name is not reused there, and none is
+without the fork. `bindings/rust/tests/incremental_reparse.rs` pins it.
+
 ### 6.3 GSTRING — implementation contract
 
 Double-quoted strings, triple-double-quoted strings, slashy, and

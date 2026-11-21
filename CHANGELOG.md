@@ -807,7 +807,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   changes; of 24,548 Java files, 4 trees without an `ERROR` change,
   each to Groovy's reading of a line with a division before a second
   `/`, another division or a comment, and one more parses without an
-  `ERROR` (`SPECIFICATION.md` §6.2).
+  `ERROR` (`SPECIFICATION.md` §6.2). After a statement that forks, such
+  as `(x) { }`, a reparse can still read the string where a parse from
+  scratch divides (`return x // c` edited into `return x /x/ c`), a
+  limit of the runtime's node reuse that §6.2 records.
 - **BREAKING:** a cast whose operand is a name on the line of its `)`
   is the cast where the line could also split after the `)`, as Groovy
   reads it. In a type body, `def k = (Foo) x` then `def m() { }`,
