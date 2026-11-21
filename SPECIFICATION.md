@@ -851,7 +851,8 @@ The resolution we adopt:
    `foo 1, *a = foo 2` is Groovy's `foo(1, *(a = foo(2)))`. A first
    argument is never a spread: `foo *a` is a product, as in Groovy, and
    `foo *a, 1`, which Groovy calls with the spread first, is an `ERROR`.
-   A spread map (`foo a: 1, *:m`) is an `ERROR` here and in parentheses.
+   A spread map is taken after a comma (`foo a: 1, *:m`, §5.11) and is
+   no first argument either (`foo *:m`, an `ERROR`).
    A named-arg key is an identifier; Apache also accepts string keys
    (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
    nested command chains, other than as the value of an assignment
@@ -1966,7 +1967,17 @@ Known limitations:
   value it is one, and joins (§6.14). The value of a named argument is
   one, so it joins even as the only argument: `foo a: 1` followed by `-b`
   has the value `1 - b`. Expressions outside command chains already
-  behave this way: `def x = 'b'` followed by `-a` is a subtraction.
+  behave this way: `def x = 'b'` followed by `-a` is a subtraction. A
+  spread after a comma takes the whole expression after its `*` (§5.5
+  item 3), so it joins the same way: `foo 1, *a` followed by `+ 1` is
+  `foo(1, *(a + 1))`, where Groovy calls `foo(1, *a)` and reads `+1` as
+  a statement (observed with Groovy 3), as it does for `foo 1, a`
+  followed by `+ 1`. Two forms Groovy rejects parse without an `ERROR`
+  for the same reason: a `*` that ends the line (`foo 1, *` followed by
+  `a`), as a line break is whitespace after a unary operator too
+  (`foo 1, -` followed by `a`), and a `,` that opens the next line
+  (`foo 1, *a` or `foo 1, a` followed by `, 2`), which goes on with the
+  call.
 - A dangling comma takes the first token of the next statement. `foo a: 1,`
   followed by a blank line and `bar b: 2` parses without an `ERROR`, as the
   chain `foo a: 1, bar` followed by the labeled statement `b: 2`. The

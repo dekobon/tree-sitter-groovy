@@ -135,7 +135,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   was an `ERROR`, and the nest took time cubic in its depth (3.0 s for
   400 levels); it is linear (0.5 ms). `foo *a` is still a product, as
   in Groovy; still an `ERROR`: a spread as the first argument
-  (`foo *a, 1`), which Groovy takes, and a spread map (`foo a: 1, *:m`).
+  (`foo *a, 1`), which Groovy takes. As for any argument after a comma,
+  a line that can continue an expression joins the spread
+  (`foo 1, *a` then `+ 1` is `*(a + 1)`, where Groovy reads two
+  statements), and `foo 1, *` then `a`, and `foo 1, *a` then `, 2`,
+  parse without an `ERROR`, where Groovy rejects both
+  (`SPECIFICATION.md` §6.8).
 - A parenthesis-free call is accepted in parentheses
   (`(sh script: 'x').trim()`, `def x = (foo 1)`), as the condition of
   `if`, `while` and `do`, a `switch` value and a `synchronized` lock

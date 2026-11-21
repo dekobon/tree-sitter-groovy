@@ -892,6 +892,39 @@ foo 1, *:m
       value: (identifier))))
 
 ==================
+A spread after a comma goes on onto the next line where Groovy ends the call (known divergence)
+==================
+
+foo 1, *a
++ 1
+foo 1, *
+a
+foo 1, *a
+, 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (spread_arguments
+      value: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (spread_arguments
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (spread_arguments
+      value: (identifier))
+    argument: (number_literal)))
+
+==================
 Spread as the first of several arguments of a command chain is unsupported
 :error
 ==================
