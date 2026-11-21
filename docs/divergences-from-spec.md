@@ -151,6 +151,16 @@ two-token shape (`text` stopping before `$`, plus the
 scanner-driven state machine would produce — but downstream
 tooling sees the same children either way.
 
+The lazy form `"${-> x}"` (Apache's `gstringValue` takes a `closure`)
+holds a `closure_parameters` node before its `value`, a leaf whose text
+is `->`, where a closure's `closure_parameters` holds an anonymous `->`
+child (`{ -> x }`). With no value, `"${-> }"`, which Groovy 3 takes as a
+closure with no statements, the `value` is a `MISSING` `true`. A
+closure with parameters there (`"${w -> w << x}"`) is an `ERROR`. And
+`"$-> x"`, which Groovy 3's lexer rejects at the `-`, parses with no
+`ERROR` as two string fragments, the `$` the literal one of the fallback
+above, as at v0.6.0.
+
 ---
 
 ## 3. AUTOMATIC_SEMICOLON — realised via statement-boundary structure
@@ -2150,6 +2160,7 @@ The Groovy column was observed by running Groovy 3.
 | `Foo f =~ /x/` | `Foo(f =~ /x/)` | the declaration of `f` with the value `~/x/`, as before |
 | `String /* c */ s`, `int/*unsigned*/ mask;`, `String /* a` then `b */ s` | a declaration | the same; before, two statements and the comment |
 | `foo /* c */ bar`, `Foo /* c */ new Bar()` | a call | two statements and the comment, as before (spec §6.14) |
+| `Foo /* c */ x.y`, `foo.bar /* c */ x` | `Foo(x.y)`, `foo.bar(x)` (Groovy 3) | two statements and the comment, as at v0.6.0: a comment between the receiver and the first argument is not read past (spec §6.14) |
 | `List</* c */String> l`, `Map<K,` then `V> m` on the next line | declarations | an `ERROR`: the look-ahead reads type arguments on one line, without comments |
 | `{ String a, b -> }`, `{ String a, b = 1 -> }`, `{ String a` then `-> }`, `{ String a, b -> }` with `b` on the next line | closure parameters | the same, as before |
 | `{ String a, b }`, `{ String a = 1, b }` | declarations | the same; before, closure parameters with a missing `->` |
@@ -2165,6 +2176,8 @@ The Groovy column was observed by running Groovy 3.
 | `def foo bar`, `def final String x = 1`, `def static String x = 1` in a type body, `def String m() { }` | a declaration of `bar`; of `x`; a field `x`; a method `m` | `def foo` and `bar`; `def final` and the declaration of `x`; the fields `def static` and `String x = 1`; `def String` and the call `m() { }`, or a field and a constructor in a type body, as before |
 | `var String s = 'a'`, `var String t`, `final var List<String> xs = []` | a declaration of `s` (`t`, `xs`) with the type, as `var` is a modifier like `def` (Apache's `modifier` lists `VAR`) | the same; before, `var String` and the statement `s = 'a'` (`t`), with no `ERROR` |
 | `var String` then `v = 1` on the next line | `var String`, then the assignment | the same |
+| `def <T> T m() { }`, also in a type body (`def <T> T unwrap(Class<T> c)`) | a method with type parameters (Groovy 3) | an `ERROR` at `def` and a method without it, as at v0.6.0: the method's head takes type parameters after modifiers but not after `def`. The two files of 266 real ones that have an `ERROR` both hold this form. Not fixed here, as an open pull request edits the same rule |
+| `for (var String x : xs)`, `for (def String x : xs)`, `try (var String r = open())`, `try (def String r = open())` | a loop variable, a resource, with the type (Groovy 3) | an `ERROR` at the type in each, as at v0.6.0, where the `for` with `var` was one `ERROR` for the whole loop: `def` and `var` take a type only where a statement or a member starts (spec §6.21) |
 | `@A foo bar` | a declaration | an `ERROR`, as before: after annotations a lowercase type needs `<` or `[` |
 | `try (String s) { }` | a resource declaration | an `ERROR`, as before |
 | `static String s`, `private String s` | a declaration | an `ERROR`, as before |
@@ -2393,6 +2406,7 @@ The Groovy column was observed by running Groovy 3.
 | `return` then `foo { }[0]` or `foo { } + 1` on the next line | `return`, then the call subscripted or added | a bare `return`, then the same as the statement (spec §6.23); at v0.6.0 the return of the subscripted or added call |
 | `foo { }()`, `foo { }?[0]`, `foo { }..x`, `foo { } ? a : b`, `foo { } == 1`, `foo { } / 2`, `foo { } * 2`, `foo { } ?: 2` | the call called, subscripted, in a range, a conditional, compared, divided, multiplied, an Elvis operand | an `ERROR`, as before |
 | `return foo { }.bar 1`, `break foo { }.bar()` | rejected | `return foo { }.bar` and `1`; `break foo` and `{ }.bar()`, as before |
+| `x = foo { }.bar 1`, `def x = foo { }.bar 1` | `x = foo({ }).bar(1)` (Groovy 3) | the assignment of `foo { }.bar` and the statement `1`, with no `ERROR`, as at v0.6.0: the tokens of spec §6.24 are emitted only where a statement starts, so a value's parenthesis-free call (spec §6.14) takes no receiver that starts with a closure call |
 
 No tree that parsed without an `ERROR` at v0.6.0 changes: of the corpus,
 Java and shape inputs none changes, and of the 266 real files one, from
