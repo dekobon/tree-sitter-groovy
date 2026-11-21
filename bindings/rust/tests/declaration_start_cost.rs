@@ -26,10 +26,10 @@ const CHUNK_BYTES: usize = 64;
 /// Most the bytes served per input byte may grow from the smaller input
 /// to the larger. A bounded look-ahead keeps the two about equal
 /// (measured: 41 and 43 bytes per byte for the nest of lists, 45 and 46
-/// unclosed, 50 and 51 for the broken lines, 60 and 64 for the nest of
+/// unclosed, 26 and 26 for the broken lines, 60 and 64 for the nest of
 /// declarations); one that reads to the end of the nest grows with it,
-/// eightfold here (254 and 2,004, 251 and 2,001, 501 and 4,001, and 254
-/// and 2,004 without the bound).
+/// eightfold here (253 and 2,003, 251 and 2,001, 251 and 2,001, and 253
+/// and 2,003 without the bound).
 const MAX_GROWTH: f64 = 1.5;
 
 /// Parses `source` and returns the bytes served to the parser per byte of
@@ -81,9 +81,12 @@ fn unclosed_nested_lists_with_defaults_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}\n", "{ T a, b = ".repeat(n)));
 }
 
+/// The lines open closures: the look-ahead reads an initializer to the
+/// `->` only where closure parameters may start, so outside a closure the
+/// lines cost 2 bytes per byte with the bound or without it.
 #[test]
 fn broken_lists_on_many_lines_are_read_a_bounded_number_of_times() {
-    assert_linear(|n| "x\nT a, b = (1,\n".repeat(n));
+    assert_linear(|n| "x\n{ T a, b = (1,\n".repeat(n));
 }
 
 #[test]
