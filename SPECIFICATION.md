@@ -2206,6 +2206,16 @@ differ:
   type `sealed` named `public` and a class in a member list; Groovy 4
   reads a sealed class (read off `GroovyParser.g4`). At v0.6.0 both
   were an `ERROR`.
+- `sealed` at the end of a line before any other member is a name.
+  `private sealed` followed by `def run() { }` or `int x = 1` on the
+  next line is a field `sealed` and then that member, as in Groovy 3,
+  where `sealed` is no keyword (observed). Groovy 4 to 6 read
+  `private sealed` as the modifiers of that member: their `modifiers`
+  takes line breaks between modifiers and `sealed` is one (read off
+  `GroovyParser.g4` 4.0.x, 6 and master). The grammar takes `sealed`
+  only before `class`, `interface` or `trait`, so the keyword would make
+  such a member an `ERROR`. At v0.6.0 `sealed` was an `ERROR` inside
+  the member.
 
 One residual does not involve a line break. A name followed by `(` is
 not a trait header, so `trait T(int x) { }` is a method `T` with

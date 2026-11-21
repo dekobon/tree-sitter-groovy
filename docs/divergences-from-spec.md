@@ -963,6 +963,7 @@ so where Groovy relies on those the readings differ:
 | `private boolean sealed` then `class Inner { }` on the next line | field `sealed` and a class (read off the 4.0.x grammar) | field `boolean` and a sealed class, as at v0.6.0 |
 | `trait T` then `{ }` on the next line, in a member list | field `T` of type `trait` and an initializer, which then fails to resolve (observed, Groovy 3) | `trait_declaration` |
 | `sealed` then `public class C { }` on the next line | sealed class (read off the 4.0.x grammar) | name `sealed` and a class at statement level; field of type `sealed` named `public` and a class in a member list; `ERROR` at v0.6.0 |
+| `private sealed` then `def run() { }` or `int x = 1` on the next line, in a class body | Groovy 4 to 6: that member with the modifiers `private sealed`, as `modifiers` takes line breaks between modifiers (read off the 4.0.x, 6 and master grammars); Groovy 3, where `sealed` is no keyword: field `sealed` and the member (observed) | field `sealed` and the member, Groovy 3's reading, as the grammar takes `sealed` only before `class`, `interface` or `trait`; at v0.6.0 the member with `sealed` an `ERROR` in it |
 | `private boolean sealed` then `static class D { }` on the next line | field `sealed` and a class (read off the 4.0.x grammar) | the same; `ERROR` at v0.6.0 |
 
 A modifier after `sealed` is an `ERROR` while the modifier order is

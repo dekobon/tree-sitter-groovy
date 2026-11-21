@@ -704,7 +704,7 @@ class M {
         body: (block)))))
 
 ==================
-Members that open with trait or sealed (#73)
+Members that open with trait or sealed (#73) (known divergence)
 ==================
 
 class N {
