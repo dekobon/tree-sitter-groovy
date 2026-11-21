@@ -3906,3 +3906,63 @@ String s
   (local_variable_declaration
     type: (type_identifier)
     name: (identifier)))
+
+==================
+A block comment between a declaration's type and its name is trivia
+==================
+
+String /* c */ s
+int/*unsigned*/ a, b
+String[] /* c */ xs
+String /* a
+b */ t
+def String /* c */ u = 1
+foo /* c */ bar
+class C {
+  private def Foo /* c */ foo
+  def m() { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier)
+    value: (number_literal))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (block_comment)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

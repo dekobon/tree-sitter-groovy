@@ -225,9 +225,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   empty scanner token, `_declaration_start`, opens the declaration
   where a statement starts, after annotations and as a `for` init, when
   it ends on its line, the next line does not go on with it, or an
-  initializer follows (`SPECIFICATION.md` §6.21). Not declarations, as
-  in v0.6.0: a comment between the type and the name
-  (`String /* c */ s`), a lowercase type after annotations
+  initializer follows (`SPECIFICATION.md` §6.21). A block comment
+  between the type and the name, also one that spans lines, is trivia
+  there, as Groovy's lexer hides it (`String /* c */ s`,
+  `int/*unsigned*/ mask;`, `def String /* c */ s = 1`); a line comment
+  ends the line. Not declarations, as in v0.6.0: a lowercase type
+  after annotations
   (`@A foo bar`), a space before `<` (`List <String> xs`), modifiers
   other than `final` (`static String s` is an `ERROR`) and a `try`
   resource without an initializer.

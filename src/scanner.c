@@ -2969,18 +2969,20 @@ static bool declaration_end_follows(
     return false;
 }
 
-// After the type of a declaration: whether, after spaces, tabs and line
-// escapes, a name follows on the line, no keyword Groovy reserves, and then
-// the end of a declaration or its initializer (`declaration_end_follows`,
-// which `valid_symbols` passes to). Between the type and the name nothing
-// else is skipped, as between a receiver and a name argument (§6.14).
+// After the type of a declaration: whether a name follows on the line, no
+// keyword Groovy reserves, and then the end of a declaration or its
+// initializer (`declaration_end_follows`, which `valid_symbols` passes to).
+// Between the type and the name the extras of a line are skipped, block
+// comments among them, which may span lines: Groovy's lexer hides them and
+// the line breaks in them (`String /* c */ s`). A line comment ends the line.
 static bool declared_name_follows(
     TSLexer *lexer,
     unsigned *items,
     const bool *valid_symbols,
     bool no_close_ahead
 ) {
-    if (!skip_same_line_space(lexer, false)
+    bool slash = false;
+    if (!skip_line_extras(lexer, true, no_close_ahead, &slash) || slash
         || !is_identifier_start(lexer->lookahead)) {
         return false;
     }
@@ -3311,9 +3313,22 @@ static bool scan_statement_start(
                 wants_array && (capitalized || is_primitive_type(word, len)),
                 type_may_start, no_close_ahead);
     }
-    if ((upper || is_primitive_type(word, len))
-        && is_identifier_start(lexer->lookahead)) {
-        return scan_typed_statement_start(lexer, valid_symbols, no_close_ahead);
+    if (upper || is_primitive_type(word, len)) {
+        if (is_identifier_start(lexer->lookahead)) {
+            return scan_typed_statement_start(lexer, valid_symbols,
+                                              no_close_ahead);
+        }
+        // A comment, a form feed or a vertical tab before the name: only a
+        // declaration reads past one, as a call's first argument does not
+        // (§6.14).
+        int32_t c = lexer->lookahead;
+        if (c == '/' || c == '\f' || c == '\v') {
+            unsigned items = 0;
+            lexer->result_symbol = DECLARATION_START;
+            return valid_symbols[DECLARATION_START]
+                && declared_name_follows(lexer, &items, valid_symbols,
+                                         no_close_ahead);
+        }
     }
     // `var`, `yield`, `in` or `as` whose own token was not valid here takes
     // no name either: whether that token is valid depends on the token

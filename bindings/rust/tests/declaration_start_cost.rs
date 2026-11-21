@@ -93,3 +93,18 @@ fn broken_lists_on_many_lines_are_read_a_bounded_number_of_times() {
 fn nested_closure_valued_declarations_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}{}\n", "Closure c = { ".repeat(n), "}".repeat(n)));
 }
+
+/// A block comment between the type and the name is read by the look-ahead
+/// as trivia, once per declaration.
+#[test]
+fn comments_between_type_and_name_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| "T /* c */ a\n".repeat(n));
+    assert_linear(|n| format!("{}{}\n", "T /* c */ a, b = { ".repeat(n), "}".repeat(n)));
+}
+
+/// A comment that spans lines between the type and the name is read once
+/// by the look-ahead, however long it is.
+#[test]
+fn a_long_comment_between_type_and_name_is_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("T /*{}*/ a\n", " c\n".repeat(n)));
+}

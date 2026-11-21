@@ -2130,7 +2130,8 @@ The Groovy column was observed by running Groovy 3.
 | `InputStream in` then `open()` or `in.close()` | the declaration and a call | the same; before, `InputStream in open()` and `InputStream in in.close()` |
 | `Foo<<Baz>> result`, `this.Foo x` | `(Foo << Baz) >> result`, `this.Foo(x)` | the same; the field access and the name, as before |
 | `Foo f =~ /x/` | `Foo(f =~ /x/)` | the declaration of `f` with the value `~/x/`, as before |
-| `String /* c */ s` | a declaration | two statements and the comment, as before |
+| `String /* c */ s`, `int/*unsigned*/ mask;`, `String /* a` then `b */ s` | a declaration | the same; before, two statements and the comment |
+| `foo /* c */ bar`, `Foo /* c */ new Bar()` | a call | two statements and the comment, as before (spec §6.14) |
 | `List</* c */String> l`, `Map<K,` then `V> m` on the next line | declarations | an `ERROR`: the look-ahead reads type arguments on one line, without comments |
 | `{ String a, b -> }`, `{ String a, b = 1 -> }`, `{ String a` then `-> }`, `{ String a, b -> }` with `b` on the next line | closure parameters | the same, as before |
 | `{ String a, b }`, `{ String a = 1, b }` | declarations | the same; before, closure parameters with a missing `->` |
@@ -2162,8 +2163,8 @@ fallback, and of 394,000 fuzzed inputs 10 that Groovy accepts went from
 no `ERROR` to one (spec §6.21).
 
 **Action**: the forms Groovy takes that stay as before need the
-statement after another on its line to continue it (#25 above), comments
-and form feeds between a type and its name, a lowercase type after
+statement after another on its line to continue it (#25 above), a
+lowercase type after
 annotations, a resource without an initializer, and type arguments
 across lines or after a space, each of which the scanner could read at
 more cost.

@@ -4177,9 +4177,10 @@ type follows by Apache's rule on the spelling, and then a declared name:
     the `]` before it); or a dotted name whose last name starts with an
     upper-case letter; a dotted name whose first name is `this` is none
     (`this.Foo x` is Groovy's call `this.Foo(x)`);
-  - between the type and the name only spaces, tabs and line escapes; the
-    name is none that names no variable in Groovy: a keyword Groovy
-    reserves, a primitive type name, `void`, `this` or `super`;
+  - between the type and the name spaces, tabs, line escapes, form feeds,
+    vertical tabs and block comments (which may span lines); the name is
+    none that names no variable in Groovy: a keyword Groovy reserves, a
+    primitive type name, `void`, `this` or `super`;
   - after the name, past spaces, tabs, line escapes, form feeds, vertical
     tabs and block comments (which may span lines, as Groovy's lexer hides
     a line break in one): the end of input, `;`, `}`, the word `else`, a
@@ -4327,8 +4328,25 @@ declarations), shifts (`Foo<<Baz>> result`), a path from `this`
 (`Foo f =~ /x/`, the declaration of `f` with the value `~/x/`, Groovy's
 `Foo(f =~ /x/)`) are read as before.
 
-Not taken, each read as before: a comment or a form feed between the type
-and the name (`String /* c */ s`, which Groovy declares), annotations
+A block comment between the type and the name is trivia, as after the
+name: Groovy's lexer hides it, and the line breaks in it
+(`String /* c */ s`, `String /* a` then `b */ s`, `int/*unsigned*/ mask;`
+are Groovy 3's declarations). Only the declaration reads past it: after a
+capitalized or a primitive type name the comment makes the statement no
+call (`Foo /* c */ new Bar()` stays `Foo` and the creation, where Groovy
+calls `Foo`; §6.14), and a lowercase name before one stays a statement of
+its own (`foo /* c */ bar`). A line comment there ends the line, and a
+form feed or a vertical tab is read as a space, as the grammar's extras
+read it (Groovy's lexer rejects both). The look-ahead reads the comment
+once per declaration: lines of `T /* c */ a` cost 2.67 bytes asked per
+input byte at 500 and 4,000 lines, a nest of `T /* c */ a, b = {` 36.1
+and 37.3, and a comment of 500 or 4,000 lines between `T` and `a` 2.00
+(`bindings/rust/tests/declaration_start_cost.rs`). No tree of the corpus,
+of 266 real files or of 4,000 shape inputs changes; of 24,548 Java files
+two do, each at `int/*unsigned*/ mask;` and the like, which are now
+declarations.
+
+Not taken, each read as before: annotations
 before a lowercase type with no `<` or `[` (`@A foo bar`, Groovy's
 declaration), type arguments that span lines, a name after the type on
 the next line (`String` then `s`, two statements in Groovy too), a
