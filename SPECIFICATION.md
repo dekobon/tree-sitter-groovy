@@ -4629,9 +4629,19 @@ reduction; the scanner decides before the name instead, as for §6.14.
 
 The braces are counted on Groovy's tokens, as §6.11 counts brackets
 before a cast: strings whole, a `${…}` with the strings in it, a slashy
-string where an operand may start, a dollar-slashy string and block
+string where Groovy's lexer opens one, a dollar-slashy string and block
 comments, through a `BoundedLexer` that ends at the line break until the
-`}`. A string, a comment or an interpolation that runs past the line, a
+`}`. Groovy's lexer reads `/` as division only after the last token of an
+operand (GroovyLexer.g4 `isRegexAllowed`: a name, a number, a string,
+`this`, `true`, `false`, `null`, `)`, `]`, `}`, `++`, `--`), so after a
+keyword a `/` opens a string (`foo { return /}/ }.bar()`, `assert`,
+`case`, `throw`, `yield`, `else`, `do`); `in` and `as` are the operators
+after an operand and names elsewhere, and a keyword after a member
+access is a name, as Groovy 6 reads them (`isSlashyForbidden`). The
+words that the grammar reserves and Groovy does not (`_`, `permits`,
+`pipeline`), and `super`, end an operand. Read as a division,
+`foo { return /}.x 1/ }` was an `ERROR` and `foo { assert /}.x/ }` a
+`method_invocation` without an access. A string, a comment or an interpolation that runs past the line, a
 line comment and a line escape end the read as a brace that does not
 close does, and so does the bound. After the `}` the view reads on past
 line breaks and comments, which Groovy's lexer hides before an access.
@@ -4678,8 +4688,7 @@ the label `foo`, as `return obj.m 'x'` and `return foo new Foo()` are
 call without the token.
 
 Not read: braces that span lines (`foo {` then `}.bar()`), braces and
-accesses past the bound, a slashy string after a keyword, which the read
-takes for a division (`foo { return /}/ }.bar()`), and the names whose own
+accesses past the bound, and the names whose own
 tokens the scanner decides at a statement's start (`record`, `trait`,
 `sealed`, `var`, `yield`, `in` and `as` where valid) and the grammar's
 keywords (`super { }.bar()`). Each stays as before, an `ERROR` but for

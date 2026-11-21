@@ -3645,20 +3645,56 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
 // measured is 66 characters.
 static const unsigned CLOSURE_CALL_LOOKAHEAD_CHARACTERS = 128;
 
+// SPECIFICATION.md §6.24 — whether a `/` after a word that `read_word`
+// returned opens a slashy string, as Groovy's lexer tells
+// (GroovyLexer.g4 `isRegexAllowed`, which reads division only after an
+// operand's last token): after a keyword, which ends no operand
+// (`return /a/`, `assert /a/`, `case`, `throw`, `yield`, `else`, `do`),
+// but not after a name, a number, `this`, `super`, `true`, `false` or
+// `null`. `in` and `as` are operators after an operand (`a in /x/`) and
+// names elsewhere, and a word after a member access is a name
+// (`x.return / 2`), as Groovy 6 reads them (`isSlashyForbidden`); so are
+// `_`, `permits` and `pipeline`, which the grammar reserves and Groovy
+// does not.
+static bool slashy_may_follow_word(
+    const char *word,
+    unsigned len,
+    bool after_operand,
+    bool member
+) {
+    if (member) {
+        return false;
+    }
+    if (word_is(word, len, "in") || word_is(word, len, "as")) {
+        return after_operand;
+    }
+    if (word_is(word, len, "yield")) {
+        return true;
+    }
+    return is_grammar_keyword(word, len) && !is_literal_word(word, len)
+        && !word_is(word, len, "super") && !word_is(word, len, "_")
+        && !word_is(word, len, "permits") && !word_is(word, len, "pipeline");
+}
+
 // SPECIFICATION.md §6.24 — from the `{` after a statement's first name,
 // through a view that ends at the line break: whether the braces close there.
 // They are counted on Groovy's tokens, as `next_line_paren_ends_cast` counts
 // brackets: strings whole (`skip_string`, a `${…}` with the strings in it), a
-// slashy string where an operand may start (`slashy_body_follows`), a
-// dollar-slashy string (`skip_dollar_slashy_string`) and block comments as
-// trivia. A string, a comment or an interpolation that runs past the line
-// ends the read as an unclosed brace does, and so does a line comment.
+// slashy string where Groovy's lexer opens one (`slashy_body_follows`): after
+// an operator, a bracket that opens or a keyword (`slashy_may_follow_word`),
+// not after an operand or `++` and `--`; a dollar-slashy string
+// (`skip_dollar_slashy_string`) and block comments as trivia. A string, a
+// comment or an interpolation that runs past the line ends the read as an
+// unclosed brace does, and so does a line comment.
 static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
     advance(input);
     unsigned depth = 1;
-    // Whether an operand may start here, as in `next_line_paren_ends_cast`:
-    // a `/` there opens a slashy string.
+    // Whether an operand may start here, so that a `/` opens a slashy
+    // string.
     bool operand = true;
+    // Whether the last token was a member access, after which a keyword is
+    // a name.
+    bool member = false;
     while (depth > 0) {
         bool slash = false;
         if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
@@ -3678,25 +3714,43 @@ static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
             } else {
                 operand = true;
             }
+            member = false;
             continue;
         }
         int32_t c = input->lookahead;
-        operand = !is_identifier_char(c) && c != '\'' && c != '"'
-            && c != ')' && c != ']' && c != '}' && c != '.';
         if (c == '\'' || c == '"') {
             if (!skip_string(input)) {
                 return false;
             }
+            operand = false;
+            member = false;
             continue;
         }
         if (is_identifier_char(c)) {
-            if (read_dollar_slashy_open(input)
-                && !skip_dollar_slashy_string(input, NULL)) {
-                return false;
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(input, word, sizeof word);
+            if (opens_dollar_slashy(word, len, input)) {
+                if (!skip_dollar_slashy_string(input, NULL)) {
+                    return false;
+                }
+                operand = false;
+            } else {
+                operand = slashy_may_follow_word(word, len, !operand, member);
             }
+            member = false;
             continue;
         }
         advance(input);
+        if ((c == '+' || c == '-') && input->lookahead == c) {
+            // `++` and `--` end an operand for Groovy's lexer
+            // (REGEX_CHECK_ARRAY), after it or before one.
+            advance(input);
+            operand = false;
+            member = false;
+            continue;
+        }
+        operand = c != ')' && c != ']' && c != '}' && c != '.';
+        member = c == '.' || (member && (c == '&' || c == '@'));
         if (c == '{') {
             depth++;
         } else if (c == '}') {

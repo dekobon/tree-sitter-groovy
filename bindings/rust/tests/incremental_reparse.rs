@@ -982,6 +982,7 @@ const CLOSURE_CALL_TEXTS: &[&str] = &[
     "a { b { c { } }.d() }.e()\n",
     "foo { }.bar 1\nbaz()\n",
     "foo { }\n.bar x: 1\n",
+    "foo { return /}/ }.bar(baz 1)\n",
 ];
 
 #[test]

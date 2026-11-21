@@ -1553,13 +1553,98 @@ foo { }..x
 ---
 
 ==================
-A call with a closure whose slashy string follows a keyword before a member access is unsupported
-:error
+The braces of a call with a closure take a slashy string after a keyword and a division after ++ before a member access
 ==================
 
 foo { return /}/ }.bar()
+foo { assert /}/ }.bar()
+foo { a in /}/ }.bar()
+foo { x++ / 2 }.bar()
 
 ---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (return_statement
+              (string_literal
+                (string_fragment)))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (assert_statement
+              (string_literal
+                (string_fragment)))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (membership_expression
+                element: (identifier)
+                collection: (string_literal
+                  (string_fragment))))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (binary_expression
+                left: (update_expression
+                  operand: (identifier))
+                right: (number_literal)))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+
+==================
+A slashy string after a keyword in a call's closure that no member access follows keeps the command chain
+==================
+
+foo { return /}.x 1/ }
+foo { assert /}.x/ }
+foo { a in /}.x 1/ }
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (return_statement
+        (string_literal
+          (string_fragment)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (assert_statement
+        (string_literal
+          (string_fragment)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (expression_statement
+        (membership_expression
+          element: (identifier)
+          collection: (string_literal
+            (string_fragment)))))))
 
 ==================
 A contextual keyword with a closure before a member access is unsupported

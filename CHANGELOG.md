@@ -841,9 +841,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   files one that had an `ERROR` (`pom {}.writeTo(…)`) has none, and no
   tree without an `ERROR` changes. The scanner decides before the name,
   reading the braces on their line on Groovy's tokens for at most 128
-  characters, so braces that span lines (`foo {` then `}.bar()`) stay
-  an `ERROR`, and an operator other than an access after the `}`
-  (`foo { }[0]`, `foo { } + 1`) is read as before
+  characters, a slashy string after a keyword included
+  (`foo { return /}/ }.bar()`), so braces that span lines (`foo {` then
+  `}.bar()`) stay an `ERROR`, and an operator other than an access after
+  the `}` (`foo { }[0]`, `foo { } + 1`) is read as before
   (`SPECIFICATION.md` §6.24, `docs/divergences-from-spec.md` §30).
 
 ## [0.6.0] - 2026-11-12
