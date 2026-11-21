@@ -95,6 +95,10 @@ path = "bindings/rust/tests/next_line_cast_cost.rs"
 name = "literal_argument_cost"
 path = "bindings/rust/tests/literal_argument_cost.rs"
 
+[[test]]
+name = "error_recovery_cost"
+path = "bindings/rust/tests/error_recovery_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 
