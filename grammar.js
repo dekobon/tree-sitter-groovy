@@ -1862,11 +1862,13 @@ module.exports = grammar({
         // `def` is a modifier in Apache's `variableDeclaration`, so a type
         // may follow it (`private def Foo foo`). The scanner opens that
         // type as it opens a typed local's (§6.21), so `def x` keeps its
-        // name without a fork at every `def`.
+        // name without a fork at every `def`. `var` is a modifier as well
+        // (Apache's `modifier`), which the scanner emits before a name.
         choice(
-          'def',
+          choice('def', varKeyword($)),
           field('type', $._type),
-          seq('def', $._declaration_start, field('type', $._type)),
+          seq(choice('def', varKeyword($)), $._declaration_start,
+            field('type', $._type)),
         ),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),

@@ -759,8 +759,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `var String t`, `final var List<String> xs = []`), as `var` is a
   modifier in Apache's `modifier` rule; at v0.6.0 they were
   `var String` and the statement `s = 'a'` (`t`) with no `ERROR`, and a
-  generic type an `ERROR`. In a type body `var` is still a type name. The
-  scanner decides the type
+  generic type an `ERROR`. The scanner decides the type
   after `def` as it does a statement's (`SPECIFICATION.md` §6.21), so
   `def String` then `s = 1` on the next line stays two statements. A
   lowercase type (`def foo bar`), a modifier after `def`
@@ -793,6 +792,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `throw` and `assert` still take a value on the next line. No tree of
   266 real files changes; 66 of 24,548 Java files do, each at a
   `return` that ends its line.
+- **BREAKING:** in a type body `var` is a modifier, as `def` is and as
+  Apache's `modifier` rule lists it, no longer a type name: `var x = 1`
+  is a `field_declaration` with an anonymous `var` and no `type` field,
+  where it had `type: (type_identifier)`, and `var String s = 'a'`,
+  `var String s, t` and `private var List<String> xs` are fields of
+  that type, where they were a field `String` of type `var` and a field
+  named `s` with its name missing, or an `ERROR`. `highlights.scm`
+  captures that `var` as a keyword, no longer a type. No real, Java or
+  shape tree changes; one corpus tree does (`SPECIFICATION.md` §6.21).
 - **BREAKING:** `var` right after `return`, `break` or `continue` on
   their line is the value or the label, as Groovy takes no declaration
   there: `return var` then `x` on the next line is the return of `var`

@@ -1598,7 +1598,7 @@ and later is read off `GroovyParser.g4`.
 | `var(a, b)`, `var (a, b).foo()` in a method | calls of `var` | `ERROR` | calls |
 | `import a.B` then `as = 1` on the next line | an import and an assignment | `ERROR` | the same as Groovy |
 | `println var`, `println in`, `foo as` | calls | `ERROR` | `println var` a call, as `println x` (#25 below); `println in` and `foo as` two statements, as `in` and `as` go on with the receiver as operators |
-| `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | the same as before |
+| `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | as Groovy: a field `x`, `var` an anonymous modifier as `def` is; `var String s` a field of type `String` |
 | `var` then `x = 1` on the next line | a declaration of `x` | the same | the same |
 | `return var` then `x = 1` on the next line, `if (c) return var` then `else x`, `break var` then `x` | `return var`, then an assignment; the `if` with its `else`; `break` to the label `var` | `return`, then a declaration of `x`; a declaration of `else`; `break`, then a declaration of `x` | as Groovy: `var` after the keyword on its line is the value or the label |
 | `yield x`, `yield (x)`, `yield -1`, `yield [1]` outside a switch expression | a call, a call, a subtraction, an index (Groovy 4 and later: the same, read off the `.g4`) | `yield_statement` | the same as before |

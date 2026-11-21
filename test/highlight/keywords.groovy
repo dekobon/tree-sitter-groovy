@@ -25,6 +25,11 @@ def x = 5
 var y = 6
 // <- keyword
 
+class F { var f = 1; var String g }
+//        ^ keyword
+//                   ^ keyword
+//                       ^ type
+
 sealed class S { }
 // <- keyword
 

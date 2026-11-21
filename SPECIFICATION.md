@@ -4354,8 +4354,13 @@ where they were `var String` and the statement `s = 'a'` (`t`) with no
 statements, as in Groovy, and `var var = 1`, `var x = 1`, `var(1)` and
 `var.x` read as before. That cost no parse state: STATE_COUNT went from
 4,789 to 4,781, as the two keywords now share the states after them.
-In a type body `var` stays a type name, as before (`var x = 1` is a
-field of type `var`).
+In a type body `var` is a modifier as `def` is, and takes the field's
+typed form after it the same way (`var String s = 'a'`,
+`private var List<String> xs`), for 3 parse states: before, it was a
+type name there, so `var x = 1` was a field of type `var` (now a field
+with `var` an anonymous child, as `def x = 1` is) and `var String s` a
+field `String` of type `var` and a field named `s` with its name
+missing.
 
 Trees that change for input that parsed without an `ERROR` are the
 declarations themselves, each a `local_variable_declaration` where the

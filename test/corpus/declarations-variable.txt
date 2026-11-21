@@ -813,10 +813,44 @@ class C {
           name: (identifier))
         value: (identifier))
       (field_declaration
-        type: (type_identifier)
         (variable_declarator
           name: (identifier)
           value: (number_literal))))))
+
+==================
+A typed field after var
+==================
+
+class A {
+  var String s = "a"
+  private var List<String> xs, ys
+  var t
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (string_fragment))))
+      (field_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier))))))
 
 ==================
 Multi-assignment mixing names and keyed pairs is not accepted
