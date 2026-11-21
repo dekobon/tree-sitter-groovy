@@ -414,6 +414,34 @@ names that start like a relational operator after parentheses are a cast operand
       value: (identifier))))
 
 ==================
+!instanceof before a bracket after parentheses starts no cast operand
+==================
+
+(x) !instanceof(Foo)
+(x) !instanceof[Foo]
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)))))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (subscript_expression
+        object: (identifier)
+        index: (identifier)))))
+
+==================
 relational operators after parentheses with comments around them
 ==================
 
