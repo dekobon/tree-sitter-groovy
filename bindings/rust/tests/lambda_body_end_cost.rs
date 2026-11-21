@@ -65,10 +65,24 @@ fn bytes_served_per_input_byte(source: &str) -> f64 {
 
 /// Most bytes served per input byte for runs of comments before an
 /// operator, one just under the bound and one far over it. Each comment of
-/// a run is read again from every one before it (measured: 2.8 for runs of
-/// 7, and 1.1 for runs of 255, whose body ends at the ninth comment); the
-/// bound of 256 comments used before served 261 per byte for runs of 255.
+/// a run is read again from every one before it (measured after a lambda's
+/// body: 2.8 for runs of 7, and 1.1 for runs of 255, whose body ends at the
+/// ninth comment); the bound of 256 comments used before served 261 per
+/// byte for runs of 255.
 const MAX_BYTES_PER_BYTE_IN_A_COMMENT_RUN: f64 = 8.0;
+
+/// Comments in a run just under the scanner's bound of eight
+/// (`LAMBDA_BODY_END_COMMENTS`): the body goes on past all of them, so each
+/// comment of the run is read again from every one before it.
+const RUN_UNDER_THE_BOUND: usize = 7;
+
+/// Comments in a run far over the bound: one fewer than the bound of 256
+/// that the scanner had before, which read the whole run from each of its
+/// comments; with the bound of eight the body ends at the ninth comment.
+const RUN_OVER_THE_BOUND: usize = 255;
+
+/// The run lengths the fixed-amount tests parse.
+const COMMENT_RUNS: [usize; 2] = [RUN_UNDER_THE_BOUND, RUN_OVER_THE_BOUND];
 
 /// Asserts that the bytes served per input byte do not grow with the
 /// number of elements `make` puts in its input.
@@ -121,8 +135,8 @@ fn interpolation_braces_before_a_comment_opener_are_read_a_bounded_number_of_tim
 }
 
 #[test]
-fn comment_runs_under_the_bound_before_an_operator_cost_a_fixed_amount() {
-    for run in [7, 255] {
+fn comment_runs_after_a_lambda_body_before_an_operator_cost_a_fixed_amount() {
+    for run in COMMENT_RUNS {
         let make = |n: usize| {
             format!(
                 "def v = (a) -> {{ y -> y }}{} .call()\n",
@@ -140,7 +154,7 @@ fn comment_runs_under_the_bound_before_an_operator_cost_a_fixed_amount() {
 
 #[test]
 fn comment_runs_after_a_statement_block_before_an_operator_cost_a_fixed_amount() {
-    for run in [7, 255] {
+    for run in COMMENT_RUNS {
         let make = |n: usize| format!("{{ y }}{} .call();\n", " /* c */".repeat(run)).repeat(n);
         let served = bytes_served_per_input_byte(&make(SMALL_ELEMENTS));
         assert!(
