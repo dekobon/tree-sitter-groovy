@@ -1363,6 +1363,7 @@ The Groovy column was observed by running Groovy 3.
 | `java.util.List 'foo'(1)` | a call | `java.util.List` and `'foo'(1)`, as before |
 | `x.y 1` then `-1` on the next line | two statements | one call with the argument `1 - 1`; before, `x.y` and `1 - 1` |
 | `x.y 2` then `++i` on the next line | `x.y(2)`, then `++i` | the call with the argument `2++`, then `i`: the line goes on with the first argument |
+| `obj.Bar $/$a/$() { }`, or `"$a"`, `"${a}"` or `"""$a"""` in place of the string, with `def` typed on the line before and deleted again | a call with the argument `$/$a/$(…)` | a call from scratch; the reparse after the deletion reads a method that returns `obj.Bar` and is named by the string, neither with an `ERROR`: the runtime ignores an empty token during the error recovery of the text with `def`, and the reparse reuses the `.` after `obj` without calling the scanner, so `_command_path_start` is not emitted (spec §6.14). v0.6.0 reads the method from scratch too. `bindings/rust/tests/incremental_reparse.rs` pins both trees |
 | `obj.m 1, *xs` | a call | a call; before, an `ERROR` |
 | `obj.m 'a': 1` | a call | `ERROR` |
 

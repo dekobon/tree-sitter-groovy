@@ -2872,6 +2872,28 @@ Groovy's call of the method a string names; and `as T`, `in b`, `!in b`,
 argument. Over 13,792 edits of texts with literal arguments, a reparse
 gives the tree of a parse from scratch.
 
+One reparse differs from a parse from scratch, through the runtime.
+During error recovery it ignores an empty external token that
+leaves the scanner's state as it was, and a later reparse reuses the
+leaf after it without calling the scanner there. Typing `def` on the
+line before `obj.Bar $/$a/$() { }` reads `def obj` and, by error
+recovery, a method whose return type is `.Bar` with a missing name
+before the dot. Deleting `def` again reuses that `.`, so
+COMMAND_PATH_START is not emitted after `obj`, and the reparse reads a
+`method_declaration` that returns `obj.Bar` and is named by the string,
+where a parse from scratch reads Groovy 3's call
+`obj.Bar($/$a/$() { })`. Neither tree has an `ERROR`; v0.6.0 reads the
+method from scratch too, so it has no difference to show. The same
+edits differ the same way with `"$a"`, `"${a}"` or `"""$a"""` in place
+of the dollar-slashy string, but not with a string without an
+interpolation, a lowercase name (`obj.bar`), two accesses (`a.b.Bar`)
+or without the `()` or the closure. A probe of 11.77 million single
+edits of the corpus inputs, each reparsed and then undone, found 17
+that differ this way, all in one input of that shape. A fix would need
+a third bit of scanner state and a token that ends the path, so the
+limit is documented instead (`docs/divergences-from-spec.md` §19), and
+`bindings/rust/tests/incremental_reparse.rs` pins both trees.
+
 Known differences from Groovy, besides those above:
 
 - An argument that goes on past the literal and ends its line takes a

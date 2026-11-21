@@ -607,8 +607,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   is about 30% larger.
 - A few edit sequences still reparse incrementally to a tree that
   differs from a parse from scratch. `SPECIFICATION.md` §6.17 to §6.22,
-  and `docs/divergences-from-spec.md` §20 for an edit of a `default`
-  modifier after a field with modifiers only, give an example of each
+  `docs/divergences-from-spec.md` §20 for an edit of a `default`
+  modifier after a field with modifiers only, and `SPECIFICATION.md`
+  §6.14 for `def` typed and deleted before a dotted call of an
+  interpolated string (`obj.Bar $/$a/$() { }`), give an example of each
   kind known but one, a closure whose two readings weigh the same
   (§6.22), and `bindings/rust/tests/incremental_reparse.rs` pins each
   example. Random edits find more, most of them in text with an `ERROR`

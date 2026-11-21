@@ -912,3 +912,43 @@ fn a_comma_after_a_final_typed_declaration_reuses_the_split_statement() {
         "the reparse now matches the parse from scratch: {incremental}",
     );
 }
+
+/// A known limitation (`SPECIFICATION.md` §6.14): during error recovery the
+/// runtime ignores an empty external token that leaves the scanner's state
+/// as it was, and a later reparse reuses the leaf after it without calling
+/// the scanner there. Typing `def` on the line before
+/// `obj.Bar $/$a/$() { }` reads `def obj` and, by error recovery, a method
+/// whose return type is `.Bar`; deleting `def` again reuses the `.` after
+/// `obj`, so `_command_path_start` is not emitted before it. The reparse
+/// reads a method that returns `obj.Bar` and is named by the string, where
+/// a parse from scratch reads Groovy 3's call `obj.Bar($/$a/$() { })`;
+/// neither has an `ERROR`. This test pins both trees, so that it fails when
+/// either reading changes. If the reparse matches the parse from scratch,
+/// remove the limitation from §6.14 and divergences §19 and move the text
+/// to `EDIT_SEQUENCES`.
+#[test]
+fn deleting_a_def_before_a_dotted_call_of_a_string_reads_a_method_on_reparse() {
+    const TEXT: &str = "\nobj.Bar $/$a/$() { }\n";
+    /// `def` typed at the start of the text, then deleted.
+    const EDITS: &[Edit] = &[(0, 0, "def"), (0, 3, "")];
+    const FRESH: &str = "(source_file (command_chain receiver: (field_access \
+        object: (identifier) field: (identifier)) argument: (method_invocation \
+        function: (string_literal (gstring_dollar_interpolation value: (identifier))) \
+        arguments: (argument_list) closure: (closure))))";
+    const REPARSED: &str = "(source_file (method_declaration return_type: \
+        (qualified_type (type_identifier) (type_identifier)) name: (quoted_identifier \
+        (gstring_dollar_interpolation value: (identifier))) parameters: \
+        (formal_parameters) body: (block)))";
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse_sequence(&mut parser, TEXT, EDITS);
+    assert_eq!(edited, TEXT);
+    assert!(!fresh.root_node().has_error());
+    assert!(!incremental.root_node().has_error());
+    assert_eq!(fresh.root_node().to_sexp(), FRESH);
+    assert_eq!(
+        incremental.root_node().to_sexp(),
+        REPARSED,
+        "the reparse changed; if it matches the parse from scratch, the limitation is gone",
+    );
+}
