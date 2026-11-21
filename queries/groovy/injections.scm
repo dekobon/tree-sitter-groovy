@@ -9,18 +9,19 @@
 ((groovydoc_comment) @injection.content
  (#set! injection.language "javadoc"))
 
-; Slashy regex `/.../` — the leading `/` is what distinguishes it
-; from the plain-string flavours at the query layer (single-,
-; triple-single-, double-, triple-double-quoted strings all
-; share the `string_literal` node kind).
-((string_literal) @injection.content
-  (#match? @injection.content "^/[^/]")
-  (#set! injection.language "regex"))
+; Slashy `/.../` and dollar-slashy `$/.../$` regexes. Every string
+; flavour is a `string_literal`; only a slashy one has a `/` child (its
+; closer) and only a dollar-slashy one a `$/` child (its opener).
+; Per fragment, so no delimiter or interpolation reaches the regex parser.
+((string_literal
+   (string_fragment) @injection.content
+   "/")
+ (#set! injection.language "regex"))
 
-; Dollar-slashy regex `$/.../$`.
-((string_literal) @injection.content
-  (#match? @injection.content "^\\$/")
-  (#set! injection.language "regex"))
+((string_literal
+   "$/"
+   (string_fragment) @injection.content)
+ (#set! injection.language "regex"))
 
 ; `sql.execute """SELECT ..."""`, `sql.rows("SELECT ...")` and the
 ; other `groovy.sql.Sql` calls. Matches a call, with or without

@@ -23,3 +23,10 @@ string'''
 """triple ${expr}"""
 // <- string
 //        ^ punctuation.special
+
+def m = /a+b/ + $/c/d/$ + x / y
+//      ^ string
+//          ^ string
+//              ^ string
+//                   ^ string
+//                          ^ operator

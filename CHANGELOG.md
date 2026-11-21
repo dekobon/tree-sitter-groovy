@@ -602,6 +602,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `foo a /* c */ : 1` is the call `foo(a: 1)`, also when the comment
   spans lines; v0.6.0 read the statement `foo` and the label `a: 1`
   (`SPECIFICATION.md` §6.8).
+- Queries. `injections.scm`: the body of a slashy or dollar-slashy
+  string is injected as `regex`, each `string_fragment` as its own
+  document, so the delimiters and `${…}` and `$name` interpolations
+  stay out of the regex parser. The whole string was captured, which
+  leaves its children out, so only a slashy string's opening `/` was
+  injected and nothing of a dollar-slashy one. A body that an
+  interpolation or a literal `$` splits is several documents
+  (`docs/divergences-from-spec.md` §7). `highlights.scm`: a slashy
+  string's closing `/` is `@string`, like its opening `/`; it was
+  `@operator`, as it is the same anonymous `/` as division, which
+  stays `@operator`.
 
 ## [0.6.0] - 2026-11-12
 

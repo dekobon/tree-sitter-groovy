@@ -101,6 +101,11 @@
   "..."
 ] @operator
 
+; A slashy string's closing `/` is the same anonymous symbol as the
+; division operator, so the list above captures it too; this later
+; match gives it back to the string, like the hidden opening `/`.
+(string_literal "/" @string)
+
 ; -- Layer 3: generic identifier fallback --------------------------
 
 (identifier) @variable

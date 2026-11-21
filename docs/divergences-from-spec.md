@@ -57,7 +57,7 @@ reasoning here.
 | §7 Conflicts | **Done** | none of the spec's predicted conflicts was needed; the real list is the `conflicts` array in `grammar.js` (see #1). |
 | §8 Tie-break corpus | **Done** | all five spec-mandated tie-breaks pinned in `operators-precedence-tiebreaks.txt`. |
 | §9.1 highlights.scm | **Done** | keywords (the contextual ones included), operators, literals, comments, annotations, labels, types and the names of declarations, calls, fields and parameters have captures; structural nodes (statements, blocks, argument lists, expressions as such) have none. |
-| §9.2 injections.scm | **Done** | groovydoc → javadoc; slashy + dollar-slashy → regex; named-call DSL → sql. |
+| §9.2 injections.scm | **Done** | groovydoc → javadoc; each `string_fragment` of a slashy or dollar-slashy string → regex, its delimiters and interpolations not (§7); named-call DSL → sql. |
 | §9.3 locals.scm | **Done** | scopes, definitions, references. |
 | §10 Issue resolution | **Done** | all eleven listed issues closed by corresponding rules and corpus regressions. |
 
@@ -630,24 +630,32 @@ which it does not.
 
 ---
 
-## 7. Slashy-regex injection relies on the raw `/` prefix
+## 7. Slashy-regex injection is one document per fragment
 
 **Spec §9.2** wants `queries/groovy/injections.scm` to inject
-slashy and dollar-slashy strings as `regex`.
+slashy and dollar-slashy bodies as `regex`.
 
-**Current implementation** in `injections.scm` uses
-`(#match? @injection.content "^/[^/]")` and `"^\\$/"` against the
-string's source text to distinguish slashy from quoted strings.
-The match still works because slashy bodies now have
-`string_fragment` and interpolation children (the regex match runs
-against the captured source range, which still starts with `/`).
+**Current implementation** injects each `string_fragment` of such a
+string as its own `regex` document. The delimiters (`/`, `$/`, `/$`)
+and the `${…}` and `$name` interpolations are not injected. Every
+string flavour is a `string_literal`; the query tells the two regex
+flavours apart by a delimiter child rather than the source text: only
+a slashy string has an anonymous `/` child (its closer; the opener is
+a hidden scanner token) and only a dollar-slashy string has `$/`.
 
-If a future quoted-string flavour also began with `/`, the match
-anchor would mis-route. The fully robust fix is distinct node
-kinds (`slashy_string_literal`, `dollar_slashy_string_literal`),
-which a v0.2.0 AST-shape change can introduce alongside any other
-breaking renames. Until then the current source-anchor predicate
-covers every shipping flavour without ambiguity.
+**Divergence**: a body that an interpolation splits is several
+documents, and so is one with a literal `$`, which is a fragment of
+its own: `/^a+$/` is `^a+` and then `$`, and a group that spans the
+split (`/(a$|b)/`) does not parse as one. Capturing the string itself
+does not avoid this: by default a node's children are left out of its
+injection, so only the opening `/` was injected (nothing of a
+dollar-slashy string), and `injection.include-children` would pass the
+delimiters and interpolations as regex text. `tree-sitter-highlight`
+injects one content node per match, and `injection.combined` would
+join every regex in the file into one document.
+
+**Action**: none. One document per string needs a body whose literal
+text is not child nodes, an AST change.
 
 ---
 
