@@ -237,13 +237,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Changed
 
-- `node-types.json`: the `value` field of `switch_case` and
-  `switch_arrow_case`, and the `index` field of `subscript_expression`
-  and `safe_subscript_expression`, are `multiple`, as a case may take
-  several values and a subscript several indices (see Added). Code
-  generated from `node-types.json` that types either field as one node
-  needs a list; `child_by_field_name` returns the first, and a tree
-  with one value or index is as before.
+- An API-visible change to `node-types.json`: the `value` field of
+  `switch_case` and `switch_arrow_case`, and the `index` field of
+  `subscript_expression` and `safe_subscript_expression`, are
+  `multiple`, as a case may take several values and a subscript several
+  indices (see Added). Code generated from `node-types.json` that types
+  either field as one node needs a list; `child_by_field_name` returns
+  the first. No tree changes with it: a tree with one value or index is
+  as before, and of the corpus, real, Java and shape inputs none that
+  parsed without an `ERROR` at v0.6.0 changes, so it is not marked
+  breaking for trees.
 - **BREAKING:** `instanceof`, `!instanceof` and `as` bind tighter than
   `<`, `<=`, `>`, `>=`, `in` and `!in`, as Apache's level 7 lists them
   first: a relational operator before one of them now takes its
