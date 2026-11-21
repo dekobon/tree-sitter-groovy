@@ -673,6 +673,46 @@ fn a_lambda_arrow_after_a_final_method_head_is_an_error_on_reparse() {
     );
 }
 
+/// A known limitation (`SPECIFICATION.md` §6.17): where a closure
+/// parameter's default and a lambda's body share a parenthesized
+/// expression, typing `{` before `T a = (b, c) -> (d) -> e }` reuses the
+/// lambda `(d) -> e` of the old tree. The reparse reads a closure whose
+/// body declares `T a = (b, c) -> (d) -> e`, where a parse from scratch
+/// reads the parameter `T a` with the default `(b, c) -> (d)` and the body
+/// `e`, as Groovy 3 does; neither has an `ERROR`. This test pins both
+/// trees, so that it fails when either reading changes. If the reparse
+/// matches the parse from scratch, remove the limitation from §6.17 and
+/// divergences §26 and move the text to `LAMBDA_BODY_EDIT_SEQUENCES`.
+#[test]
+fn a_brace_typed_before_a_lambda_default_keeps_the_lambda_on_reparse() {
+    const TEXT: &str = "def d =  T a = (b, c) -> (d) -> e }\n";
+    /// The second space after `=`, where `{` replaces it.
+    const BRACE_AT: usize = 8;
+    const FRESH: &str = "(source_file (local_variable_declaration (variable_declarator \
+        name: (identifier) value: (closure (closure_parameters (closure_parameter \
+        type: (type_identifier) name: (identifier) default: (lambda_expression \
+        parameters: (formal_parameters (formal_parameter name: (identifier)) \
+        (formal_parameter name: (identifier))) body: (parenthesized_expression \
+        (identifier))))) (expression_statement (identifier))))))";
+    const REPARSED: &str = "(source_file (local_variable_declaration (variable_declarator \
+        name: (identifier) value: (closure (local_variable_declaration \
+        type: (type_identifier) name: (identifier) value: (lambda_expression \
+        parameters: (formal_parameters (formal_parameter name: (identifier)) \
+        (formal_parameter name: (identifier))) body: (lambda_expression \
+        parameters: (formal_parameters (formal_parameter name: (identifier))) \
+        body: (identifier))))))))";
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, BRACE_AT, BRACE_AT + 1, "{");
+    assert_eq!(edited, "def d = {T a = (b, c) -> (d) -> e }\n");
+    assert_eq!(fresh.root_node().to_sexp(), FRESH);
+    assert_eq!(
+        incremental.root_node().to_sexp(),
+        REPARSED,
+        "the reparse changed; if it matches the parse from scratch, the limitation is gone",
+    );
+}
+
 /// A known limitation (`docs/divergences-from-spec.md` §20): the members
 /// before a `default` method fork, a field's name against a type, and the
 /// runtime checks a reused node only while one stack version exists

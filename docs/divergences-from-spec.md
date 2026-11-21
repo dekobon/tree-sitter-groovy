@@ -2005,7 +2005,8 @@ closure parameter's default otherwise than a parse from scratch:
 typing `{` before `T a = (b, c) -> (d) -> e }` reuses the lambda
 `(d) -> e`, so the closure's body declares `a`, where a parse from
 scratch reads the parameter `T a` with the default `(b, c) -> (d)`, as
-Groovy 3 does; neither tree has an `ERROR`.
+Groovy 3 does; neither tree has an `ERROR`
+(`bindings/rust/tests/incremental_reparse.rs` pins both).
 
 **Action**: the call forms in the fourth row would need the scanner to
 read every call's arguments; measured on code made of calls, the

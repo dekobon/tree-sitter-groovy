@@ -3137,7 +3137,8 @@ by `{` is `def d = {T a = (b, c) -> (d) -> e }`, which a parse from
 scratch reads as the closure parameter `T a` with the default
 `(b, c) -> (d)` and the body `e`, Groovy 3's reading; the reparse
 reuses the old `lambda_expression` `(d) -> e` and reads a closure whose
-body declares `T a = (b, c) -> (d) -> e`. Neither tree has an `ERROR`.
+body declares `T a = (b, c) -> (d) -> e`. Neither tree has an `ERROR`
+(`bindings/rust/tests/incremental_reparse.rs` pins both trees).
 
 Nested lambdas whose bodies are expressions parse in time quadratic in
 the nesting, a known cost limit. The parenthesized reading after
