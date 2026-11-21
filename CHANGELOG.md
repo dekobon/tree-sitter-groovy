@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- An interpolation takes the lazy form `"${-> x}"`, a closure without
+  parameters, as Apache's `gstringValue` takes a `closure`: the `->` is a
+  `closure_parameters` leaf before the `value`
+  (`(gstring_brace_interpolation (closure_parameters) value: …)`), which
+  `highlights.scm` captures as `@operator`. It was an `ERROR`, as at
+  v0.6.0. A closure with parameters there (`"${w -> w << x}"`) is still
+  an `ERROR` (`SPECIFICATION.md` §5.5 item 1). `node-types.json` adds
+  `closure_parameters` to the children of `gstring_brace_interpolation`.
 - A subscript takes several indices, any of them a spread, as Apache's
   `indexPropertyArgs` takes `expressionList[true]`: `y[1, 2]`,
   `y[1, *a]`, `x[*a]`, `y?[*a]` and `y[1, 2] = 3` parse, an `index`

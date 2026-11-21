@@ -6143,6 +6143,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "closure_parameters",
+          "named": true
+        }
+      ]
     }
   },
   {

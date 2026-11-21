@@ -12843,11 +12843,8 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "IMMEDIATE_TOKEN",
-          "content": {
-            "type": "STRING",
-            "value": "${"
-          }
+          "type": "SYMBOL",
+          "name": "_gstring_brace_open"
         },
         {
           "type": "FIELD",
@@ -12874,6 +12871,35 @@
         {
           "type": "STRING",
           "value": "}"
+        }
+      ]
+    },
+    "_gstring_brace_open": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "IMMEDIATE_TOKEN",
+          "content": {
+            "type": "STRING",
+            "value": "${"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "STRING",
+                "value": "->"
+              },
+              "named": true,
+              "value": "closure_parameters"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },

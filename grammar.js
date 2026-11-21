@@ -3813,9 +3813,18 @@ module.exports = grammar({
     // as a closure whose one statement is the value, so it may be a
     // parenthesis-free call (`"${sh script: 'x'}"`, §5.5 item 1).
     gstring_brace_interpolation: $ => seq(
-      token.immediate('${'),
+      $._gstring_brace_open,
       field('value', statementExpression($)),
       '}',
+    ),
+
+    // Apache's `gstringValue` is a `closure`, so `"${-> x}"` is lazy: the
+    // `->` of a closure without parameters, a `closure_parameters` leaf.
+    // A rule of its own, so that both openers reach one state before the
+    // value: `->` inline cost 20 states, and parameters before it 27.
+    _gstring_brace_open: $ => seq(
+      token.immediate('${'),
+      optional(alias('->', $.closure_parameters)),
     ),
 
     // §5.7 — `$/...$/` dollar-slashy strings. The body is parsed

@@ -33,6 +33,10 @@
 (gstring_brace_interpolation
   "${" @punctuation.special
   "}" @punctuation.special)
+; The `->` of a lazy interpolation (`"${-> x}"`) is a `closure_parameters`
+; leaf of its own, which the operator list below does not reach.
+(gstring_brace_interpolation
+  (closure_parameters) @operator)
 (gstring_dollar_interpolation
   value: (identifier) @variable)
 

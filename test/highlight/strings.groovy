@@ -24,6 +24,10 @@ string'''
 // <- string
 //        ^ punctuation.special
 
+"lazy ${-> count}"
+//     ^ punctuation.special
+//       ^ operator
+
 def m = /a+b/ + $/c/d/$ + x / y
 //      ^ string
 //          ^ string

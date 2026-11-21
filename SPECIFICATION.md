@@ -766,8 +766,12 @@ The resolution we adopt:
    as the scanner looks into one parenthesis only (§6.14); and more
    than one statement, a declaration, another statement that is no
    expression or a closure's parameters in an interpolation
-   (`"${a; b}"`, `"${def x = 1}"`, `"${return 1}"`, `"${-> x}"`). Each
-   is an `ERROR`. A keyword Groovy reserves is no receiver of a value
+   (`"${a; b}"`, `"${def x = 1}"`, `"${return 1}"`, `"${y -> y}"`). Each
+   is an `ERROR`. The `->` of a closure without parameters is taken, the
+   lazy form (`"${-> x}"`, `"${-> foo 1}"`), as a `closure_parameters`
+   leaf before the value; parameters before it would cost 27 parse
+   states, as the interpolation's start would hold every item of a
+   closure's parameter list. A keyword Groovy reserves is no receiver of a value
    (§6.14): `"${return 1}"` is no call of `return`. Nor is a first
    argument on the line after the receiver inside parentheses, `(foo`
    followed by `1)`,
