@@ -762,8 +762,18 @@ module.exports = grammar({
   // empty `property` set keeps `foo.new` (Apache `namePart`) valid;
   // `_property_name` also names methods, so `new` is not reserved
   // where a method name may follow (`def new`, `int new`).
+  //
+  // `case` is reserved as in Groovy. While it was a name, error recovery
+  // on `case 1:` lines outside a switch kept a version that nested each
+  // line as a label in the one before and closed the whole nest at every
+  // line: time quadratic in the lines. It stays a key where Groovy's
+  // `namedArgLabel`, `mapEntryLabel` and `elementValuePairName` take
+  // keywords: an alternative of `map_entry`, of the named argument after
+  // a comma and of an annotation's `name = value`, and the empty
+  // `property` set for a key after `_command_named_key` and a name after
+  // a member access (`x.case`, `x::case`).
   reserved: {
-    global: _ => ['new'],
+    global: _ => ['new', 'case'],
     property: _ => [],
   },
 
@@ -1236,8 +1246,9 @@ module.exports = grammar({
     // After a comma a newline cannot end the statement, so a key on a
     // continuation line (`sh script: 'make',` then `returnStdout: true`)
     // needs no scanner token. Same-line keys normally come from the
-    // scanner; `case` and `default`, which the scanner rejects, reach
-    // this rule on the same line too (`foo 'a', default: 1`).
+    // scanner; `default`, which the scanner rejects, reaches this rule
+    // on the same line too (`foo 'a', default: 1`). The reserved `case`
+    // (see `reserved`) is no identifier here, so it is a key of its own.
     //
     // A call that is a value can sit inside a list or an argument list,
     // where a name and `:` after its comma may also be the next map
@@ -1245,7 +1256,7 @@ module.exports = grammar({
     // gives it to the call, as Apache's greedy argument list does, and
     // `right` keeps `b: c = 1` one argument.
     _command_continued_named_argument: $ => prec.right(1, seq(
-      field('key', $.identifier),
+      field('key', choice($.identifier, alias('case', $.identifier))),
       ':',
       field('value', $._expression),
     )),
@@ -2341,7 +2352,7 @@ module.exports = grammar({
     // `=` would conflict with this rule, and the precedence shifts the
     // `=` here instead.
     _element_value_pair: $ => prec.right(PREC.ASSIGN, seq(
-      field('left', $.identifier),
+      field('left', choice($.identifier, alias('case', $.identifier))),
       field('operator', '='),
       field('right', choice(
         $._element_value,
@@ -2965,7 +2976,7 @@ module.exports = grammar({
     method_reference_expression: $ => prec.left(PREC.ACCESS, seq(
       field('target', $._expression),
       '::',
-      field('name', choice($.identifier, 'new')),
+      field('name', choice(reserved('property', $.identifier), 'new')),
     )),
 
     // §3.2 — postfix `++` / `--`. Distinct node kind from the
@@ -3453,7 +3464,7 @@ module.exports = grammar({
     },
 
     map_entry: $ => seq(
-      field('key', $._expression),
+      field('key', choice($._expression, alias('case', $.identifier))),
       ':',
       field('value', enhancedExpression($)),
     ),

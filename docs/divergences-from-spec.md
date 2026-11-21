@@ -21,7 +21,7 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). The Groovy 6 keywords `async`, `await`, `defer` and `val` have no construct and parse as names; grammar literals for them were attempted and reverted. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + same-line lookahead. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). String keys (`foo 'a': 1`) are not; `case` / `default` are not accepted as keys as the first argument, a deliberate divergence from Apache; a spread argument is accepted after a comma (`foo 'a', *args`), not first (`foo *a, 1`), and a spread map is not (`foo a: 1, *:m`); an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. A name, `!` or `~` is a first argument too (`println x`, `obj.m arg`, `def r = foo bar`), told from a declaration (`String s`) by Apache's rule; see #25 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), a name after a receiver that may name a type in a value (`def x = Foo bar`), the chain continuations (`foo a bar`), with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19, #23 and #25 below. |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). String keys (`foo 'a': 1`) are not; `default` is not accepted as a key as the first argument, a deliberate divergence from Apache; a spread argument is accepted after a comma (`foo 'a', *args`), not first (`foo *a, 1`), and a spread map is not (`foo a: 1, *:m`); an argument after a comma continues onto a following line that can continue an expression (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. A name, `!` or `~` is a first argument too (`println x`, `obj.m arg`, `def r = foo bar`), told from a declaration (`String s`) by Apache's rule; see #25 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), a name after a receiver that may name a type in a value (`def x = Foo bar`), the chain continuations (`foo a bar`), with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19, #23 and #25 below. |
 | §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, in parentheses and in an interpolation. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
@@ -36,7 +36,7 @@ reasoning here.
 | §6.2 Slashy scanner | **Done** | context guards + same-line lookahead, which stops at 64 escaped slashes (spec §6.2). |
 | §6.3 GString scanner | **Equivalent** | grammar-level; spec proposes scanner state, grammar achieves the same children. |
 | §6.4 AUTOMATIC_SEMICOLON | **Equivalent** | grammar-boundary resolution covers every spec-named case (see #3 below; #11 for a `{` on the next line). |
-| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `case` / `default`), and labels keep grammar precedence. |
+| §6.5 LABEL_COLON | **Equivalent** | grammar precedence on `labeled_statement` covers spec-named cases. A scanner-token implementation was attempted earlier but coupled to the then-missing named-argument command chain (`archiveArtifacts artifacts: 'x'`). Named-argument command chains now use their own scanner token, `_command_named_key` (an identifier followed by `:` on the same line, excluding `default`), and labels keep grammar precedence. |
 | §6.6 Block-comment scanner | **Done** | single-token emit, `/**/` and `/***/` parse correctly. A `/*` with no `*/` is not a comment; the first one emits an empty hidden `_unterminated_comment` extra that carries the scanner's "no `*/` from here on" bit, one of its two bits of state, so later ones do not read to the end of input again (#75). Error recovery near that first `/*` can differ from v0.6.0, for worse as well as better; see #16 below. |
 | §6.7 RECORD_KEYWORD | **Done** | `record` emitted only when a name follows on the same line and `(` or `<` after it, comments and a line break before `(` allowed; `record.key()`, `private Record record`, `public void record()` are identifiers. Residuals listed in §6.7. |
 | §6.8 COMMAND_NAMED_KEY | **Done** | an empty token, emitted only before a name followed by `:` on the same line, block comments between them aside (`foo a /* c */ : 1`), never during error recovery; the in-grammar lexer reads the key, so a non-ASCII key (`foo 名前: 1`) is an identifier by the grammar's own class. Limitations are in the §5.5 row above and spec §6.8. |
@@ -2255,7 +2255,7 @@ per byte of input on runs of 255 comments, against 1.2 (spec §6.22).
 
 ## 29. Parse time on input this grammar rejects
 
-Three shapes of input that parse with an `ERROR`, here and at v0.6.0,
+Two shapes of input that parse with an `ERROR`, here and at v0.6.0,
 take time above linear in their length, where v0.6.0 was linear. Each
 appeared with a feature of this release. The times are the minimum of three parses, without a logger, by
 the runtime of `tree-sitter` 0.27.2; the counts are from its log.
@@ -2264,18 +2264,22 @@ the runtime of `tree-sitter` 0.27.2; the counts are from its log.
 |---|---|---|---|---|
 | `foo 1, %a = ` repeated, then `1` | rejected | 71, 416 and 2,970 ms at 100, 200 and 400 levels; reductions grow with the square of the levels and stack versions linearly (213 at 100) | 0.6, 1.2 and 2.4 ms; 4 versions | a call as a value (849c0ab): each level keeps a version alive past the `ERROR` of its argument |
 | `@C(, ` repeated | rejected | 214, 845 and 3,625 ms at 1,000, 2,000 and 4,000; reductions and log messages linear | 2.0, 4.1 and 8.3 ms | annotations as annotation values (d23d53f): recovery inserts a missing name, which nests each `@C(` in the one before, and the runtime rebuilds the growing `ERROR` node, work its log does not show |
-| `case 1:` lines outside a `switch` | rejected | 260, 1,040 and 4,178 ms at 1,000, 2,000 and 4,000 lines; about n²/2 reductions | 6.0, 12.1 and 24.1 ms | the `default` modifier (fa9986c, §20): one version nests the lines as labels and closes the whole nest at each line |
 
-The first row was `foo 1, *a = ` repeated, which Groovy reads as
-`foo(1, *(a = foo(…)))`, at the same cost, while a command chain took no
-spread argument after a comma. It takes one now, and that nest parses
-without an `ERROR` in one stack version: 0.13, 0.26 and 0.49 ms at 100,
-200 and 400 levels.
+Two more shapes were in this table. `foo 1, *a = ` repeated, which
+Groovy reads as `foo(1, *(a = foo(…)))`, cost as much as the first row
+while a command chain took no spread argument after a comma. It takes
+one now, and that nest parses without an `ERROR` in one stack version:
+0.13, 0.26 and 0.49 ms at 100, 200 and 400 levels. `case 1:` lines
+outside a `switch`, which Groovy rejects, took 237, 963 and 3,873 ms at
+1,000, 2,000 and 4,000 lines (about n²/2 reductions) after the
+`default` modifier (fa9986c, §20): while `case` was a name, one version
+nested the lines as labels and closed the whole nest at each line.
+`case` is reserved now, as in Groovy, and stays a key and a member name
+(spec §5.2): 6.3, 12.7 and 24.9 ms, against 5.7, 11.7 and 23.0 ms at
+v0.6.0.
 
-**Action**: none planned. Reserving `case`, which Groovy does, makes the
-third linear and changes no parse table size, but turns the keys
-`foo a: 1, case: 2`, `foo(a: 1, case: 2)` and `[case: 1]`, which Groovy
-takes, into `ERROR`s. `bindings/rust/tests/error_recovery_cost.rs`
-pins today's reductions and stack versions of each, so that they grow no
-further, and bounds the spread nest's linearly; for the second row those
-counts are linear and its time is not pinned.
+**Action**: none planned. `bindings/rust/tests/error_recovery_cost.rs`
+pins today's reductions and stack versions of each row, so that they
+grow no further, and bounds those of the spread nest and the `case 1:`
+lines linearly; for the second row those counts are linear and its time
+is not pinned.

@@ -609,6 +609,109 @@ foo a: 1, case: 2
       value: (number_literal))))
 
 ==================
+The reserved word case as a key, an element name and a member name
+==================
+
+foo case: 1
+x = foo case: 1, a: 2
+foo(case: 2)
+[case: 1, *:m]
+@A(case = 1)
+def m() { }
+x.case
+x?.case()
+x.&case
+x::case
+"${x.case}"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (map_literal
+      (map_entry
+        key: (identifier)
+        value: (number_literal))
+      (spread_map_entry
+        value: (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (number_literal))))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (safe_navigation_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_pointer_expression
+      object: (identifier)
+      method: (identifier)))
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier)))
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (field_access
+          object: (identifier)
+          field: (identifier))))))
+
+==================
+The reserved word case is no name in an assignment
+:error
+==================
+
+case = 1
+
+---
+
+==================
+The reserved word case is no name in an argument
+:error
+==================
+
+foo(case)
+
+---
+
+==================
 Named arguments with the keys this and if on continuation lines
 ==================
 
@@ -4330,7 +4433,6 @@ _ new Foo()
 abstract new Foo()
 assert new Foo()
 break new Foo()
-case new Foo()
 catch new Foo()
 continue new Foo()
 def new Foo()
@@ -4376,12 +4478,6 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (break_statement)
-  (expression_statement
-    (object_creation_expression
-      type: (type_identifier)
-      arguments: (argument_list)))
-  (expression_statement
-    (identifier))
   (expression_statement
     (object_creation_expression
       type: (type_identifier)
@@ -4519,6 +4615,15 @@ volatile new Foo()
     return_type: (type_identifier)
     name: (identifier)
     parameters: (formal_parameters)))
+
+==================
+The reserved word case before new outside a switch is an error
+:error
+==================
+
+case new Foo()
+
+---
 
 ==================
 The word instanceof before new is not a receiver

@@ -1,8 +1,8 @@
 //! Cost ceilings for shapes of input that this grammar rejects and parses in
 //! time above linear in its length (`docs/divergences-from-spec.md` §29), and
-//! a linear bound for a valid input that was one of them. At v0.6.0 each was
-//! linear. The rejected shapes are not fixed: these tests pin today's cost so
-//! that it does not grow further.
+//! linear bounds for two inputs that were among them. At v0.6.0 each was
+//! linear. The rejected shapes left are not fixed: these tests pin today's
+//! cost so that it does not grow further.
 //!
 //! - Nested parenthesis-free calls with an argument that is an `ERROR`
 //!   after a comma and `=`, `foo 1, %a = foo 1, %a = … 1`. Each nesting
@@ -20,9 +20,12 @@
 //!   1,000 annotations, at most 6 versions); the time is not, because the
 //!   runtime rebuilds the growing `ERROR` node, which its log does not show.
 //!   The ceiling below pins the counts only.
-//! - Lines of `case 1:` outside a `switch`: a version that nests the lines
-//!   as labels closes the whole nest at each line (measured: 5,151, 20,301
-//!   and 80,601 reductions at 100, 200 and 400 lines; v0.6.0 401 at 400).
+//! - Lines of `case 1:` outside a `switch`, which Groovy rejects. While
+//!   `case` was a name, a version nested the lines as labels and closed the
+//!   whole nest at each line (measured: 5,151, 20,301 and 80,601 reductions
+//!   at 100, 200 and 400 lines; v0.6.0 401 at 400). `case` is reserved now,
+//!   and the reductions are linear in the lines (measured: 797 and 6,397 at
+//!   200 and 1,600 lines, at most 2 versions).
 //!
 //! The counts come from the parser's log, which is deterministic where time
 //! is not.
@@ -66,11 +69,16 @@ const MAX_ANNOTATION_REDUCTIONS: usize = 4_000;
 /// Most stack versions at once for `ANNOTATIONS` annotations: 6 measured.
 const MAX_ANNOTATION_VERSIONS: usize = 10;
 
-/// Lines of `case 1:`.
+/// Lines of `case 1:` in the shorter run; the longer one has `SCALE` times
+/// as many.
 const CASE_LINES: usize = 200;
 
-/// Most reductions for `CASE_LINES` lines: 20,301 measured.
-const MAX_CASE_REDUCTIONS: usize = 30_000;
+/// Most reductions per line of `case 1:`: 4 measured at both lengths (797
+/// and 6,397), where a `case` that was a name made 20,301 at 200 lines.
+const MAX_CASE_REDUCTIONS_PER_LINE: usize = 6;
+
+/// Most stack versions at once for the lines of `case 1:`: 2 measured.
+const MAX_CASE_VERSIONS: usize = 3;
 
 /// The key of the version count in the parser's `process version` messages.
 const VERSION_COUNT_KEY: &str = "version_count:";
@@ -175,11 +183,18 @@ fn runs_of_unfinished_annotations_stay_under_the_measured_cost() {
 }
 
 #[test]
-fn case_lines_outside_a_switch_stay_under_the_measured_cost() {
-    let cost = cost(&"case 1:\n".repeat(CASE_LINES), true);
-    assert!(
-        cost.reductions <= MAX_CASE_REDUCTIONS,
-        "{} reductions for {CASE_LINES} lines",
-        cost.reductions,
-    );
+fn case_lines_outside_a_switch_parse_in_linear_cost() {
+    for lines in [CASE_LINES, CASE_LINES * SCALE] {
+        let cost = cost(&"case 1:\n".repeat(lines), true);
+        assert!(
+            cost.reductions <= MAX_CASE_REDUCTIONS_PER_LINE * lines,
+            "{} reductions for {lines} lines",
+            cost.reductions,
+        );
+        assert!(
+            cost.most_versions <= MAX_CASE_VERSIONS,
+            "{} stack versions for {lines} lines",
+            cost.most_versions,
+        );
+    }
 }

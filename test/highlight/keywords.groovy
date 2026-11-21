@@ -92,6 +92,24 @@ default void script() { }
 foo default: 1
 //  ^ label
 
+// `case` is reserved, but a key and a member name keep their captures.
+foo case: 1, a: 2
+//  ^ variable
+//  ^ !keyword.control
+bar a: 1, case: 2
+//        ^ variable
+//        ^ !keyword.control
+m = [case: 1]
+//   ^ variable
+//   ^ !keyword.control
+foo(case: 2)
+//  ^ variable
+//  ^ !keyword.control
+x.case
+//^ property
+x::case
+// ^ function
+
 yield 42
 // <- keyword.control
 

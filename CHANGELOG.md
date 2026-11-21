@@ -289,15 +289,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   switch. An arrow case or an empty switch body still gets the missing
   `}`. It came with the `default` keyword above
   (`docs/divergences-from-spec.md` §20).
-- Three shapes of input that parse with an `ERROR`, here and at v0.6.0,
+- Two shapes of input that parse with an `ERROR`, here and at v0.6.0,
   take time above linear in their length, where v0.6.0 was linear:
-  nested `foo 1, %a = …` calls (3.0 s for 400 levels, 4.8 KB), runs of
-  `@C(,` and a space (3.6 s for 4,000) and `case 1:` lines outside a `switch`
-  (4.2 s for 4,000). They came with the call as a value, annotations as
-  annotation values and the `default` modifier. The new
+  nested `foo 1, %a = …` calls (3.0 s for 400 levels, 4.8 KB) and runs
+  of `@C(,` and a space (3.6 s for 4,000). They came with the call as a
+  value and annotations as annotation values. The new
   `bindings/rust/tests/error_recovery_cost.rs` pins their cost
   (`docs/divergences-from-spec.md` §29). The same nest with `*`, which
-  Groovy takes, is linear (see Added).
+  Groovy takes, is linear (see Added), and so are `case 1:` lines
+  outside a `switch`, which took 3.9 s for 4,000 after the `default`
+  modifier until `case` was reserved (below): 25 ms.
+- **BREAKING:** `case` is a reserved word, as in Groovy, and no longer a
+  name. Input that parsed without an `ERROR` at v0.6.0 and that Groovy
+  rejects is an `ERROR`: `case = 1`, `foo(case)`, `x = case`,
+  `def m(int case) { }`, `{ case -> }`, `[(case): 1]`, the label
+  `case:`, `case new Foo()` outside a switch, `import a.case.B`,
+  `package a.case` and `enum E { case }`. It stays a key and a member
+  name, with the same trees: `[case: 1]`, `foo(case: 1)`,
+  `foo a: 1, case: 2`, `@A(case = 1)`, `x.case`, `x?.case()`,
+  `x.&case`, `x::case`. `foo case: 1`, which was `foo` and the label
+  `case: 1`, is a call with a named argument, as in Groovy, also as a
+  value, after a dotted receiver and on a `switch` case's line
+  (`case 1: foo case: 2`). Still wider than Groovy: `def case = 1`,
+  `def case() { }` and `class C { int case }` parse
+  (`SPECIFICATION.md` §5.2).
 - **BREAKING:** a line that ends in parentheses around a name, a dotted
   name or a primitive type (`def y = (x)`, `return (x)`), followed on
   the next line by a multi-assignment declaration that starts with

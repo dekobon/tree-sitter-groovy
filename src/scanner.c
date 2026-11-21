@@ -505,13 +505,14 @@ static bool scan_contextual_word(
 
 // Whether the name that `read_word` just consumed is the key of a named
 // argument: `:` follows on the same line, and not `::`, which makes a
-// method reference. `case:` and `default:` are switch labels, not keys.
-// Apache's `namedArgLabel` accepts both keywords, so `foo default: 1`
-// diverges on purpose: the one-liner
-// `switch (x) { case 1: foo default: bar }` in statements-switch.txt
-// depends on the rejection.
+// method reference. `default:` is a switch label, not a key. Apache's
+// `namedArgLabel` accepts the keyword, so `foo default: 1` diverges on
+// purpose: the one-liner `switch (x) { case 1: foo default: bar }` in
+// statements-switch.txt depends on the rejection. `case` is a key
+// (`foo case: 1`), as in Groovy: a `case` label needs a value before its
+// `:`, and the grammar reserves the word, so no `case:` is a label.
 static bool key_colon_follows(TSLexer *lexer, const char *word, unsigned len) {
-    if (word_is(word, len, "case") || word_is(word, len, "default")) {
+    if (word_is(word, len, "default")) {
         return false;
     }
     if (!skip_same_line_space(lexer, false)) {
