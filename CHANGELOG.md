@@ -753,6 +753,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   message as a colon does, before or after a line break, as Apache's
   `assertStatement` takes `COLON | COMMA`. It was an `ERROR`, as at
   v0.6.0.
+- A list literal takes spread elements (`[*a, *b]`, `[1, *a]`,
+  `[*a, 1]`), a `spread_arguments` node each, as Apache's `list` takes
+  `expressionList[true]`, and an argument list takes a spread map
+  (`foo(*:m, x: 1)`, `foo(a: 1, *:m)`, `foo a: 1, *:m`), a
+  `spread_map_entry`, as Apache's `namedArg` does. Each was an `ERROR`,
+  as at v0.6.0. A spread first in a parenthesis-free call
+  (`foo *a, 1`, `foo *:m`) is still an `ERROR`.
 
 ## [0.6.0] - 2026-11-12
 

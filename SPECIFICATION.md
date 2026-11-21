@@ -1189,8 +1189,20 @@ two statements), which the structural-newline approach sidesteps.
 | Position | Symbol | Production |
 |---|---|---|
 | Argument list | `*expr` | `spread_arguments` |
+| List literal element | `*expr` | `spread_arguments` |
 | Member access | `recv*.prop` / `recv*.method(args)` | `spread_dot_expression` |
 | Map literal entry | `*: expr` | `spread_map_entry` |
+| Argument list | `*: expr` | `spread_map_entry` |
+
+A list literal takes a spread element anywhere, as Apache's
+`list: LBRACK expressionList[true]? COMMA? RBRACK` does (`[*a, 1, *b]`),
+and an argument list takes a spread map anywhere among its arguments,
+as Apache's `namedArg` and `namedPropertyArg` have the alternative
+`MUL COLON nls expression` (`foo(*:m, x: 1)`, `foo(a: 1, *:m)`, and after
+a comma in a parenthesis-free call, `foo a: 1, *:m`). Neither is the
+first argument of a parenthesis-free call (`foo *a, 1`, `foo *:m`, calls
+in Groovy): `foo *a` is a multiplication, so taking `*a` as the call's
+first argument would need the scanner to find the `,` past it.
 
 murtaza64 collapses these under `access_op` which mis-shapes the
 spread-args case (`*x` in a call) and the spread-map case (`*:`).

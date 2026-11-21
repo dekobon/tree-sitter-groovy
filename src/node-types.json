@@ -226,6 +226,10 @@
           "named": true
         },
         {
+          "type": "spread_map_entry",
+          "named": true
+        },
+        {
           "type": "string_literal",
           "named": true
         },
@@ -2833,6 +2837,10 @@
           },
           {
             "type": "spread_dot_expression",
+            "named": true
+          },
+          {
+            "type": "spread_map_entry",
             "named": true
           },
           {
@@ -7761,6 +7769,10 @@
         },
         {
           "type": "spaceship_expression",
+          "named": true
+        },
+        {
+          "type": "spread_arguments",
           "named": true
         },
         {

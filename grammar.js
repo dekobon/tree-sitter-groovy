@@ -495,6 +495,7 @@ function commandArgumentsAfterFirst($) {
     alias($._command_continued_named_argument, $.named_argument),
     $._expression,
     $.spread_arguments,
+    $.spread_map_entry,
   ))));
 }
 
@@ -3062,6 +3063,8 @@ module.exports = grammar({
       enhancedExpression($),
       alias($.map_entry, $.named_argument),
       $.spread_arguments,
+      // Apache `namedArg: … | MUL COLON nls expression`: `foo(*:m, x: 1)`.
+      $.spread_map_entry,
     ),
 
     // §5.11 — `*expr` only inside argument list / list literal.
@@ -3451,12 +3454,16 @@ module.exports = grammar({
     list_literal: $ => seq(
       choice('[', alias($._subscript_open, '[')),
       optional(seq(
-        $._expression,
-        repeat(seq(',', $._expression)),
+        $._list_element,
+        repeat(seq(',', $._list_element)),
         optional(','),
       )),
       ']',
     ),
+
+    // Apache `list: LBRACK expressionList[true]? COMMA? RBRACK`: an element
+    // may be a spread (`[*a, 1]`), the `spread_arguments` of a call.
+    _list_element: $ => choice($._expression, $.spread_arguments),
 
     // §3.2 PRIMARY / §5.3 — map literal. `[:]` is the empty map;
     // anything else is one-or-more `key: value` entries. The
@@ -3486,9 +3493,9 @@ module.exports = grammar({
       field('value', enhancedExpression($)),
     ),
 
-    // §5.11 — `*: expr` only inside a map literal. `*:` is a single
-    // anonymous token (longest-match keeps it intact); a bare `*`
-    // followed by a `:` colon outside this context would have to be
+    // §5.11 — `*: expr` inside a map literal or an argument list. `*:` is
+    // a single anonymous token (longest-match keeps it intact); a bare `*`
+    // followed by a `:` colon outside these contexts would have to be
     // syntactically impossible by the surrounding rules.
     spread_map_entry: $ => seq(
       '*:',

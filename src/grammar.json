@@ -280,6 +280,10 @@
                       {
                         "type": "SYMBOL",
                         "name": "spread_arguments"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "spread_map_entry"
                       }
                     ]
                   }
@@ -382,6 +386,10 @@
                           {
                             "type": "SYMBOL",
                             "name": "spread_arguments"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "spread_map_entry"
                           }
                         ]
                       }
@@ -524,6 +532,10 @@
                         {
                           "type": "SYMBOL",
                           "name": "spread_arguments"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "spread_map_entry"
                         }
                       ]
                     }
@@ -9046,6 +9058,10 @@
         {
           "type": "SYMBOL",
           "name": "spread_arguments"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "spread_map_entry"
         }
       ]
     },
@@ -11840,7 +11856,7 @@
               "members": [
                 {
                   "type": "SYMBOL",
-                  "name": "_expression"
+                  "name": "_list_element"
                 },
                 {
                   "type": "REPEAT",
@@ -11853,7 +11869,7 @@
                       },
                       {
                         "type": "SYMBOL",
-                        "name": "_expression"
+                        "name": "_list_element"
                       }
                     ]
                   }
@@ -11880,6 +11896,19 @@
         {
           "type": "STRING",
           "value": "]"
+        }
+      ]
+    },
+    "_list_element": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "spread_arguments"
         }
       ]
     },

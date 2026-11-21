@@ -858,13 +858,38 @@ foo *a
       right: (identifier))))
 
 ==================
-Spread map argument in a command chain is unsupported
-:error
+Spread map argument after a comma in a command chain
 ==================
 
 foo a: 1, *:m
+foo a: 1, *:m, b: 2
+foo 1, *:m
 
 ---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (spread_map_entry
+      value: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (spread_map_entry
+      value: (identifier))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)
+    argument: (spread_map_entry
+      value: (identifier))))
 
 ==================
 Spread as the first of several arguments of a command chain is unsupported
