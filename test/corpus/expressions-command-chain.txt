@@ -3496,6 +3496,109 @@ obj::m 8
     (number_literal)))
 
 ==================
+Spaces before the first access of a value's receiver (known divergence)
+==================
+
+def a = foo .bar 1
+def b = Foo .bar baz
+def c = foo .Bar y
+def d = foo .new Bar()
+x = (foo	?.bar 2)
+(p, q) = foo .bar 3
+def e = Map .Entry[].class
+println(String [].class)
+foo /* c */.bar 4
+def f = foo /* c */.bar 5
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (command_chain
+          receiver: (safe_navigation_expression
+            object: (identifier)
+            property: (identifier))
+          argument: (number_literal)))))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_type
+          (qualified_type
+            (type_identifier)
+            (type_identifier)))
+        field: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier)))))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      (block_comment)
+      field: (identifier))
+    argument: (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (identifier)
+        (block_comment)
+        field: (identifier))))
+  (expression_statement
+    (number_literal)))
+
+==================
 Spread argument in a command chain with a dotted receiver is unsupported
 :error
 ==================
