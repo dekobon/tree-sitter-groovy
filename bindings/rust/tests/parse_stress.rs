@@ -64,8 +64,7 @@ fn parses_stress_corpus_with_no_errors() {
 
     let mut failures = Vec::new();
     for file in &files {
-        let source = std::fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("read {file:?}: {e}"));
+        let source = std::fs::read_to_string(file).unwrap_or_else(|e| panic!("read {file:?}: {e}"));
         let tree = parser
             .parse(&source, None)
             .unwrap_or_else(|| panic!("parser returned None for {file:?}"));
