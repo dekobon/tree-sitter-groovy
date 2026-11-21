@@ -118,8 +118,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   for `short[]` and at the start of a statement. The element must be a
   primitive or capitalized name: package-qualified, lowercase and
   generic elements (`java.lang.String[].class`, `List<String>[].class`)
-  and a bare `String[]` where a type may start (`return String[]`) read
-  as before (`SPECIFICATION.md` §6.15).
+  read as before, and so does a bare `String[]` where a type may start
+  (`return String[]`), a subscript with a `MISSING` index, which is now
+  a missing `identifier` where it was a missing `true`
+  (`SPECIFICATION.md` §6.15).
 - `multi_assignment_declaration` takes the forms of Apache's
   `variableDeclaration` with names in parentheses: a type per name
   (`def (int a, String b) = l`, in a new `type` field of the
@@ -146,9 +148,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `assertEquals expected, actual`, `foo !x`). The argument is the
   whole expression (`foo new Foo().bar()`, `println x + 1`). Apache's
   `isInvalidLocalVariableDeclaration` decides a name on its spelling,
-  so `String s`, `int x`, `foo.Bar x` and `foo bar = 1` stay
-  declarations. A name is no first argument before `->` (closure
-  parameters), unless an argument after a comma starts with `(` or a
+  so `String s`, `int x` and `foo.Bar x` are declarations, which v0.6.0
+  read as two statements each (see the BREAKING entry on typed
+  locals), and `foo bar = 1` stays one. A name is no first argument
+  before `->` (closure parameters), unless an argument after a comma
+  starts with `(` or a
   key (`assertThrows IllegalArgumentException, () -> foo()` and
   `foo x, k: () -> b` pass a lambda), before parentheses that hold
   typed parameters (`foo bar(int a) { }` stays a method), or after a
@@ -305,9 +309,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `castOperandExpression` takes no binary operator: `(int) a ** b` is
   `((int) a) ** b` (Groovy 3: `(int) 2.9 ** 2` is 4), where it was
   `(int) (a ** b)`, and so are `(T) a.b ** c`, `(T) (U) a ** b`,
-  `-(T) a ** b` (`-(((T) a) ** b)`) and `a ** (T) b ** c`
-  (`(a ** ((T) b)) ** c`). Unchanged: `(T) a++`, `(T) a[0]`,
-  `(T) a.b()`, `(T) a * b`, `(T) a as U` and `(T) () -> x ** 2`. A
+  `-(T) a ** b` (`-(((T) a) ** b)`), `++(T) a ** b`
+  (`++(((T) a) ** b)`) and `a ** (T) b ** c` (`(a ** ((T) b)) ** c`);
+  `!(T) a ** b` is `(!((T) a)) ** b`, as `!` binds tighter than `**`,
+  where it was `!((T) (a ** b))`. Unchanged: `(T) a++`, `(T) a[0]`,
+  `(T) a.b()`, `(T) a * b` and `(T) a as U`; `(T) () -> x ** 2` is the
+  cast of the lambda, an `ERROR` at v0.6.0, which had no lambdas. A
   prefix sign in the operand still takes the power after it,
   `(int) -a ** b` is `(int) (-(a ** b))`, where Groovy casts `-a`
   (`docs/divergences-from-spec.md` §32). No parse-state change; the
@@ -354,7 +361,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `trait` and a block in a member list; both were a
   `trait_declaration`. `modifiers Type trait` at the end of a line is a
   field named `trait`, where v0.6.0 read a field `Type` and a
-  `trait_declaration` that took the next member. In a class body a
+  `trait_declaration` that took the next member, an `ERROR` unless that
+  member was a name and braces; before a name and braces
+  (`private Type trait` then `T { }`) it is the modifier-only field
+  `private Type`, a field `T` of type `trait` and a block, as in a
+  member list above. In a class body a
   modifier-only field followed by a method named `sealed` or `trait`
   (`static count` then `void sealed() { }`) is now a typed field and a
   constructor, the misreading of #96 that the keyword hid. (#73)
@@ -437,7 +448,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   above `case B:` was `case(A: case)` and the label `B:`), without an
   `ERROR` where the lines held names; with `case` reserved (above) and
   without this rule, recovery read `A:` as a label and the next line as
-  its statement, in time quadratic in the lines (see above). A label
+  its statement, in time quadratic in the lines (see above). The missing
+  `switch` is a new external token, `_unreachable`, which the scanner
+  never emits, aliased to `switch`. A label
   with several values (`case 1, 2:`) holds the values before the last
   in an `ERROR`. Trees in a switch body do not change
   (`SPECIFICATION.md` §5.2).
@@ -675,7 +688,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   initializers in fields recover as one `ERROR` for the whole file. A
   new external token, `_statement_block_end`, ends the block
   (`SPECIFICATION.md` §6.22).
-- Twenty-seven external scanner tokens are added, so there are 38
+- Thirty-three external scanner tokens are added, so there are 44
   instead of 11: `_trait_keyword` and `_sealed_keyword` (#73,
   `SPECIFICATION.md` §6.13); `_var_keyword`, `_var_names_keyword`,
   `_yield_keyword`, `_in_keyword`, `_as_keyword` and `_contextual_key`,
@@ -690,8 +703,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `_multi_assignment_comma`, the first `,` of `(a, b) = …` (§6.20);
   `_declaration_start`, and `_closure_parameters_start`, which is never
   emitted (§6.21); `_statement_block_end` (§6.22);
-  `_relational_close`, and `_type_only_close`, which is never emitted
-  (§6.11); `_cast_type_arguments_open` (§3.2.2);
+  `_relational_close`, `_cast_word_close`, and `_type_only_close`,
+  which is never emitted (§6.11); `_cast_type_arguments_open` and
+  `_type_arguments_open` (§3.2.2); `_jump_statement_end` (§6.23);
+  `_closure_call_start` and `_closure_command_start` (§6.24);
+  `_unreachable`, which is never emitted or read (§5.2);
   and `_unterminated_comment` (#75), an empty hidden extra (§6.6). The
   keyword and punctuation tokens are aliased, so the anonymous `trait`,
   `sealed`, `var`, `yield`, `in`, `as`, `(`, `)`, `,` and `<` nodes
@@ -701,9 +717,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
   `lambda_expression`, `multi_assignment_expression`,
   `rest_declarator`) and one field, `dimensions`; none is removed.
-  `SYMBOL_COUNT` goes from 321 to 408, `FIELD_COUNT` from 45 to 46 and
-  `STATE_COUNT` from 4,025 to 4,658, so most symbol ids and the field
-  ids after `dimensions` change. In `node-types.json`: every expression position adds
+  `SYMBOL_COUNT` goes from 321 to 423, `FIELD_COUNT` from 45 to 46,
+  `STATE_COUNT` from 4,025 to 4,789 and `LARGE_STATE_COUNT` from 1,758
+  to 1,846, so most symbol ids and the field ids after `dimensions`
+  change. In `node-types.json`: every expression position adds
   `array_creation_expression`, `array_type`, `lambda_expression` and
   `multi_assignment_expression`; `command_chain` is added to the
   `value` of `variable_declarator`, `local_variable_declaration`,
@@ -715,6 +732,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   member-access kinds; `argument_list`, `list_literal`,
   `assignment_expression.right` and `multi_assignment_declaration` add
   `annotation`, and `multi_assignment_declaration` `rest_declarator`;
+  `list_literal`, `command_chain.argument` and the `index` of
+  `subscript_expression` and `safe_subscript_expression` add
+  `spread_arguments`, and `argument_list` and `command_chain.argument`
+  `spread_map_entry`; the `index` and the `value` of `switch_case` and
+  `switch_arrow_case` become `multiple` (see the first entry of
+  Changed); `gstring_brace_interpolation` adds `closure_parameters`;
   `variable_declarator` gains `type` and `key`;
   `method_declaration` gains `default`; `class_body` adds
   `compact_constructor_declaration` and `multi_assignment_declaration`,
@@ -723,20 +746,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   and `labeled_statement.statement` add `block`; and
   `object_creation_expression.type` drops `array_type`. (#52, #72, #73,
   #75, #94, #95, #101, #102)
-- Parsing costs more than at v0.6.0, counted in user-space
-  instructions. On files that parse without an `ERROR` in both
-  versions, 148 real Groovy, Gradle and Jenkins files take 4.4% more
-  and 241 Java files 3.0% more; with the files that have an `ERROR`,
-  58 of 206 real files at v0.6.0 and 15 now, the real files take 4.9%
-  fewer, as error recovery is costly. Lines of one kind of statement
-  take 7% to 11% more (calls, assignments, dotted calls such as
-  `log.info(y)`). A script method head with untyped parameters and a
-  body (`def f(a, b) { }`) takes 10% to 13% more for two to sixteen
-  parameters, about as much as a typed head (9% more with two), and
-  1.8 times as much with twenty, past the scanner's look-ahead of
-  sixteen names (`SPECIFICATION.md` §6.20); a typed local with an
-  initializer (`String s = 'a'`) takes 42% fewer. The compiled parser
-  is about 30% larger.
+- Parsing costs more than at v0.6.0 on files that parse without an
+  `ERROR` in both versions, and less with the files that have one, as
+  error recovery is costly. Measured as the minimum of 25 runs (6 for
+  the Java files), with noise of about 1%: ten parses of the 266 real
+  Groovy, Gradle and Jenkins files, concatenated, take 0.300 s, 0.316 s
+  at v0.6.0, and twenty of the 190 that parse without an `ERROR` in both
+  versions 0.273 s, 0.247 s at v0.6.0 (11% more); the 24,548 Java files
+  take 9.45 s, 9.69 s at v0.6.0, and the 15,865 of them without an
+  `ERROR` in both 2.33 s, 2.20 s at v0.6.0 (6% more). Two of the 266 real
+  files have an `ERROR`, both at a method with `def` before its type
+  parameters (`def <T> T unwrap(Class<T> iface)`), 76 at v0.6.0, and
+  4,717 of the Java files, 8,683 at v0.6.0. The lexer asks for 1.914
+  bytes per byte of the real files, 1.601 at v0.6.0, as the scanner's
+  look-aheads read ahead of the in-grammar lexer. The compiled parser
+  is 39% larger (2.02 MB, 1.45 MB at v0.6.0), and `src/parser.c`
+  9.87 MB (7.88 MB).
 - A few edit sequences still reparse incrementally to a tree that
   differs from a parse from scratch. `SPECIFICATION.md` §6.17 to §6.22,
   `docs/divergences-from-spec.md` §20 for an edit of a `default`
@@ -779,9 +804,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   generic type an `ERROR`. The scanner decides the type
   after `def` as it does a statement's (`SPECIFICATION.md` §6.21), so
   `def String` then `s = 1` on the next line stays two statements. A
-  lowercase type (`def foo bar`), a modifier after `def`
-  (`def final String x`) and a return type after `def`
-  (`def String m() { }`) are read as before.
+  lowercase type (`def foo bar`) and a return type after `def`
+  (`def String m() { }`) are read as before. A modifier after `def`
+  (`def final String x`) is not taken either: it is `def final` and the
+  typed local `String x`, where v0.6.0 read three statements (see the
+  BREAKING entry on typed locals).
   Of 266 real files, one that had an `ERROR` has none.
 - **BREAKING:** a line break after `return`, `break` or `continue` ends
   the statement, as Groovy takes the value or the label only on the
@@ -806,8 +833,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   statement `foo { }[0]` is read (`docs/divergences-from-spec.md` §30),
   where Groovy subscripts or adds the call. A new external token,
   `_jump_statement_end`, ends the statement (`SPECIFICATION.md` §6.23).
-  `throw` and `assert` still take a value on the next line. No tree of
-  266 real files changes; 66 of 24,548 Java files do, each at a
+  `throw` and `assert` still take a value on the next line. In an arrow
+  case, `case 1 -> return` then `foo()` on the next line, which v0.6.0
+  read with no `ERROR` as the case returning `foo()`, is the case's
+  statement `foo()` after a bare `return` in an `ERROR`; Apache master's
+  AST builder rejects it, as an arrow case holds one statement. No tree
+  of 266 real files changes; 66 of 24,548 Java files do, each at a
   `return` that ends its line.
 - **BREAKING:** in a type body `var` is a modifier, as `def` is and as
   Apache's `modifier` rule lists it, no longer a type name: `var x = 1`
@@ -850,8 +881,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   there: `yield` then `x` on the next line, also after `// c` or
   `/* c */` on the line of `yield`, are the names `yield` and `x`, where
   v0.6.0 read a `yield_statement` of `x`; Groovy 3 reads two names too.
-  A line escape still joins the lines (`SPECIFICATION.md` §6.16). No
-  corpus, real, Java or shape tree changes.
+  A line escape still joins the lines (`SPECIFICATION.md` §6.16). As a
+  name, `yield` goes on with a literal, a closure or a sign on the next
+  line as any name does (`foo` then `1`): `yield` then `{ }` is the
+  call `yield { }`, as in Groovy, but `yield` then `1` and `yield // c`
+  then `1` are the `command_chain` `yield 1`, and `yield` then `-1` the
+  difference `yield - 1`, where Groovy reads the name `yield` and then
+  the statement (`docs/divergences-from-spec.md` §22). No corpus, real,
+  Java or shape tree changes.
 - **BREAKING:** a `/` after an operand on its line is division, as
   Groovy's lexer reads it after a name, a literal, `this`, `)`, `]`,
   `}`, `++`, `--` or a string. Where the next statement or a call's
@@ -886,10 +923,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `void`, `public` and so on, and a constructor, method or field, with
   no `ERROR`; it is the field `k` with the cast and the member, also
   with a primitive or dotted type (`(int) x`, `(a.b.Foo) x`) and an
-  operand `x.y`. `x = (Foo) y` then `{ -> 1 }` and `{ foo() }` on the
-  next lines was the assignment of `(Foo)`, the call `y { -> 1 }` and a
-  block; it is the cast of `y` called with both closures, as Groovy 3
-  calls it. A new external token, `_cast_word_close`, is the `)` before
+  operand `x.y`. A new external token, `_cast_word_close`, is the `)` before
   a name (`SPECIFICATION.md` §6.11). No tree of the corpus or of 266
   real files changes; of 24,548 Java files one with an `ERROR` does, and
   of 4,000 shape inputs two do, each to Groovy's reading.
@@ -910,8 +944,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   arguments that never closed and was an `ERROR`, as the name could be
   a cast's type or a declaration's. Type arguments that close there, or
   run past the scanner's read, still make a type: `(List<String>) x`,
-  `List<String> xs = []`. No tree of 266 real files changes; 6 of
-  24,548 Java files parse without an `ERROR` (`(len<min)?min:len`,
+  `List<String> xs = []`; their `<` there is a new external token,
+  `_type_arguments_open`, aliased to `<`. No tree of 266 real files
+  changes; 6 of 24,548 Java files parse without an `ERROR`
+  (`(len<min)?min:len`,
   `if((load<0.0 || load>1.0) && …)`), and every tree that changes had
   an `ERROR` before (`SPECIFICATION.md` §3.2.2).
 - `trait` and `sealed` are names wherever they do not open a
@@ -989,11 +1025,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `tree-sitter highlight` and other tools that read the file load the
   injections; v0.6.0 left them out. `locals.scm` stays unlisted, as
   `tree-sitter tags` rejects its `@local.definition.var` captures.
-- A block comment between the key of a parenthesis-free call's named
-  argument and its `:` is trivia, as Groovy's lexer hides it:
-  `foo a /* c */ : 1` is the call `foo(a: 1)`, also when the comment
-  spans lines; v0.6.0 read the statement `foo` and the label `a: 1`
-  (`SPECIFICATION.md` §6.8).
+- **BREAKING:** a block comment between the key of a parenthesis-free
+  call's named argument and its `:` is trivia, as Groovy's lexer hides
+  it: `foo a /* c */ : 1` is the call `foo(a: 1)`, also when the comment
+  spans lines; v0.6.0 read the statement `foo` and the label `a: 1`,
+  with no `ERROR` (`SPECIFICATION.md` §6.8).
 - Queries. `injections.scm`: the body of a slashy or dollar-slashy
   string is injected as `regex`, each `string_fragment` as its own
   document, so the delimiters and `${…}` and `$name` interpolations
@@ -1018,8 +1054,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `foo { }.bar x: 1`, `foo { }.bar(baz 1)`). Each was an `ERROR`, as at
   v0.6.0; of 266 real files one that had an `ERROR`
   (`pom {}.writeTo(…)`) has none, and no tree without an `ERROR`
-  changes. The scanner decides before the name, reading the braces on
-  their line on Groovy's tokens for at most 128 characters, a slashy
+  changes. The scanner decides before the name, with two new external
+  tokens, `_closure_call_start` and `_closure_command_start`, reading
+  the braces on their line on Groovy's tokens for at most 128
+  characters, a slashy
   string after a keyword included (`foo { return /}/ }.bar()`), and a
   division after `yield` as a name and after a keyword that `::`
   names (`foo { yield / 2 }.bar()`, `foo { x::return / 2 }.bar()`), so
