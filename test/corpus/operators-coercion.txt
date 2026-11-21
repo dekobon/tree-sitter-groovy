@@ -590,3 +590,40 @@ foo((Foo)
         (ERROR
           (identifier))
         (string_literal)))))
+
+==================
+A cast inside a call whose closing parenthesis is more than 256 characters on reads as a call (known divergence)
+==================
+
+foo((Foo)
+  (bar) + 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+foo((Foo)
+  (bar)[0], 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          right: (number_literal))
+        (string_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (subscript_expression
+          object: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          index: (number_literal))
+        (string_literal)))))
