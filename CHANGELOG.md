@@ -785,6 +785,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `throw` and `assert` still take a value on the next line. No tree of
   266 real files changes; 66 of 24,548 Java files do, each at a
   `return` that ends its line.
+- **BREAKING:** parentheses before a keyword that starts no operand on
+  their line close no cast: `if (a) (b) else c` is an `if_statement`
+  with the `alternative` `c`, as Groovy runs it, where v0.6.0 read the
+  cast `(b)` of a name `else` and the statement `c` without an `ERROR`;
+  `if (a) (b) else (c)`, `if (a) (b) else if (d) e` and
+  `if (b) (c) else break` likewise. `x = (a) default`, which Groovy
+  rejects, is an `ERROR` (`SPECIFICATION.md` §6.11). No corpus, real or
+  shape tree changes; 5 of 24,548 Java trees with an `ERROR` change and
+  keep one.
 - **BREAKING:** a line break after `yield` makes it a name, as Apache's
   `yieldStatement` (`YIELD expression`, 4.0.x to master) takes no line
   break before the value, which Groovy's lexer reads as a newline token

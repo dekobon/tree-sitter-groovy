@@ -3437,6 +3437,26 @@ static bool keyword_operand_follows(TSLexer *lexer, bool in) {
         || (in && ((c >= '0' && c <= '9') || c == '\'' || c == '"'));
 }
 
+// SPECIFICATION.md §6.11 — whether a keyword of grammar.js that
+// `read_word` returned, with `next` the character after it, may start the
+// operand of a cast: `new`, `super`, `switch`, `true`, `false`, `null` and
+// `static` before a `.` (Apache `pathExpression`), and the words the grammar
+// reserves that Groovy takes as names (`_`, `permits`, `pipeline`). The
+// others start a statement or a clause, or are modifiers.
+static bool keyword_starts_operand(
+    const char *word,
+    unsigned len,
+    int32_t next
+) {
+    if (word_is(word, len, "static")) {
+        return next == '.';
+    }
+    return word_is(word, len, "new") || word_is(word, len, "super")
+        || word_is(word, len, "switch") || is_literal_word(word, len)
+        || word_is(word, len, "_") || word_is(word, len, "permits")
+        || word_is(word, len, "pipeline");
+}
+
 // What a `)` closes, by what follows it on its line (§6.11).
 typedef enum {
     // Nothing: a cast whose operand is on a later line ranks below a
@@ -3448,16 +3468,17 @@ typedef enum {
     // The same where the operand is a name, which could also start the
     // type of the next member (CAST_WORD_CLOSE).
     NAME_CLOSE,
-    // A relational operator that Groovy applies to the parentheses, or a
-    // division (§6.2): the parentheses close no cast.
+    // A relational operator that Groovy applies to the parentheses, a
+    // division (§6.2) or a keyword that starts no operand
+    // (`keyword_starts_operand`): the parentheses close no cast.
     OPERATOR_CLOSE,
 } ParenClose;
 
 // SPECIFICATION.md §6.11 — what a `)` closes, read from the first
 // character after it on its line: OPERATOR_CLOSE before a relational
 // operator that Groovy applies to the parentheses, where a cast's operand
-// cannot start, NAME_CLOSE before a name, and OPERAND_CLOSE before anything
-// else. `instanceof`, `!instanceof` and `!in` are operators wherever
+// cannot start, and before a keyword that starts no operand (`else`),
+// NAME_CLOSE before a name, and OPERAND_CLOSE before anything else. `instanceof`, `!instanceof` and `!in` are operators wherever
 // Groovy's lexer meets them (GroovyLexer.g4 INSTANCEOF, NOT_INSTANCEOF and
 // NOT_IN), so `(x) instanceof Foo` tests `(x)` and is no cast of a name
 // `instanceof`. `as` and `in` are names too, and `(Foo) in` casts the name
@@ -3481,6 +3502,13 @@ static ParenClose read_relational_operator(TSLexer *lexer) {
             return keyword_operand_follows(lexer, word[0] == 'i')
                 ? OPERATOR_CLOSE
                 : OPERAND_CLOSE;
+        }
+        // A keyword that starts no operand (`if (a) (b) else c`, where the
+        // in-grammar lexer would read `else` as the cast's operand, a name)
+        // closes no cast either.
+        if (is_grammar_keyword(word, len)
+            && !keyword_starts_operand(word, len, lexer->lookahead)) {
+            return OPERATOR_CLOSE;
         }
         return is_reserved_lambda_name(word, len)
                 || opens_dollar_slashy(word, len, lexer)

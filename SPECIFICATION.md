@@ -2240,10 +2240,21 @@ goes on with
     that is not `as`, `in` or `instanceof`, nor `new` after `as`, or
     after `in` a digit or a quote, or
   - a `/` that opens no comment, a division after a `)` to Groovy's
-    lexer, which no cast's operand starts with (§6.2).
+    lexer, which no cast's operand starts with (§6.2), or
+  - a keyword of grammar.js that starts no operand: any but `new`,
+    `super`, `switch`, `true`, `false`, `null`, `static` before a `.`,
+    and `_`, `permits` and `pipeline`, which Groovy takes as names.
 Emit it also in a state where it is not valid, where only a cast's type
 takes the `)`: no rule takes it there, so that reading ends.
 ```
+
+A keyword that starts no operand, such as `else`, ends the cast's reading
+too: the in-grammar lexer reads a keyword as a name where the state has
+no action for it, so `if (a) (b) else c` read the cast `(b)` of a name
+`else` and the statement `c`, with no `ERROR`, and `if (a) (b) else (c)`
+the cast of a call `else(c)`, where Groovy runs the `if` with an `else`
+(observed with Groovy 3). `(b) return` and `(b) while (x) y`, which
+Groovy rejects, are the parenthesized name and the next statement.
 
 `instanceof` is reserved in Groovy, but here a keyword lexes as a name
 where it has no action, so `(x) instanceof Foo` read the cast `(x)` of a
