@@ -3214,11 +3214,13 @@ module.exports = grammar({
     _index_element: $ => choice($._expression, $.spread_arguments),
 
     // §3.1 level 2 / §3.2 — `**`. Distinct node kind so metric tools
-    // count power separately from multiplicative ops. Right-assoc
-    // per Apache: `1 ** 2 ** 3` parses as `1 ** (2 ** 3)`. POWER
-    // binds tighter than UNARY (+ -) but looser than UNARY_NOT
-    // (! ~) — see PREC table comments.
-    power_expression: $ => prec.right(PREC.POWER, seq(
+    // count power separately from multiplicative ops. Left-associative,
+    // as Apache's powerExprAlt has no `<assoc=right>`: `2 ** 3 ** 2` is
+    // `(2 ** 3) ** 2`, 64 in Groovy. POWER binds tighter than UNARY
+    // (+ -) but looser than UNARY_NOT (! ~) — see PREC table comments —
+    // so `-2 ** 2` is `-(2 ** 2)` and `2 ** -2 ** 3` is
+    // `2 ** -(2 ** 3)`.
+    power_expression: $ => prec.left(PREC.POWER, seq(
       field('left', $._expression),
       '**',
       field('right', $._expression),

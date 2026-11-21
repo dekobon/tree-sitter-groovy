@@ -2391,3 +2391,25 @@ Groovy column is read off the 4.0.x to master grammars.
 **Action**: none planned; rejecting the two accepted forms needs a line
 break before the comma to end the case's values and `default` to be
 turned down there, for input that Groovy rejects anyway.
+
+## 32. A cast before a power
+
+**Apache `GroovyParser.g4`** (3.0.x to master): the cast alternative of
+`expression` is `castParExpression castOperandExpression`, and
+`castOperandExpression` is another cast, a `postfixExpression`, or `!`,
+`~`, `++`, `--`, `+` or `-` before another `castOperandExpression`: no
+binary operator, so every one applies to the cast.
+
+**Current implementation**: `parenthesized_type_cast` has the
+precedence of the prefix operators (`PREC.UNARY`), so an operator that
+binds tighter than those, `**`, is in its operand.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `(int) a * b`, `(int) a + b` | the product or sum of the cast | the same |
+| `(int) a ** b` | `((int) a) ** b`; Groovy 3 evaluates `(int) 2.5 ** 2` to 4 | `(int) (a ** b)`, a cast of the power |
+| `(int) -a ** b` | `((int) (-a)) ** b` | `(int) (-(a ** b))` |
+
+**Action**: a precedence tighter than POWER on the cast would take
+`(int) a ** b` as Groovy does, but not `(int) -a ** b`, whose unary
+minus would still take the power; not attempted.

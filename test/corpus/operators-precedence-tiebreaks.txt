@@ -183,7 +183,7 @@ a ==> b ==> c
         right: (identifier)))))
 
 ==================
-Power is right-associative
+Power is left-associative
 ==================
 
 1 ** 2 ** 3
@@ -193,10 +193,10 @@ Power is right-associative
 (source_file
   (expression_statement
     (power_expression
-      left: (number_literal)
-      right: (power_expression
+      left: (power_expression
         left: (number_literal)
-        right: (number_literal)))))
+        right: (number_literal))
+      right: (number_literal))))
 
 ==================
 Unary plus and minus are looser than power

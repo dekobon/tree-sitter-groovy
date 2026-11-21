@@ -27,7 +27,7 @@ Power on number literals
       right: (number_literal))))
 
 ==================
-Power right-associative chain
+Power left-associative chain
 ==================
 
 1 ** 2 ** 3
@@ -37,10 +37,10 @@ Power right-associative chain
 (source_file
   (expression_statement
     (power_expression
-      left: (number_literal)
-      right: (power_expression
+      left: (power_expression
         left: (number_literal)
-        right: (number_literal)))))
+        right: (number_literal))
+      right: (number_literal))))
 
 ==================
 Unary minus is looser than power
@@ -56,6 +56,84 @@ Unary minus is looser than power
       operand: (power_expression
         left: (number_literal)
         right: (number_literal)))))
+
+==================
+Prefix operators take the powers after them, in a power's right operand too
+==================
+
+a = 2 ** -2 ** 3
+b = -2 ** 2
+c = x ** y ** -z
+d = ++x ** 2
+e = x ** y++
+f = x ** y * z
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (number_literal)
+        right: (unary_expression
+          operand: (power_expression
+            left: (number_literal)
+            right: (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (power_expression
+          left: (number_literal)
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (power_expression
+          left: (identifier)
+          right: (identifier))
+        right: (unary_expression
+          operand: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (unary_update_expression
+        operand: (power_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (power_expression
+        left: (identifier)
+        right: (update_expression
+          operand: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (power_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier)))))
+
+==================
+A cast takes the power after its operand, which Groovy applies to the cast (known divergence)
+==================
+
+(int) a ** b
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (power_expression
+        left: (identifier)
+        right: (identifier)))))
 
 ==================
 Bitwise complement is tighter than power

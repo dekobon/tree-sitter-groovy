@@ -9326,7 +9326,7 @@
       ]
     },
     "power_expression": {
-      "type": "PREC_RIGHT",
+      "type": "PREC_LEFT",
       "value": 17,
       "content": {
         "type": "SEQ",

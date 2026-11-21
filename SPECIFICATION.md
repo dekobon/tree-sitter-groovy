@@ -218,7 +218,7 @@ alternative binds tighter, so a level splits in two (7a and 7b below).
 | Apache level | Name | Operators | Associativity | Notes |
 |---:|---|---|---|---|
 | 1 | UNARY_NOT | `~` `!` | right | |
-| 2 | POWER | `**` | right | `1 ** 2 ** 3` → `1 ** (2 ** 3)` |
+| 2 | POWER | `**` | left | `2 ** 3 ** 2` → `(2 ** 3) ** 2`, 64 in Groovy 3: `left=expression op=POWER nls right=expression` has no `<assoc=right>` in 3.0.x, 4.0.x, 5.0.x, master or 6.0.x. Before 0.7.0 the grammar read it right-associative. Prefix `+`, `-`, `++` and `--` (level 3) take the powers after them, also in a power's right operand: `-2 ** 2` is `-(2 ** 2)`, `2 ** -2 ** 3` is `2 ** (-(2 ** 3))`, and `++a ** 2` is `++(a ** 2)`, as Groovy 3 reads it. A cast takes them too here, where Groovy's `castOperandExpression` takes no binary operator: `(int) a ** b` is `(int) (a ** b)`, Groovy's `((int) a) ** b` (`docs/divergences-from-spec.md` §32). |
 | 3 | UNARY_ADD | prefix `++` `--`, unary `+` `-` | right | |
 | 4 | MUL | `*` `/` `%` | left | |
 | 5 | ADD | `+` `-` (binary) | left | |
@@ -302,7 +302,7 @@ issue #246's "Suggested fix" path 1.
 | Symbol | Node kind | Field shape | Notes |
 |---|---|---|---|
 | `+` `-` `*` `/` `%` `<<` `>>` `>>>` `&` `^` `\|` `&&` `\|\|` `<` `<=` `>` `>=` `==` `!=` | `binary_expression` | `left`, `operator`, `right` | Java-shaped; precedence per §3.1. |
-| `**` | `power_expression` | `left`, `right` | Right-associative; separate node so metric counts power-ops distinctly. |
+| `**` | `power_expression` | `left`, `right` | Left-associative (§3.1); separate node so metric counts power-ops distinctly. |
 | `?:` | **`elvis_expression`** | `value`, `default` | Resolves #246. No `MISSING` child anywhere. |
 | `? :` | `ternary_expression` | `condition`, `consequence`, `alternative` | Standard. |
 | `==>` | `logical_implication_expression` | `left`, `right` | Rare; emit distinct kind. |
@@ -4991,7 +4991,7 @@ Other per-operator corpus files mandated:
 - `operators-method-reference.txt` (::)
 - `operators-assignment.txt` (=, the augmented forms, ?=)
 - `operators-implication.txt` (==>)
-- `operators-power.txt` (** including `2 ** 3 ** 2` right-assoc test)
+- `operators-power.txt` (** including `1 ** 2 ** 3` left-assoc test)
 - `operators-safe-chain-dot.txt` (??.) — Groovy 4+; v2 addition
 - `expressions-lambda.txt` (`->` lambdas, §5.16) — every position of
   each form, the bodies, the arrow after a line break or a comment,
@@ -5009,7 +5009,7 @@ Other per-operator corpus files mandated:
     (Elvis nests inside ternary's middle slot)
   - `a ?: b ?: c` → `a ?: (b ?: c)` (right-assoc)
   - `a ==> b ==> c` → `a ==> (b ==> c)` (right-assoc)
-  - `1 ** 2 ** 3` → `1 ** (2 ** 3)` (right-assoc)
+  - `1 ** 2 ** 3` → `(1 ** 2) ** 3` (left-assoc)
 
 ### 8.2 Per-issue regression corpus
 

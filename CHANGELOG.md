@@ -264,6 +264,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   Unchanged: `a == b =~ c`, which was and is `(a == b) =~ c`, and
   `a =~ b & c`. No corpus, real, Java or shape tree changes
   (`SPECIFICATION.md` §3.1).
+- **BREAKING:** `**` is left-associative, as Apache's `powerExprAlt`
+  has no `<assoc=right>`: `a ** b ** c` is `(a ** b) ** c` (Groovy 3:
+  `2 ** 3 ** 2` is 64), where it was `a ** (b ** c)`, and so is every
+  chain of powers, `a ** b ** -c` included, which is `(a ** b) ** (-c)`.
+  Unchanged: a prefix `+`, `-`, `++` or `--` takes the powers after it,
+  in a power's right operand too (`-2 ** 2` is `-(2 ** 2)`,
+  `2 ** -2 ** 3` is `2 ** (-(2 ** 3))`), and `a ** b * c`,
+  `a * b ** c`, `!a ** b`, `a ** b++` and `a **= b ** c` read as
+  before. `(int) a ** b` is still a cast of the power, where Groovy
+  casts `a` (`docs/divergences-from-spec.md` §32). Two corpus trees
+  change, the pinned right-associative chains; no real, Java or shape
+  tree does (`SPECIFICATION.md` §3.1).
 - **BREAKING:** a dotted name followed on its line by a literal or a
   `name:` key is a `command_chain` (see Added), which changes trees for
   input that parsed without an `ERROR` at v0.6.0. `obj.method 'x'`,
