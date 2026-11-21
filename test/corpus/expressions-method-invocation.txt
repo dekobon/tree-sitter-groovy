@@ -1470,26 +1470,103 @@ foo { a / 2 }.bar()
       arguments: (argument_list))))
 
 ==================
-A call with a closure that ends after a member access in brackets is not a receiver (known divergence)
+Brackets after a call with a closure and a member access hold a parenthesis-free call or span lines or the look-ahead bound
+==================
+
+foo { }.bar(baz 1)
+foo { }.each {
+  x
+}
+foo { }.bar("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list
+        (string_literal
+          (string_fragment))))))
+
+==================
+A call with a closure whose accesses go on after brackets to a first argument is unsupported
+:error
 ==================
 
 foo { }.bar().baz 1
 
 ---
 
-(source_file
-  (expression_statement
-    (field_access
-      object: (method_invocation
-        function: (field_access
-          object: (method_invocation
-            function: (identifier)
-            closure: (closure))
-          field: (identifier))
-        arguments: (argument_list))
-      field: (identifier)))
-  (expression_statement
-    (number_literal)))
+==================
+A call with a closure whose accesses go on after a closure argument to a first argument is unsupported
+:error
+==================
+
+a { }.b { }.c 1
+
+---
+
+==================
+A call with a closure whose accesses go on after an argument list to a first argument is unsupported
+:error
+==================
+
+a { }.b(1).c 2
+
+---
+
+==================
+A call with a closure whose accesses go on after arguments that span lines to a first argument is unsupported
+:error
+==================
+
+foo { }.bar(1,
+2).baz 1
+
+---
+
+==================
+A call with a closure whose access is subscripted before a first argument is unsupported
+:error
+==================
+
+foo { }.bar[0] 1
+
+---
+
+==================
+A call with a closure whose last access is new before a name is unsupported
+:error
+==================
+
+foo { x }.new X
+
+---
 
 ==================
 A call with a closure that an operator other than a member access follows stays a command chain (known divergence)

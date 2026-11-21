@@ -29,7 +29,8 @@ const CHUNK_BYTES: usize = 64;
 /// Most the bytes served per input byte may grow from the shorter line to the
 /// longer. The bound keeps the two about equal (measured: 36.5 and 38.5 bytes
 /// per byte for a line of closed closures, 43.3 and 47.4 for unclosed ones,
-/// 19.8 and 20.3 for closures with accesses); without it every read went to
+/// 19.8 and 20.3 for closures with accesses, 18.6 and 19.1 for unclosed
+/// closures after accesses); without it every read went to
 /// the end of the line, and the ratio grew with it, about eightfold here
 /// (132.2 and 1,008.2 for the closed closures with the bound at 2^30).
 const MAX_BYTES_GROWTH: f64 = 1.5;
@@ -84,6 +85,11 @@ fn a_line_of_nested_closures_is_read_a_bounded_number_of_times() {
     });
     assert_bounded("a line of closures with accesses", |n| {
         format!("{}{}\n", "a { ".repeat(n), "}.b() ".repeat(n))
+    });
+    // The read goes into the brackets after each access, and each `a`
+    // opens a statement of the closure before it.
+    assert_bounded("a line of unclosed closures after accesses", |n| {
+        format!("{}\n", "a { }.b { ".repeat(n))
     });
 }
 

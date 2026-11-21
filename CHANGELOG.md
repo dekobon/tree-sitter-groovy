@@ -837,15 +837,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a later one (`foo { }` then `.bar()`), with any access (`?.`, `*.`,
   `??.`, `.&`, `.@`, `::`). Where a first argument follows the accesses
   they are the receiver of a `command_chain` (`foo { }.bar 1`,
-  `foo { }.bar x: 1`). Each was an `ERROR`, as at v0.6.0; of 266 real
-  files one that had an `ERROR` (`pom {}.writeTo(…)`) has none, and no
-  tree without an `ERROR` changes. The scanner decides before the name,
-  reading the braces on their line on Groovy's tokens for at most 128
-  characters, a slashy string after a keyword included
-  (`foo { return /}/ }.bar()`), so braces that span lines (`foo {` then
-  `}.bar()`) stay an `ERROR`, and an operator other than an access after
-  the `}` (`foo { }[0]`, `foo { } + 1`) is read as before
-  (`SPECIFICATION.md` §6.24, `docs/divergences-from-spec.md` §30).
+  `foo { }.bar x: 1`, `foo { }.bar(baz 1)`). Each was an `ERROR`, as at
+  v0.6.0; of 266 real files one that had an `ERROR`
+  (`pom {}.writeTo(…)`) has none, and no tree without an `ERROR`
+  changes. The scanner decides before the name, reading the braces on
+  their line on Groovy's tokens for at most 128 characters, a slashy
+  string after a keyword included (`foo { return /}/ }.bar()`), so
+  braces that span lines (`foo {` then `}.bar()`) stay an `ERROR`, and
+  an operator other than an access after the `}` (`foo { }[0]`,
+  `foo { } + 1`) is read as before. Where a first argument follows
+  brackets after an access or a later access (`foo { }.bar().baz 1`,
+  `a { }.b { }.c 1`, `foo { }.bar[0] 1`), which no receiver of the
+  grammar takes, and where a name follows `.new`, the statement stays an
+  `ERROR` (`SPECIFICATION.md` §6.24, `docs/divergences-from-spec.md`
+  §30).
 
 ## [0.6.0] - 2026-11-12
 

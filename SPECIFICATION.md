@@ -4580,15 +4580,23 @@ scanner decides there, and that `{` follows on its line:
   - the braces must close on the name's line;
   - past spaces, line breaks and comments a member access must follow
     the `}`: `.` other than `..`, `?.`, `??.`, `*.`, `.&`, `.@` or `::`;
-  - then each access's name (trivia and line breaks between them), and
-    after the last on its line what follows it.
+  - then each access's name (trivia and line breaks between them), the
+    brackets after it (`(…)`, `[…]`, `?[…]`, `{…}`, read past to the
+    one that closes them, line breaks included), and after the last
+    name or brackets on their line what follows.
 Emits CLOSURE_COMMAND_START, empty and before the name, iff a first
 argument that `obj.m 1` takes (§6.14, any name included) follows the
-last name on its line and every access is one of `.`, `?.`, `??.`,
-`*.`, `.&`, `.@` with a plain name.
+last name on its line, or parentheses after it hold a
+parenthesis-free call (`.bar(baz 1)`), no brackets come before, and
+every access is one of `.`, `?.`, `??.`, `*.`, `.&`, `.@` with a plain
+name.
+Emits nothing where such an argument, or a name after brackets, follows
+brackets or a later access's name, or a name follows `new` as the last
+name.
 Emits CLOSURE_CALL_START, empty and before the name, iff no such argument
 follows.
-Else, and wherever the read reaches the bound: emits nothing.
+Else, and wherever the read reaches the bound before brackets after an
+access: emits nothing.
 ```
 
 Groovy reads `foo { }.bar()` as `foo({ }).bar()`. Apache's
@@ -4675,10 +4683,22 @@ no type, so `foo { }.Bar x` calls, as in Groovy, where `foo.Bar x`
 declares `x`. Where the accesses hold `::` or a quoted name, which the
 receiver rule does not take, no token is emitted when an argument
 follows, and `foo { }::bar 1` and `foo { }.'bar' 1` stay the `ERROR` they
-were. Brackets after an access end the read of the accesses there:
-`foo { }.bar().baz 1` and `a { }.b { }.c 1` are the call's accesses and
-then `1`, which Groovy passes to `baz` and to `c`, as `foo().baz 1` is
-read (§5.5 item 2); both were an `ERROR` before.
+were. Parentheses after the last name that hold a parenthesis-free call
+are its first argument, as §6.14 reads `obj.m (foo 1)`: `foo { }.bar(baz 1)`
+is a `command_chain` whose argument is `(baz 1)`. Other brackets after an
+access are read past, to the bracket that closes them, line breaks
+included, and the read goes on after them. Where a first argument follows
+them or a later access's name (`foo { }.bar().baz 1`, `a { }.b { }.c 1`,
+`a { }.b(1).c 2`, `foo { }.bar[0] 1`, `foo { }.bar(1,` then `2).baz 1`),
+which Groovy passes to `baz`, to `c` or to the element, no receiver of
+the grammar takes the call, as none takes `foo().baz 1` (§5.5 item 2), and
+the call alone would leave the argument a statement of its own: no token
+is emitted, and each stays the `ERROR` it was. So does `foo { }.new X`,
+Groovy's `foo({ }).new(X)`, which the grammar reads as `obj.new X` is,
+the access and the statement `X`. Brackets that do not close within the
+bound are the call's arguments, and what follows them is read as after
+`foo().bar(…)`: the bound cuts nothing there, so that `foo { }.each(…)`
+with a long argument stays a call.
 
 After `return`, `break` and `continue` on their line neither token is
 emitted, so that `return foo { }.bar 1` stays the return of
@@ -4707,7 +4727,9 @@ before, and one of `foo { a }.bar()` lines 3.1, where it was an `ERROR`
 read 4.9 times. 128 characters cover a statement's closure and access on
 a line of 120 columns; the longest closure that opens and closes on a
 statement's line in the 266 real files is 66 characters. A line of 16,000
-unclosed `a {` parses in 24 ms, 10 ms before (37 ms at 256).
+unclosed `a {` parses in 24 ms, 10 ms before (37 ms at 256). A line of
+unclosed calls with accesses (`a { }.b { a { }.b { …`), whose brackets
+the read goes into, is read 15 times per character, 3 before it did.
 `bindings/rust/tests/closure_call_cost.rs` pins the bytes served per
 byte at two lengths, which grow eightfold without the bound.
 

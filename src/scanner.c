@@ -3676,22 +3676,27 @@ static bool slashy_may_follow_word(
         && !word_is(word, len, "permits") && !word_is(word, len, "pipeline");
 }
 
-// SPECIFICATION.md §6.24 — from the `{` after a statement's first name,
-// through a view that ends at the line break: whether the braces close there.
-// They are counted on Groovy's tokens, as `next_line_paren_ends_cast` counts
-// brackets: strings whole (`skip_string`, a `${…}` with the strings in it), a
-// slashy string where Groovy's lexer opens one (`slashy_body_follows`): after
-// an operator, a bracket that opens or a keyword (`slashy_may_follow_word`),
+// SPECIFICATION.md §6.24 — inside `depth` opening brackets (`{`, `(`, `[`),
+// consumes the tokens to the bracket that closes the outermost. They are
+// counted on Groovy's tokens, as `next_line_paren_ends_cast` counts them:
+// strings whole (`skip_string`, a `${…}` with the strings in it), a slashy
+// string where Groovy's lexer opens one (`slashy_body_follows`): after an
+// operator, a bracket that opens or a keyword (`slashy_may_follow_word`),
 // not after an operand or `++` and `--`; a dollar-slashy string
-// (`skip_dollar_slashy_string`) and block comments as trivia. A string, a
-// comment or an interpolation that runs past the line ends the read as an
-// unclosed brace does, and so does a line comment.
-static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
-    advance(input);
-    unsigned depth = 1;
-    // Whether an operand may start here, so that a `/` opens a slashy
-    // string.
-    bool operand = true;
+// (`skip_dollar_slashy_string`) and block comments as trivia. `operand`
+// says whether an operand may start at the first token. Returns false where
+// the brackets do not close: at the end of the input, which a
+// BoundedLexer's bound or line sets, and at a string, a comment or an
+// interpolation that does not close. A line comment ends the read as well,
+// unless `lines` is set: it is then trivia, and a line break any other
+// character.
+static bool skip_closure_tokens(
+    TSLexer *input,
+    unsigned depth,
+    bool operand,
+    bool lines,
+    bool no_close_ahead
+) {
     // Whether the last token was a member access, after which a keyword is
     // a name.
     bool member = false;
@@ -3703,9 +3708,15 @@ static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
         }
         if (slash) {
             if (input->lookahead == '/') {
-                return false;
-            }
-            if (operand && input->lookahead != '=') {
+                if (!lines) {
+                    return false;
+                }
+                while (!input->eof(input)
+                       && !is_line_break(input->lookahead)) {
+                    advance(input);
+                }
+                operand = true;
+            } else if (operand && input->lookahead != '=') {
                 if (!slashy_body_follows(input)) {
                     return false;
                 }
@@ -3751,9 +3762,9 @@ static bool closure_closes_on_line(TSLexer *input, bool no_close_ahead) {
         }
         operand = c != ')' && c != ']' && c != '}' && c != '.';
         member = c == '.' || (member && (c == '&' || c == '@'));
-        if (c == '{') {
+        if (c == '{' || c == '(' || c == '[') {
             depth++;
-        } else if (c == '}') {
+        } else if (c == '}' || c == ')' || c == ']') {
             depth--;
         }
     }
@@ -3780,6 +3791,151 @@ static bool read_closure_access(TSLexer *lexer, bool *receiver) {
         && !(dot && lexer->lookahead == '.');
 }
 
+// What follows an access's name, or brackets after it, in
+// `read_closure_accesses`.
+typedef enum {
+    // Another access, consumed: a name follows.
+    NEXT_ACCESS,
+    // Brackets, consumed.
+    BRACKETS,
+    // Neither on the line, nothing consumed there: the accesses end.
+    ACCESSES_END,
+    // Parentheses that hold a parenthesis-free call (`.bar(baz 1)`), the
+    // first argument of a call that the accesses are the receiver of.
+    PARENTHESIZED_COMMAND,
+    // What the read cannot take or tell, such as brackets that do not
+    // close within the bound: the accesses are an expression.
+    ACCESS_STOP,
+} AccessRest;
+
+// SPECIFICATION.md §6.24 — at the `(` after an access's name: whether the
+// parentheses hold a parenthesis-free call, read as far as
+// `parenthesized_command_follows` reads it (Groovy's `bar(baz 1)`, which
+// `first_argument_follows` takes after a receiver), or are read past as
+// brackets. Up to the first argument `parenthesized_command_follows`
+// consumes no bracket, so where it finds none the brackets are read on from
+// there; where a name may start one, the answer is that of
+// `first_argument_follows`, and ACCESS_STOP where it is no.
+static AccessRest read_closure_parentheses(
+    TSLexer *input,
+    bool no_close_ahead
+) {
+    advance(input);
+    if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
+        return ACCESS_STOP;
+    }
+    bool operand = true;
+    if (is_identifier_start(input->lookahead)) {
+        bool upper = is_upper_letter(input->lookahead);
+        char word[sizeof "synchronized"];
+        unsigned len = read_word(input, word, sizeof word);
+        if (opens_dollar_slashy(word, len, input)) {
+            if (!skip_dollar_slashy_string(input, NULL)) {
+                return ACCESS_STOP;
+            }
+            operand = false;
+        } else if (is_value_keyword(word, len, input->lookahead)) {
+            operand = slashy_may_follow_word(word, len, false, false);
+        } else {
+            bool accesses = is_member_access_start(input->lookahead);
+            int32_t last_name = 0;
+            bool nested = false;
+            bool ends_in_new = false;
+            if (read_member_accesses(input, &last_name, &nested,
+                                     &ends_in_new)) {
+                bool names = accesses
+                    ? path_takes_names(last_name, ends_in_new)
+                    : !may_name_type(word, len, upper);
+                if (!skip_same_line_space(input, false)) {
+                    return ACCESS_STOP;
+                }
+                int32_t c = input->lookahead;
+                if (is_literal_start(c) || (names && c == '~')) {
+                    return PARENTHESIZED_COMMAND;
+                }
+                if (names && c == '!') {
+                    if (negation_follows(input)) {
+                        return PARENTHESIZED_COMMAND;
+                    }
+                } else if (is_identifier_start(c)) {
+                    return first_argument_follows(input, false, names, false,
+                                                  no_close_ahead)
+                        ? PARENTHESIZED_COMMAND
+                        : ACCESS_STOP;
+                } else {
+                    operand = false;
+                }
+            }
+        }
+    }
+    return skip_closure_tokens(input, 1, operand, true, no_close_ahead)
+        ? BRACKETS
+        : ACCESS_STOP;
+}
+
+// SPECIFICATION.md §6.24 — after an access's name (`after_name`) or the
+// brackets after it: a member access, brackets that open on its line
+// (`(`, `[`, `?[`, `{`), past the trivia on the line; or, where none follows
+// on the line, an access that opens a later one, past line breaks and
+// comments. `*bracketed` is set at brackets.
+static AccessRest read_closure_access_rest(
+    TSLexer *input,
+    bool after_name,
+    bool *receiver,
+    bool *bracketed,
+    bool no_close_ahead
+) {
+    bool slash = false;
+    if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
+        || (slash && input->lookahead != '/')) {
+        return ACCESS_STOP;
+    }
+    if (slash || input->eof(input) || is_line_break(input->lookahead)) {
+        // No argument on the line: only an access that opens a later line
+        // goes on with the name.
+        while (!input->eof(input) && !is_line_break(input->lookahead)) {
+            advance(input);
+        }
+        return skip_header_trivia(input, true, no_close_ahead, NULL, NULL)
+                && read_closure_access(input, receiver)
+            ? NEXT_ACCESS
+            : ACCESS_STOP;
+    }
+    int32_t c = input->lookahead;
+    if (c == '?') {
+        advance(input);
+        if (input->lookahead != '[') {
+            // `?.` or `??.`, as `read_member_access` reads them.
+            if (input->lookahead == '?') {
+                advance(input);
+            }
+            if (input->lookahead != '.') {
+                return ACCESS_STOP;
+            }
+            advance(input);
+            return NEXT_ACCESS;
+        }
+        c = '[';
+    }
+    if (c == '(' && after_name) {
+        AccessRest rest = read_closure_parentheses(input, no_close_ahead);
+        *bracketed = *bracketed || rest != PARENTHESIZED_COMMAND;
+        return rest;
+    }
+    if (c == '(' || c == '[' || c == '{') {
+        *bracketed = true;
+        advance(input);
+        return skip_closure_tokens(input, 1, true, true, no_close_ahead)
+            ? BRACKETS
+            : ACCESS_STOP;
+    }
+    if (c == ':' || is_member_access_start(c)) {
+        return read_closure_access(input, receiver) ? NEXT_ACCESS
+                                                    : ACCESS_STOP;
+    }
+    return ACCESSES_END;
+}
+
 // SPECIFICATION.md §6.24 — after the `}` of a statement's closure that closed
 // on its line: whether a member access follows, past line breaks and
 // comments, which Groovy's lexer hides there (Apache's `pathElement` takes
@@ -3792,10 +3948,19 @@ static bool read_closure_access(TSLexer *lexer, bool *receiver) {
 // Where such an argument follows another receiver (`foo { }::bar 1`,
 // `foo { }.'bar' 1`), no token is emitted, as no rule reads that call, and
 // the statement stays the ERROR it was: the call alone would leave the
-// argument a statement of its own. An access that brackets follow
-// (`foo { }.bar().baz 1`) ends the read: what follows them is read as after
-// `foo().baz 1` (§5.5 item 2).
-static ClosureCall read_closure_accesses(TSLexer *input, bool no_close_ahead) {
+// argument a statement of its own. So it does where brackets follow an
+// access and a first argument comes after them or after a later access
+// (`foo { }.bar().baz 1`, `a { }.b { }.c 1`, `foo { }.bar[0] 1`), which no
+// receiver of the grammar takes either (`foo().baz 1` is `foo().baz` and
+// `1`, §5.5 item 2), and where a name follows `new` (`foo { }.new X`, as
+// `obj.new X` is `obj.new` and `X`). The brackets are read past, line
+// breaks included (`skip_closure_tokens`); `*bracketed` is set once the read
+// is in them.
+static ClosureCall read_closure_accesses(
+    TSLexer *input,
+    bool no_close_ahead,
+    bool *bracketed
+) {
     if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
         return NO_CLOSURE_CALL;
     }
@@ -3804,80 +3969,81 @@ static ClosureCall read_closure_accesses(TSLexer *input, bool no_close_ahead) {
         return NO_CLOSURE_CALL;
     }
     bool ends_in_new = false;
-    for (;;) {
-        if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
-            return CLOSURE_CALL;
-        }
-        if (input->lookahead == '\'' || input->lookahead == '"') {
-            if (!skip_string(input)) {
+    AccessRest rest = NEXT_ACCESS;
+    while (rest != ACCESSES_END) {
+        if (rest == NEXT_ACCESS) {
+            if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
                 return CLOSURE_CALL;
             }
-            receiver = false;
-            ends_in_new = false;
-        } else if (is_identifier_start(input->lookahead)) {
-            char name[sizeof "new"];
-            ends_in_new =
-                word_is(name, read_word(input, name, sizeof name), "new");
+            if (input->lookahead == '\'' || input->lookahead == '"') {
+                if (!skip_string(input)) {
+                    return CLOSURE_CALL;
+                }
+                receiver = false;
+                ends_in_new = false;
+            } else if (is_identifier_start(input->lookahead)) {
+                char name[sizeof "new"];
+                ends_in_new =
+                    word_is(name, read_word(input, name, sizeof name), "new");
+            } else {
+                return CLOSURE_CALL;
+            }
         } else {
+            ends_in_new = false;
+        }
+        rest = read_closure_access_rest(input, rest == NEXT_ACCESS,
+                                        &receiver, bracketed, no_close_ahead);
+        if (rest == ACCESS_STOP) {
             return CLOSURE_CALL;
         }
-        bool slash = false;
-        if (!skip_header_trivia(input, false, no_close_ahead, NULL, &slash)
-            || (slash && input->lookahead != '/')) {
-            return CLOSURE_CALL;
+        if (rest == PARENTHESIZED_COMMAND) {
+            return receiver && !*bracketed ? CLOSURE_COMMAND
+                                           : NO_CLOSURE_CALL;
         }
-        if (slash || input->eof(input) || is_line_break(input->lookahead)) {
-            // No argument on the line: only an access that opens a later
-            // line goes on with the name.
-            while (!input->eof(input) && !is_line_break(input->lookahead)) {
-                advance(input);
-            }
-            if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)
-                || !read_closure_access(input, &receiver)) {
-                return CLOSURE_CALL;
-            }
-            continue;
-        }
-        if (input->lookahead != ':'
-            && !is_member_access_start(input->lookahead)) {
-            break;
-        }
-        if (!read_closure_access(input, &receiver)) {
-            return CLOSURE_CALL;
-        }
+    }
+    if (!skip_same_line_space(input, false)) {
+        return CLOSURE_CALL;
+    }
+    if (ends_in_new && is_identifier_start(input->lookahead)) {
+        return NO_CLOSURE_CALL;
     }
     // A receiver that starts with a call names no type, so a capitalized
     // last name takes a name too (`foo { }.Bar x` is `foo({ }).Bar(x)`),
-    // where `foo.Bar x` declares `x`. After `new` the name is the created
-    // type, as after `this.new`.
-    if (!first_argument_follows(input, true, !ends_in_new, true,
-                                no_close_ahead)) {
+    // where `foo.Bar x` declares `x`. After brackets a name is an argument
+    // to Groovy as well (`foo { }.bar() x` is `foo({ }).bar().x`).
+    if (!first_argument_follows(input, false, *bracketed || !ends_in_new,
+                                true, no_close_ahead)) {
         return CLOSURE_CALL;
     }
-    return receiver ? CLOSURE_COMMAND : NO_CLOSURE_CALL;
+    return receiver && !*bracketed ? CLOSURE_COMMAND : NO_CLOSURE_CALL;
 }
 
 // SPECIFICATION.md §6.24 — at the `{` after the first name of a statement,
 // which the caller has read: whether the braces close on this line and a
-// member access follows them (`closure_closes_on_line`,
+// member access follows them (`skip_closure_tokens`,
 // `read_closure_accesses`). Groovy reads `foo { }.bar()` as
 // `foo({ }).bar()`, where `command_chain` would take `foo { }` as the whole
 // statement. The read goes through a BoundedLexer, which ends at the line
 // break until the `}`. One that reaches the bound answers NO_CLOSURE_CALL
 // whatever it read, so that an argument the bound cuts off never leaves the
-// call and a statement of its own.
+// call and a statement of its own; but once it is in brackets after an
+// access (`foo { }.each(…)`), whatever comes after them is read as after
+// `foo().bar(…)`, as before brackets were read past.
 static ClosureCall read_closure_call(TSLexer *lexer, bool no_close_ahead) {
     BoundedLexer view =
         bounded_lexer(lexer, CLOSURE_CALL_LOOKAHEAD_CHARACTERS);
     view.line = true;
     bounded_refresh(&view);
-    if (!closure_closes_on_line(&view.lexer, no_close_ahead)) {
+    advance(&view.lexer);
+    if (!skip_closure_tokens(&view.lexer, 1, true, false, no_close_ahead)) {
         return NO_CLOSURE_CALL;
     }
     view.line = false;
     bounded_refresh(&view);
-    ClosureCall call = read_closure_accesses(&view.lexer, no_close_ahead);
-    return view.left == 0 ? NO_CLOSURE_CALL : call;
+    bool bracketed = false;
+    ClosureCall call =
+        read_closure_accesses(&view.lexer, no_close_ahead, &bracketed);
+    return view.left == 0 && !bracketed ? NO_CLOSURE_CALL : call;
 }
 
 // SPECIFICATION.md §6.11 — what follows a `)` on its line. The `)` is

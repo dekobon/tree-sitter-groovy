@@ -969,8 +969,9 @@ fn deleting_a_def_before_a_dotted_call_of_a_string_reads_a_method_on_reparse() {
 /// Texts around a statement that calls a name with a closure and goes on
 /// with a member access (§6.24), as an expression or as the receiver of a
 /// parenthesis-free call. The scanner decides the token before the name
-/// from the line up to the `}`, the trivia and accesses after it and the
-/// first argument after them, so each edit there must lex that token again.
+/// from the line up to the `}`, the trivia, accesses and brackets after it
+/// and the first argument after them, so each edit there must lex that
+/// token again.
 const CLOSURE_CALL_TEXTS: &[&str] = &[
     "foo { }.bar()\n",
     "foo { a }\n.bar()\nx = 1\n",
@@ -983,6 +984,8 @@ const CLOSURE_CALL_TEXTS: &[&str] = &[
     "foo { }.bar 1\nbaz()\n",
     "foo { }\n.bar x: 1\n",
     "foo { return /}/ }.bar(baz 1)\n",
+    "foo { }.bar().baz 1\nx()\n",
+    "a { }.b(1,\n2) { }.c\n",
 ];
 
 #[test]
