@@ -52,6 +52,10 @@ return x
 throw e
 // <- keyword.control
 
+assert x == 1, 'x must be one'
+// <- keyword.control
+//             ^ string
+
 try { x }
 // <- keyword.control
 

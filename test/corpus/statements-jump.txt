@@ -134,6 +134,48 @@ assert x == 1 : 'x must be one'
     message: (string_literal)))
 
 ==================
+Assert with a comma before the message
+==================
+
+assert x == 1, 'x must be one'
+assert foo(a, b), "got ${a}"
+assert a, b ?: c
+assert x
+, 'm'
+assert y,
+  'm'
+
+---
+
+(source_file
+  (assert_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    message: (string_literal))
+  (assert_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)))
+    message: (string_literal
+      (string_fragment)
+      (gstring_brace_interpolation
+        value: (identifier))))
+  (assert_statement
+    (identifier)
+    message: (elvis_expression
+      value: (identifier)
+      default: (identifier)))
+  (assert_statement
+    (identifier)
+    message: (string_literal))
+  (assert_statement
+    (identifier)
+    message: (string_literal)))
+
+==================
 Do while
 ==================
 

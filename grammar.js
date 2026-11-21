@@ -1429,14 +1429,15 @@ module.exports = grammar({
       $._expression,
     )),
 
-    // §4 — power-assert: `assert e` or `assert e : msg`. The colon
+    // §4 — power-assert: `assert e`, `assert e : msg` or `assert e, msg`
+    // (Apache `assertStatement` takes `COLON | COMMA`). The colon
     // separator may collide with map_entry in later iterations, but
     // assert is a statement-only construct so the context resolves
     // it.
     assert_statement: $ => prec.right(seq(
       'assert',
       $._expression,
-      optional(seq(':', field('message', $._expression))),
+      optional(seq(choice(':', ','), field('message', $._expression))),
     )),
 
     // §4 — try / catch / finally. At least one of catch/finally is

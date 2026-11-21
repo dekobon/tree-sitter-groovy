@@ -733,6 +733,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   string's closing `/` is `@string`, like its opening `/`; it was
   `@operator`, as it is the same anonymous `/` as division, which
   stays `@operator`.
+- `assert x == 1, 'msg'` parses: a comma separates an assertion's
+  message as a colon does, before or after a line break, as Apache's
+  `assertStatement` takes `COLON | COMMA`. It was an `ERROR`, as at
+  v0.6.0.
 
 ## [0.6.0] - 2026-11-12
 
