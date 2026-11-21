@@ -6256,6 +6256,30 @@ foo '' + b
       right: (identifier))))
 
 ==================
+A first argument string longer than 256 characters is the whole argument (known divergence)
+==================
+
+foo "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + b
+foo "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (string_literal
+        (string_fragment))
+      right: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
 Comments and a line escape after a literal first argument
 ==================
 

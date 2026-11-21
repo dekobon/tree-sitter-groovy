@@ -11,11 +11,15 @@
 //! input from each of its statements, in time quadratic in its length, and
 //! one that closes to the close of each string. `skip_string` follows at
 //! most `STRING_NESTING_DEPTH` (8) strings, one inside another, so each
-//! statement reads a bounded part of the nest.
+//! statement reads a bounded part of the nest. The look-ahead reads at most
+//! `LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS` (256) characters of a string, and
+//! a longer one is the whole argument, so a long string, which the
+//! in-grammar lexer reads next, is not read twice.
 //!
 //! The test reads the input through a callback and compares the bytes the
 //! parser asks for at two lengths of a nest, which a look-ahead that read to
-//! the end of the nest from every statement would make grow with it.
+//! the end of the nest from every statement would make grow with it, and
+//! bounds them for one long string.
 
 /// Levels in the shorter nest; the longer one has eight times as many.
 const SHORT_NEST: usize = 250;
@@ -83,6 +87,34 @@ fn assert_linear(levels: impl Fn(usize) -> String, has_error: bool) {
 fn a_nest_of_strings_that_does_not_close_is_read_a_bounded_number_of_times() {
     assert_linear(|n| "foo \"${ {\n".repeat(n), true);
     assert_linear(|n| "foo \"${ { foo 1 + 2\n".repeat(n), true);
+}
+
+/// Characters in the long string of the test below, far above the
+/// look-ahead's bound (`LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS`, 256).
+const LONG_STRING_CHARACTERS: usize = 10_000;
+
+/// Most bytes served per input byte for a call whose first argument is one
+/// long string. Read once, by the in-grammar lexer, the input is served
+/// about once (measured: 1.03 for both strings below); read to its end by
+/// the look-ahead as well, it was served twice (2.00 for both).
+const MAX_LONG_STRING_BYTES_PER_BYTE: f64 = 1.2;
+
+#[test]
+fn a_long_string_first_argument_is_read_once() {
+    let body = "a".repeat(LONG_STRING_CHARACTERS);
+    let lines = "echo $HOME\n".repeat(LONG_STRING_CHARACTERS / 11);
+    for source in [
+        format!("foo \"{body}\"\n"),
+        format!("sh \"\"\"\n{lines}\"\"\"\n"),
+    ] {
+        let (ratio, has_error) = bytes_served_per_input_byte(&source);
+        assert!(!has_error, "{:?}", &source[..20]);
+        assert!(
+            ratio <= MAX_LONG_STRING_BYTES_PER_BYTE,
+            "bytes served per input byte of {:?} were {ratio:.2}",
+            &source[..20],
+        );
+    }
 }
 
 #[test]

@@ -519,9 +519,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   is one call), as after a name argument; a comment between the receiver
   and the literal, the receivers `var`, `record`, `trait`, `sealed`,
   `permits`, `super` and `_`, a literal on the line after the
-  receiver, and a lambda in parentheses after the literal on its line
+  receiver, a lambda in parentheses after the literal on its line
   (`foo "a" (x) -> x`, the call and a lambda statement, where Groovy
-  passes the lambda to a call of the literal) keep the literal alone.
+  passes the lambda to a call of the literal) and a quoted string longer
+  than 256 characters keep the literal alone: `foo "<257 characters>" + b`
+  is the call and `+b`, and `.trim()` after it an `ERROR`, as at v0.6.0,
+  so that a long string, most often the whole argument (`sh """…"""`),
+  is not read twice.
   An assignment after the literal
   (`foo "a" = b`, `foo "a" += b`), and `= b` or `** b` on the next line,
   which Groovy rejects, are a call with no `ERROR`, as are a number's

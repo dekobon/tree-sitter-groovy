@@ -2672,7 +2672,9 @@ number's digits, letters and `_`, a `.` before a digit and the sign of
 a decimal exponent (`1e-5`); a string to its closing quote, on its line
 unless triple-quoted, a `\` taking the character after it, with each
 `${…}` read as code to its `}`, braces counted and strings in it read
-whole, at most 8 strings deep. Then the argument goes on at once at a
+whole, at most 8 strings deep, within
+LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS (256) characters from its
+opening quote: a longer string is not one. Then the argument goes on at once at a
 number's `.` that no digit follows (`1.m()`, `1..3`), and otherwise
 after Groovy's trivia at the first token: on the literal's line at any
 but `,`, `;`, `}` and the end of input, and on a later line at a `/`
@@ -3140,6 +3142,22 @@ Known differences from Groovy, besides those above:
   `super "a" + b` is `super "a"` and `+b`. So does a comment between the
   receiver and the literal (`foo /* c */ "a" + b`), as for every first
   argument.
+- A quoted string longer than LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS
+  (256) characters keeps the literal alone: `foo "<257 characters>" + b`
+  is the call `foo "…"` and `+b`, and `.trim()` or `?: c` after it an
+  `ERROR`, as at v0.6.0. Read to its end, a string that is the whole
+  argument was read twice, by the look-ahead and by the in-grammar
+  lexer: `foo` and a string of 10,000 characters asked for 2.00 bytes
+  per input byte, 1.00 at v0.6.0. Such strings are most often the whole
+  argument, a build step's script (`sh """…"""`): in the 266 real
+  files no string that the argument goes on past is longer than 62
+  characters, and of 1,242 reads of a string there 53 were of one
+  longer than 256. With the bound the bytes the parser asks for per
+  input byte of those files went from 1.966 to 1.914, with no tree
+  changed (1.904 at 128 characters). The shorter strings are still
+  read twice: with no string read at all, at the cost of every string
+  that the argument goes on past, the figure would be 1.827. It was
+  1.801 before literal arguments were read and 1.601 at v0.6.0.
 
 ### 6.15 ARRAY_VALUE_START and TYPE_START — implementation contract
 

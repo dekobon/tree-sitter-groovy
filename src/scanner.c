@@ -509,6 +509,7 @@ static inline bool contextual_word_may_start(
 );
 static bool slashy_body_follows(TSLexer *lexer);
 static bool skip_string(TSLexer *lexer);
+static bool skip_short_string(TSLexer *lexer);
 static bool lambda_parameters_follow(
     TSLexer *lexer,
     bool no_close_ahead,
@@ -2682,7 +2683,7 @@ static bool statement_argument_follows(
             || literal_argument_goes_on(lexer, no_close_ahead);
     }
     if (c == '"' || c == '\'') {
-        if (!skip_string(lexer)
+        if (!skip_short_string(lexer)
             || (!names && (!skip_same_line_space(lexer, false)
                            || lexer->lookahead == '('))) {
             return false;
@@ -3658,6 +3659,26 @@ static BoundedLexer bounded_lexer(TSLexer *input, unsigned characters) {
         .line = false,
     };
     return view;
+}
+
+// SPECIFICATION.md §6.14 — the most characters of a quoted string that is
+// a statement's first argument, from its opening quote, that
+// `statement_argument_follows` reads to learn whether the argument goes on
+// past it (`println "a" + b`). A longer one is taken for the whole argument,
+// with no token, so that it is not read twice, once here and once by the
+// in-grammar lexer: a script's or a build step's long string, often a
+// triple-quoted one on several lines (`sh """…"""`), is read once, and
+// `foo "<longer>" + b` is the call `foo "<longer>"` and the statement
+// `+b` (`docs/divergences-from-spec.md` §25). Of the 266 real files, no
+// string that an argument goes on past is longer than 62 characters.
+static const unsigned LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS = 256;
+
+// Reads a quoted string as `skip_string` does, through a BoundedLexer, so
+// that it is false as well at the bound.
+static bool skip_short_string(TSLexer *lexer) {
+    BoundedLexer view =
+        bounded_lexer(lexer, LITERAL_ARGUMENT_LOOKAHEAD_CHARACTERS);
+    return skip_string(&view.lexer);
 }
 
 // SPECIFICATION.md §6.11 — the most characters, from the `(` that opens the
