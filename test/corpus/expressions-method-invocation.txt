@@ -1551,6 +1551,116 @@ foo { }.bar(1,
 ---
 
 ==================
+A call with a closure and an access takes an operator in the parentheses after the access
+==================
+
+foo { }.bar(a in b).qux()
+foo { }.bar(a as B)[0]
+foo { }.bar(a instanceof B).qux
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (field_access
+            object: (method_invocation
+              function: (identifier)
+              closure: (closure))
+            field: (identifier))
+          arguments: (argument_list
+            (membership_expression
+              element: (identifier)
+              collection: (identifier))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (subscript_expression
+      object: (method_invocation
+        function: (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier))
+        arguments: (argument_list
+          (cast_expression
+            value: (identifier)
+            type: (type_identifier))))
+      index: (number_literal)))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (field_access
+          object: (method_invocation
+            function: (identifier)
+            closure: (closure))
+          field: (identifier))
+        arguments: (argument_list
+          (instanceof_expression
+            value: (identifier)
+            type: (type_identifier))))
+      field: (identifier))))
+
+==================
+A call with a closure whose accesses go on after an operator in parentheses to a first argument is unsupported
+==================
+
+foo { }.bar(a in b).qux 1
+foo { }.bar(a as B).qux 1
+foo { }.bar(a instanceof B).qux 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (membership_expression
+            element: (identifier)
+            collection: (identifier))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (cast_expression
+            value: (identifier)
+            type: (type_identifier))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (instanceof_expression
+            value: (identifier)
+            type: (type_identifier))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
 A call with a closure whose access is subscripted before a first argument is unsupported
 :error
 ==================

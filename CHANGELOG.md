@@ -947,10 +947,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   an operator other than an access after the `}` (`foo { }[0]`,
   `foo { } + 1`) is read as before. Where a first argument follows
   brackets after an access or a later access (`foo { }.bar().baz 1`,
-  `a { }.b { }.c 1`, `foo { }.bar[0] 1`), which no receiver of the
-  grammar takes, and where a name follows `.new`, the statement stays an
-  `ERROR` (`SPECIFICATION.md` §6.24, `docs/divergences-from-spec.md`
-  §30).
+  `a { }.b { }.c 1`, `foo { }.bar[0] 1`, `foo { }.bar(a in b).qux 1`,
+  also with `as` or `instanceof` in the parentheses), which no receiver
+  of the grammar takes, and where a name follows `.new`, the statement
+  stays an `ERROR` (`SPECIFICATION.md` §6.24,
+  `docs/divergences-from-spec.md` §30).
 
 ## [0.6.0] - 2026-11-12
 

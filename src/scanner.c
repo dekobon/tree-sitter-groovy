@@ -858,6 +858,17 @@ static bool first_argument_follows(
     bool no_close_ahead
 );
 
+static bool first_argument_word_follows(
+    TSLexer *lexer,
+    const char *argument,
+    unsigned argument_len,
+    bool capitalized,
+    bool parenthesized,
+    bool names,
+    bool statement,
+    bool no_close_ahead
+);
+
 // The trivia after a name argument, which Groovy's lexer hides: spaces,
 // tabs, line escapes and block comments, which may span lines; a line
 // comment is read to the end of its line. Returns false where the look-ahead
@@ -1282,6 +1293,23 @@ static bool first_argument_follows(
     bool capitalized = is_capital(c);
     char argument[sizeof "synchronized"];
     unsigned argument_len = read_word(lexer, argument, sizeof argument);
+    return first_argument_word_follows(lexer, argument, argument_len,
+                                       capitalized, parenthesized, names,
+                                       statement, no_close_ahead);
+}
+
+// `first_argument_follows` past a name, `argument`, which the caller has
+// read; `capitalized` says whether it starts with an upper-case letter.
+static bool first_argument_word_follows(
+    TSLexer *lexer,
+    const char *argument,
+    unsigned argument_len,
+    bool capitalized,
+    bool parenthesized,
+    bool names,
+    bool statement,
+    bool no_close_ahead
+) {
     if (is_literal_word(argument, argument_len)) {
         return true;
     }
@@ -3854,8 +3882,10 @@ typedef enum {
 // `first_argument_follows` takes after a receiver), or are read past as
 // brackets. Up to the first argument `parenthesized_command_follows`
 // consumes no bracket, so where it finds none the brackets are read on from
-// there; where a name may start one, the answer is that of
-// `first_argument_follows`, and ACCESS_STOP where it is no.
+// there, past `in`, `as` and `instanceof` too, which are operators after the
+// name; where another name may start one, the answer is that of
+// `first_argument_follows`, and ACCESS_STOP where it is no, which only
+// parentheses that the grammar reads with an ERROR in them give.
 static AccessRest read_closure_parentheses(
     TSLexer *input,
     bool no_close_ahead
@@ -3898,10 +3928,26 @@ static AccessRest read_closure_parentheses(
                         return PARENTHESIZED_COMMAND;
                     }
                 } else if (is_identifier_start(c)) {
-                    return first_argument_follows(input, false, names, false,
-                                                  no_close_ahead)
-                        ? PARENTHESIZED_COMMAND
-                        : ACCESS_STOP;
+                    bool capitalized = is_capital(c);
+                    char argument[sizeof "synchronized"];
+                    unsigned argument_len =
+                        read_word(input, argument, sizeof argument);
+                    if (!word_is(argument, argument_len, "in")
+                        && !word_is(argument, argument_len, "as")
+                        && !word_is(argument, argument_len, "instanceof")) {
+                        return first_argument_word_follows(
+                                   input, argument, argument_len, capitalized,
+                                   false, names, false, no_close_ahead)
+                            ? PARENTHESIZED_COMMAND
+                            : ACCESS_STOP;
+                    }
+                    // An operator on the name (`.bar(a in b)`), unless a
+                    // key (`.bar(a as: 1)`): the parentheses are read on to
+                    // their `)`, so that what follows them is told as after
+                    // any other brackets.
+                    if (key_colon_follows(input, argument, argument_len)) {
+                        return PARENTHESIZED_COMMAND;
+                    }
                 } else {
                     operand = false;
                 }

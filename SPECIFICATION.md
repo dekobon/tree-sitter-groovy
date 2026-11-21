@@ -4802,9 +4802,14 @@ were. Parentheses after the last name that hold a parenthesis-free call
 are its first argument, as §6.14 reads `obj.m (foo 1)`: `foo { }.bar(baz 1)`
 is a `command_chain` whose argument is `(baz 1)`. Other brackets after an
 access are read past, to the bracket that closes them, line breaks
-included, and the read goes on after them. Where a first argument follows
+included, and the read goes on after them; so are parentheses where
+`in`, `as` or `instanceof` follows a first name (`.bar(a in b)`), an
+operator on it, not a first argument. Before, the read ended there and
+`foo { }.bar(a in b).qux 1` became the accesses and a statement `1`
+without an `ERROR`. Where a first argument follows
 them or a later access's name (`foo { }.bar().baz 1`, `a { }.b { }.c 1`,
-`a { }.b(1).c 2`, `foo { }.bar[0] 1`, `foo { }.bar(1,` then `2).baz 1`),
+`a { }.b(1).c 2`, `foo { }.bar[0] 1`, `foo { }.bar(1,` then `2).baz 1`,
+`foo { }.bar(a in b).qux 1`),
 which Groovy passes to `baz`, to `c` or to the element, no receiver of
 the grammar takes the call, as none takes `foo().baz 1` (§5.5 item 2), and
 the call alone would leave the argument a statement of its own: no token
