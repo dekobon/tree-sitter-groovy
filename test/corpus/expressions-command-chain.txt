@@ -6135,8 +6135,6 @@ A line that opens with an operator continues a literal first argument
 
 foo "a"
 * b
-foo 1
-/ b
 foo "a"
 ?: b
 foo 1
@@ -6167,11 +6165,6 @@ foo "a"
     argument: (binary_expression
       left: (string_literal
         (string_fragment))
-      right: (identifier)))
-  (command_chain
-    receiver: (identifier)
-    argument: (binary_expression
-      left: (number_literal)
       right: (identifier)))
   (command_chain
     receiver: (identifier)
@@ -6237,6 +6230,22 @@ foo "a"
         (line_comment)
         field: (identifier))
       arguments: (argument_list))))
+
+==================
+A line that opens with a slash and holds no other continues a literal first argument
+==================
+
+foo 1
+/ b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (binary_expression
+      left: (number_literal)
+      right: (identifier))))
 
 ==================
 A line that opens with a closure, as, in or instanceof continues a literal first argument
