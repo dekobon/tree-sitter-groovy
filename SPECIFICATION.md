@@ -208,7 +208,8 @@ order).
 
 This is the precedence ordering encoded in
 `apache/groovy:src/antlr/GroovyParser.g4` (rule `expression`, lines
-797–908). The numbering follows Apache's "level" comments
+899–1013 on master and 779–878 on 4.0.x, in the copies of November 2026).
+The numbering follows Apache's "level" comments
 (1 = highest, 15 = lowest); the tree-sitter PREC constants run the
 other way, higher = tighter, and only their *relative* order matters.
 Where one of Apache's levels holds several alternatives, the order of
@@ -270,9 +271,11 @@ Notes on the corrected ordering versus v1 of this spec:
   `<assoc=right>`. v1 was correct on associativity but worth
   emphasising: `a ==> b ==> c` parses as `a ==> (b ==> c)`.
 - **`as` and `!instanceof` take a type, not an expression.** Apache
-  has `op=(AS | INSTANCEOF | NOT_INSTANCEOF) nls type` (4.0.x and
-  later; older drafts split `coercionType` and `matchingType`) versus
-  `op=(LE | GE | …) nls right=expression`, and the first alternative
+  has `op=(AS | INSTANCEOF | NOT_INSTANCEOF) nls type` in 3.0.x and
+  4.0.x, splits it in 5.0.x (`INSTANCEOF nls matchingType`, then
+  `(AS | NOT_INSTANCEOF) nls type`) and in master and 6.0.x into three
+  (`matchingType`, `notInstanceofType`, `coercionType`), each a type,
+  versus `op=(LE | GE | …) nls right=expression`, and the first alternative
   binds tighter (level 7a above): before 0.7.0 the grammar put both
   at one level, so `a < b instanceof T` was `(a < b) instanceof T`. The grammar must
   thread this through — the RHS of `as` is `_type`, RHS of `<` is
