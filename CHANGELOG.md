@@ -369,8 +369,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   compares or calls (`foo(x instanceof a.b<T> y, 1)`). Also an `ERROR`:
   a cast type's type arguments of more than 256 items, which the
   scanner's look-ahead reads as comparisons, 86 or more arguments
-  separated by `, ` (`x as Map<T0, …, T85>`) or 129 by `,`; Groovy reads
-  the type, as v0.6.0 did (`SPECIFICATION.md` §3.2.2). Read otherwise
+  separated by a comma and a space (`x as Map<T0, …, T85>`) or 129 by a
+  comma alone; Groovy reads the type, as v0.6.0 did
+  (`SPECIFICATION.md` §3.2.2). Read otherwise
   than Groovy: `x as a.b[0]` subscripts the cast, a space before `<`
   makes a comparison (`x as List <String>` is an `ERROR`), and after
   `return` or in brackets the type arguments of a name of three or more
