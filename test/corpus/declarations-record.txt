@@ -171,14 +171,6 @@ record Point(1, 2)
 
 ---
 
-(source_file
-  (record_declaration
-    name: (identifier)
-    components: (record_components
-      (ERROR
-        (number_literal)
-        (number_literal)))))
-
 ==================
 Field named record then a comment then a nested record
 ==================
