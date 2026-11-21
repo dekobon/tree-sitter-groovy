@@ -819,10 +819,15 @@ The resolution we adopt:
    `foo != x`, `foo !in xs`. A bare array type is a first argument as
    well (`foo String[]`, Groovy's `foo(String[])`).
    After a comma an argument is a
-   named arg or any expression (`assertEquals 'v', a + b`,
-   `foo 'a', x ? 1 : 2`). That is Apache's `argumentListElement`
-   without spread arguments: `foo 'a', *args` and `foo a: 1, *:m`
-   are an `ERROR`.
+   named arg, any expression or a spread argument
+   (`assertEquals 'v', a + b`, `foo 'a', x ? 1 : 2`, `foo 'a', *args`,
+   `foo a: 1, *b`, also on the line after the comma). That is Apache's
+   `argumentListElement`, whose `expressionListElement[true]` takes `*`.
+   The spread takes the whole expression after it, as in parentheses:
+   `foo 1, *a = foo 2` is Groovy's `foo(1, *(a = foo(2)))`. A first
+   argument is never a spread: `foo *a` is a product, as in Groovy, and
+   `foo *a, 1`, which Groovy calls with the spread first, is an `ERROR`.
+   A spread map (`foo a: 1, *:m`) is an `ERROR` here and in parentheses.
    A named-arg key is an identifier; Apache also accepts string keys
    (`foo 'a': 1`), which are not implemented yet (§6.8). Disallowed:
    nested command chains, other than as the value of an assignment
@@ -4896,7 +4901,7 @@ on dekobon's side is a follow-up.
   laptop is the target. Tree-sitter's incremental nature makes
   steady-state editing free. Three shapes of input that parse with an
   `ERROR` take time above linear in their length: nested
-  `foo 1, *a = …` calls, runs of `@C(,` and a space, and `case 1:`
+  `foo 1, %a = …` calls, runs of `@C(,` and a space, and `case 1:`
   lines outside a `switch` (4,000 lines take about 4 seconds);
   `docs/divergences-from-spec.md` §29 has the measurements, and
   `bindings/rust/tests/error_recovery_cost.rs` pins their cost.

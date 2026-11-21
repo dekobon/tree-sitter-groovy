@@ -1,15 +1,20 @@
-//! Cost ceilings for three shapes of input that this grammar rejects and
-//! parses in time above linear in its length (`docs/divergences-from-spec.md`
-//! §29). At v0.6.0 each was linear. None is fixed: these tests pin today's
-//! cost so that it does not grow further.
+//! Cost ceilings for shapes of input that this grammar rejects and parses in
+//! time above linear in its length (`docs/divergences-from-spec.md` §29), and
+//! a linear bound for a valid input that was one of them. At v0.6.0 each was
+//! linear. The rejected shapes are not fixed: these tests pin today's cost so
+//! that it does not grow further.
 //!
-//! - Nested parenthesis-free calls with a spread argument and `=`,
-//!   `foo 1, *a = foo 1, *a = … 1`, which Groovy 3 reads as
-//!   `foo(1, *(a = foo(…)))`. A spread argument is an `ERROR` in a command
-//!   chain, and each nesting level keeps stack versions alive: the parser's
-//!   reductions grow with the square of the nesting and its stack versions
-//!   linearly (measured: 1,408, 5,283 and 20,533 reductions and 63, 113 and
-//!   213 versions at 25, 50 and 100 levels; v0.6.0 409 and 4 at 100).
+//! - Nested parenthesis-free calls with an argument that is an `ERROR`
+//!   after a comma and `=`, `foo 1, %a = foo 1, %a = … 1`. Each nesting
+//!   level keeps stack versions alive: the parser's reductions grow with the
+//!   square of the nesting and its stack versions linearly (measured: 1,408,
+//!   5,283 and 20,533 reductions and 63, 113 and 213 versions at 25, 50 and
+//!   100 levels; v0.6.0 409 and 4 at 100).
+//! - The same nest with a spread argument, `foo 1, *a = foo 1, *a = … 1`,
+//!   which Groovy reads as `foo(1, *(a = foo(…)))`. It cost as much while a
+//!   command chain took no spread argument; now that it takes one, the nest
+//!   parses without an `ERROR` in one stack version and reductions linear in
+//!   its depth (measured: 201 and 1,601 at 50 and 400 levels).
 //! - Runs of unfinished annotations, `@C(, @C(, …`. The parser's counts are
 //!   linear (measured: 1,244, 2,494 and 4,994 reductions at 250, 500 and
 //!   1,000 annotations, at most 6 versions); the time is not, because the
@@ -27,15 +32,30 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tree_sitter::{LogType, Parser};
 
-/// Nesting levels of the spread-argument calls.
+/// Nesting levels of the calls with an `ERROR` argument.
+const NEST_LEVELS: usize = 50;
+
+/// Most reductions for `NEST_LEVELS` levels: 5,283 measured, about 1.5
+/// times that.
+const MAX_NEST_REDUCTIONS: usize = 8_000;
+
+/// Most stack versions at once for `NEST_LEVELS` levels: 113 measured.
+const MAX_NEST_VERSIONS: usize = 170;
+
+/// Nesting levels of the shallower spread-argument nest; the deeper one has
+/// `SCALE` times as many.
 const SPREAD_LEVELS: usize = 50;
 
-/// Most reductions for `SPREAD_LEVELS` levels: 5,283 measured, about 1.5
-/// times that.
-const MAX_SPREAD_REDUCTIONS: usize = 8_000;
+/// How many times longer the second input of a linear bound is.
+const SCALE: usize = 8;
 
-/// Most stack versions at once for `SPREAD_LEVELS` levels: 113 measured.
-const MAX_SPREAD_VERSIONS: usize = 170;
+/// Most reductions per nesting level of the spread-argument nest: 4
+/// measured at both depths (201 and 1,601), where a command chain without
+/// spread arguments made 5,283 at 50 levels.
+const MAX_SPREAD_REDUCTIONS_PER_LEVEL: usize = 6;
+
+/// Most stack versions at once for the spread-argument nest: 1 measured.
+const MAX_SPREAD_VERSIONS: usize = 2;
 
 /// Unfinished annotations in a run.
 const ANNOTATIONS: usize = 500;
@@ -61,9 +81,10 @@ struct Cost {
     most_versions: usize,
 }
 
-/// Parses `source`, which must hold an `ERROR`, and counts the reductions
-/// and the most stack versions at once in the parser's log.
-fn cost(source: &str) -> Cost {
+/// Parses `source`, which must hold an `ERROR` exactly when `rejected`, and
+/// counts the reductions and the most stack versions at once in the parser's
+/// log.
+fn cost(source: &str, rejected: bool) -> Cost {
     let mut parser = Parser::new();
     parser
         .set_language(&dekobon_tree_sitter_groovy::LANGUAGE.into())
@@ -87,8 +108,9 @@ fn cost(source: &str) -> Cost {
         }
     })));
     let tree = parser.parse(source, None).expect("parse");
-    assert!(
+    assert_eq!(
         tree.root_node().has_error(),
+        rejected,
         "{}",
         tree.root_node().to_sexp()
     );
@@ -104,24 +126,42 @@ fn cost(source: &str) -> Cost {
 }
 
 #[test]
-fn nested_spread_argument_calls_stay_under_the_measured_cost() {
-    let source = format!("{}1\n", "foo 1, *a = ".repeat(SPREAD_LEVELS));
-    let cost = cost(&source);
+fn nested_calls_with_an_error_argument_stay_under_the_measured_cost() {
+    let source = format!("{}1\n", "foo 1, %a = ".repeat(NEST_LEVELS));
+    let cost = cost(&source, true);
     assert!(
-        cost.reductions <= MAX_SPREAD_REDUCTIONS,
-        "{} reductions for {SPREAD_LEVELS} levels",
+        cost.reductions <= MAX_NEST_REDUCTIONS,
+        "{} reductions for {NEST_LEVELS} levels",
         cost.reductions,
     );
     assert!(
-        cost.most_versions <= MAX_SPREAD_VERSIONS,
-        "{} stack versions for {SPREAD_LEVELS} levels",
+        cost.most_versions <= MAX_NEST_VERSIONS,
+        "{} stack versions for {NEST_LEVELS} levels",
         cost.most_versions,
     );
 }
 
 #[test]
+fn nested_spread_argument_calls_parse_in_linear_cost() {
+    for levels in [SPREAD_LEVELS, SPREAD_LEVELS * SCALE] {
+        let source = format!("{}1\n", "foo 1, *a = ".repeat(levels));
+        let cost = cost(&source, false);
+        assert!(
+            cost.reductions <= MAX_SPREAD_REDUCTIONS_PER_LEVEL * levels,
+            "{} reductions for {levels} levels",
+            cost.reductions,
+        );
+        assert!(
+            cost.most_versions <= MAX_SPREAD_VERSIONS,
+            "{} stack versions for {levels} levels",
+            cost.most_versions,
+        );
+    }
+}
+
+#[test]
 fn runs_of_unfinished_annotations_stay_under_the_measured_cost() {
-    let cost = cost(&"@C(, ".repeat(ANNOTATIONS));
+    let cost = cost(&"@C(, ".repeat(ANNOTATIONS), true);
     assert!(
         cost.reductions <= MAX_ANNOTATION_REDUCTIONS,
         "{} reductions for {ANNOTATIONS} annotations",
@@ -136,7 +176,7 @@ fn runs_of_unfinished_annotations_stay_under_the_measured_cost() {
 
 #[test]
 fn case_lines_outside_a_switch_stay_under_the_measured_cost() {
-    let cost = cost(&"case 1:\n".repeat(CASE_LINES));
+    let cost = cost(&"case 1:\n".repeat(CASE_LINES), true);
     assert!(
         cost.reductions <= MAX_CASE_REDUCTIONS,
         "{} reductions for {CASE_LINES} lines",

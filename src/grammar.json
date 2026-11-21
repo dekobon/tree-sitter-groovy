@@ -276,6 +276,10 @@
                       {
                         "type": "SYMBOL",
                         "name": "_expression"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "spread_arguments"
                       }
                     ]
                   }
@@ -374,6 +378,10 @@
                           {
                             "type": "SYMBOL",
                             "name": "_expression"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "spread_arguments"
                           }
                         ]
                       }
@@ -512,6 +520,10 @@
                         {
                           "type": "SYMBOL",
                           "name": "_expression"
+                        },
+                        {
+                          "type": "SYMBOL",
+                          "name": "spread_arguments"
                         }
                       ]
                     }

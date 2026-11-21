@@ -126,6 +126,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   first argument (`foo 1 bar 2` is two calls and `foo a bar` a call and
   a name, where Groovy reads `foo(1).bar(2)`) and a comment between the
   receiver and the argument (`SPECIFICATION.md` §5.5, §6.14).
+- A parenthesis-free call takes a spread argument after a comma, as
+  Apache's `argumentListElement` does: `foo 'a', *args`,
+  `foo a: 1, *b, c: 2`, `x = foo 1, *a`, `obj.m 1, *xs`, and on the
+  line after the comma. The argument is a `spread_arguments`, as in
+  parentheses, over the whole expression after the `*`, so the nest
+  `foo 1, *a = foo 1, *a = 1` is Groovy's `foo(1, *(a = foo(…)))`. It
+  was an `ERROR`, and the nest took time cubic in its depth (3.0 s for
+  400 levels); it is linear (0.5 ms). `foo *a` is still a product, as
+  in Groovy; still an `ERROR`: a spread as the first argument
+  (`foo *a, 1`), which Groovy takes, and a spread map (`foo a: 1, *:m`).
 - A parenthesis-free call is accepted in parentheses
   (`(sh script: 'x').trim()`, `def x = (foo 1)`), as the condition of
   `if`, `while` and `do`, a `switch` value and a `synchronized` lock
@@ -281,12 +291,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`docs/divergences-from-spec.md` §20).
 - Three shapes of input that parse with an `ERROR`, here and at v0.6.0,
   take time above linear in their length, where v0.6.0 was linear:
-  nested `foo 1, *a = …` calls (3.1 s for 400 levels, 4.8 KB), runs of
+  nested `foo 1, %a = …` calls (3.0 s for 400 levels, 4.8 KB), runs of
   `@C(,` and a space (3.6 s for 4,000) and `case 1:` lines outside a `switch`
   (4.2 s for 4,000). They came with the call as a value, annotations as
   annotation values and the `default` modifier. The new
   `bindings/rust/tests/error_recovery_cost.rs` pins their cost
-  (`docs/divergences-from-spec.md` §29).
+  (`docs/divergences-from-spec.md` §29). The same nest with `*`, which
+  Groovy takes, is linear (see Added).
 - **BREAKING:** a line that ends in parentheses around a name, a dotted
   name or a primitive type (`def y = (x)`, `return (x)`), followed on
   the next line by a multi-assignment declaration that starts with

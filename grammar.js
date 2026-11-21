@@ -483,8 +483,8 @@ function parameter($, value = $._expression) {
 
 /**
  * The arguments of a parenthesis-free call after its first: after each
- * comma a named argument or any expression, Apache's
- * `argumentListElement` without spread arguments.
+ * comma a named argument, any expression or a spread argument, Apache's
+ * `argumentListElement` (`expressionListElement[true]` takes `*`).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {RepeatRule} The repeated comma and argument.
@@ -494,6 +494,7 @@ function commandArgumentsAfterFirst($) {
     alias($._command_named_argument, $.named_argument),
     alias($._command_continued_named_argument, $.named_argument),
     $._expression,
+    $.spread_arguments,
   ))));
 }
 
@@ -1129,10 +1130,9 @@ module.exports = grammar({
     // parentheses or a literal that the argument goes on past
     // (`println 'a' + b`), in `_path_command_chain`, and a call that is a
     // value in `_value_command_chain`. After a comma an argument is a named
-    // argument or any expression: Apache's `argumentListElement` without
-    // spread arguments (`foo 'a', *args` is an ERROR). The continuations
-    // of a chain (`foo a bar`) are not taken. Closes a subset of
-    // murtaza64 #5.
+    // argument, any expression or a spread argument (`foo 'a', *args`):
+    // Apache's `argumentListElement`. The continuations of a chain
+    // (`foo a bar`) are not taken. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
       field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),

@@ -2828,6 +2828,10 @@
             "named": true
           },
           {
+            "type": "spread_arguments",
+            "named": true
+          },
+          {
             "type": "spread_dot_expression",
             "named": true
           },

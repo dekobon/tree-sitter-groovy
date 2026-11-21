@@ -1363,7 +1363,8 @@ The Groovy column was observed by running Groovy 3.
 | `java.util.List 'foo'(1)` | a call | `java.util.List` and `'foo'(1)`, as before |
 | `x.y 1` then `-1` on the next line | two statements | one call with the argument `1 - 1`; before, `x.y` and `1 - 1` |
 | `x.y 2` then `++i` on the next line | `x.y(2)`, then `++i` | the call with the argument `2++`, then `i`: the line goes on with the first argument |
-| `obj.m 1, *xs`, `obj.m 'a': 1` | a call | `ERROR` |
+| `obj.m 1, *xs` | a call | a call; before, an `ERROR` |
+| `obj.m 'a': 1` | a call | `ERROR` |
 
 **Action**: none planned for the spaced and multi-line receivers. A
 receiver that ends in a call or a subscript needs the scanner to read
@@ -2261,15 +2262,20 @@ the runtime of `tree-sitter` 0.27.2; the counts are from its log.
 
 | Input | Groovy 3 | Here | v0.6.0 | From |
 |---|---|---|---|---|
-| `foo 1, *a = ` repeated, then `1` | `foo(1, *(a = foo(…)))` | 65, 434 and 3,086 ms at 100, 200 and 400 levels; reductions grow with the square of the levels and stack versions linearly (213 at 100) | 0.6, 1.2 and 2.4 ms; 4 versions | a call as a value (849c0ab): a spread argument is an `ERROR` in a command chain, and each level keeps a version alive |
+| `foo 1, %a = ` repeated, then `1` | rejected | 71, 416 and 2,970 ms at 100, 200 and 400 levels; reductions grow with the square of the levels and stack versions linearly (213 at 100) | 0.6, 1.2 and 2.4 ms; 4 versions | a call as a value (849c0ab): each level keeps a version alive past the `ERROR` of its argument |
 | `@C(, ` repeated | rejected | 214, 845 and 3,625 ms at 1,000, 2,000 and 4,000; reductions and log messages linear | 2.0, 4.1 and 8.3 ms | annotations as annotation values (d23d53f): recovery inserts a missing name, which nests each `@C(` in the one before, and the runtime rebuilds the growing `ERROR` node, work its log does not show |
 | `case 1:` lines outside a `switch` | rejected | 260, 1,040 and 4,178 ms at 1,000, 2,000 and 4,000 lines; about n²/2 reductions | 6.0, 12.1 and 24.1 ms | the `default` modifier (fa9986c, §20): one version nests the lines as labels and closes the whole nest at each line |
+
+The first row was `foo 1, *a = ` repeated, which Groovy reads as
+`foo(1, *(a = foo(…)))`, at the same cost, while a command chain took no
+spread argument after a comma. It takes one now, and that nest parses
+without an `ERROR` in one stack version: 0.13, 0.26 and 0.49 ms at 100,
+200 and 400 levels.
 
 **Action**: none planned. Reserving `case`, which Groovy does, makes the
 third linear and changes no parse table size, but turns the keys
 `foo a: 1, case: 2`, `foo(a: 1, case: 2)` and `[case: 1]`, which Groovy
-takes, into `ERROR`s. The first runs into the spread argument that a
-command chain does not take. `bindings/rust/tests/error_recovery_cost.rs`
+takes, into `ERROR`s. `bindings/rust/tests/error_recovery_cost.rs`
 pins today's reductions and stack versions of each, so that they grow no
-further; for the second those counts are linear and its time is not
-pinned.
+further, and bounds the spread nest's linearly; for the second row those
+counts are linear and its time is not pinned.
