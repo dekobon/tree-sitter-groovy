@@ -1039,6 +1039,46 @@ fn a_comma_after_a_final_typed_declaration_reuses_the_split_statement() {
     );
 }
 
+/// A known limitation (`SPECIFICATION.md` §6.18): the runtime reuses a node,
+/// and breaks it down for a changed token after it, only while one stack
+/// version exists. In a type body `final String z` before `static class C`
+/// is also `final String` and a field `z` named `static` before `class C`,
+/// which a weight ranks below. Typing `w` after a last `final String`,
+/// which the `}` after it made a field named `String`, reuses that field at
+/// a point where one version is left; the reduction after it splits the
+/// two readings of the lines before, the one that holds the reused field
+/// meets an `ERROR` at `w` and ends, and the other one stays. The fuzz seed
+/// 4420640461419634763 found it on the corpus test of nested types after
+/// typed fields in a record. This test pins the difference. If it fails,
+/// the two parses agree again: remove the limitation from §6.18.
+#[test]
+fn a_name_typed_after_a_last_field_keeps_the_split_reading_before_it() {
+    const TEXT: &str = "class A {\n  final String z\n  static class C { }\n  final String }";
+    /// The offset after `final String ` on the last line, where `w` and a
+    /// line break are typed.
+    const INSERT_AT: usize = 63;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, "w\n");
+    assert_eq!(
+        edited,
+        "class A {\n  final String z\n  static class C { }\n  final String w\n}"
+    );
+    assert!(!incremental.root_node().has_error());
+    assert!(!fresh.root_node().has_error());
+
+    // From scratch the first field is typed, `z` its name; the reparse
+    // keeps the modifier-only field `final String` before it.
+    let typed_first = "(class_body (field_declaration type: (type_identifier)";
+    let fresh = fresh.root_node().to_sexp();
+    let incremental = incremental.root_node().to_sexp();
+    assert!(fresh.contains(typed_first), "{fresh}");
+    assert!(
+        !incremental.contains(typed_first),
+        "the reparse now matches the parse from scratch: {incremental}",
+    );
+}
+
 /// A known limitation (`SPECIFICATION.md` §6.14): during error recovery the
 /// runtime ignores an empty external token that leaves the scanner's state
 /// as it was, and a later reparse reuses the leaf after it without calling

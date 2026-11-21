@@ -3870,6 +3870,18 @@ character at a time, 27 differ, all typing `(a, b)` two lines after
 which the trees agree again. The grammar before had 18, 12 of them to
 the end.
 
+The same limit shows in a type body, where `final String z` before
+`static class C { }` on the next line is also `final String` and a
+field `z` named `static` before `class C { }`, which
+MODIFIER_ONLY_FIELD_WEIGHT ranks below. Typing `w` after a last
+`final String`, which the `}` after it made a field named `String`,
+reuses that field where one stack version is left; the reduction after
+it splits the two readings of the lines before, the version that holds
+the reused field meets an `ERROR` at `w` and ends, and the other reading
+stays, with no `ERROR`. It is the same at v0.6.0; the fuzz seed
+4420640461419634763 found it on a record's corpus test, and
+`bindings/rust/tests/incremental_reparse.rs` pins it.
+
 Trees that change for input that parsed without an `ERROR`: a `(` that
 opens a line after an expression where a statement may start, and that
 can open one, was the arguments of a call of that expression, and opens
