@@ -743,6 +743,11 @@ static bool call_arguments_follow(
     bool no_close_ahead
 );
 
+static bool keyword_starts_operand(
+    const char *word,
+    unsigned len,
+    int32_t next
+);
 // Defined after is_grammar_keyword, which they call.
 static bool is_value_keyword(const char *word, unsigned len, int32_t next);
 static bool is_reserved_lambda_name(const char *word, unsigned len);
@@ -2251,21 +2256,37 @@ static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
 // SPECIFICATION.md §6.16 — `var` declares the name that follows it, on
 // the line or a later one (`var x = 1`, `def f(var x)`), as it did when
 // the word was always a keyword. `var instanceof T` tests `var`, as in
-// Groovy (`instanceof_test_follows`). Before `(` it opens a
-// multi-assignment: where `var` alone may open one (VAR_NAMES_KEYWORD
-// valid), only when the names, `)` and `=` follow; after `final`, always.
-// Anywhere else the word is a name.
+// Groovy, and a keyword after it that is no modifier and starts no operand
+// (`keyword_starts_operand`), such as `else`, leaves it a name (`if (c) var`
+// then `else x`); before `new` it stays the keyword, an `ERROR`, as Groovy's
+// `var(new Foo())` is no call the grammar takes.
+// Right after `return`, `break` or `continue` on their line, where
+// JUMP_STATEMENT_END is valid, it is the value or the label (§6.23), as
+// Groovy takes no declaration there: `return var` then `x` on the next
+// line returns `var`. Before `(` it opens a multi-assignment: where `var`
+// alone may open one (VAR_NAMES_KEYWORD valid), only when the names, `)`
+// and `=` follow; after `final`, always. Anywhere else the word is a name.
 static bool scan_var(
     TSLexer *lexer,
     const bool *valid_symbols,
     bool no_close_ahead
 ) {
-    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+    if ((valid_symbols[JUMP_STATEMENT_END] && !valid_symbols[ERROR_SENTINEL])
+        || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
         return false;
     }
     if (is_identifier_start(lexer->lookahead)) {
-        if (lexer->lookahead == 'i'
-            && instanceof_test_follows(lexer, no_close_ahead)) {
+        char word[sizeof "synchronized"];
+        unsigned len = read_word(lexer, word, sizeof word);
+        if (word_is(word, len, "instanceof")) {
+            if (skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+                && is_identifier_start(lexer->lookahead)) {
+                return false;
+            }
+        } else if (is_value_keyword(word, len, lexer->lookahead)
+                   && !is_modifier_word(word, len)
+                   && !word_is(word, len, "def")
+                   && !keyword_starts_operand(word, len, lexer->lookahead)) {
             return false;
         }
         lexer->result_symbol = VAR_KEYWORD;

@@ -1600,7 +1600,7 @@ and later is read off `GroovyParser.g4`.
 | `println var`, `println in`, `foo as` | calls | `ERROR` | `println var` a call, as `println x` (#25 below); `println in` and `foo as` two statements, as `in` and `as` go on with the receiver as operators |
 | `var x = 1` in a class body | a field `x`, `var` a modifier | a field `x` of type `var` | the same as before |
 | `var` then `x = 1` on the next line | a declaration of `x` | the same | the same |
-| `return var` then `x = 1` on the next line | `return var`, then an assignment | `return`, then a declaration of `x` | the same as before |
+| `return var` then `x = 1` on the next line, `if (c) return var` then `else x`, `break var` then `x` | `return var`, then an assignment; the `if` with its `else`; `break` to the label `var` | `return`, then a declaration of `x`; a declaration of `else`; `break`, then a declaration of `x` | as Groovy: `var` after the keyword on its line is the value or the label |
 | `yield x`, `yield (x)`, `yield -1`, `yield [1]` outside a switch expression | a call, a call, a subtraction, an index (Groovy 4 and later: the same, read off the `.g4`) | `yield_statement` | the same as before |
 | `yield` then `x` on the next line, also after `// c` or `/* c */` on its line | two names (Groovy 4 and later: the same, as `yieldStatement` takes no `nls` before its value) | a `yield_statement` of `x`, also at v0.6.0 | two names |
 | `var in xs`, `var as T` | a declaration of `xs` of type `in` (`T` of type `as`) | a declaration of `in` (`as`), then `xs` (`T`) | the same as before |

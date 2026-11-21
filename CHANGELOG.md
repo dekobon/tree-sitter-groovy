@@ -793,6 +793,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `throw` and `assert` still take a value on the next line. No tree of
   266 real files changes; 66 of 24,548 Java files do, each at a
   `return` that ends its line.
+- **BREAKING:** `var` right after `return`, `break` or `continue` on
+  their line is the value or the label, as Groovy takes no declaration
+  there: `return var` then `x` on the next line is the return of `var`
+  and the statement `x`, where v0.6.0 read a bare `return` and a
+  declaration of `x`; `if (c) return var` then `else x`, which declared
+  a local named `else`, is the `if` with its `else`; `break var` then
+  `x` breaks to the label `var`. A keyword that starts no operand after
+  `var` leaves it a name as well (`if (c) var` then `else x`,
+  `var` then `if (a) b`). No real, Java or shape tree changes
+  (`SPECIFICATION.md` §6.16).
 - **BREAKING:** parentheses before a keyword that starts no operand on
   their line close no cast: `if (a) (b) else c` is an `if_statement`
   with the `alternative` `c`, as Groovy runs it, where v0.6.0 read the

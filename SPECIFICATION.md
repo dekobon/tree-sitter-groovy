@@ -3224,8 +3224,12 @@ On the word `var`, `yield`, `in` or `as`, not followed by an
 identifier character, where its token is valid, look past any mix of
 spaces, tabs, line escapes, line breaks, block and line comments:
   VAR_KEYWORD        a name follows, other than `instanceof` followed by
-                     a type; or `(` follows where VAR_NAMES_KEYWORD is
-                     not valid (after `final`, in a parameter).
+                     a type and a keyword that is no modifier and starts
+                     no operand (`else`, `if`; §6.11); or `(` follows
+                     where VAR_NAMES_KEYWORD is not valid (after
+                     `final`, in a parameter). Never where
+                     JUMP_STATEMENT_END is valid, right after `return`,
+                     `break` or `continue` on their line (§6.23).
   VAR_NAMES_KEYWORD  `(` follows, then only names, `,`, `*`, `:`, `.`,
                      `<`, `>`, `?`, `[`, `]` and trivia up to `)`, then
                      `=` that is not `==` or `=~`.
@@ -3317,6 +3321,18 @@ the next line, as Groovy allows. Where no type follows, the word keeps
 its reading: `var instanceof = 1`, which Groovy rejects, is still a
 declaration of `instanceof`; taking the word as a name there would
 turn that tree into an `ERROR`.
+
+After `return`, `break` or `continue` on their line `var` is the value
+or the label, as Groovy takes no declaration there: `return var` then
+`x` on the next line returns `var` (observed with Groovy 3), where the
+keyword declared `x`, and `if (c) return var` then `else x` declared a
+local named `else`. A keyword after `var` that names nothing, being no
+modifier and starting no operand, makes it a name too:
+`if (c) var` then `else x` and `var` then `if (a) b` are a name and
+the `else` or the `if`, as in Groovy. Before `new`, `true` or another
+keyword that starts an operand the word stays the keyword, so
+`var new Foo()`, Groovy's `var(new Foo())`, stays an `ERROR` rather than
+two statements.
 
 `in++` and `yield++` update a name. After `++` or `--` the look-ahead
 stays on the line, so the operator is the name's postfix update when

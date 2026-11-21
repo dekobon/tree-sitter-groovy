@@ -684,6 +684,31 @@ def m() {
           arguments: (argument_list))))))
 
 ==================
+A var before a keyword that starts a statement is a name
+==================
+
+if (c) var
+else x
+var
+if (a) b
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))
+    alternative: (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))))
+
+==================
 Multi-assignment with var alone
 ==================
 

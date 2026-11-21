@@ -206,6 +206,46 @@ def f() {
         (identifier)))))
 
 ==================
+A var after return or break on its line is the value or the label
+==================
+
+def f() {
+  if (c) return var
+  else x
+  return var
+  y
+}
+while (a) {
+  break var
+  z
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (return_statement
+          (identifier))
+        alternative: (expression_statement
+          (identifier)))
+      (return_statement
+        (identifier))
+      (expression_statement
+        (identifier))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement
+        label: (identifier))
+      (expression_statement
+        (identifier)))))
+
+==================
 Throw
 ==================
 
