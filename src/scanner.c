@@ -3381,8 +3381,8 @@ typedef enum {
     // A possible operand of a cast, which then outranks a parenthesized
     // expression.
     OPERAND_CLOSE,
-    // A relational operator that Groovy applies to the parentheses, which
-    // close no cast.
+    // A relational operator that Groovy applies to the parentheses, or a
+    // division (§6.2): the parentheses close no cast.
     OPERATOR_CLOSE,
 } ParenClose;
 
@@ -3831,7 +3831,8 @@ static ClosureCall read_closure_call(TSLexer *lexer, bool no_close_ahead) {
 // The grammar ranks a cast by this answer; it does not forbid one,
 // because inside `(…)` and `[…]` a line break ends nothing. Spaces,
 // tabs, line escapes and block comments that close on the line may
-// come first. A line comment ends the line.
+// come first. A line comment ends the line, and any other `/` is a
+// division (OPERATOR_CLOSE).
 static ParenClose read_paren_close(TSLexer *lexer) {
     lexer->mark_end(lexer);
     for (;;) {
@@ -3848,8 +3849,11 @@ static ParenClose read_paren_close(TSLexer *lexer) {
         if (lexer->lookahead == '/') {
             return PLAIN_CLOSE;
         }
+        // §6.2 — after `)` Groovy's lexer reads `/` as division, never as
+        // the start of a slashy string, so no cast's operand starts there
+        // (`(a)/2 + (b)/2`).
         if (lexer->lookahead != '*') {
-            return OPERAND_CLOSE;
+            return OPERATOR_CLOSE;
         }
         // A block comment that closes on this line is skipped, and the
         // answer depends on what follows it. One that runs past the
@@ -5848,7 +5852,16 @@ bool tree_sitter_groovy_external_scanner_scan(
     //       closing `/` on the same line. Without this, `a / b\nc`
     //       at end of file would emit a slashy opener and leave
     //       the body unterminated.
-    if (!wants_slashy) {
+    // §6.2 — after an operand Groovy's lexer reads `/` as division
+    // (GroovyLexer.g4 `isRegexAllowed`: after a name, a literal, `this`,
+    // `)`, `]`, `}`, `++`, `--` or the end of a string). NOT_IN is valid
+    // exactly where an expression ends, which on the same line is after
+    // such a token, so the next statement or a call's first argument that
+    // the grammar lets start there opens no slashy string: `x = w/2 + h/2`
+    // was `x = w` and the string `/2 + h/`. Past a line break one may
+    // start, as Groovy's lexer emits a newline token there (`x = a` and
+    // `/re/` on the next line).
+    if (!wants_slashy || (expression_ends && !crossed_line)) {
         return false;
     }
     // `lexer->mark_end` records the position where the slashy opener

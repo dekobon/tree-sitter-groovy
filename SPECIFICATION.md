@@ -1705,6 +1705,30 @@ changed, but for the inputs with a line past the bound, all of which
 had an `ERROR` before and after (1,583 of 17,762).
 `bindings/rust/tests/slashy_string_cost.rs` checks the two lines.
 
+The valid tokens stand in for `last_token` only where an operand may
+start, and the grammar lets one start right after an operand: the next
+statement may follow on the same line, and a parenthesis-free call's
+first argument after its receiver. So a `/` after an operand opened a
+slashy string wherever a second `/` closed one on the line:
+`x = w/2 + h/2` was `x = w`, the string `/2 + h/` and `2`,
+`println a/2 + b/2` the call `println a` and the same string, and
+`x = (a)/2 + (b)/2` a cast of a string, each without an `ERROR`.
+Groovy's lexer reads `/` after a name, a literal, `this`, `)`, `]`,
+`}`, `++`, `--` or the end of a string as division (`isRegexAllowed`,
+`REGEX_CHECK_ARRAY` in `GroovyLexer.g4`; Groovy 6 adds value-ending
+keywords and a member name, `obj.class / 2`). NOT_IN is valid exactly
+where an expression ends, so the scanner opens no slashy string where
+it is valid and no line break comes before the `/`; past a line break
+it may, as Groovy's lexer emits a newline token there (`x = a` and
+`/re/` on the next line are two statements). A `/` after a `)` that
+opens no comment closes no cast either (RELATIONAL_CLOSE, §6.11).
+Inputs Groovy rejects are an `ERROR` now: `println /abc/`,
+`foo /a/, 1`, `obj.m /x/` and `(String) /a/`, where Groovy reads a
+division with no right operand. After the `}` of a call's trailing
+closure in a statement (`foo { }/2`) the statement still ends, as a
+call with a closure is a command chain there, and a slashy string
+opens the next; Groovy reads `foo({ }) / 2`.
+
 ### 6.3 GSTRING — implementation contract
 
 Double-quoted strings, triple-double-quoted strings, slashy, and
@@ -2102,7 +2126,9 @@ goes on with
   - `as` or `in` as a whole word, then only spaces, tabs, line
     escapes and block comments that close on the line, then a name
     that is not `as`, `in` or `instanceof`, nor `new` after `as`, or
-    after `in` a digit or a quote.
+    after `in` a digit or a quote, or
+  - a `/` that opens no comment, a division after a `)` to Groovy's
+    lexer, which no cast's operand starts with (§6.2).
 Emit it also in a state where it is not valid, where only a cast's type
 takes the `)`: no rule takes it there, so that reading ends.
 ```

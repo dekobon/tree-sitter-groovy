@@ -585,6 +585,135 @@ a / b
       right: (identifier))))
 
 ==================
+A slash after an operand on its line is division, also where a statement may follow
+==================
+
+x = w/2 + h/2
+w/2 + h/2
+x = a/b/c
+x = (a)/2 + f()/2 + a[0]/2 + i++/2
+x = a/b // c
+x = a/2 + (s =~ /re/)
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (binary_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (number_literal))
+      right: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (parenthesized_expression
+                (identifier))
+              right: (number_literal))
+            right: (binary_expression
+              left: (method_invocation
+                function: (identifier)
+                arguments: (argument_list))
+              right: (number_literal)))
+          right: (binary_expression
+            left: (subscript_expression
+              object: (identifier)
+              index: (number_literal))
+            right: (number_literal)))
+        right: (binary_expression
+          left: (update_expression
+            operand: (identifier))
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (line_comment)
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (parenthesized_expression
+          (regex_find_expression
+            subject: (identifier)
+            pattern: (string_literal
+              (string_fragment))))))))
+
+==================
+A slashy string may open the line after an operand
+==================
+
+x = a
+/re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A slash after a name opens no slashy string argument
+:error
+==================
+
+println /abc/
+
+---
+
+==================
+A slash after a member access opens no slashy string argument
+:error
+==================
+
+obj.m /x/
+
+---
+
+==================
+A slash after the parentheses of a cast opens no slashy string operand
+:error
+==================
+
+x = (String) /a/
+
+---
+
+==================
 Double-quoted string that starts with two slashes
 ==================
 

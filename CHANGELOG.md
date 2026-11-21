@@ -691,6 +691,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`SPECIFICATION.md` §6.23). `throw` and `assert` still take a value
   on the next line. No tree of 266 real files changes; 66 of 24,548
   Java files do, each at a `return` that ends its line.
+- **BREAKING:** a `/` after an operand on its line is division, as
+  Groovy's lexer reads it after a name, a literal, `this`, `)`, `]`,
+  `}`, `++`, `--` or a string. Where the next statement or a call's
+  first argument may start, it opened a slashy string that a second `/`
+  on the line closed: `x = w/2 + h/2` was three statements (`x = w`,
+  the string `/2 + h/` and `2`), `println a/2 + b/2` the call
+  `println a` and that string, and `x = (a)/2 + (b)/2` a cast of a
+  string, each without an `ERROR`; `x = a/2 + (s =~ /re/)` and
+  `a/b // c` were an `ERROR`. Each is one expression now, as in
+  Groovy. `println /abc/`, `foo /a/, 1`, `obj.m /x/` and
+  `(String) /a/`, which Groovy rejects, are an `ERROR`. A slashy string
+  still opens a line after an expression (`x = a` and `/re/` on the
+  next line), and after an operator, a bracket, a comma or a keyword
+  (`foo(/a/)`, `return /a/`, `x in /a/`). No tree of 266 real files
+  changes; of 24,548 Java files, 4 trees without an `ERROR` change,
+  each to Groovy's reading of a line with a division before a second
+  `/`, another division or a comment, and one more parses without an
+  `ERROR` (`SPECIFICATION.md` §6.2).
 
 ### Fixed
 
