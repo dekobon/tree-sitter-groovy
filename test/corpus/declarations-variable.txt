@@ -359,13 +359,13 @@ final (*init, last) = list
   (multi_assignment_declaration
     (variable_declarator
       name: (identifier))
-    (variable_declarator
+    (rest_declarator
       name: (identifier))
     value: (identifier))
   (multi_assignment_declaration
     (variable_declarator
       name: (identifier))
-    (variable_declarator
+    (rest_declarator
       type: (generic_type
         base: (type_identifier)
         arguments: (type_arguments
@@ -373,7 +373,7 @@ final (*init, last) = list
       name: (identifier))
     value: (identifier))
   (multi_assignment_declaration
-    (variable_declarator
+    (rest_declarator
       name: (identifier))
     (variable_declarator
       name: (identifier))
@@ -395,7 +395,7 @@ def (h, List<Integer> *t) = l
 1:5  - 1:6        variable_declarator
 1:5  - 1:6          name: identifier `h`
 1:6  - 1:7        ","
-1:8  - 1:24       variable_declarator
+1:8  - 1:24       rest_declarator
 1:8  - 1:21         type: generic_type
 1:8  - 1:12           base: type_identifier `List`
 1:12 - 1:21           arguments: type_arguments
@@ -407,6 +407,117 @@ def (h, List<Integer> *t) = l
 1:24 - 1:25       ")"
 1:26 - 1:27       "="
 1:28 - 1:29       value: identifier `l`
+
+==================
+Multi-assignment rest binding in each place and with each kind of type (Groovy 6)
+==================
+
+def (*a) = l
+def (*a, b) = l
+def (a, *b, c) = l
+def (int a, List *b) = l
+def (a, String[] *b) = l
+def (a, java.util.List *b) = l
+var (a, *b) = l
+final var (a, *b) = l
+for (def (a, *b) = l; a; ) { }
+class C {
+    private (a, *b) = l
+}
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (rest_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      type: (array_type
+        (type_identifier))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (for_statement
+    init: (multi_assignment_declaration
+      (variable_declarator
+        name: (identifier))
+      (rest_declarator
+        name: (identifier))
+      value: (identifier))
+    condition: (identifier)
+    body: (block))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (rest_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+Multi-assignment with two rest bindings parses, which Groovy rejects after parsing (known divergence)
+==================
+
+def (*a, *b) = l
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier)))
 
 ==================
 Multi-assignment with keyed pairs (Groovy 6)
@@ -456,7 +567,7 @@ final (a, b) = m
   (multi_assignment_declaration
     (variable_declarator
       name: (identifier))
-    (variable_declarator
+    (rest_declarator
       name: (identifier))
     value: (identifier))
   (expression_statement

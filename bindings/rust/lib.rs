@@ -53,49 +53,51 @@ mod tests {
             .expect("Error loading Groovy parser");
     }
 
-    /// The `*` of a rest binding is the `rest` field of its declarator
-    /// (`SPECIFICATION.md` §4, multi-assignment). The field is on an
-    /// anonymous node, which no output of `tree-sitter parse` labels, so the
-    /// corpus tests cannot pin it.
-    #[test]
-    fn a_rest_binding_has_its_star_in_the_rest_field() {
+    /// Returns the text of each node of `source` that `capture` of the
+    /// locals query takes, in the order of the query's matches.
+    fn locals_captures(source: &str, capture: &str) -> Vec<String> {
+        use tree_sitter::StreamingIterator;
+
+        let language = super::LANGUAGE.into();
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(&super::LANGUAGE.into())
+            .set_language(&language)
             .expect("Error loading Groovy parser");
-        for (source, rest_index) in [
-            ("def (h, List<Integer> *t) = l\n", 1),
-            ("final (*init, last) = l\n", 0),
+        let tree = parser.parse(source, None).expect("parse");
+        assert!(!tree.root_node().has_error(), "{source:?}");
+        let query =
+            tree_sitter::Query::new(&language, include_str!("../../queries/groovy/locals.scm"))
+                .expect("locals query");
+        let index = query
+            .capture_index_for_name(capture)
+            .expect("a capture of the locals query");
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut texts = Vec::new();
+        let mut captures = cursor.captures(&query, tree.root_node(), source.as_bytes());
+        while let Some((found, capture_index)) = captures.next() {
+            let capture = found.captures()[*capture_index];
+            if capture.index == index {
+                texts.push(source[capture.node.byte_range()].to_owned());
+            }
+        }
+        texts
+    }
+
+    /// The rest binding of a multi-assignment, a `rest_declarator`, defines
+    /// its name as the other names do (`queries/groovy/locals.scm`). The
+    /// CLI's `tree-sitter test` runs no locals query.
+    #[test]
+    fn a_rest_binding_defines_its_name() {
+        for (source, names) in [
+            ("def (a, *b) = l\n", ["a", "b"]),
+            ("final (*init, last) = l\n", ["init", "last"]),
+            ("def (h, List<Integer> *t) = l\n", ["h", "t"]),
         ] {
-            let tree = parser.parse(source, None).expect("parse");
-            let declaration = tree.root_node().named_child(0).expect("a statement");
             assert_eq!(
-                declaration.kind(),
-                "multi_assignment_declaration",
+                locals_captures(source, "local.definition.var"),
+                names,
                 "{source:?}"
             );
-            let mut cursor = declaration.walk();
-            let declarators: Vec<_> = declaration
-                .named_children(&mut cursor)
-                .filter(|child| child.kind() == "variable_declarator")
-                .collect();
-            assert_eq!(declarators.len(), 2, "{source:?}");
-            for (index, declarator) in declarators.iter().enumerate() {
-                let rest = declarator.child_by_field_name("rest");
-                if index == rest_index {
-                    let star = rest.expect("a rest field");
-                    assert_eq!(star.kind(), "*", "{source:?}");
-                    assert_eq!(
-                        declarator
-                            .child_by_field_name("name")
-                            .map(|n| n.start_byte()),
-                        Some(star.end_byte()),
-                        "{source:?}",
-                    );
-                } else {
-                    assert_eq!(rest, None, "{source:?}");
-                }
-            }
         }
     }
 }

@@ -228,6 +228,7 @@
 (lambda_expression parameters: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)
 (variable_declarator name: (identifier) @variable)
+(rest_declarator name: (identifier) @variable)
 (field_declaration (variable_declarator name: (identifier) @property))
 
 ; Labels (declaration + use sites)

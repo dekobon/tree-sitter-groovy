@@ -5884,7 +5884,7 @@
                         "name": "_rest_multi_assignment_declarator"
                       },
                       "named": true,
-                      "value": "variable_declarator"
+                      "value": "rest_declarator"
                     }
                   ]
                 },
@@ -5920,7 +5920,7 @@
                               "name": "_rest_multi_assignment_declarator"
                             },
                             "named": true,
-                            "value": "variable_declarator"
+                            "value": "rest_declarator"
                           }
                         ]
                       }
@@ -6013,12 +6013,8 @@
           ]
         },
         {
-          "type": "FIELD",
-          "name": "rest",
-          "content": {
-            "type": "STRING",
-            "value": "*"
-          }
+          "type": "STRING",
+          "value": "*"
         },
         {
           "type": "FIELD",

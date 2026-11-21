@@ -10226,6 +10226,10 @@
           "named": true
         },
         {
+          "type": "rest_declarator",
+          "named": true
+        },
+        {
           "type": "variable_declarator",
           "named": true
         }
@@ -13190,6 +13194,44 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "rest_declarator",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "generic_type",
+            "named": true
+          },
+          {
+            "type": "qualified_type",
+            "named": true
+          },
+          {
+            "type": "type_identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -18511,16 +18553,6 @@
           {
             "type": "identifier",
             "named": true
-          }
-        ]
-      },
-      "rest": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "*",
-            "named": false
           }
         ]
       },

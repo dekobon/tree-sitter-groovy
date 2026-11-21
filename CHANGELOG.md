@@ -93,9 +93,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `@Field def (a, b) = l`), a `for` init, and a type body member with
   a field's modifiers (`private static def (a, b) = l`,
   `private var (a, b) = l`). It takes Groovy 6's rest binding,
-  `def (a, *b) = list`, with the `*` in a new `rest` field, and keyed
-  pairs, `def (name: n, age: int a) = map`, with the key in a `key`
-  field; a list holds names or pairs, not both. Each was an `ERROR`.
+  `def (a, *b) = list`, in any place of the list, as a new
+  `rest_declarator` with a `name` and, when typed, a `type`
+  (`def (h, List<Integer> *t) = list`), and keyed pairs,
+  `def (name: n, age: int a) = map`, with the key in a `key` field; a
+  list holds names or pairs, not both. A rest binding's name is a local
+  definition and `@variable`, as the other names are. Each was an
+  `ERROR`.
   Annotations alone (`@A (a, b) = l`) and modifiers other than `final`
   where a statement starts (`static def (a, b) = l`) are still one.
 - A parenthesis-free call takes more first arguments on the receiver's
@@ -472,14 +476,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   keyword and punctuation tokens are aliased, so the anonymous `trait`,
   `sealed`, `var`, `yield`, `in`, `as`, `(`, `)`, `,` and `<` nodes
   keep their kinds. The scanner now carries two bits of serialized
-  state, one byte while either is set (§6.6, §6.19). Seven named node
+  state, one byte while either is set (§6.6, §6.19). Eight named node
   kinds are added (`array_creation_expression`, `array_initializer`,
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
-  `lambda_expression`, `multi_assignment_expression`) and two fields,
-  `dimensions` and `rest`; none is removed. `SYMBOL_COUNT` goes from
-  321 to 408, `FIELD_COUNT` from 45 to 47 and `STATE_COUNT` from 4,025
-  to 4,658, so most symbol ids and the field ids after `dimensions`
-  change. In `node-types.json`: every expression position adds
+  `lambda_expression`, `multi_assignment_expression`,
+  `rest_declarator`) and one field, `dimensions`; none is removed.
+  `SYMBOL_COUNT` goes from 321 to 408, `FIELD_COUNT` from 45 to 46 and
+  `STATE_COUNT` from 4,025 to 4,658, so most symbol ids and the field
+  ids after `dimensions` change. In `node-types.json`: every expression position adds
   `array_creation_expression`, `array_type`, `lambda_expression` and
   `multi_assignment_expression`; `command_chain` is added to the
   `value` of `variable_declarator`, `local_variable_declaration`,
@@ -490,7 +494,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `synchronized_statement.lock`; `command_chain.receiver` adds the six
   member-access kinds; `argument_list`, `list_literal`,
   `assignment_expression.right` and `multi_assignment_declaration` add
-  `annotation`; `variable_declarator` gains `type`, `key` and `rest`;
+  `annotation`, and `multi_assignment_declaration` `rest_declarator`;
+  `variable_declarator` gains `type` and `key`;
   `method_declaration` gains `default`; `class_body` adds
   `compact_constructor_declaration` and `multi_assignment_declaration`,
   and `enum_body` and `for_statement.init` the latter; the children of

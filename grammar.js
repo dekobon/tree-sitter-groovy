@@ -2247,16 +2247,17 @@ module.exports = grammar({
     // keyword before a name lexes as a type: `def (def a, b)` has the
     // type `def`.
     //
-    // Groovy 6 adds a rest binding, `def (a, *b) = list`, whose `*` is
-    // the `rest` field of its `variable_declarator`, and keyed pairs,
-    // `def (name: n, age: int a) = map`, whose key is a `key` field. A
-    // list holds names or keyed pairs, not both. Groovy accepts one rest
-    // binding per list; that is checked after parsing, here not at all.
+    // Groovy 6 adds a rest binding, `def (a, *b) = list`, a node of its
+    // own, `rest_declarator`, with the optional `type` and the `name` of
+    // a typed name, and keyed pairs, `def (name: n, age: int a) = map`,
+    // whose key is a `key` field. A list holds names or keyed pairs, not
+    // both. Groovy accepts one rest binding per list, in any place; that
+    // is checked after parsing, here not at all.
     _multi_assignment_names: $ => {
       const declarator = choice(
         $.variable_declarator,
         alias($._typed_multi_assignment_declarator, $.variable_declarator),
-        alias($._rest_multi_assignment_declarator, $.variable_declarator),
+        alias($._rest_multi_assignment_declarator, $.rest_declarator),
       );
       const keyed = alias($._keyed_multi_assignment_declarator, $.variable_declarator);
       return seq(
@@ -2276,7 +2277,7 @@ module.exports = grammar({
 
     _rest_multi_assignment_declarator: $ => seq(
       optional(field('type', $._type)),
-      field('rest', '*'),
+      '*',
       field('name', $.identifier),
     ),
 

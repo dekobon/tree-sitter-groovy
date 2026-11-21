@@ -158,6 +158,12 @@ class Pair {
     //                      ^ variable
 }
 
+def (h, List<Integer> *t) = l
+//   ^ variable
+//      ^ type
+//                    ^ operator
+//                     ^ variable
+
 int var = yield
 //  ^ variable
 //        ^ variable

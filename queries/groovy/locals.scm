@@ -30,6 +30,8 @@
 ; `formal_parameter`.
 (lambda_expression parameters: (identifier) @local.definition.parameter)
 (variable_declarator name: (identifier) @local.definition.var)
+; A multi-assignment's rest binding: `def (a, *b) = l`.
+(rest_declarator name: (identifier) @local.definition.var)
 ; A typed local has its name on the declaration itself, with no
 ; `variable_declarator`: `String s = 'a'`, `final String s`.
 (local_variable_declaration name: (identifier) @local.definition.var)
