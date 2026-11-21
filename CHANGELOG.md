@@ -790,6 +790,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   each to Groovy's reading of a line with a division before a second
   `/`, another division or a comment, and one more parses without an
   `ERROR` (`SPECIFICATION.md` §6.2).
+- **BREAKING:** a cast whose operand is a name on the line of its `)`
+  is the cast where the line could also split after the `)`, as Groovy
+  reads it. In a type body, `def k = (Foo) x` then `def m() { }`,
+  `void m() { }`, `String m() { }`, `C() { }`, `public C() { }`,
+  `static { }`, `static int y = 1` or `private String y` on the next
+  line was the field `k = (Foo)`, a field of type `x` named `def`,
+  `void`, `public` and so on, and a constructor, method or field, with
+  no `ERROR`; it is the field `k` with the cast and the member, also
+  with a primitive or dotted type (`(int) x`, `(a.b.Foo) x`) and an
+  operand `x.y`. `x = (Foo) y` then `{ -> 1 }` and `{ foo() }` on the
+  next lines was the assignment of `(Foo)`, the call `y { -> 1 }` and a
+  block; it is the cast of `y` called with both closures, as Groovy 3
+  calls it. A new external token, `_cast_word_close`, is the `)` before
+  a name (`SPECIFICATION.md` §6.11). No tree of the corpus or of 266
+  real files changes; of 24,548 Java files one with an `ERROR` does, and
+  of 4,000 shape inputs two do, each to Groovy's reading.
 
 ### Fixed
 

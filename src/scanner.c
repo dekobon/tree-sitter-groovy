@@ -24,7 +24,8 @@
 // and the parentheses can open one; §6.15 ARRAY_VALUE_START, an
 // empty token before an array type that is a value (`String[].class`);
 // §6.11 CAST_CLOSE, a `)` with
-// something after it on its line, and RELATIONAL_CLOSE, one before a
+// something after it on its line, CAST_WORD_CLOSE, one before a name on its
+// line, and RELATIONAL_CLOSE, one before a
 // relational operator that Groovy applies to the parentheses (`(x)
 // instanceof Foo`) or one that ends its line before a line that opens with
 // `(` where no bracket holds both lines, neither of which closes a cast;
@@ -63,8 +64,8 @@
 // the parser marks it valid only during error recovery, where
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
-// ARRAY_VALUE_START, CAST_CLOSE, RELATIONAL_CLOSE, CAST_TYPE_ARGUMENTS_OPEN,
-// TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
+// ARRAY_VALUE_START, CAST_CLOSE, CAST_WORD_CLOSE, RELATIONAL_CLOSE,
+// CAST_TYPE_ARGUMENTS_OPEN, TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
 // LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
 // JUMP_STATEMENT_END and the STRING_BODY check are suppressed. The keywords
 // `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
@@ -147,6 +148,7 @@ enum TokenType {
     CLOSURE_COMMAND_START,
     UNREACHABLE,
     TYPE_ARGUMENTS_OPEN,
+    CAST_WORD_CLOSE,
     ERROR_SENTINEL,
 };
 
@@ -3393,6 +3395,9 @@ typedef enum {
     // A possible operand of a cast, which then outranks a parenthesized
     // expression.
     OPERAND_CLOSE,
+    // The same where the operand is a name, which could also start the
+    // type of the next member (CAST_WORD_CLOSE).
+    NAME_CLOSE,
     // A relational operator that Groovy applies to the parentheses, or a
     // division (§6.2): the parentheses close no cast.
     OPERATOR_CLOSE,
@@ -3401,41 +3406,52 @@ typedef enum {
 // SPECIFICATION.md §6.11 — what a `)` closes, read from the first
 // character after it on its line: OPERATOR_CLOSE before a relational
 // operator that Groovy applies to the parentheses, where a cast's operand
-// cannot start, and OPERAND_CLOSE before anything else. `instanceof`,
-// `!instanceof` and `!in` are operators wherever Groovy's lexer meets
-// them (GroovyLexer.g4 INSTANCEOF, NOT_INSTANCEOF and NOT_IN), so
-// `(x) instanceof Foo` tests `(x)` and is no cast of a name `instanceof`.
-// `as` and `in` are names too, and `(Foo) in` casts the name `in`; they
-// are the operators when what they take follows on the line, as Groovy
-// 6.0.0 reads `(x) as Foo` and `(x) in y` (GROOVY-10355). A `-`, `(`, `[`,
-// `{` or `.` goes on with the name in Groovy (`(Foo) in.read()`).
+// cannot start, NAME_CLOSE before a name, and OPERAND_CLOSE before anything
+// else. `instanceof`, `!instanceof` and `!in` are operators wherever
+// Groovy's lexer meets them (GroovyLexer.g4 INSTANCEOF, NOT_INSTANCEOF and
+// NOT_IN), so `(x) instanceof Foo` tests `(x)` and is no cast of a name
+// `instanceof`. `as` and `in` are names too, and `(Foo) in` casts the name
+// `in`; they are the operators when what they take follows on the line, as
+// Groovy 6.0.0 reads `(x) as Foo` and `(x) in y` (GROOVY-10355). A `-`, `(`,
+// `[`, `{` or `.` goes on with the name in Groovy (`(Foo) in.read()`). A
+// name is a word that is no keyword of grammar.js, primitive type name or
+// `void`, nor the `$` of a dollar-slashy string; the read stops after the
+// word, or after what follows `as` or `in`.
 static ParenClose read_relational_operator(TSLexer *lexer) {
-    bool negated = lexer->lookahead == '!';
-    if (negated) {
-        advance(lexer);
+    if (lexer->lookahead != '!') {
+        if (!is_identifier_start(lexer->lookahead)) {
+            return OPERAND_CLOSE;
+        }
+        char word[sizeof "synchronized"];
+        unsigned len = read_word(lexer, word, sizeof word);
+        if (word_is(word, len, "instanceof")) {
+            return OPERATOR_CLOSE;
+        }
+        if (word_is(word, len, "in") || word_is(word, len, "as")) {
+            return keyword_operand_follows(lexer, word[0] == 'i')
+                ? OPERATOR_CLOSE
+                : OPERAND_CLOSE;
+        }
+        return is_reserved_lambda_name(word, len)
+                || opens_dollar_slashy(word, len, lexer)
+            ? OPERAND_CLOSE
+            : NAME_CLOSE;
     }
-    RelationalWord word = read_relational_word(lexer);
-    int32_t next = lexer->lookahead;
-    switch (word) {
+    advance(lexer);
+    switch (read_relational_word(lexer)) {
         case INSTANCEOF_WORD:
             // Without whitespace after it, `!instanceof` is no operator
             // (GroovyLexer.g4 `NOT_INSTANCEOF`) but `!` and the keyword,
             // which starts no operand either.
             return OPERATOR_CLOSE;
-        case IN_WORD:
-            if (negated) {
-                // GroovyLexer.g4 `NOT_IN`, as in the scan of NOT_IN (§6.12).
-                return is_whitespace(next) || next == '[' || next == '('
-                        || next == '{'
-                    ? OPERATOR_CLOSE
-                    : OPERAND_CLOSE;
-            }
-            return keyword_operand_follows(lexer, true) ? OPERATOR_CLOSE
-                                                        : OPERAND_CLOSE;
-        case AS_WORD:
-            return !negated && keyword_operand_follows(lexer, false)
+        case IN_WORD: {
+            // GroovyLexer.g4 `NOT_IN`, as in the scan of NOT_IN (§6.12).
+            int32_t next = lexer->lookahead;
+            return is_whitespace(next) || next == '[' || next == '('
+                    || next == '{'
                 ? OPERATOR_CLOSE
                 : OPERAND_CLOSE;
+        }
         default:
             return OPERAND_CLOSE;
     }
@@ -5955,6 +5971,11 @@ bool tree_sitter_groovy_external_scanner_scan(
                                              &in_string);
                 }
                 lexer->result_symbol = CAST_CLOSE;
+                return true;
+            case NAME_CLOSE:
+                lexer->result_symbol = valid_symbols[CAST_WORD_CLOSE]
+                    ? CAST_WORD_CLOSE
+                    : CAST_CLOSE;
                 return true;
             default:
                 // Also where only a cast's type takes the `)`, which no

@@ -69,8 +69,9 @@ The default branch is **`main`**.
     opens that statement rather than a call's arguments (§6.18), and
     the start of an array type that is a value (`String[].class`),
     which needs `[]` after the name (§6.15);
-  - a `)` with something after it on its line, which ranks a cast, and
-    a `)` that closes no cast (§6.11): before a relational operator
+  - a `)` with something after it on its line, which ranks a cast,
+    one before a name there, which ranks it above a member that the
+    name would start, and a `)` that closes no cast (§6.11): before a relational operator
     that Groovy applies to the parentheses (`(x) instanceof Foo`), and
     at the end of a line before a line that opens with `(`, unless,
     read on Groovy's tokens for at most 256 characters

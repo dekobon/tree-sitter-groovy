@@ -186,6 +186,154 @@ z = (a) (b)
           (identifier))))))
 
 ==================
+A cast of a name in a field's value ends where the next member starts
+==================
+
+class C {
+  def a = (Foo) x
+  def m() { }
+  def b = (int) x
+  void n() { }
+  def c = (a.b.Foo) x
+  String o() { }
+  def d = (Foo) x
+  C() { }
+  def e = (Foo) x
+  public C(int i) { }
+  def f = (Foo) x
+  static { }
+  def g = (Foo) x
+  static int y = 1
+  def h = (Foo) x.y
+  private String z
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (qualified_type
+              (type_identifier)
+              (type_identifier)
+              (type_identifier))
+            value: (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (static_initializer
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (field_access
+              object: (identifier)
+              field: (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+A cast of a name before closures on the next lines takes them
+==================
+
+x = (Foo) y
+{ -> 1 }
+{ foo() }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (method_invocation
+          function: (method_invocation
+            function: (identifier)
+            closure: (closure
+              (closure_parameters)
+              (expression_statement
+                (number_literal))))
+          closure: (closure
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list)))))))))
+
+==================
 Parentheses before something that cannot start a cast operand
 ==================
 

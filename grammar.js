@@ -1002,6 +1002,11 @@ module.exports = grammar({
     // run past the scanner's read, so that `(i<n)` compares and
     // `(List<String>) x` casts.
     $._type_arguments_open,
+    // §6.11 — a `)` before a name on its line, emitted in place of
+    // `_cast_close` where it is valid. The name is the operand of a cast in
+    // Groovy, and could also start a member that would split the line
+    // (see `parenthesized_expression`).
+    $._cast_word_close,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -2899,7 +2904,7 @@ module.exports = grammar({
       weighted(CAST_WEIGHT, prec.right(PREC.UNARY, seq(
         statementParen($),
         field('type', $._type),
-        alias($._cast_close, ')'),
+        choice(alias($._cast_close, ')'), alias($._cast_word_close, ')')),
         field('value', $._expression),
       ))),
       // The cast whose operand is on a later line, in two alternatives by
@@ -3624,10 +3629,24 @@ module.exports = grammar({
     // takes `_relational_close`, the `)` before a relational operator that
     // Groovy applies to the parentheses (`(x) instanceof Foo`). The content may
     // be a parenthesis-free call (`(sh script: 'x').trim()`, §5.5 item 1).
+    //
+    // Before a name on the line, `_cast_word_close`, the cast outranks this
+    // rule by more than the typed member that the name could start. Members
+    // need no separator here, so `def k = (Foo) x` then `def m() { }` was
+    // also the field `k = (Foo)`, a field `x def` and a constructor `m`,
+    // which weighed as much as the cast and the method and won the tie, and
+    // `public C() { }` after it the field `x public` and a constructor,
+    // which weighed more. Groovy needs a separator between members and casts
+    // the name.
     parenthesized_expression: $ => seq(
       statementParen($),
       enhancedStatementExpression($),
-      choice(')', alias($._cast_close, ')'), alias($._relational_close, ')')),
+      choice(
+        ')',
+        alias($._cast_close, ')'),
+        weighted(-TYPED_FIELD_WEIGHT, alias($._cast_word_close, ')')),
+        alias($._relational_close, ')'),
+      ),
     ),
 
     // §3.2 — single `unary_expression` node kind but two precedence

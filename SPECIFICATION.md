@@ -2161,6 +2161,52 @@ the scanner does not know which brackets enclose it. The token is
 aliased to `)` and the tree is the same either way. It is not emitted
 during error recovery.
 
+The same scan emits CAST_WORD_CLOSE instead of CAST_CLOSE where a name
+follows:
+
+```text
+Emit CAST_WORD_CLOSE for a `)` when it is valid and, after the trivia
+above, the line goes on with a word that is
+  - no keyword of grammar.js, primitive type name or `void`,
+  - not `instanceof`, nor `as` or `in` before what it takes (below),
+  - not the `$` that opens a dollar-slashy string (§5.7).
+Emit CAST_CLOSE there when CAST_WORD_CLOSE is not valid.
+```
+
+Both rules take the token, aliased to `)`. `parenthesized_type_cast`
+takes it as it takes CAST_CLOSE; `parenthesized_expression` takes it
+with a dynamic precedence of `-TYPED_FIELD_WEIGHT`. In Groovy the name
+is the cast's operand: Apache tries `castExprAlt` first, and a type
+body needs a separator between members. Here members need none, and the
+reading that ends the value at the `)` takes the name as the type of a
+member that starts there, with that member's weight: `def k = (Foo) x`
+then `def m() { }` on the next line was the field `k = (Foo)`, a field
+of type `x` named `def` (a keyword lexes as a name where it has no
+action) and a constructor `m() { }`, which weighed as much as the cast
+and the method and won the tie, and `public C() { }` after the same line
+was a field `x public` and a constructor, which outweighed the cast.
+Where a statement may start, the same split made the name a statement
+of its own on the line: `x = (Foo) y` then `{ -> 1 }` and `{ foo() }`
+was the assignment of `(Foo)`, the call `y { -> 1 }` and a block, where
+Groovy calls `y` with both closures. The penalty is the weight of the
+typed field that the split adds, so the split weighs less than the cast
+wherever the members after it weigh the same. Where no cast parses, the
+parenthesized expression is the only reading and keeps it:
+`(c + c) x` is still `(c + c)` and the statement `x` (Groovy calls the
+parentheses with `x`). A keyword after the `)` starts no type and is
+left to CAST_CLOSE. The read stops after the word, or after what follows
+`as` or `in`. Not emitted during error recovery.
+
+Measured against the grammar before: STATE_COUNT 4,777 to 4,789,
+LARGE_STATE_COUNT 1,831 to 1,843, one external token. The penalty is
+on the rule's own alternative; carried by a hidden rule of one token it
+would be lost, as tree-sitter removes such unit reductions, and limited
+to the parentheses that hold an `_expression` it cost 300 more states.
+No tree of the corpus or of 266 real files changes; of 24,548 Java files
+one with an `ERROR` changes (`x = (T) y;` then `else`, now the cast and
+the `else`), and of 4,000 shape inputs two, each `x = (a.b.C) y` then
+closures on the next lines, now Groovy 3's reading.
+
 The same scan emits RELATIONAL_CLOSE instead of CAST_CLOSE when what
 follows the `)` is a relational operator that Groovy applies to the
 parentheses:

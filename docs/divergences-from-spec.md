@@ -1091,14 +1091,19 @@ line, below every other complete reading when it is not.
 At v0.5.0 the two readings were unranked and the stack order decided:
 `x = (a)` followed by `foo()` was a cast of the call.
 
-In a class body a cast's own line does not decide either. `def k =
-(Foo) x` followed by `void m() { }` or `private int n` on the next line
-is the field `k` with the value `(Foo)`, a field `x void` (`x private`)
-and the constructor `m() { }` (the field `n`), with no `ERROR`, where
-Groovy 3 reads the cast and a method or a field: the second reading
-holds a typed field, whose weight (`TYPED_FIELD_WEIGHT`, 4 steps)
-outweighs the cast's (`CAST_WEIGHT`, 1 step). A `;` after `x` ends the
-field.
+In a type body a cast's own line decides too. `def k = (Foo) x`
+followed by `void m() { }` or `private int n` on the next line is the
+field `k` with the cast and a method or a field, as in Groovy 3. Until
+the `)` before a name on its line became `_cast_word_close` (spec
+§6.11) it was the field `k` with the value `(Foo)`, a field `x void`
+(`x private`) and the constructor `m() { }` (the field `n`), with no
+`ERROR`: the second reading holds a typed field, whose weight
+(`TYPED_FIELD_WEIGHT`, 4 steps) outweighed the cast's (`CAST_WEIGHT`, 1
+step). Parentheses that hold no type keep the split where a name
+follows: `def k = (1) x` then `def m() { }` is still the field `k = (1)`,
+a field `x def` and a constructor, where Groovy calls `(1)` with `x`
+(a command expression whose receiver is in parentheses, which this
+grammar does not read).
 
 A multi-assignment declaration on the next line is a case where only
 one reading used to be complete. After a line that ends in a
