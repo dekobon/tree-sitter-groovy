@@ -3239,6 +3239,65 @@ String s
     name: (identifier)))
 
 ==================
+A blank final with several names is closure parameters before an arrow, and a declaration whose later name holds a lambda
+==================
+
+def c1 = { final String a, b = (T) (x, y) -> z }
+def c2 = { final String a, b = (x, y) -> (z) -> w }
+final String c, d = (x) -> y
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (method_invocation
+              function: (parenthesized_expression
+                (identifier))
+              arguments: (argument_list
+                (identifier)
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (lambda_expression
+              parameters: (formal_parameters
+                (formal_parameter
+                  name: (identifier))
+                (formal_parameter
+                  name: (identifier)))
+              body: (parenthesized_expression
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier))))
+
+==================
 A typed local on the line after return, break and continue is a declaration
 ==================
 

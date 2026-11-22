@@ -2297,7 +2297,19 @@ module.exports = grammar({
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
-        repeat(seq(',', $._typed_declarator)),
+      )),
+      // With more names the blank final weighs what the typed form with an
+      // initializer does. A later name's value may hold a lambda
+      // (`final String a, b = (x) -> y`), which LAMBDA_WEIGHT ranks against
+      // that weight: at 2, `{ final String a, b = (T) (x, y) -> z }` tied
+      // the closure with two parameters, and the declaration won.
+      weighted(TYPED_LOCAL_WEIGHT, seq(
+        repeat($.annotation),
+        'final',
+        field('type', $._type),
+        optional($._command_statement_start),
+        field('name', $.identifier),
+        repeat1(seq(',', $._typed_declarator)),
       )),
       weighted(2, seq(
         repeat1($.annotation),
