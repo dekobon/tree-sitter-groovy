@@ -728,7 +728,7 @@ class C {
         body: (block)))))
 
 ==================
-Default after a statement stays a label, in a default method too
+Default after a statement stays a label, in a default method too (known divergence)
 ==================
 
 foo default: 1

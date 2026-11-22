@@ -188,37 +188,28 @@ def r = switch (x) {
 A colon case with several values
 ==================
 
-switch (x) {
-    case 1:
-    case 2, 3:
-        foo()
-        break
-    default:
-        bar()
+def r = switch (x) {
+    case 1, 2: yield 'a'
+    default: yield 'b'
 }
 
 ---
 
 (source_file
-  (expression_statement
-    (switch_expression
-      value: (identifier)
-      body: (switch_block
-        (switch_case
-          value: (number_literal))
-        (switch_case
-          value: (number_literal)
-          value: (number_literal)
-          (expression_statement
-            (method_invocation
-              function: (identifier)
-              arguments: (argument_list)))
-          (break_statement))
-        (switch_default
-          (expression_statement
-            (method_invocation
-              function: (identifier)
-              arguments: (argument_list))))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_case
+            value: (number_literal)
+            value: (number_literal)
+            (yield_statement
+              (string_literal)))
+          (switch_default
+            (yield_statement
+              (string_literal))))))))
 
 ==================
 A comma on the next line and default among a case's values are accepted, which Groovy rejects (known divergence)

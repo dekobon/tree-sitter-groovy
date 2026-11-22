@@ -423,7 +423,7 @@ class A {
         body: (block)))))
 
 ==================
-Fields named trait and sealed after a modifier (#73)
+Field named trait after a modifier and a type (#73)
 ==================
 
 class Hero {

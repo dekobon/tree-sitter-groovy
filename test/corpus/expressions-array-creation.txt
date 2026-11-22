@@ -316,7 +316,7 @@ def n = new int[3]
         field: (identifier)))))
 
 ==================
-Braces after sized dimensions are a trailing closure
+Braces after sized dimensions are a trailing closure, which Groovy rejects
 ==================
 
 def a = new int[3] { it }
@@ -351,7 +351,7 @@ def b = new int[2][3] {1}
             (number_literal)))))))
 
 ==================
-Braces on the next line after sized dimensions are a trailing closure
+Braces on the next line after sized dimensions are a trailing closure, which Groovy rejects
 ==================
 
 def a = new int[3]

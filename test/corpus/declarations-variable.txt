@@ -1225,7 +1225,7 @@ Multi-assignment without def with other identifier characters in its names
       value: (identifier))))
 
 ==================
-Multi-assignment without def with form feeds and vertical tabs between its names
+Multi-assignment without def with form feeds and vertical tabs between its names (Groovy rejects them)
 ==================
 
 (a,b) = l;

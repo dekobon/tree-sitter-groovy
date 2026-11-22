@@ -414,7 +414,7 @@ names that start like a relational operator after parentheses are a cast operand
       value: (identifier))))
 
 ==================
-!instanceof before a bracket after parentheses starts no cast operand
+!instanceof before a bracket after parentheses starts no cast operand, which Groovy rejects
 ==================
 
 (x) !instanceof(Foo)

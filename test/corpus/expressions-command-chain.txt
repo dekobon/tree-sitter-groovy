@@ -1761,7 +1761,7 @@ def x = foo bar
         argument: (identifier)))))
 
 ==================
-A receiver inside a binary expression is not a command chain value
+A receiver inside a binary expression is not a command chain value, which Groovy rejects
 ==================
 
 def s = 'a' + foo 1
@@ -1779,7 +1779,7 @@ def s = 'a' + foo 1
     (number_literal)))
 
 ==================
-Return of a parenthesis-free call is two statements
+Return of a parenthesis-free call is two statements, which Groovy rejects
 ==================
 
 return foo 1
@@ -2391,7 +2391,7 @@ foo(String[].class)
           field: (identifier))))))
 
 ==================
-A name after return before a command chain in parentheses is the returned value
+A name after return before a command chain in parentheses is the returned value, which Groovy rejects
 ==================
 
 return println(foo 1)
@@ -3444,7 +3444,7 @@ foo 'a' obj.m 'b'
     argument: (string_literal)))
 
 ==================
-Return followed by a dotted call on the same line returns the receiver
+Return followed by a dotted call on the same line returns the receiver, which Groovy rejects
 ==================
 
 def f() {
@@ -4676,7 +4676,7 @@ case new Foo()
 ---
 
 ==================
-The word instanceof before new is not a receiver
+The word instanceof before new is not a receiver, which Groovy rejects
 ==================
 
 instanceof new Foo()
@@ -4941,11 +4941,11 @@ var new Foo()
 ---
 
 ==================
-New with an annotated type as a first argument is unsupported
+An annotation after new is unsupported
 :error
 ==================
 
-foo new @A Foo()
+def x = new @A Foo()
 
 ---
 
@@ -5450,7 +5450,7 @@ foo bar
     argument: (identifier)))
 
 ==================
-A contextual word is not the receiver of a name argument
+A contextual word is not the receiver of a name argument (known divergence)
 ==================
 
 in x
@@ -7406,7 +7406,7 @@ c = { foo a, b = i
           (identifier))))))
 
 ==================
-Parameters after a lowercase name before parentheses keep the method
+Parameters after a lowercase name before parentheses keep the method (known divergence)
 ==================
 
 foo bar(Map<String, List<X>> a, int b) { }
@@ -7685,6 +7685,8 @@ foo var x
 foo var x, y
 foo yield x
 foo record x
+foo trait x
+foo sealed x
 obj.m var x
 foo var
 
@@ -7706,6 +7708,18 @@ foo var
   (expression_statement
     (identifier))
   (yield_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
     (identifier))
   (expression_statement
     (identifier))

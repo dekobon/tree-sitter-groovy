@@ -1779,7 +1779,7 @@ A call with a closure past the look-ahead bound before a member access is unsupp
 :error
 ==================
 
-foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar()
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar()
 
 ---
 
@@ -1788,9 +1788,39 @@ A call with a closure whose first argument after the accesses passes the look-ah
 :error
 ==================
 
-foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar 1
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar 1
 
 ---
+
+==================
+A call with a closure that ends at the look-ahead bound before a member access, and one whose first argument does
+==================
+
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar()
+foo { 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }.bar 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (string_literal))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure
+          (expression_statement
+            (string_literal))))
+      field: (identifier))
+    argument: (number_literal)))
 
 ==================
 A range after a call with a closure is unsupported
@@ -1802,13 +1832,14 @@ foo { }..x
 ---
 
 ==================
-The braces of a call with a closure take a slashy string after a keyword and a division after ++ before a member access
+The braces of a call with a closure take a slashy string after a keyword or yield and a division after ++ before a member access
 ==================
 
 foo { return /}/ }.bar()
 foo { assert /}/ }.bar()
 foo { a in /}/ }.bar()
 foo { x++ / 2 }.bar()
+foo { yield /}/ }.bar()
 
 ---
 
@@ -1860,8 +1891,18 @@ foo { x++ / 2 }.bar()
                   operand: (identifier))
                 right: (number_literal)))))
         field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (yield_statement
+              (string_literal
+                (string_fragment)))))
+        field: (identifier))
       arguments: (argument_list))))
-
 
 ==================
 A call with a closure takes a slashy string argument after an access and a slashy string after !in in its braces
@@ -1913,11 +1954,10 @@ foo { x !in /}/ }.bar()
       arguments: (argument_list))))
 
 ==================
-The braces of a call with a closure take a division after yield as a name and after a keyword after a method reference
+The braces of a call with a closure take a division after yield as a name
 ==================
 
 foo { yield / 2 }.bar()
-foo { x::return / 2 }.bar()
 
 ---
 
@@ -1933,7 +1973,17 @@ foo { x::return / 2 }.bar()
                 left: (identifier)
                 right: (number_literal)))))
         field: (identifier))
-      arguments: (argument_list)))
+      arguments: (argument_list))))
+
+==================
+The braces of a call with a closure take a division after a keyword that a method reference names
+==================
+
+foo { x::return / 2 }.bar()
+
+---
+
+(source_file
   (expression_statement
     (method_invocation
       function: (field_access

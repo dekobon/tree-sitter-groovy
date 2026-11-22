@@ -645,7 +645,7 @@ Annotation element with the default modifier
         default: (string_literal)))))
 
 ==================
-Default on the line after an element stays its default
+Default on the line after an element stays its default, which Groovy rejects
 ==================
 
 @interface Tag {
