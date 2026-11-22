@@ -919,6 +919,63 @@ fn reparse_after_an_operator_word_that_is_a_name_matches_parse_from_scratch() {
     );
 }
 
+/// A multi-assignment declaration while it is typed: without its `=` it is
+/// an error production whose value is missing, and the statements after it
+/// stay statements; with a token that starts no statement in place of the
+/// `=`, recovery wraps the names in an `ERROR`. Typing the `=` and the
+/// value, or deleting them, must give the tree of a parse from scratch.
+///
+/// The third text holds a word of ten characters before the `=`. Skipping
+/// it costs what the missing value does, and a reparse kept the other
+/// recovery until the error production got its weight
+/// (`MISSING_VALUE_WEIGHT` in `grammar.js`).
+#[test]
+fn reparse_after_multi_assignment_declaration_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "def (a, b)\nfoo()\n",
+            "def (a, b) = l\nfoo()\n",
+            "x = 1\ndef (a, b) abcdefghij = l\ndef s = 1\n",
+            "def (a, b) : l\nfoo()\n",
+            "def (k: a, b) =\nfoo()\n",
+            "class C {\n  private (e, f)\n  void m() { }\n}\n",
+        ],
+        &["", "=", " ", "l", "\n", ",", ":", " instanceof "],
+    );
+}
+
+/// A known limitation (`docs/divergences-from-spec.md` §29), through the
+/// runtime. In `def (a, b) abcdefghij = f g`, skipping the word of ten
+/// characters costs what the missing value of the error production does,
+/// and both recoveries are alive until the statement after the line. A
+/// reparse reuses that statement as one node in the first of them, and
+/// while two stack versions are alive the runtime does not break a reused
+/// node down when the token after it has changed. So ` instanceof ` typed
+/// after `def s = 1` goes on with the value from scratch and is a statement
+/// of its own on reparse. This test pins the difference. If it fails, the
+/// two parses agree again: remove the limitation from §29 and move the text
+/// to the test above.
+#[test]
+fn a_word_typed_after_the_statement_after_a_tied_multi_assignment_is_a_statement_on_reparse() {
+    const TEXT: &str = "def (a, b) abcdefghij = f g\ndef s = 1\n";
+    const INSERTION: &str = " instanceof ";
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) =
+        reparse(&mut parser, TEXT, TEXT.len(), TEXT.len(), INSERTION);
+    assert_eq!(
+        edited,
+        "def (a, b) abcdefghij = f g\ndef s = 1\n instanceof "
+    );
+    let fresh = fresh.root_node().to_sexp();
+    let incremental = incremental.root_node().to_sexp();
+    assert!(fresh.contains("instanceof_expression"), "{fresh}");
+    assert!(
+        !incremental.contains("instanceof_expression"),
+        "the reparse now matches the parse from scratch: {incremental}",
+    );
+}
+
 /// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks
 /// before its `(` (after `final g`), the method's version reads the `(` of
 /// its parameters on its own, with none of the look-ahead for a lambda that

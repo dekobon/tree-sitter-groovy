@@ -166,6 +166,19 @@ const CAST_WEIGHT = 1;
 const DOTTED_CAST_TYPE_WEIGHT = 1 / WEIGHT_UNIT;
 
 /*
+ * The weight of the error production for a multi-assignment declaration
+ * whose `=` does not come (`_multi_assignment_tail`). Recovery by its
+ * missing value costs what skipping a word of ten characters does, and
+ * `def (a, b) abcdefghij = l` is the declaration with that word skipped
+ * and also a declaration without a value before an assignment. Tied
+ * recoveries are ranked by the order the parser reaches them in, which a
+ * reparse changes, so the reparse and a parse from scratch chose
+ * differently. Half a step down, the error production loses the tie in
+ * both.
+ */
+const MISSING_VALUE_WEIGHT = -1 / WEIGHT_UNIT;
+
+/*
  * The weight of a lambda. A closure parameter's default may
  * end where a lambda's parameters do: `def c = { a = (b) -> c }` is a
  * closure with the parameter `a` in Groovy, and also a closure whose body
@@ -2357,6 +2370,49 @@ module.exports = grammar({
       optional(seq('=', field('value', enhancedStatementExpression($)))),
     ),
 
+    // The names of a multi-assignment declaration, Apache `typeNamePairs`.
+    // A typed name is a `variable_declarator` with a `type` field, so that
+    // each name keeps its own type. A keyword before a name lexes as a
+    // type: `def (def a, b)` has the type `def`.
+    //
+    // Groovy 6 adds a rest binding, `def (a, *b) = list`, a node of its
+    // own, `rest_declarator`, with the optional `type` and the `name` of
+    // a typed name, and keyed pairs, `def (name: n, age: int a) = map`,
+    // whose key is a `key` field. Groovy's list holds names or keyed
+    // pairs, not both (`typeNamePair (COMMA typeNamePair)*` or
+    // `keyedPair (COMMA keyedPair)*`). Here one list takes both, so
+    // `def (name: n, b) = m` parses, which Groovy rejects: with a list of
+    // pairs alone, recovery from an error after the `=` could not go back
+    // into the list at a plain name (`def (k: a, j: b) =, b) = …`), and a
+    // run of such errors took time quadratic in its length
+    // (`_multi_assignment_tail`). Groovy accepts one rest binding per
+    // list, in any place; that is checked after parsing, here not at all.
+    //
+    // The list is left-recursive rather than a name and a `repeat`, which
+    // makes two rules, `(a)` and `(a, b…)`, and so two parse states after
+    // a list. Here every list ends in one state. Two recoveries from an
+    // error in the list (`def (a::, b) = l` is the name `a` before two
+    // skipped tokens, and the key `a` before two others) then meet at the
+    // `)`, where the parser keeps one. With two states they met after the
+    // value, at the first token of the next statement, and a reparse that
+    // reused that statement kept the other one from there on
+    // (`docs/divergences-from-spec.md` §29 has the counts). The left
+    // recursion takes 124 parse states fewer as well.
+    //
+    // The rule stands before the rules that use it. Tree-sitter sums up
+    // the children of a rule in the order of the rules, and on its first
+    // pass a hidden rule further down has none, which made the names of a
+    // `multi_assignment_declaration` optional in `node-types.json`.
+    _multi_assignment_list: $ => {
+      const name = choice(
+        $.variable_declarator,
+        alias($._typed_multi_assignment_declarator, $.variable_declarator),
+        alias($._rest_multi_assignment_declarator, $.rest_declarator),
+        alias($._keyed_multi_assignment_declarator, $.variable_declarator),
+      );
+      return choice(name, seq($._multi_assignment_list, ',', name));
+    },
+
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
     // `typeNamePairs`. Closes murtaza64 #22. The form without `def` is
     // `multi_assignment_expression`. It takes annotations, then `def`,
@@ -2378,9 +2434,7 @@ module.exports = grammar({
         seq('final', optional(varKeyword($))),
         alias($._var_names_keyword, 'var'),
       ),
-      $._multi_assignment_names,
-      '=',
-      field('value', enhancedStatementExpression($)),
+      $._multi_assignment_tail,
     ),
 
     // The same in a type body, Apache `fieldDeclaration`, with the
@@ -2394,38 +2448,56 @@ module.exports = grammar({
         seq(repeat($._modifier), choice('def', alias($._var_names_keyword, 'var'))),
         repeat1($._modifier),
       ),
-      $._multi_assignment_names,
-      '=',
-      field('value', enhancedStatementExpression($)),
+      $._multi_assignment_tail,
     ),
 
-    // Apache `typeNamePairs`. A typed name is a `variable_declarator`
-    // with a `type` field, so that each name keeps its own type. A
-    // keyword before a name lexes as a type: `def (def a, b)` has the
-    // type `def`.
+    // The names in their parentheses, then the `=` and the value, which
+    // stand in this rule, not after it in the two declarations. A rule of
+    // the names alone is complete at its `)`, and the parser reduces it
+    // before the `=`. Recovery from an error after the `=`
+    // (`def (a, b) =, b) = …`) could then no longer go back into the list,
+    // as it did at v0.6.0: it skipped tokens, and a run of such errors
+    // took time quadratic in its length (`docs/divergences-from-spec.md`
+    // §29). Here the list stays on the stack until the value ends, and a
+    // `,` after the `=` goes on with it. No tree without an `ERROR`
+    // changes.
     //
-    // Groovy 6 adds a rest binding, `def (a, *b) = list`, a node of its
-    // own, `rest_declarator`, with the optional `type` and the `name` of
-    // a typed name, and keyed pairs, `def (name: n, age: int a) = map`,
-    // whose key is a `key` field. A list holds names or keyed pairs, not
-    // both. Groovy accepts one rest binding per list, in any place; that
-    // is checked after parsing, here not at all.
-    _multi_assignment_names: $ => {
-      const declarator = choice(
-        $.variable_declarator,
-        alias($._typed_multi_assignment_declarator, $.variable_declarator),
-        alias($._rest_multi_assignment_declarator, $.rest_declarator),
-      );
-      const keyed = alias($._keyed_multi_assignment_declarator, $.variable_declarator);
-      return seq(
+    // The second alternative is an error production for a declaration
+    // whose `=` does not come, as while it is typed (`def (a, b)` before
+    // the next statement). `_missing_value` never comes, so only recovery
+    // takes it. Its names are a rule of their own,
+    // `_multi_assignment_names`, which the parser reduces at the `)` only
+    // before `_missing_value`: in recovery, which tries every reduction.
+    // Recovery then has two ways on, besides going back into the list.
+    // Where the next token can start a statement, it completes the
+    // declaration with the missing value, and the statements after it stay
+    // statements. Where it cannot (`def (a, b) : l`), the runtime tries no
+    // missing token, and recovery wraps the names, as one node, in an
+    // `ERROR` and goes on after `def`, as it did while the names were a
+    // rule before the `=`. With the list on the stack alone it had
+    // neither way, and took the statements after the declaration into one
+    // `ERROR`. The production costs 6 parse states.
+    _multi_assignment_tail: $ => choice(
+      seq(
         '(',
-        choice(
-          seq(declarator, repeat(seq(',', declarator))),
-          seq(keyed, repeat(seq(',', keyed))),
-        ),
+        $._multi_assignment_list,
         ')',
-      );
-    },
+        '=',
+        field('value', enhancedStatementExpression($)),
+      ),
+      seq(
+        $._multi_assignment_names,
+        weighted(MISSING_VALUE_WEIGHT, field('value', alias($._missing_value, $.identifier))),
+      ),
+    ),
+
+    _multi_assignment_names: $ => seq('(', $._multi_assignment_list, ')'),
+
+    // A token that matches no input, for the error production above. It is
+    // no second use of `$._unreachable`: that token's one alias, `switch`,
+    // is what a `case` label outside a switch prints as missing, and with
+    // two aliases it printed as a named node.
+    _missing_value: _ => token(/[^\s\S]/),
 
     _typed_multi_assignment_declarator: $ => seq(
       field('type', $._type),

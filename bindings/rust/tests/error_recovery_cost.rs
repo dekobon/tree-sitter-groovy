@@ -42,6 +42,23 @@
 //!   square of the lines (measured: 443, 8,393 and 92,243 at 100, 200 and
 //!   500 lines, at most 4 versions). While `case` was a name both parsed in
 //!   linear time.
+//! - A multi-assignment declaration with a run of `, b) =` after its `=`,
+//!   `def (a, b) =, b) =, b) = … 1`. While the names were a rule of their
+//!   own, which the parser reduced before the `=`, recovery could not go
+//!   back into the list at the `,`, as it did at v0.6.0. It skipped tokens,
+//!   which left each `b … =` an assignment nested in the one before, and
+//!   every error reduced the whole nest (measured: 307, 1,232 and 4,957
+//!   reductions at 25, 50 and 100 repeats, at most 4 versions; v0.6.0 80,
+//!   155 and 305, at most 3). With the `=` and the value in the rule of the
+//!   names' parentheses the list stays on the stack, and the run takes
+//!   about 2 reductions a repeat in at most 3 versions (measured: 106 and
+//!   806 reductions at 50 and 400 repeats). A list of keyed pairs,
+//!   `def (k: a, j: b) =`, took no plain name, so `, b` did not continue it
+//!   and its run cost what it had (1,232 reductions at 50 repeats); one
+//!   list takes names and pairs alike now, wider than Groovy, and that run
+//!   is linear as well. Where no list of names takes it, after `x =` or
+//!   alone, the run is quadratic, here and at v0.6.0; after the names of a
+//!   multi-assignment without `def`, `(a, b) =`, it is linear.
 //!
 //! The counts come from the parser's log, which is deterministic where time
 //! is not.
@@ -139,6 +156,33 @@ const MAX_TERNARY_CASE_REDUCTIONS: usize = 12_000;
 
 /// Most stack versions at once for `TERNARY_CASE_LINES` repeats: 4 measured.
 const MAX_TERNARY_CASE_VERSIONS: usize = 6;
+
+/// Repeats of `, b) =` after the `=` of a multi-assignment declaration in
+/// the shorter run; the longer one has `SCALE` times as many.
+const MULTI_ASSIGNMENT_RUN: usize = 50;
+
+/// The declarations the run follows: the keywords that open one, typed
+/// names, a rest binding, keyed pairs, an annotation, the member of a type
+/// body and a `for` init.
+const MULTI_ASSIGNMENT_RUN_FRAMES: [(&str, &str); 9] = [
+    ("def (a, b) =", " 1\n"),
+    ("final (a, b) =", " 1\n"),
+    ("var (a, b) =", " 1\n"),
+    ("def (int a, String b) =", " 1\n"),
+    ("def (a, *b) =", " 1\n"),
+    ("def (k: a, j: b) =", " 1\n"),
+    ("@A def (a, b) =", " 1\n"),
+    ("class C { def (a, b) =", " 1 }\n"),
+    ("for (def (a, b) =", " 1; ;) { }\n"),
+];
+
+/// Most reductions per repeat of the run: at most 2.2 measured (109 for 50
+/// repeats in a `for` init, 809 for 400), where the names as a rule of
+/// their own made 1,232 at 50 repeats.
+const MAX_MULTI_ASSIGNMENT_RUN_REDUCTIONS_PER_REPEAT: usize = 4;
+
+/// Most stack versions at once for the run: 3 measured.
+const MAX_MULTI_ASSIGNMENT_RUN_VERSIONS: usize = 5;
 
 /// The key of the version count in the parser's `process version` messages.
 const VERSION_COUNT_KEY: &str = "version_count:";
@@ -301,4 +345,24 @@ fn a_reserved_case_in_expressions_stays_under_the_measured_cost() {
         "{} stack versions for {TERNARY_CASE_LINES} repeats",
         ternaries.most_versions,
     );
+}
+
+#[test]
+fn a_run_after_a_multi_assignment_declaration_parses_in_linear_cost() {
+    for (before, after) in MULTI_ASSIGNMENT_RUN_FRAMES {
+        for repeats in [MULTI_ASSIGNMENT_RUN, MULTI_ASSIGNMENT_RUN * SCALE] {
+            let source = format!("{before}{}{after}", ", b) =".repeat(repeats));
+            let cost = cost(&source, true);
+            assert!(
+                cost.reductions <= MAX_MULTI_ASSIGNMENT_RUN_REDUCTIONS_PER_REPEAT * repeats,
+                "{} reductions for {repeats} repeats after {before:?}",
+                cost.reductions,
+            );
+            assert!(
+                cost.most_versions <= MAX_MULTI_ASSIGNMENT_RUN_VERSIONS,
+                "{} stack versions for {repeats} repeats after {before:?}",
+                cost.most_versions,
+            );
+        }
+    }
 }

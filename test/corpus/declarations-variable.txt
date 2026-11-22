@@ -947,13 +947,134 @@ new Object() { var m() { } }
           body: (block))))))
 
 ==================
-Multi-assignment mixing names and keyed pairs is not accepted
-:error
+Multi-assignment mixing names and keyed pairs is accepted, which Groovy rejects (known divergence)
 ==================
 
 def (name: n, b) = m
+def (a, age: int b) = m
+def (name: n, *rest) = m
 
 ---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+A multi-assignment declaration without its = misses its value and keeps the statements after it (error recovery)
+==================
+
+def (a, b)
+foo()
+def (c, d) l
+bar()
+class C {
+    private (e, f)
+    void m() { }
+}
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+A multi-assignment declaration with a token that starts no statement in place of its = keeps the statements after it (error recovery)
+==================
+
+def (a, b) : l
+foo()
+def f() {
+    def (c, d).x
+    bar()
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (ERROR
+      (variable_declarator
+        name: (identifier))
+      (variable_declarator
+        name: (identifier)))
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (ERROR
+          (variable_declarator
+            name: (identifier))
+          (variable_declarator
+            name: (identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
 
 ==================
 Multi-assignment without def (#94)
