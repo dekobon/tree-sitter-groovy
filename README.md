@@ -167,8 +167,8 @@ These are documented in detail in
   `foo bar` is a call. A lowercase type after annotations
   (`@A foo bar`) and a type with a space before `<` (`List <String> x`)
   are not declarations here, and a declaration followed by a line that
-  starts with an operator (`String s` then `.trim()`) reads as two
-  statements, where Groovy reads a call. A type and a name after another
+  goes on from its name (`String s` then `.trim()` or `== 1`) reads as
+  two statements, where Groovy reads a call. A type and a name after another
   statement on its line declare (`move left By steps` is the call
   `move left` and the declaration `By steps`), where Groovy goes on with
   the call (`move(left).By(steps)`).
@@ -207,9 +207,12 @@ These are documented in detail in
 - **Parameter modifiers have one order** -- annotations, then `final`,
   then `def`, `var` or a type. `def String x`, `final @A x` and a
   varargs parameter with no type (`... xs`) are an `ERROR` (#98).
-- **A line break does not end a statement** -- a newline is whitespace
-  to the grammar. Most code is unaffected, because the next token
-  cannot continue the statement. Known cases that read wrongly with no
+- **A line break ends a statement only in some places** -- after
+  `return`, `break` and `continue`, before a `(` that can open a
+  statement, and after a typed local declaration with no initializer.
+  Elsewhere a newline is whitespace to the grammar. Most code is
+  unaffected, because the next token cannot continue the statement.
+  Known cases that read wrongly with no
   `ERROR`: a bare name followed by a literal on the next line is one
   parenthesis-free call (#90); a field with a modifier and no type
   followed by a typed method is a typed field and a constructor (#96);

@@ -127,10 +127,11 @@ The default branch is **`main`**.
   scanner needs to know where it is: `_string_body` inside a string
   body, where the scanner emits nothing outside error recovery
   (§6.10); `_type_start` where a type may start (§6.15);
-  `_closure_parameters_start` where closure parameters may start, the
-  one place a `->` after an initializer ends a parameter list
-  (`{ String a = 1 -> }`) rather than belonging to a lambda in the
-  value (§6.21); `_type_only_close` before the `)` of a cast of an
+  `_closure_parameters_start` where closure parameters may start and
+  after a closure parameter's annotations, the one place a `->` after
+  an initializer ends a parameter list (`{ String a = 1 -> }`) rather
+  than belonging to a lambda in the value (§6.21); `_type_only_close`
+  before the `)` of a cast of an
   array or generic type, which no expression is, so that the rule above
   keeps that cast across the line break (`(List<String>)` then `(x)`)
   (§6.11); `_body_block_end` after the `}` of the block that is the
@@ -142,16 +143,19 @@ The default branch is **`main`**.
   comments, the marker of an unterminated `/*`, the slashy opener and
   the contextual keywords.
 
-  Its state is three bits, "no `*/` from here on", "the body goes on
-  past the token that follows" and "a jump statement goes on past the
-  block comment that follows", carried by an empty hidden token
-  emitted at the first unterminated `/*` (§6.6) and after the `}` of a
-  lambda's body or a statement's block where the body goes on past a
-  comment, or past `as` or `in`, which the scanner reads (§6.19,
-  §6.22), and after `return`, `break` or `continue` where a block
-  comment, spaces and something else follow on the line (§6.23); the
-  next call clears the second and the third. GString interpolation,
-  automatic semicolons and label colons are handled in-grammar
+  Its state has four bits. The first records "no `*/` from here on";
+  the second records "the body goes on past the token that follows";
+  the third records "a jump statement goes on past the block comment
+  that follows". An empty hidden token carries these bits, emitted
+  at the first unterminated `/*` (§6.6), after a lambda's body or a
+  statement's block that an expression continues (§6.19, §6.22),
+  or after `return`, `break` or `continue` before a block comment
+  followed by something else on the line (§6.23). The next call
+  clears the second and third bits. The fourth records "a slashy
+  string may follow a comment after a line break"; a block or
+  Groovydoc comment carries it when a slashy string can start a
+  statement on that line (§6.2). GString interpolation, automatic
+  semicolons and label colons are in-grammar
   (`docs/divergences-from-spec.md`). Symbols are
   `tree_sitter_groovy_external_scanner_*`. `tree-sitter generate` does
   NOT rewrite `scanner.c`, so these symbols are stable across
