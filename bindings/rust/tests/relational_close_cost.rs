@@ -80,6 +80,22 @@ fn a_line_of_in_tests_after_parentheses_is_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}true\n", "(x) in y && ".repeat(n)));
 }
 
+/// After `(x) in` the scanner reads a `[` for the `,` after a list's first
+/// element, at most `MEMBERSHIP_LIST_LOOKAHEAD_CHARACTERS` (256) characters.
+#[test]
+fn a_line_of_list_tests_after_parentheses_is_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{}true\n", "(x) in [a, b] && ".repeat(n)));
+}
+
+/// In a nest of such tests the `,` of an outer list comes after every inner
+/// one, so each `)` reads to the bound: a constant per `)` (measured: 51.9
+/// and 53.4 bytes per byte), where a read to the `,` grows with the nest
+/// (253.5 and 2,003.6 with the bound at 2^30).
+#[test]
+fn a_nest_of_list_tests_after_parentheses_is_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("{}1{}\n", "(x) in [".repeat(n), ", 2]".repeat(n)));
+}
+
 #[test]
 fn a_line_of_instanceof_tests_after_parentheses_is_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("{}true\n", "(x) instanceof T || (y) !in z || ".repeat(n)));

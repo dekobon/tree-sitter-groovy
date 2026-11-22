@@ -238,6 +238,78 @@ fn reparse_after_edit_matches_parse_from_scratch() {
     assert_every_edit_reparses(TEXTS, INSERTIONS);
 }
 
+#[test]
+fn reparse_after_slashy_comment_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "x = a\n/* c */ /re/\n",
+            "x = a\n/* one */ /* two */ /re/\n",
+            "x = a /* c */ /re/ d\n",
+            "x = a\n/* c */ b /c/ d\n",
+            "foo(a\n/*c*/ /2)\nx = b/3 + c/4\n",
+            "foo(a\n/*c*/ /2) /3 + b/4\n",
+        ],
+        &["", "\n", "/", "x"],
+    );
+}
+
+/// Texts whose look-aheads tell a slashy string from a division by the token
+/// before the `/` (§6.2): a lambda's default value (§6.17), the parentheses
+/// after a closure call's access (§6.24), a `(` that opens a line (§6.18)
+/// and a cast whose operand is on the next line (§6.11). An edit that turns
+/// `++` into `+`, or `in` into a name, must lex the start of the look-ahead
+/// again.
+#[test]
+fn reparse_after_slash_operand_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "def f = (a = x++ / 2) -> a\n",
+            "def g = (a = x in /x,y/) -> a\n",
+            "foo { }.bar(/x/).baz()\n",
+            "foo { x !in /}/ }.bar()\n",
+            "foo\n(x in /a,b/)\n",
+            "foo\n(x++ / 2, y)\n",
+            "def s = foo((Foo)\n  (Bar) y++ / 2)\n",
+        ],
+        &["", "/", "+", "x", "\n", ")"],
+    );
+}
+
+/// Closure parameters that the scanner reads to their `->` past an
+/// annotation or `var` at the end of a line (§6.14, §6.21), a typed local
+/// before a generic method or a call in parentheses on the next line
+/// (§6.21), and `var` before parentheses in an enum constant's arguments
+/// (§6.16): an edit in what the look-ahead read must lex its start again.
+#[test]
+fn reparse_after_parameter_line_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "def c = { @A String a = b -> c }\n",
+            "def c = {\n  String a = 1,\n  @A\n  String b -> a\n}\n",
+            "def c = { String a = 1, var\n  b -> a }\n",
+            "String s\n<T> T m(T t) { t }\n",
+            "String s\n(Foo new Bar())\n",
+            "enum E { A(var(1)) }\n",
+        ],
+        &["", "\n", "x", ",", "@", "-"],
+    );
+}
+
+/// A `)` before `in` and a `[` closes no cast where the brackets hold
+/// several elements (§6.11), which the scanner reads up to the first `,`,
+/// so an edit up to there must lex the `)` again.
+#[test]
+fn reparse_after_membership_list_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "r = (x) in [1, 2]\n",
+            "r = (float) in[i]\n",
+            "r = (x) in [f(a, b), c]\n",
+        ],
+        &["", ",", "x", "\n", "]", "["],
+    );
+}
+
 /// Texts with a `)` before a relational operator (§6.11), which closes a
 /// parenthesized expression and no cast, and with names that start like
 /// one (`(x) inside`) or that the operator's operand cannot start
@@ -817,6 +889,34 @@ fn reparse_after_contextual_keyword_edits_matches_parse_from_scratch() {
             "after the edits of {text:?}: {edited:?}",
         );
     }
+}
+
+/// Texts with `in` or `as` on the line after a statement and no operand
+/// after the word, so that the word is a name (§6.16). From scratch the
+/// scanner reads the word in the state after the expression before it, where
+/// the operator is valid; a reparse that reuses that statement reads it in
+/// the state after the statement, where it is not. Both must decide the
+/// tokens before a statement's first name alike (§6.14, §6.21, §6.24):
+/// `as { }.bar 1` after `x = 1` was an `ERROR` from scratch and a call after
+/// an edit further on.
+#[test]
+fn reparse_after_an_operator_word_that_is_a_name_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "x = 1\nas { }.bar 1\n",
+            "foo()\nas { y }.bar()\n",
+            "x = 1\nas \"a\" + b\n",
+            "x = 1\nas 1 + 2\n",
+            "x = 1\nas (foo 1)\n",
+            "x = 1\nas[] q\n",
+            "x = 1\nas<T> q\n",
+            "x = 1\nas.Bar q\n",
+            "x = 1\nin.Bar q\n",
+            "x = 1\nin<T> q\n",
+            "x = 1\nas.Foo[].class\n",
+        ],
+        &["", "2", "y", " ", "\n", "."],
+    );
 }
 
 /// A known limitation (`SPECIFICATION.md` §6.17): where a method head forks

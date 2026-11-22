@@ -586,6 +586,77 @@ xs.each { @Lazy x, String... rest -> x }
           (identifier))))))
 
 ==================
+An annotated typed closure parameter with a default, and the same braces as the body of an if
+==================
+
+def c1 = { @A String a = b -> c }
+def c2 = { @A String a = 1 -> a }
+def c3 = { @A(x) String a, b = 1 -> a }
+if (x) { @A String a = b -> c }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        name: (identifier)
+        value: (lambda_expression
+          parameters: (identifier)
+          body: (identifier))))))
+
+==================
 Closure body opening with an assignment
 ==================
 
@@ -1238,6 +1309,91 @@ xs.each { a, var -> a }
             name: (identifier)))
         (expression_statement
           (identifier))))))
+
+==================
+A closure parameter on the line after its annotation or after var
+==================
+
+def c1 = {
+    String a = 1,
+    @A
+    String b -> a
+}
+def c2 = {
+    foo a,
+    @a.b.C(x = 1)
+    String b -> a
+}
+def c3 = { String a = 1, var
+    b -> a }
+println a, var
+def f = x -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)
+                (identifier)
+                (identifier))
+              arguments: (argument_list
+                (assignment_expression
+                  left: (identifier)
+                  right: (number_literal))))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier)))))
 
 ==================
 Closure parameters named var and yield, used in the body

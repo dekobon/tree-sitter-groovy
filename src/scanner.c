@@ -74,9 +74,10 @@
 // UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
 // function tries the decisions is described above it.
 //
-// Three bits of state, `Scanner.no_comment_close_ahead` (§6.6),
-// `Scanner.lambda_body_continues` (§6.19) and `Scanner.jump_continues`
-// (§6.23). Nothing else is kept between calls.
+// Four bits of state: `Scanner.no_comment_close_ahead` (§6.6),
+// `Scanner.lambda_body_continues` (§6.19), `Scanner.jump_continues`
+// (§6.23) and `Scanner.slashy_after_comment_newline` (§6.2). Nothing else
+// is kept between calls.
 //
 // Known inconsistencies, kept as they are:
 //   - Form feeds and vertical tabs. The grammar's extras skip them, and so
@@ -184,6 +185,7 @@ typedef struct {
     bool no_comment_close_ahead;
     bool lambda_body_continues;
     bool jump_continues;
+    bool slashy_after_comment_newline;
 } Scanner;
 
 // A failed allocation leaves the scanner without its memory, which
@@ -767,6 +769,8 @@ static bool is_reserved_bare_lambda_name(const char *word, unsigned len);
 static const unsigned NAME_ARGUMENT_LOOKAHEAD_ITEMS = 256;
 
 static bool is_modifier_word(const char *word, unsigned len);
+static bool is_reserved_variable_name(const char *word, unsigned len);
+static bool type_parameters_follow(TSLexer *lexer);
 
 // The code points of the upper-case letters `is_upper_letter` knows
 // beyond A to Z: the capitals of Latin-1 (`À` to `Þ`, but for the
@@ -1009,6 +1013,7 @@ static bool skip_comment_body(TSLexer *lexer) {
 static bool next_line_continues(
     TSLexer *lexer,
     bool slash,
+    bool declaration,
     bool no_close_ahead
 );
 
@@ -1028,7 +1033,18 @@ enum {
 // it, `in` and `as`: `{ foo a, b = i++` then `* 2 -> a }`); and LINE_ENDS
 // when it starts the next statement. A `(` or `,` that opens the line ends
 // the element, as it ends a call's last argument.
-static int default_line_follows(TSLexer *lexer, bool no_close_ahead) {
+//
+// After `var` that starts an element (`after_var`), the name it declares
+// may open the line, as Apache's `variableModifiers` takes `nls` after each
+// modifier (`{ String a = 1, var` then `b -> a }`): LINE_ARROW where `->`
+// follows that name on its line and LINE_GOES_ON where `,` or `=` does.
+// Any other line ends the element, as `var` is a name too, a call's last
+// argument (`foo a, var` then the next statement).
+static int default_line_follows(
+    TSLexer *lexer,
+    bool after_var,
+    bool no_close_ahead
+) {
     bool slash = false;
     if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, &slash)) {
         return LINE_ENDS;
@@ -1049,15 +1065,27 @@ static int default_line_follows(TSLexer *lexer, bool no_close_ahead) {
             return LINE_ENDS;
         }
         if (is_identifier_start(c)) {
-            char word[sizeof "instanceof"];
+            char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
-            return word_is(word, len, "in") || word_is(word, len, "as")
-                    || word_is(word, len, "instanceof")
-                ? LINE_GOES_ON
-                : LINE_ENDS;
+            if (word_is(word, len, "in") || word_is(word, len, "as")
+                || word_is(word, len, "instanceof")) {
+                return LINE_GOES_ON;
+            }
+            if (!after_var || is_reserved_variable_name(word, len)
+                || !skip_same_line_space(lexer, false)) {
+                return LINE_ENDS;
+            }
+            if (lexer->lookahead == ',' || lexer->lookahead == '=') {
+                return LINE_GOES_ON;
+            }
+            if (lexer->lookahead != '-') {
+                return LINE_ENDS;
+            }
+            advance(lexer);
+            return lexer->lookahead == '>' ? LINE_ARROW : LINE_ENDS;
         }
     }
-    return next_line_continues(lexer, slash, no_close_ahead)
+    return next_line_continues(lexer, slash, false, no_close_ahead)
         ? LINE_GOES_ON
         : LINE_ENDS;
 }
@@ -1069,10 +1097,13 @@ static int default_line_follows(TSLexer *lexer, bool no_close_ahead) {
 // anything; comments are trivia, and a string is one item, a triple-quoted
 // one across lines (`skip_string`) and a dollar-slashy one as well
 // (`skip_dollar_slashy_string`). A line break ends the list unless a comma,
-// a modifier, an operator or an open bracket comes before it (a postfix `++`
-// or `--` and a slashy string end an operand), or `->` or a line that goes on
-// with the element after it (`default_line_follows`): a call's last argument
-// ends at it (`foo a, i++` then the next statement). `;`, a closing bracket
+// a modifier, an annotation, an operator or an open bracket comes before it
+// (a postfix `++` or `--` and a slashy string end an operand), or `->` or a
+// line that goes on with the element after it (`default_line_follows`): a
+// call's last argument ends at it (`foo a, i++` then the next statement).
+// An annotation is `@`, its dotted name and arguments in parentheses, with
+// no bracket open: the parameter it stands on may follow on the next line
+// (`{ String a,` then `@A` then `String b -> }`). `;`, a closing bracket
 // with none open and the end of the
 // budget, `budget` items, end the look-ahead with no `->`. So does an
 // element, the first item after a `,` outside brackets, that is `(` or a
@@ -1090,14 +1121,29 @@ static bool parameters_follow(
     // Whether the item read next starts an element: the last item read, line
     // breaks and comments aside, is a `,` outside brackets.
     bool element_start = false;
+    // An annotation outside brackets: whether the last item is the `@` or
+    // a `.` of its name, whether it is a part of that name, and whether its
+    // arguments are open.
+    bool annotation_prefix = false;
+    bool annotation_name = false;
+    bool annotation_arguments = false;
+    // Whether the last item on this line is `var` that starts an element.
+    bool var_word = false;
     for (unsigned items = 0; items < budget; items++) {
         if (!skip_same_line_space(lexer, false) || lexer->eof(lexer)) {
             return false;
         }
         int32_t c = lexer->lookahead;
+        bool after_var = var_word;
+        var_word = false;
+        bool after_annotation_prefix = annotation_prefix;
+        annotation_prefix = false;
+        bool after_annotation_name = annotation_name;
+        annotation_name = false;
         if (is_line_break(c)) {
             if (depth == 0 && !continued) {
-                int line = default_line_follows(lexer, no_close_ahead);
+                int line =
+                    default_line_follows(lexer, after_var, no_close_ahead);
                 if (line != LINE_GOES_ON) {
                     return line == LINE_ARROW;
                 }
@@ -1179,7 +1225,10 @@ static bool parameters_follow(
             if (element_start && key_colon_follows(lexer, word, len)) {
                 return false;
             }
-            continued = is_modifier_word(word, len) || word_is(word, len, "def");
+            annotation_name = after_annotation_prefix;
+            continued = annotation_name || is_modifier_word(word, len)
+                || word_is(word, len, "def");
+            var_word = element_start && word_is(word, len, "var");
             element_start = false;
             continue;
         }
@@ -1187,6 +1236,9 @@ static bool parameters_follow(
             return false;
         }
         if (c == '(' || c == '[' || c == '{') {
+            if (c == '(' && depth == 0 && after_annotation_name) {
+                annotation_arguments = true;
+            }
             depth++;
         } else if (c == ')' || c == ']' || c == '}') {
             if (depth == 0) {
@@ -1198,6 +1250,14 @@ static bool parameters_follow(
         }
         advance(lexer);
         continued = c != ')' && c != ']' && c != '}';
+        if (depth == 0) {
+            if (c == ')' && annotation_arguments) {
+                annotation_arguments = false;
+                continued = true;
+            }
+            annotation_prefix =
+                c == '@' || (c == '.' && after_annotation_name);
+        }
         element_start = c == ',' && depth == 0;
     }
     return false;
@@ -1403,14 +1463,17 @@ static bool parenthesized_command_follows(
 static const unsigned ELLIPSIS_DOTS = 3;
 
 // At the name after a parameter's type, which `parameter_name_follows` has
-// reached: whether it names the parameter. `instanceof` does not, and nor
-// do `as` and `in` (Apache `identifier` takes both) unless what ends a
-// parameter follows them, `,`, `)` or a default's `=`: otherwise they are
-// operators on a value (`(X as T)`, `(X in xs)`).
+// reached: whether it names the parameter. `instanceof` does not, nor does
+// a word that names no variable (`is_reserved_variable_name`: `(Foo new
+// Bar())` holds a call of `Foo`), and nor do `as` and `in` (Apache
+// `identifier` takes both) unless what ends a parameter follows them, `,`,
+// `)` or a default's `=`: otherwise they are operators on a value
+// (`(X as T)`, `(X in xs)`).
 static bool parameter_word_follows(TSLexer *lexer, bool no_close_ahead) {
-    char word[sizeof "instanceof"];
+    char word[sizeof "synchronized"];
     unsigned len = read_word(lexer, word, sizeof word);
-    if (word_is(word, len, "instanceof")) {
+    if (word_is(word, len, "instanceof")
+        || is_reserved_variable_name(word, len)) {
         return false;
     }
     if (!word_is(word, len, "as") && !word_is(word, len, "in")) {
@@ -2313,8 +2376,13 @@ static bool scan_var(
         lexer->result_symbol = VAR_NAMES_KEYWORD;
         return names_assignment_follows(lexer, no_close_ahead);
     }
+    // After `final` the word before `(` is always the keyword
+    // (`final var (a, b) = l`). Where an expression may start as well
+    // (BARE_LAMBDA_START valid), as in the arguments of an enum's first
+    // constant, which may be a constructor's parameters, the parentheses
+    // call a method named `var` (`enum E { A(var(1)) }`).
     lexer->result_symbol = VAR_KEYWORD;
-    return valid_symbols[VAR_KEYWORD];
+    return valid_symbols[VAR_KEYWORD] && !valid_symbols[BARE_LAMBDA_START];
 }
 
 // Whether `word` is one of the contextual keywords of §6.16.
@@ -2893,7 +2961,10 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 // as before: the type and the name as statements. A line goes on when it
 // starts with what no statement starts with: an operator other than `+`,
 // `-`, `++`, `--`, `!` and `~` (`.`, `?.`, `*`, `<`, `-=`, `!=`, `/=`, the
-// `->` of closure parameters), `instanceof`, `:`, `,` or a closing bracket;
+// `->` of closure parameters), `instanceof`, `:`, `,` or a closing bracket.
+// After a declaration (`declaration`) a `<` that opens type parameters
+// starts a generic method instead (`String s` then `<T> T m(T t) { }`,
+// `type_parameters_follow`); after a list's element it compares, as before;
 // a `/` that opens no comment unless the scanner opens a slashy string
 // there, as Groovy's lexer reads one, which needs it to close on its line
 // and to start with no `=` (`slashy_body_follows`; `Foo foo` then `/ 2` is
@@ -2906,6 +2977,7 @@ static bool read_dimensions(TSLexer *lexer, bool no_close_ahead) {
 static bool next_line_continues(
     TSLexer *lexer,
     bool slash,
+    bool declaration,
     bool no_close_ahead
 ) {
     int32_t c = lexer->lookahead;
@@ -2923,13 +2995,14 @@ static bool next_line_continues(
         case '^':
         case '|':
         case '&':
-        case '<':
         case '>':
         case ':':
         case ',':
         case ')':
         case ']':
             return true;
+        case '<':
+            return !(declaration && type_parameters_follow(lexer));
         case '!':
             return !negation_follows(lexer);
         case '+':
@@ -3014,7 +3087,8 @@ static bool declaration_end_follows(
                 return false;
             }
             if (slash || lexer->lookahead != '=') {
-                return !next_line_continues(lexer, slash, no_close_ahead);
+                return !next_line_continues(lexer, slash, true,
+                                            no_close_ahead);
             }
             c = '=';
         }
@@ -3340,8 +3414,20 @@ static bool scan_statement_start(
         lexer->result_symbol = SEALED_KEYWORD;
         return scan_sealed_target(lexer, no_close_ahead);
     }
+    // `in` and `as` are operators only after an expression, where their
+    // tokens are valid, and where their operand follows (§6.16): on false
+    // the word is a name. A reparse that reuses the statement before lexes
+    // the word in the state after that statement, where the operator is not
+    // valid, and reads on below. So that both states answer alike, a word
+    // that `.` or `<` follows, which starts no operand, is read on below in
+    // both (`x = 1` then `in.gov.Foo y` declares `y`), and `as` before
+    // anything else that is no name is no receiver in either (`as_word`).
+    bool as_word = word_is(word, len, "as");
+    bool operator_word = as_word || word_is(word, len, "in");
+    bool no_operand = lexer->lookahead == '.' || lexer->lookahead == '<';
     if (is_contextual_word(word, len)
-        && contextual_word_may_start(word[0], valid_symbols)) {
+        && contextual_word_may_start(word[0], valid_symbols)
+        && !(operator_word && no_operand)) {
         lexer->mark_end(lexer);
         return scan_contextual_word(lexer, word, len, valid_symbols,
                                     no_close_ahead);
@@ -3380,7 +3466,13 @@ static bool scan_statement_start(
             && generic_declaration_follows(lexer, valid_symbols,
                                            no_close_ahead);
     }
-    if (!skip_same_line_space(lexer, false)) {
+    // After an expression `as` is the operator before a name, past Groovy's
+    // trivia, and a name before anything else, with no token (above): a
+    // token here made `x = 1` then `as { }.bar 1` a call on a reparse and
+    // an `ERROR` from scratch. An expression is the operand of `in`, and
+    // each first argument below starts one, so `in` needs no such rule.
+    if (!skip_same_line_space(lexer, false)
+        || (as_word && !is_identifier_start(lexer->lookahead))) {
         return false;
     }
     // §6.24 — a call with a closure that a member access goes on with.
@@ -3460,19 +3552,25 @@ static bool skip_same_line_trivia(TSLexer *lexer) {
     }
 }
 
+static bool membership_list_follows(TSLexer *lexer);
+
 // SPECIFICATION.md §6.11 — whether `as` or `in`, consumed by the caller,
 // takes what follows it on its line: a type for `as`, so a name other than
 // `new`, and for `in` a name, a number or a string. Another of the
 // operators that a name spells applies to the cast of the name instead
-// (`(x) as instanceof T`, `(x) in as T`). A `[` does not count:
-// `(byte) in[i]` casts an element of an array named `in`. The read stops at
-// the first character after the trivia, or after the word that starts
-// there.
+// (`(x) as instanceof T`, `(x) in as T`). A `[` counts for `in` only where
+// the brackets hold several elements (`(x) in [1, 2]`,
+// `membership_list_follows`): `(byte) in[i]` casts an element of an array
+// named `in`. The read stops at the first character after the trivia, after
+// the word that starts there, or in those brackets.
 static bool keyword_operand_follows(TSLexer *lexer, bool in) {
     if (!skip_same_line_trivia(lexer)) {
         return false;
     }
     int32_t c = lexer->lookahead;
+    if (c == '[' && in) {
+        return membership_list_follows(lexer);
+    }
     if (c == 'a' || c == 'i') {
         return read_relational_word(lexer) == NO_RELATIONAL_WORD;
     }
@@ -3681,6 +3779,178 @@ static bool skip_short_string(TSLexer *lexer) {
     return skip_string(&view.lexer);
 }
 
+// SPECIFICATION.md §6.24 — whether a `/` after a word that `read_word`
+// returned opens a slashy string, as Groovy's lexer tells
+// (GroovyLexer.g4 `isRegexAllowed`, which reads division only after an
+// operand's last token): after a keyword, which ends no operand
+// (`return /a/`, `assert /a/`, `case`, `throw`, `yield`, `else`, `do`),
+// but not after a name, a number, `this`, `super`, `true`, `false` or
+// `null`. `in` and `as` are operators after an operand (`a in /x/`) and
+// names elsewhere, and a word after a member access is a name
+// (`x.return / 2`), as Groovy 6 reads them (`isSlashyForbidden`); so are
+// `_`, `permits` and `pipeline`, which the grammar reserves and Groovy
+// does not.
+static bool slashy_may_follow_word(
+    const char *word,
+    unsigned len,
+    bool after_operand,
+    bool member
+) {
+    if (member) {
+        return false;
+    }
+    if (word_is(word, len, "in") || word_is(word, len, "as")) {
+        return after_operand;
+    }
+    if (word_is(word, len, "yield")) {
+        return true;
+    }
+    return is_grammar_keyword(word, len) && !is_literal_word(word, len)
+        && !word_is(word, len, "super") && !word_is(word, len, "_")
+        && !word_is(word, len, "permits") && !word_is(word, len, "pipeline");
+}
+
+// What the look-aheads that count brackets on Groovy's tokens keep from one
+// token to the next, to tell a slashy string from a division at a `/`. Read
+// a character at a time, `x++ / 2` opened a string after the second `+`, and
+// the `/` after the operator `in` divided (`x in /a,b/`).
+typedef struct {
+    // Whether an operand may start at the next token, where a `/` opens a
+    // slashy string.
+    bool operand;
+    // Whether the last token was a member access, after which a keyword is
+    // a name (`x.in / 2`).
+    bool member;
+    // Whether the last token was a `!` after an operand, which `in` goes on
+    // as the operator `!in` (`x !in /a,b/`).
+    bool negation;
+} SlashState;
+
+// After a string, a slashy string or `++` and `--`: an operand ended, or
+// Groovy's lexer reads it so (REGEX_CHECK_ARRAY lists `++` and `--`).
+static inline void slash_state_after_operand(SlashState *state) {
+    state->operand = false;
+    state->member = false;
+    state->negation = false;
+}
+
+// After a `/` that divides, or another operator that needs no telling
+// apart.
+static inline void slash_state_after_operator(SlashState *state) {
+    state->operand = true;
+    state->member = false;
+    state->negation = false;
+}
+
+// After a word that `read_word` returned.
+static inline void slash_state_after_word(
+    SlashState *state,
+    const char *word,
+    unsigned len
+) {
+    state->operand = slashy_may_follow_word(
+        word, len, !state->operand || state->negation, state->member);
+    state->member = false;
+    state->negation = false;
+}
+
+// After the punctuation character `c`, which the caller consumed, with
+// `next` the character after it. Returns whether `next` is the second
+// character of `++` or `--`, which the caller consumes too.
+static inline bool slash_state_after_punctuation(
+    SlashState *state,
+    int32_t c,
+    int32_t next
+) {
+    if ((c == '+' || c == '-') && next == c) {
+        slash_state_after_operand(state);
+        return true;
+    }
+    state->negation = c == '!' && !state->operand;
+    state->operand = c != ')' && c != ']' && c != '}' && c != '.';
+    // `::` is an access too (`x::return / 2`), as `.&` and `.@` are.
+    state->member = c == '.' || (c == ':' && next == ':')
+        || (state->member && (c == '&' || c == '@' || c == ':'));
+    return false;
+}
+
+// SPECIFICATION.md §6.11 — the most characters, from the `[` after
+// `(x) in`, that `membership_list_follows` reads for the `,` after a list's
+// first element. A longer first element leaves the reading of a subscript.
+static const unsigned MEMBERSHIP_LIST_LOOKAHEAD_CHARACTERS = 256;
+
+// SPECIFICATION.md §6.11 — at the `[` after `(x) in`: whether the brackets
+// hold a `,` with no other bracket open, as a list of several elements does
+// (`(x) in [1, 2]`), which Groovy 6 tests `(x)` against. A subscript takes
+// several indices too (`in[i, j]`), so the grammar reads both the test and
+// the cast of an element of an array named `in`, and the cast outranks the
+// test; an array named `in` with several indices is the rarer of the two.
+// With one element the cast stays (`(byte) in[i]`). The brackets are read
+// on Groovy's tokens through a BoundedLexer, as `next_line_paren_ends_cast`
+// reads them, line breaks included; where they cannot be read as far as the
+// `,` (the bound, a string or a comment that does not close), the answer is
+// no.
+static bool membership_list_follows(TSLexer *lexer) {
+    BoundedLexer view =
+        bounded_lexer(lexer, MEMBERSHIP_LIST_LOOKAHEAD_CHARACTERS);
+    TSLexer *input = &view.lexer;
+    advance(input);
+    unsigned depth = 1;
+    SlashState state = {.operand = true};
+    for (;;) {
+        bool slash = false;
+        if (!skip_header_trivia(input, true, false, NULL, &slash)
+            || input->eof(input)) {
+            return false;
+        }
+        if (slash) {
+            if (state.operand && input->lookahead != '=') {
+                if (!slashy_body_follows(input)) {
+                    return false;
+                }
+                advance(input);
+                slash_state_after_operand(&state);
+            } else {
+                slash_state_after_operator(&state);
+            }
+            continue;
+        }
+        int32_t c = input->lookahead;
+        if (c == '\'' || c == '"') {
+            if (!skip_string(input)) {
+                return false;
+            }
+            slash_state_after_operand(&state);
+            continue;
+        }
+        if (is_identifier_char(c)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(input, word, sizeof word);
+            if (!opens_dollar_slashy(word, len, input)) {
+                slash_state_after_word(&state, word, len);
+            } else if (skip_dollar_slashy_string(input, NULL)) {
+                slash_state_after_operand(&state);
+            } else {
+                return false;
+            }
+            continue;
+        }
+        if (c == ',' && depth == 1) {
+            return true;
+        }
+        advance(input);
+        if (slash_state_after_punctuation(&state, c, input->lookahead)) {
+            advance(input);
+            continue;
+        }
+        if (c == '(' || c == '[' || c == '{') {
+            depth++;
+        } else if ((c == ')' || c == ']' || c == '}') && --depth == 0) {
+            return false;
+        }
+    }
+}
+
 // SPECIFICATION.md §6.11 — the most characters, from the `(` that opens the
 // line after a cast's `)`, that `next_line_paren_ends_cast` reads for the `)`
 // or `]` of brackets around both lines. The read runs at every `)` that ends
@@ -3734,9 +4004,9 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
     TSLexer *input = &view.lexer;
     unsigned depth = 0;
     bool first_closed = false;
-    // Whether an operand may start here, as in `parentheses_open_statement`:
-    // a `/` there opens a slashy string.
-    bool operand = true;
+    // An operand may start here, as in `parentheses_open_statement`: a `/`
+    // there opens a slashy string.
+    SlashState state = {.operand = true};
     for (;;) {
         bool slash = false;
         if (!skip_header_trivia(input, true, no_close_ahead, NULL, &slash)
@@ -3744,34 +4014,42 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
             return true;
         }
         if (slash) {
-            if (operand && input->lookahead != '=') {
+            if (state.operand && input->lookahead != '=') {
                 if (!slashy_body_follows(input)) {
                     return true;
                 }
                 advance(input);
-                operand = false;
+                slash_state_after_operand(&state);
             } else {
-                operand = true;
+                slash_state_after_operator(&state);
             }
             continue;
         }
         int32_t c = input->lookahead;
-        operand = !is_identifier_char(c) && c != '\'' && c != '"'
-            && c != ')' && c != ']' && c != '}' && c != '.';
         if (c == '\'' || c == '"') {
             if (!skip_string(input)) {
                 return true;
             }
+            slash_state_after_operand(&state);
             continue;
         }
         if (is_identifier_char(c)) {
-            if (read_dollar_slashy_open(input)
-                && !skip_dollar_slashy_string(input, NULL)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(input, word, sizeof word);
+            if (!opens_dollar_slashy(word, len, input)) {
+                slash_state_after_word(&state, word, len);
+            } else if (skip_dollar_slashy_string(input, NULL)) {
+                slash_state_after_operand(&state);
+            } else {
                 return true;
             }
             continue;
         }
         advance(input);
+        if (slash_state_after_punctuation(&state, c, input->lookahead)) {
+            advance(input);
+            continue;
+        }
         if (c == '(' || c == '[' || c == '{') {
             depth++;
         } else if (c == ')' || c == ']' || c == '}') {
@@ -3789,7 +4067,7 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
                     if (input->lookahead == '>') {
                         return false;
                     }
-                    operand = true;
+                    slash_state_after_operator(&state);
                 }
             }
         }
@@ -3814,37 +4092,6 @@ static bool next_line_paren_ends_cast(TSLexer *lexer, bool no_close_ahead) {
 // measured is 66 characters.
 static const unsigned CLOSURE_CALL_LOOKAHEAD_CHARACTERS = 128;
 
-// SPECIFICATION.md §6.24 — whether a `/` after a word that `read_word`
-// returned opens a slashy string, as Groovy's lexer tells
-// (GroovyLexer.g4 `isRegexAllowed`, which reads division only after an
-// operand's last token): after a keyword, which ends no operand
-// (`return /a/`, `assert /a/`, `case`, `throw`, `yield`, `else`, `do`),
-// but not after a name, a number, `this`, `super`, `true`, `false` or
-// `null`. `in` and `as` are operators after an operand (`a in /x/`) and
-// names elsewhere, and a word after a member access is a name
-// (`x.return / 2`), as Groovy 6 reads them (`isSlashyForbidden`); so are
-// `_`, `permits` and `pipeline`, which the grammar reserves and Groovy
-// does not.
-static bool slashy_may_follow_word(
-    const char *word,
-    unsigned len,
-    bool after_operand,
-    bool member
-) {
-    if (member) {
-        return false;
-    }
-    if (word_is(word, len, "in") || word_is(word, len, "as")) {
-        return after_operand;
-    }
-    if (word_is(word, len, "yield")) {
-        return true;
-    }
-    return is_grammar_keyword(word, len) && !is_literal_word(word, len)
-        && !word_is(word, len, "super") && !word_is(word, len, "_")
-        && !word_is(word, len, "permits") && !word_is(word, len, "pipeline");
-}
-
 // SPECIFICATION.md §6.24 — inside `depth` opening brackets (`{`, `(`, `[`),
 // consumes the tokens to the bracket that closes the outermost. They are
 // counted on Groovy's tokens, as `next_line_paren_ends_cast` counts them:
@@ -3866,9 +4113,7 @@ static bool skip_closure_tokens(
     bool lines,
     bool no_close_ahead
 ) {
-    // Whether the last token was a member access, after which a keyword is
-    // a name.
-    bool member = false;
+    SlashState state = {.operand = operand};
     // Whether the last token was the word `yield`, not after an access.
     bool yield = false;
     while (depth > 0) {
@@ -3886,23 +4131,22 @@ static bool skip_closure_tokens(
                        && !is_line_break(input->lookahead)) {
                     advance(input);
                 }
-                operand = true;
-            } else if (operand && input->lookahead != '=') {
+                slash_state_after_operator(&state);
+            } else if (state.operand && input->lookahead != '=') {
                 if (slashy_body_follows(input)) {
                     advance(input);
-                    operand = false;
+                    slash_state_after_operand(&state);
                 } else if (yield && is_whitespace(input->lookahead)) {
                     // No slashy string opens after `yield` here, so the
                     // grammar reads `yield` as a name and the `/` as
                     // division (§6.16): `foo { yield / 2 }.bar()`.
-                    operand = true;
+                    slash_state_after_operator(&state);
                 } else {
                     return false;
                 }
             } else {
-                operand = true;
+                slash_state_after_operator(&state);
             }
-            member = false;
             yield = false;
             continue;
         }
@@ -3912,8 +4156,7 @@ static bool skip_closure_tokens(
             if (!skip_string(input)) {
                 return false;
             }
-            operand = false;
-            member = false;
+            slash_state_after_operand(&state);
             continue;
         }
         if (is_identifier_char(c)) {
@@ -3923,27 +4166,18 @@ static bool skip_closure_tokens(
                 if (!skip_dollar_slashy_string(input, NULL)) {
                     return false;
                 }
-                operand = false;
+                slash_state_after_operand(&state);
             } else {
-                operand = slashy_may_follow_word(word, len, !operand, member);
-                yield = !member && word_is(word, len, "yield");
+                yield = !state.member && word_is(word, len, "yield");
+                slash_state_after_word(&state, word, len);
             }
-            member = false;
             continue;
         }
         advance(input);
-        if ((c == '+' || c == '-') && input->lookahead == c) {
-            // `++` and `--` end an operand for Groovy's lexer
-            // (REGEX_CHECK_ARRAY), after it or before one.
+        if (slash_state_after_punctuation(&state, c, input->lookahead)) {
             advance(input);
-            operand = false;
-            member = false;
             continue;
         }
-        operand = c != ')' && c != ']' && c != '}' && c != '.';
-        // `::` is an access too (`x::return / 2`), as `.&` and `.@` are.
-        member = c == '.' || (c == ':' && input->lookahead == ':')
-            || (member && (c == '&' || c == '@' || c == ':'));
         if (c == '{' || c == '(' || c == '[') {
             depth++;
         } else if (c == '}' || c == ')' || c == ']') {
@@ -4005,11 +4239,22 @@ static AccessRest read_closure_parentheses(
     bool no_close_ahead
 ) {
     advance(input);
-    if (!skip_header_trivia(input, true, no_close_ahead, NULL, NULL)) {
+    bool slash = false;
+    if (!skip_header_trivia(input, true, no_close_ahead, NULL, &slash)) {
         return ACCESS_STOP;
     }
     bool operand = true;
-    if (is_identifier_start(input->lookahead)) {
+    if (slash) {
+        // A slashy string opens the parentheses (`.bar(/x/)`). It is read
+        // whole and the parentheses on to their `)`, so that an argument
+        // after them is found (`foo { }.bar(/x/).baz 1`); stopping here
+        // made the accesses a call and that argument a statement.
+        if (input->lookahead == '=' || !slashy_body_follows(input)) {
+            return ACCESS_STOP;
+        }
+        advance(input);
+        operand = false;
+    } else if (is_identifier_start(input->lookahead)) {
         bool upper = is_upper_letter(input->lookahead);
         char word[sizeof "synchronized"];
         unsigned len = read_word(input, word, sizeof word);
@@ -4409,13 +4654,13 @@ static bool skip_lambda_tokens(
     unsigned angles = 0;
     // Whether the last item is a capitalized name with nothing after it yet.
     bool type_name = false;
-    // Whether an operand may start here, as in `parentheses_open_statement`:
-    // a `/` there opens a slashy string, one item, which the scan function
-    // opens where no `=` follows the `/` and the string closes on its line
+    // An operand may start here, as in `parentheses_open_statement`: a `/`
+    // there opens a slashy string, one item, which the scan function opens
+    // where no `=` follows the `/` and the string closes on its line
     // (`slashy_body_follows`), so that its `,` and `)` end nothing
     // (`(a = /x,y/) -> a`). One that does not close on its line ends the
     // look-ahead.
-    bool operand = true;
+    SlashState state = {.operand = true};
     while (spend_lambda_item(items)) {
         bool slash = false;
         if (is_whitespace(lexer->lookahead) || lexer->lookahead == '\\'
@@ -4434,29 +4679,33 @@ static bool skip_lambda_tokens(
             angles = 0;
         }
         if (slash) {
-            if (operand && lexer->lookahead != '=') {
+            if (state.operand && lexer->lookahead != '=') {
                 if (!slashy_body_follows(lexer)) {
                     return false;
                 }
                 advance(lexer);
-                operand = false;
+                slash_state_after_operand(&state);
             } else {
-                operand = true;
+                slash_state_after_operator(&state);
             }
             continue;
         }
-        operand = !is_identifier_char(c) && c != '\'' && c != '"'
-            && c != ')' && c != ']' && c != '}' && c != '.';
         if (c == '\'' || c == '"') {
             if (!skip_string(lexer)) {
                 return false;
             }
+            slash_state_after_operand(&state);
             continue;
         }
         if (is_identifier_char(c)) {
             type_name = is_capital(c);
-            if (read_dollar_slashy_open(lexer)
-                && !skip_dollar_slashy_string(lexer, NULL)) {
+            char word[sizeof "synchronized"];
+            unsigned len = read_word(lexer, word, sizeof word);
+            if (!opens_dollar_slashy(word, len, lexer)) {
+                slash_state_after_word(&state, word, len);
+            } else if (skip_dollar_slashy_string(lexer, NULL)) {
+                slash_state_after_operand(&state);
+            } else {
                 *in_string = true;
                 return false;
             }
@@ -4479,6 +4728,9 @@ static bool skip_lambda_tokens(
             return true;
         }
         advance(lexer);
+        if (slash_state_after_punctuation(&state, c, lexer->lookahead)) {
+            advance(lexer);
+        }
     }
     return false;
 }
@@ -4893,11 +5145,11 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
         // waits for its name.
         bool receiver = !comma;
         bool access = false;
-        // Whether an operand may start here, where Groovy's lexer reads a
-        // `/` as the start of a slashy string: after an operator, an open
-        // bracket, `,`, `:` or `?`, not after a name, a number, a string or
-        // a closing bracket.
-        bool operand = true;
+        // An operand may start here, where Groovy's lexer reads a `/` as
+        // the start of a slashy string: after an operator, an open bracket,
+        // `,`, `:` or `?`, not after a name, a number, a string, a closing
+        // bracket or `++` and `--`.
+        SlashState state = {.operand = true};
         int32_t end = 0;
         while (end == 0) {
             bool slash = false;
@@ -4914,7 +5166,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             // (`slashy_body_follows`). Its `,` and `:` are none of the
             // element's (`(text =~ /a, b/)`); one that does not close on its
             // line ends the reading.
-            if (slash && operand && angles == 0 && c != '=') {
+            if (slash && state.operand && angles == 0 && c != '=') {
                 if (!slashy_body_follows(lexer)) {
                     known = false;
                     break;
@@ -4924,7 +5176,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                 one_name = false;
                 access = false;
                 receiver = false;
-                operand = false;
+                slash_state_after_operand(&state);
                 continue;
             }
             if (angles > 0
@@ -4956,13 +5208,12 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             access = false;
             if (slash) {
                 receiver = false;
-                operand = true;
+                slash_state_after_operator(&state);
                 continue;
             }
-            operand = !is_identifier_char(c) && c != '\'' && c != '"'
-                && c != ')' && c != ']' && c != '}' && c != '.';
             if (c == ',') {
                 advance(lexer);
+                slash_state_after_operator(&state);
                 if (angles > 0) {
                     angle_comma = true;
                 }
@@ -4970,6 +5221,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             if (c == '(' || c == '[' || c == '{') {
                 advance(lexer);
+                slash_state_after_operator(&state);
                 receiver = false;
                 depth++;
                 continue;
@@ -4980,6 +5232,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                     break;
                 }
                 advance(lexer);
+                slash_state_after_operand(&state);
                 depth--;
                 continue;
             }
@@ -4988,6 +5241,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                     known = false;
                     break;
                 }
+                slash_state_after_operand(&state);
                 receiver = false;
                 continue;
             }
@@ -4996,6 +5250,9 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             if (c == '.' || c == '?' || c == '*') {
                 advance(lexer);
+                // The characters after the first are read below; the state
+                // after them is that of a member access where `dot` is set.
+                slash_state_after_operator(&state);
                 bool dot = c == '.';
                 if (c == '.') {
                     if (lexer->lookahead == '&' || lexer->lookahead == '@') {
@@ -5022,6 +5279,10 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                         advance(lexer);
                     }
                 }
+                if (dot) {
+                    state.operand = false;
+                    state.member = true;
+                }
                 access = dot && receiver && was_access
                     && is_identifier_start(lexer->lookahead);
                 receiver = access;
@@ -5029,9 +5290,11 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             if (c == ':') {
                 advance(lexer);
+                slash_state_after_operator(&state);
                 receiver = false;
                 if (lexer->lookahead == ':') {
                     advance(lexer);
+                    state.member = true;
                 } else if (depth == 0 && angles == 0 && !command) {
                     if (questions == 0) {
                         return false;
@@ -5042,6 +5305,7 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             if (c == '>') {
                 advance(lexer);
+                slash_state_after_operator(&state);
                 receiver = false;
                 if (angles > 0 && --angles == 0) {
                     angle_comma = false;
@@ -5050,6 +5314,10 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             if (!is_identifier_char(c)) {
                 advance(lexer);
+                if (slash_state_after_punctuation(&state, c,
+                                                  lexer->lookahead)) {
+                    advance(lexer);
+                }
                 receiver = false;
                 continue;
             }
@@ -5059,12 +5327,14 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                 known = false;
                 break;
             }
+            slash_state_after_word(&state, word, len);
             bool name = is_identifier_start(c);
             if (first) {
                 one_name = name;
             }
             if (lexer->lookahead == '<' && (angles > 0 || is_capital(c))) {
                 advance(lexer);
+                slash_state_after_operator(&state);
                 angles++;
                 receiver = false;
                 continue;
@@ -5089,9 +5359,10 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             int32_t next = lexer->lookahead;
             if (is_identifier_start(next)) {
-                char argument[sizeof "instanceof"];
+                char argument[sizeof "synchronized"];
                 unsigned argument_len =
                     read_word(lexer, argument, sizeof argument);
+                slash_state_after_word(&state, argument, argument_len);
                 tokens++;
                 one_name = false;
                 command = !word_is(argument, argument_len, "in")
@@ -5650,11 +5921,12 @@ static const unsigned UNSET_STATE_LENGTH = 0;
 static const unsigned SET_STATE_LENGTH = 1;
 
 // The bits of that byte: `no_comment_close_ahead`,
-// `lambda_body_continues` and `jump_continues`. Any other bit is read as
-// unset.
+// `lambda_body_continues`, `jump_continues` and
+// `slashy_after_comment_newline`. Any other bit is read as unset.
 static const char NO_COMMENT_CLOSE_AHEAD_BIT = 1;
 static const char LAMBDA_BODY_CONTINUES_BIT = 2;
 static const char JUMP_CONTINUES_BIT = 4;
+static const char SLASHY_AFTER_COMMENT_NEWLINE_BIT = 8;
 
 unsigned tree_sitter_groovy_external_scanner_serialize(
     void *payload,
@@ -5664,14 +5936,17 @@ unsigned tree_sitter_groovy_external_scanner_serialize(
     if (scanner == NULL
         || (!scanner->no_comment_close_ahead
             && !scanner->lambda_body_continues
-            && !scanner->jump_continues)) {
+            && !scanner->jump_continues
+            && !scanner->slashy_after_comment_newline)) {
         return UNSET_STATE_LENGTH;
     }
     buffer[0] = (char)((scanner->no_comment_close_ahead
                         ? NO_COMMENT_CLOSE_AHEAD_BIT : 0)
-                       | (scanner->lambda_body_continues
-                          ? LAMBDA_BODY_CONTINUES_BIT : 0)
-                       | (scanner->jump_continues ? JUMP_CONTINUES_BIT : 0));
+                        | (scanner->lambda_body_continues
+                           ? LAMBDA_BODY_CONTINUES_BIT : 0)
+                        | (scanner->jump_continues ? JUMP_CONTINUES_BIT : 0)
+                        | (scanner->slashy_after_comment_newline
+                           ? SLASHY_AFTER_COMMENT_NEWLINE_BIT : 0));
     return SET_STATE_LENGTH;
 }
 
@@ -5689,6 +5964,8 @@ void tree_sitter_groovy_external_scanner_deserialize(
             set && (buffer[0] & LAMBDA_BODY_CONTINUES_BIT) != 0;
         scanner->jump_continues =
             set && (buffer[0] & JUMP_CONTINUES_BIT) != 0;
+        scanner->slashy_after_comment_newline =
+            set && (buffer[0] & SLASHY_AFTER_COMMENT_NEWLINE_BIT) != 0;
     }
 }
 
@@ -6268,6 +6545,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         }
         lexer->mark_end(lexer);
         lexer->result_symbol = LINE_COMMENT;
+        if (scanner != NULL) {
+            scanner->slashy_after_comment_newline = false;
+        }
         read_deferred_extent(lexer, body_continues, no_close_ahead);
         return true;
     }
@@ -6340,6 +6620,28 @@ bool tree_sitter_groovy_external_scanner_scan(
                 }
                 lexer->result_symbol = BLOCK_COMMENT;
             }
+            // A comment can swallow the newline before it. Keep that
+            // fact only for a statement's next comment or slashy string;
+            // inside parentheses a slash after the comment still divides.
+            if (scanner != NULL) {
+                bool after_newline = !body_continues
+                    && valid_symbols[STATEMENT_PAREN]
+                    && (crossed_line || scanner->slashy_after_comment_newline);
+                scanner->slashy_after_comment_newline = false;
+                if (after_newline) {
+                    while (is_inline_space(lexer->lookahead)) {
+                        advance(lexer);
+                    }
+                    if (lexer->lookahead == '/') {
+                        advance(lexer);
+                        scanner->slashy_after_comment_newline =
+                            lexer->lookahead == '*'
+                            || (lexer->lookahead != '='
+                                && lexer->lookahead != '/'
+                                && slashy_body_follows(lexer));
+                    }
+                }
+            }
             read_deferred_extent(lexer, body_continues, no_close_ahead);
             return true;
         }
@@ -6389,7 +6691,9 @@ bool tree_sitter_groovy_external_scanner_scan(
     // was `x = w` and the string `/2 + h/`. Past a line break one may
     // start, as Groovy's lexer emits a newline token there (`x = a` and
     // `/re/` on the next line).
-    if (!wants_slashy || (expression_ends && !crossed_line)) {
+    if (!wants_slashy
+        || (expression_ends && !crossed_line
+            && (scanner == NULL || !scanner->slashy_after_comment_newline))) {
         return false;
     }
     // `lexer->mark_end` records the position where the slashy opener
@@ -6398,6 +6702,9 @@ bool tree_sitter_groovy_external_scanner_scan(
     lexer->mark_end(lexer);
     if (!slashy_body_follows(lexer)) {
         return false;
+    }
+    if (scanner != NULL) {
+        scanner->slashy_after_comment_newline = false;
     }
     lexer->result_symbol = SLASHY_STRING_START;
     return true;

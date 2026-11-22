@@ -2802,6 +2802,27 @@ int a, b
         argument: (number_literal)))))
 
 ==================
+Typed local without an initializer before a call of a capitalized name with new in parentheses on the next line
+==================
+
+String s
+(Foo new Bar())
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))))))
+
+==================
 A line that goes on with the name ends no typed local (known divergence)
 ==================
 
@@ -2861,6 +2882,63 @@ String g
     (parenthesized_type_cast
       type: (type_identifier)
       value: (closure))))
+
+==================
+A typed local or field before a generic method on the next line; before a comparison it is no declaration (known divergence)
+==================
+
+String s
+<T> T foo(T x) { return x }
+class C {
+    def String t
+    <T extends A, U> void m() { }
+}
+String u
+< limit
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (method_declaration
+    type_parameters: (method_type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block
+      (return_statement
+        (identifier))))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)
+            (type_identifier))
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
 
 ==================
 A parenthesized range or cast on the next line ends a typed local
@@ -3811,6 +3889,61 @@ as T
     (identifier))
   (expression_statement
     (identifier)))
+
+==================
+A typed local whose dotted or generic type starts with in or as declares after an expression
+==================
+
+foo()
+in.gov.Foo x
+bar()
+as.b.Foo<T> y
+baz()
+in<T> q
+in.close()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list))))
 
 ==================
 A line that starts with an operator goes on with a typed local's name (Groovy reads a call)

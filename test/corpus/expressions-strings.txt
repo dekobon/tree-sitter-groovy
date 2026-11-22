@@ -734,6 +734,176 @@ x = a
       (string_fragment))))
 
 ==================
+A block comment on the next line before a slashy string
+==================
+
+x = a
+/* c */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A slashy string after a comment in a method block
+==================
+
+def f() {
+  x = a
+  /* c */ /re/
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (identifier)))
+      (block_comment)
+      (expression_statement
+        (string_literal
+          (string_fragment))))))
+
+==================
+A Groovydoc comment on the next line before a slashy string
+==================
+
+x = a
+/** c */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (groovydoc_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+Two comments after a newline before a slashy string
+==================
+
+x = a
+/* one */ /* two */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (block_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A division after a comment inside a call does not turn later divisions into a slashy string
+==================
+
+foo(a
+/*c*/ /2)
+x = b/3 + c/4
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (identifier)
+          (block_comment)
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (binary_expression
+          left: (identifier)
+          right: (number_literal))))))
+
+==================
+A division after a comment inside a call does not turn an outer division into a slashy string
+==================
+
+foo(a
+/*c*/ /2) /3 + b/4
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (binary_expression
+              left: (identifier)
+              (block_comment)
+              right: (number_literal))))
+        right: (number_literal))
+      right: (binary_expression
+        left: (identifier)
+        right: (number_literal)))))
+
+==================
+Slash after a same-line comment or a name following a comment still divides
+==================
+
+x = a /* c */ /re/ d
+x = a
+/* c */ b /c/ d
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          (block_comment)
+          right: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
 A slash after a name opens no slashy string argument
 :error
 ==================

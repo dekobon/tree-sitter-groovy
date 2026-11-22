@@ -70,8 +70,13 @@ fn reductions_per_line(line: &str, count: usize) -> f64 {
     })));
     let tree = parser.parse(line.repeat(count), None).expect("parse");
     assert!(!tree.root_node().has_error(), "{line:?}");
+    let reduction_count = reductions.load(Ordering::Relaxed);
+    assert!(
+        reduction_count > 0,
+        "no `{REDUCE_PREFIX}` message in the parser's log for {line:?}",
+    );
     #[allow(clippy::cast_precision_loss, reason = "counts far below 2^52")]
-    let ratio = reductions.load(Ordering::Relaxed) as f64 / count as f64;
+    let ratio = reduction_count as f64 / count as f64;
     ratio
 }
 

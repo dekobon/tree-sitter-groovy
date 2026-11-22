@@ -663,6 +663,31 @@ def s = foo((Foo)
               value: (identifier))))))))
 
 ==================
+A cast inside a call keeps its operand on the next line before a division after an update
+==================
+
+def s = foo((Foo)
+  (Bar) y++ / 2)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (binary_expression
+            left: (parenthesized_type_cast
+              type: (type_identifier)
+              value: (parenthesized_type_cast
+                type: (type_identifier)
+                value: (update_expression
+                  operand: (identifier))))
+            right: (number_literal)))))))
+
+==================
 Brackets in strings and comments after a cast's operand on the next line are not counted
 ==================
 

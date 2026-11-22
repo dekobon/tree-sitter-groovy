@@ -3499,7 +3499,23 @@ module.exports = grammar({
       '->',
     ),
 
-    closure_parameter: $ => parameter($, choice($._expression, $._bare_lambda_name)),
+    // The second alternative never matches, like the one of
+    // `closure_parameters`: it keeps `_closure_parameters_start` valid
+    // after a parameter's annotations, where the scanner decides the type
+    // of `{ @A String a = 1 -> }` (§6.21). The token of
+    // `closure_parameters` is valid only before them, so the scanner
+    // opened a declaration after them. In `closure_parameters` the
+    // alternative would cost half the states (36 against 70) and list
+    // `annotation` among that node's children in `node-types.json`; the
+    // name after the token keeps the `name` field required there.
+    closure_parameter: $ => choice(
+      parameter($, choice($._expression, $._bare_lambda_name)),
+      seq(
+        repeat1($.annotation),
+        $._closure_parameters_start,
+        field('name', $.identifier),
+      ),
+    ),
 
     // §5.16 — a Java-style lambda with parentheses, Apache's
     // `lambdaExpression`: `(a, b) -> a + b`, `() -> { }`,

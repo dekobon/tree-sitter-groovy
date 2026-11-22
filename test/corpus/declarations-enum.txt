@@ -1204,6 +1204,30 @@ enum F { A, record }
         name: (identifier)))))
 
 ==================
+A call of a method named var and the name var in an enum constant's arguments
+==================
+
+enum E { A(var(1)), B(var) }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (number_literal)))))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
 Annotated enum constants
 ==================
 

@@ -1057,6 +1057,59 @@ def m = foo
       alternative: (identifier))))
 
 ==================
+Parentheses on the next line with a slashy string after in or !in open a statement
+==================
+
+foo
+(x in /a,b/)
+foo
+(x !in /a,b/).each { }
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (membership_expression
+        element: (identifier)
+        collection: (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (membership_expression
+            element: (identifier)
+            collection: (string_literal
+              (string_fragment))))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Parentheses on the next line that hold a comma after a division after an update stay the arguments, which Groovy rejects
+==================
+
+foo
+(x++ / 2, y)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (update_expression
+            operand: (identifier))
+          right: (number_literal))
+        (identifier)))))
+
+==================
 A lambda on the line after a closure parameter's default is appended to it (known divergence)
 ==================
 
@@ -1551,6 +1604,15 @@ foo { }.bar(1,
 ---
 
 ==================
+A call with a closure whose accesses go on after a slashy string argument to a first argument is unsupported
+:error
+==================
+
+foo { }.bar(/x/).baz 1
+
+---
+
+==================
 A call with a closure and an access takes an operator in the parentheses after the access
 ==================
 
@@ -1802,6 +1864,55 @@ foo { x++ / 2 }.bar()
 
 
 ==================
+A call with a closure takes a slashy string argument after an access and a slashy string after !in in its braces
+==================
+
+foo { }.bar(/x/)
+foo { }.bar(/a,b/).baz()
+foo { x !in /}/ }.bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      arguments: (argument_list
+        (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (field_access
+            object: (method_invocation
+              function: (identifier)
+              closure: (closure))
+            field: (identifier))
+          arguments: (argument_list
+            (string_literal
+              (string_fragment))))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure
+            (expression_statement
+              (membership_expression
+                element: (identifier)
+                collection: (string_literal
+                  (string_fragment))))))
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
 The braces of a call with a closure take a division after yield as a name and after a keyword after a method reference
 ==================
 
@@ -1878,6 +1989,42 @@ A contextual keyword with a closure before a member access is unsupported
 record { }.bar()
 
 ---
+
+==================
+A call of a method named as with a closure before a member access is unsupported
+:error
+==================
+
+as { }.bar()
+
+---
+
+==================
+A call of a method named as with a closure before a member access is unsupported after an expression too
+:error
+==================
+
+x = 1
+as { }.bar 1
+
+---
+
+==================
+A call of a method named in with a closure and a member access is a receiver where a statement starts
+==================
+
+in { }.bar 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (number_literal)))
 
 ==================
 A method reference as the receiver of a parenthesis-free call after a closure is unsupported

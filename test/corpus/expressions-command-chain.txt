@@ -5494,6 +5494,42 @@ foo var
     argument: (identifier)))
 
 ==================
+A method named as is called with new, and before a literal that an operator follows with the literal alone (known divergence)
+==================
+
+as "a" + b;
+as new Foo();
+x = 1
+as "a" + b
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
 A keyword is not a first argument, and return takes the name before one
 ==================
 

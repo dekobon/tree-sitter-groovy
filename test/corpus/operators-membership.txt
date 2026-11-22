@@ -244,6 +244,88 @@ return (x) !in[1, 2]
         (number_literal)))))
 
 ==================
+in after parentheses before a list of several elements tests the parentheses, before one element it casts a subscript
+==================
+
+(x) in [1, 2]
+def ok = (a.b) in ['main', 'dev']
+if ((x) in [
+  f(a, b),
+  2]) { }
+return (x) in [/a,b/, c] && (y) in [3, 4]
+out[i] = (float) in[i]
+(Foo) in [f(a, b)]
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (list_literal
+        (number_literal)
+        (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (parenthesized_expression
+          (field_access
+            object: (identifier)
+            field: (identifier)))
+        collection: (list_literal
+          (string_literal)
+          (string_literal)))))
+  (if_statement
+    condition: (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (list_literal
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))
+        (number_literal)))
+    consequence: (block))
+  (return_statement
+    (binary_expression
+      left: (membership_expression
+        element: (parenthesized_expression
+          (identifier))
+        collection: (list_literal
+          (string_literal
+            (string_fragment))
+          (identifier)))
+      right: (membership_expression
+        element: (parenthesized_expression
+          (identifier))
+        collection: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (subscript_expression
+          object: (identifier)
+          index: (identifier)))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (subscript_expression
+        object: (identifier)
+        index: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))))))
+
+==================
 in after parentheses at the end of a line, or before a member access, a subscript or an operator, is a cast of the name
 ==================
 
