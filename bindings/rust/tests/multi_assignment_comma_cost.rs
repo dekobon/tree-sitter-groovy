@@ -14,6 +14,10 @@
 //! sizes. One test counts the parse steps that have more than one stack
 //! version, which the look-ahead keeps from growing with a method head's
 //! untyped parameters.
+//!
+//! The last test is about the names of a declaration, `def (a, b) = l`,
+//! and the shape of their rule rather than a look-ahead: it reads the
+//! parser's log for the rule's reductions.
 
 use std::fmt::Write as _;
 use std::sync::Arc;
@@ -267,4 +271,53 @@ fn a_method_head_longer_than_the_bound_is_one() {
         .child_by_field_name("parameters")
         .expect("its parameters");
     assert_eq!(parameters.named_child_count(), PAST_THE_BOUND);
+}
+
+/// Names in the declaration of the test below.
+const DECLARED_NAMES: usize = 200;
+
+/// The names of a declaration, `def (a0, a1, …) = l`, are one rule over a
+/// `repeat` (`_multi_assignment_list` in `grammar.js`), and the runtime
+/// balances the nodes of a `repeat`. As a left-recursive rule, which the
+/// list was for a few commits, the names nested a node each, and
+/// `Node::child`, `Node::next_sibling` and `Tree::changed_ranges` took time
+/// quadratic in the names (2 s to walk the siblings of 8,000 names,
+/// a hundred times what the `repeat` takes). Time is not measured:
+/// the parser's log shows the shape, one reduction of the rule and those
+/// of its `repeat`.
+#[test]
+fn the_names_of_a_declaration_are_one_rule_over_a_repeat() {
+    /// The log line of a reduction of the rule; the `,` ends its name.
+    const LIST: &str = "reduce sym:_multi_assignment_list,";
+    /// The log line of a reduction of the rule's `repeat`.
+    const REPEAT: &str = "reduce sym:_multi_assignment_list_repeat1,";
+
+    let lists = Arc::new(AtomicUsize::new(0));
+    let repeats = Arc::new(AtomicUsize::new(0));
+    let (list_seen, repeat_seen) = (Arc::clone(&lists), Arc::clone(&repeats));
+    let mut parser = parser();
+    parser.set_logger(Some(Box::new(move |log_type, message| {
+        if log_type != LogType::Parse {
+            return;
+        }
+        if message.starts_with(LIST) {
+            list_seen.fetch_add(1, Ordering::Relaxed);
+        } else if message.starts_with(REPEAT) {
+            repeat_seen.fetch_add(1, Ordering::Relaxed);
+        }
+    })));
+    let source = format!("def ({}) = l\n", names(DECLARED_NAMES));
+    let tree = parser.parse(&source, None).expect("parse");
+    parser.set_logger(None);
+    assert!(!tree.root_node().has_error(), "{source:?}");
+    assert!(
+        repeats.load(Ordering::Relaxed) >= DECLARED_NAMES - 1,
+        "{} `{REPEAT}` lines in the parser's log for {DECLARED_NAMES} names",
+        repeats.load(Ordering::Relaxed),
+    );
+    assert_eq!(
+        lists.load(Ordering::Relaxed),
+        1,
+        "`{LIST}` lines in the parser's log: the rule nests a node for each name again",
+    );
 }

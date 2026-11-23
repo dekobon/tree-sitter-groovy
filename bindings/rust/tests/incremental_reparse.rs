@@ -937,6 +937,9 @@ fn reparse_after_multi_assignment_declaration_edits_matches_parse_from_scratch()
             "def (a, b) = l\nfoo()\n",
             "x = 1\ndef (a, b) abcdefghij = l\ndef s = 1\n",
             "def (a, b) : l\nfoo()\n",
+            "def (a, b) =,\ndef c = 1\n",
+            "def (a, b),\ndef c = 1\n",
+            "def (a,\ndef c = 1\nfoo()\n",
             "def (k: a, b) =\nfoo()\n",
             "class C {\n  private (e, f)\n  void m() { }\n}\n",
         ],
@@ -972,6 +975,38 @@ fn a_word_typed_after_the_statement_after_a_tied_multi_assignment_is_a_statement
     assert!(fresh.contains("instanceof_expression"), "{fresh}");
     assert!(
         !incremental.contains("instanceof_expression"),
+        "the reparse now matches the parse from scratch: {incremental}",
+    );
+}
+
+/// A known limitation (`docs/divergences-from-spec.md` §29), through the
+/// runtime. The names of a declaration are one node
+/// (`_multi_assignment_list` in `grammar.js`), which a reparse reuses as a
+/// whole, also when it holds an `ERROR` and the parser recovers from an
+/// error typed before it. In `def(a,l(a,b)` the `(` after `l` is an `ERROR`
+/// in a typed name, `l a`. With `,` typed after `def`, a parse from scratch
+/// finds a cheaper recovery, one `ERROR` over the comma and the names up to
+/// `l`; the reparse keeps the list and its typed name. As a left-recursive
+/// rule the list had no such difference, as the runtime reuses none of its
+/// nodes after an error in it, but it nested a node for each name
+/// (`multi_assignment_comma_cost.rs`). This test pins the difference. If it
+/// fails, the two parses agree again: remove the limitation from §29 and
+/// move the text to
+/// `reparse_after_multi_assignment_declaration_edits_matches_parse_from_scratch`.
+#[test]
+fn a_comma_typed_before_a_list_of_names_with_an_error_keeps_the_list_on_reparse() {
+    const TEXT: &str = "def(a,l(a,b)";
+    /// The end of `def`, where `,` is typed.
+    const INSERT_AT: usize = 3;
+
+    let mut parser = parser();
+    let (edited, incremental, fresh) = reparse(&mut parser, TEXT, INSERT_AT, INSERT_AT, ",");
+    assert_eq!(edited, "def,(a,l(a,b)");
+    let fresh = fresh.root_node().to_sexp();
+    let incremental = incremental.root_node().to_sexp();
+    assert!(!fresh.contains("type_identifier"), "{fresh}");
+    assert!(
+        incremental.contains("type_identifier"),
         "the reparse now matches the parse from scratch: {incremental}",
     );
 }

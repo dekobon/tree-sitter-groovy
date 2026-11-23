@@ -167,8 +167,9 @@ const DOTTED_CAST_TYPE_WEIGHT = 1 / WEIGHT_UNIT;
 
 /*
  * The weight of the error production for a multi-assignment declaration
- * whose `=` does not come (`_multi_assignment_tail`). Recovery by its
- * missing value costs what skipping a word of ten characters does, and
+ * whose `=` does not come, the first of `_multi_assignment_valueless`; the
+ * second, whose `=` comes, has none. Recovery by its missing value costs
+ * what skipping a word of ten characters does, and
  * `def (a, b) abcdefghij = l` is the declaration with that word skipped
  * and also a declaration without a value before an assignment. Tied
  * recoveries are ranked by the order the parser reaches them in, which a
@@ -528,6 +529,41 @@ function caseValues($) {
     field('value', $._expression),
     repeat(seq(',', field('value', $._expression))),
   );
+}
+
+/**
+ * One name of a multi-assignment declaration: a plain or typed name, a
+ * rest binding or a keyed pair.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {ChoiceRule} The name rule.
+ */
+function multiAssignmentName($) {
+  return choice(
+    $.variable_declarator,
+    alias($._typed_multi_assignment_declarator, $.variable_declarator),
+    alias($._rest_multi_assignment_declarator, $.rest_declarator),
+    alias($._keyed_multi_assignment_declarator, $.variable_declarator),
+  );
+}
+
+/**
+ * The names of a multi-assignment declaration in their parentheses: the
+ * list (`_multi_assignment_list`), then names that no input without an
+ * error reaches, as the list takes every `,` after a name. They are what
+ * error recovery goes on with when it goes back into a list that the
+ * parser has reduced (`_multi_assignment_tail`).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral[]} The parentheses and what they hold, in order.
+ */
+function multiAssignmentNames($) {
+  return [
+    '(',
+    $._multi_assignment_list,
+    repeat(seq(',', multiAssignmentName($))),
+    ')',
+  ];
 }
 
 /**
@@ -2388,30 +2424,37 @@ module.exports = grammar({
     // (`_multi_assignment_tail`). Groovy accepts one rest binding per
     // list, in any place; that is checked after parsing, here not at all.
     //
-    // The list is left-recursive rather than a name and a `repeat`, which
-    // makes two rules, `(a)` and `(a, b…)`, and so two parse states after
-    // a list. Here every list ends in one state. Two recoveries from an
-    // error in the list (`def (a::, b) = l` is the name `a` before two
-    // skipped tokens, and the key `a` before two others) then meet at the
-    // `)`, where the parser keeps one. With two states they met after the
-    // value, at the first token of the next statement, and a reparse that
-    // reused that statement kept the other one from there on
-    // (`docs/divergences-from-spec.md` §29 has the counts). The left
-    // recursion takes 124 parse states fewer as well.
+    // The names are a rule, so that every list, of one name or of more,
+    // ends in one parse state. Two recoveries from an error in the list
+    // (`def (a::, b) = l` is the name `a` before two skipped tokens, and
+    // the key `a` before two others) then meet at the `)`, where the
+    // parser keeps one. Written out where they are used, a name and a
+    // `repeat` are two rules, `(a)` and `(a, b…)`, with a state each: the
+    // recoveries met after the value, at the first token of the next
+    // statement, and a reparse that reused that statement kept the other
+    // one from there on (`docs/divergences-from-spec.md` §29 has the
+    // counts).
+    //
+    // `prec.right` makes the rule take every `,` after a name, where the
+    // rules that use it take names after it as well
+    // (`multiAssignmentNames`). A left-recursive rule (`list , name`) has
+    // the one state too, and a `,` goes on with it without those names,
+    // but it nests a node for each name, where the runtime balances a
+    // `repeat`: `ts_node_child`, `ts_node_next_sibling` and
+    // `ts_tree_get_changed_ranges` took time quadratic in the names (2 s
+    // against 0.02 s for the siblings of 8,000 names). The price is a
+    // reparse that differs from a parse from scratch: the runtime reuses
+    // this rule's node as a whole, also with an `ERROR` in it, and reused
+    // no node of the left-recursive rule after an error (§29).
     //
     // The rule stands before the rules that use it. Tree-sitter sums up
     // the children of a rule in the order of the rules, and on its first
     // pass a hidden rule further down has none, which made the names of a
     // `multi_assignment_declaration` optional in `node-types.json`.
-    _multi_assignment_list: $ => {
-      const name = choice(
-        $.variable_declarator,
-        alias($._typed_multi_assignment_declarator, $.variable_declarator),
-        alias($._rest_multi_assignment_declarator, $.rest_declarator),
-        alias($._keyed_multi_assignment_declarator, $.variable_declarator),
-      );
-      return choice(name, seq($._multi_assignment_list, ',', name));
-    },
+    _multi_assignment_list: $ => prec.right(seq(
+      multiAssignmentName($),
+      repeat(seq(',', multiAssignmentName($))),
+    )),
 
     // §4 — `def (a, b) = expr`, Apache `variableDeclaration` with
     // `typeNamePairs`. Closes murtaza64 #22. The form without `def` is
@@ -2453,50 +2496,74 @@ module.exports = grammar({
 
     // The names in their parentheses, then the `=` and the value, which
     // stand in this rule, not after it in the two declarations. A rule of
-    // the names alone is complete at its `)`, and the parser reduces it
-    // before the `=`. Recovery from an error after the `=`
-    // (`def (a, b) =, b) = …`) could then no longer go back into the list,
-    // as it did at v0.6.0: it skipped tokens, and a run of such errors
-    // took time quadratic in its length (`docs/divergences-from-spec.md`
-    // §29). Here the list stays on the stack until the value ends, and a
-    // `,` after the `=` goes on with it. No tree without an `ERROR`
-    // changes.
+    // the names and their parentheses is complete at its `)`, and the
+    // parser reduces it before the `=`. Recovery from an error after the
+    // `=` (`def (a, b) =, b) = …`) could then no longer go back into the
+    // list, as it did at v0.6.0: it skipped tokens, and a run of such
+    // errors took time quadratic in its length
+    // (`docs/divergences-from-spec.md` §29). Here the parentheses stay on
+    // the stack until the value ends, and a `,` after the `=` goes on
+    // with the names after the list. No tree without an `ERROR` changes.
     //
-    // The second alternative is an error production for a declaration
-    // whose `=` does not come, as while it is typed (`def (a, b)` before
-    // the next statement). `_missing_value` never comes, so only recovery
-    // takes it. Its names are a rule of their own,
-    // `_multi_assignment_names`, which the parser reduces at the `)` only
-    // before `_missing_value`: in recovery, which tries every reduction.
-    // Recovery then has two ways on, besides going back into the list.
-    // Where the next token can start a statement, it completes the
-    // declaration with the missing value, and the statements after it stay
-    // statements. Where it cannot (`def (a, b) : l`), the runtime tries no
-    // missing token, and recovery wraps the names, as one node, in an
-    // `ERROR` and goes on after `def`, as it did while the names were a
-    // rule before the `=`. With the list on the stack alone it had
-    // neither way, and took the statements after the declaration into one
-    // `ERROR`. The production costs 6 parse states.
+    // The second alternative holds the error productions, for a
+    // declaration whose value does not come (`_multi_assignment_valueless`).
+    // A `,` may follow one. Recovery otherwise went back into the list at
+    // that `,` and took the next line as names (`def (a, b) =,` before
+    // `def c = 1` or `class D { }`), which left both lines an `ERROR`;
+    // on one line, where a name and a `)` follow, it still goes back
+    // into the list, as the run above needs.
     _multi_assignment_tail: $ => choice(
       seq(
-        '(',
-        $._multi_assignment_list,
-        ')',
+        ...multiAssignmentNames($),
         '=',
         field('value', enhancedStatementExpression($)),
       ),
-      seq(
+      seq($._multi_assignment_valueless, optional(',')),
+    ),
+
+    // Error productions: `_missing_value` never comes, so only recovery
+    // takes them, with a missing `identifier` as the value.
+    //
+    // The first is a declaration whose `=` does not come, as while it is
+    // typed (`def (a, b)` before the next statement). Its names are a rule
+    // of their own, `_multi_assignment_names`, which the parser reduces at
+    // the `)` only before `_missing_value`: in recovery, which tries every
+    // reduction. Recovery then has two ways on, besides going back into
+    // the list. Where the next token can start a statement, it completes
+    // the declaration with the missing value, and the statements after it
+    // stay statements. Where it cannot (`def (a, b) : l`), the runtime
+    // tries no missing token, and recovery wraps the names, as one node,
+    // in an `ERROR` and goes on after `def`, as it did while the names
+    // were a rule before the `=`. With the parentheses on the stack alone
+    // it had neither way, and took the statements after the declaration
+    // into one `ERROR`. Only this production has the weight
+    // (`MISSING_VALUE_WEIGHT`).
+    //
+    // The second is a declaration whose `=` comes and whose value does
+    // not, for the `,` that may follow in `_multi_assignment_tail`. Before
+    // a token that can end a statement the runtime inserts a missing
+    // `identifier` of its own, as the value of the first alternative
+    // there. It is a rule with the first, not a missing value in
+    // `_multi_assignment_tail` before the `,`: the runtime inserts a
+    // missing token only where the next token then reduces a rule.
+    _multi_assignment_valueless: $ => choice(
+      weighted(MISSING_VALUE_WEIGHT, seq(
         $._multi_assignment_names,
-        weighted(MISSING_VALUE_WEIGHT, field('value', alias($._missing_value, $.identifier))),
+        field('value', alias($._missing_value, $.identifier)),
+      )),
+      seq(
+        ...multiAssignmentNames($),
+        '=',
+        field('value', alias($._missing_value, $.identifier)),
       ),
     ),
 
-    _multi_assignment_names: $ => seq('(', $._multi_assignment_list, ')'),
+    _multi_assignment_names: $ => seq(...multiAssignmentNames($)),
 
-    // A token that matches no input, for the error production above. It is
-    // no second use of `$._unreachable`: that token's one alias, `switch`,
-    // is what a `case` label outside a switch prints as missing, and with
-    // two aliases it printed as a named node.
+    // A token that matches no input, for the error productions above. It
+    // is no second use of `$._unreachable`: that token's one alias,
+    // `switch`, is what a `case` label outside a switch prints as missing,
+    // and with two aliases it printed as a named node.
     _missing_value: _ => token(/[^\s\S]/),
 
     _typed_multi_assignment_declarator: $ => seq(

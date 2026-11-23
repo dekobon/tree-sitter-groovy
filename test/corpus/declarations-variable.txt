@@ -1077,6 +1077,84 @@ def f() {
           arguments: (argument_list))))))
 
 ==================
+A multi-assignment declaration before a comma in place of its value, or of its = and its value, misses the value and keeps the next line (error recovery)
+==================
+
+def (a, b) =,
+def c = 1
+def (d, e),
+class D { }
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+A comma after the value of a multi-assignment declaration is an error (error recovery)
+==================
+
+def (a, b) = l,
+foo()
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (ERROR)
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A comma, a name and a ) after the = of a multi-assignment declaration go on with its names (error recovery)
+==================
+
+def (c, d) =, e) = 1
+bar()
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    (ERROR)
+    (variable_declarator
+      name: (identifier))
+    value: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
 Multi-assignment without def (#94)
 ==================
 

@@ -51,8 +51,10 @@
 //!   reductions at 25, 50 and 100 repeats, at most 4 versions; v0.6.0 80,
 //!   155 and 305, at most 3). With the `=` and the value in the rule of the
 //!   names' parentheses the list stays on the stack, and the run takes
-//!   about 2 reductions a repeat in at most 3 versions (measured: 106 and
-//!   806 reductions at 50 and 400 repeats). A list of keyed pairs,
+//!   about 5 reductions a repeat in at most 4 versions (measured: 256 and
+//!   2,006 reductions at 50 and 400 repeats): 2 that go on with the list,
+//!   and 3 of a version that ends the declaration at each `=,` with a
+//!   missing value and is dropped at the `)`. A list of keyed pairs,
 //!   `def (k: a, j: b) =`, took no plain name, so `, b` did not continue it
 //!   and its run cost what it had (1,232 reductions at 50 repeats); one
 //!   list takes names and pairs alike now, wider than Groovy, and that run
@@ -176,13 +178,13 @@ const MULTI_ASSIGNMENT_RUN_FRAMES: [(&str, &str); 9] = [
     ("for (def (a, b) =", " 1; ;) { }\n"),
 ];
 
-/// Most reductions per repeat of the run: at most 2.2 measured (109 for 50
-/// repeats in a `for` init, 809 for 400), where the names as a rule of
+/// Most reductions per repeat of the run: at most 6.2 measured (309 for 50
+/// repeats in a type body, 2,409 for 400), where the names as a rule of
 /// their own made 1,232 at 50 repeats.
-const MAX_MULTI_ASSIGNMENT_RUN_REDUCTIONS_PER_REPEAT: usize = 4;
+const MAX_MULTI_ASSIGNMENT_RUN_REDUCTIONS_PER_REPEAT: usize = 10;
 
-/// Most stack versions at once for the run: 3 measured.
-const MAX_MULTI_ASSIGNMENT_RUN_VERSIONS: usize = 5;
+/// Most stack versions at once for the run: 4 measured.
+const MAX_MULTI_ASSIGNMENT_RUN_VERSIONS: usize = 6;
 
 /// The key of the version count in the parser's `process version` messages.
 const VERSION_COUNT_KEY: &str = "version_count:";
