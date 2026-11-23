@@ -1523,13 +1523,21 @@ module.exports = grammar({
     // reads past the word to tell `it in: 1` from `it in xs`, and the
     // keyword it may emit instead must end at the word, where an empty
     // key cannot (§6.16).
-    _command_named_argument: $ => seq(
-      choice(
-        seq($._command_named_key, field('key', reserved('property', $.identifier))),
-        field('key', alias($._contextual_key, $.identifier)),
+    //
+    // A string key (`attributes 'Main-Class': 'a.B'`, Apache's
+    // `namedArgPrimary`) needs no token: no other argument has a `:`
+    // after a string, so the precedence takes the `:` from the string as
+    // an expression.
+    _command_named_argument: $ => choice(
+      seq(
+        choice(
+          seq($._command_named_key, field('key', reserved('property', $.identifier))),
+          field('key', alias($._contextual_key, $.identifier)),
+        ),
+        ':',
+        field('value', $._expression),
       ),
-      ':',
-      field('value', $._expression),
+      prec.right(1, seq(field('key', $.string_literal), ':', field('value', $._expression))),
     ),
 
     // After a comma a newline cannot end the statement, so a key on a

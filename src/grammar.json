@@ -1266,57 +1266,91 @@
       ]
     },
     "_command_named_argument": {
-      "type": "SEQ",
+      "type": "CHOICE",
       "members": [
         {
-          "type": "CHOICE",
+          "type": "SEQ",
           "members": [
             {
-              "type": "SEQ",
+              "type": "CHOICE",
               "members": [
                 {
-                  "type": "SYMBOL",
-                  "name": "_command_named_key"
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "_command_named_key"
+                    },
+                    {
+                      "type": "FIELD",
+                      "name": "key",
+                      "content": {
+                        "type": "RESERVED",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "identifier"
+                        },
+                        "context_name": "property"
+                      }
+                    }
+                  ]
                 },
                 {
                   "type": "FIELD",
                   "name": "key",
                   "content": {
-                    "type": "RESERVED",
+                    "type": "ALIAS",
                     "content": {
                       "type": "SYMBOL",
-                      "name": "identifier"
+                      "name": "_contextual_key"
                     },
-                    "context_name": "property"
+                    "named": true,
+                    "value": "identifier"
                   }
                 }
               ]
             },
             {
+              "type": "STRING",
+              "value": ":"
+            },
+            {
               "type": "FIELD",
-              "name": "key",
+              "name": "value",
               "content": {
-                "type": "ALIAS",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_contextual_key"
-                },
-                "named": true,
-                "value": "identifier"
+                "type": "SYMBOL",
+                "name": "_expression"
               }
             }
           ]
         },
         {
-          "type": "STRING",
-          "value": ":"
-        },
-        {
-          "type": "FIELD",
-          "name": "value",
+          "type": "PREC_RIGHT",
+          "value": 1,
           "content": {
-            "type": "SYMBOL",
-            "name": "_expression"
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "FIELD",
+                "name": "key",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "string_literal"
+                }
+              },
+              {
+                "type": "STRING",
+                "value": ":"
+              },
+              {
+                "type": "FIELD",
+                "name": "value",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_expression"
+                }
+              }
+            ]
           }
         }
       ]

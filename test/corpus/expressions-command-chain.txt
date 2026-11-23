@@ -934,13 +934,99 @@ foo *a, 1
 ---
 
 ==================
-String key in a command chain is unsupported
-:error
+String keys in a command chain
 ==================
 
-foo 'a': 1
+attributes 'Main-Class': 'a.B', 'X-Y': 'z'
+foo "$k": 1, b: 2
+foo a: 1, 'b': 2
+foo 'a',
+    'b': 2
 
 ---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal))
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier)))
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (string_literal)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (string_literal)
+      value: (number_literal))))
+
+==================
+String key in a command chain that is a value
+==================
+
+def m = foo 'a': 1
+x = foo 'a': 1, 'b': c = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal))
+        argument: (named_argument
+          key: (string_literal)
+          value: (assignment_expression
+            left: (identifier)
+            right: (number_literal)))))))
+
+==================
+A string before a colon of a ternary stays an argument
+==================
+
+foo 'a', c ? 'x' : 'y'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (ternary_expression
+      condition: (identifier)
+      consequence: (string_literal)
+      alternative: (string_literal))))
 
 ==================
 Named arguments with non-ASCII keys
@@ -3869,13 +3955,21 @@ obj.m 1, *xs
       value: (identifier))))
 
 ==================
-String key in a command chain with a dotted receiver is unsupported
-:error
+String key in a command chain with a dotted receiver
 ==================
 
-obj.m 'a': 1
+manifest.attributes 'Main-Class': 'a.B'
 
 ---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal))))
 
 ==================
 Capitalized last name before a string with no parenthesis is a command chain
