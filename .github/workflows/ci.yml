@@ -81,7 +81,7 @@ jobs:
       - uses: tree-sitter/setup-action/cli@faab9a23fa6195da0f1cf868219cc1e89f238d3d # v2
         with:
           tree-sitter-ref: ${{ steps.ts-cli.outputs.ref }}
-      - uses: tree-sitter/parser-test-action@aba4a3de737f86f8ce83be38166a1ab521d4c960 # v2
+      - uses: tree-sitter/parser-test-action@92e35c06b51ea26c80ffbd3cc8d9286d9110df17 # v3
         with:
           generate: true
           test-parser: true
