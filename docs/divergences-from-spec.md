@@ -1371,8 +1371,8 @@ an upper-case letter or `c` is followed by `=`: `a.b.C x` and
 `a.b c = 1` are declarations.
 
 **Current implementation** (#52): the receiver of `command_chain` may be
-a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`)
-written without spaces, built of the same nodes as in an expression. A
+a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`,
+`?.@`, `??.@`, `*.@`) written without spaces, built of the same nodes as in an expression. A
 statement with such a receiver holds `_command_path_start`, an empty
 token between the first name and the first access that the scanner
 emits only when a literal, a key, a `new`, an array type value or a

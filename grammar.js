@@ -707,6 +707,9 @@ const COMMAND_PATH_ACCESSES = [
   ['spread_dot_expression', '*.', 'property'],
   ['method_pointer_expression', '.&', 'method'],
   ['direct_field_access_expression', '.@', 'field'],
+  ['safe_direct_field_access_expression', '?.@', 'field'],
+  ['safe_chain_direct_field_access_expression', '??.@', 'field'],
+  ['spread_direct_field_access_expression', '*.@', 'field'],
 ];
 
 /**
@@ -2948,6 +2951,9 @@ module.exports = grammar({
       $.spread_dot_expression,
       $.method_pointer_expression,
       $.direct_field_access_expression,
+      $.safe_direct_field_access_expression,
+      $.safe_chain_direct_field_access_expression,
+      $.spread_direct_field_access_expression,
       $.method_reference_expression,
       $.object_creation_expression,
       $.array_creation_expression,
@@ -3452,6 +3458,26 @@ module.exports = grammar({
     direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
       field('object', $._expression),
       '.@',
+      field('field', $._property_name),
+    )),
+
+    // Apache `pathElement` takes the `@` of a direct field access after
+    // `?.`, `??.` and `*.` as well as after `.`.
+    safe_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '?.@',
+      field('field', $._property_name),
+    )),
+
+    safe_chain_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '??.@',
+      field('field', $._property_name),
+    )),
+
+    spread_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '*.@',
       field('field', $._property_name),
     )),
 

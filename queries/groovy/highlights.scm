@@ -99,6 +99,9 @@
   "*."
   ".&"
   ".@"
+  "?.@"
+  "??.@"
+  "*.@"
   "::"
   "*:"
   "->"
@@ -210,6 +213,9 @@
 (safe_chain_dot_expression      property: [(identifier) (quoted_identifier)] @property)
 (spread_dot_expression          property: [(identifier) (quoted_identifier)] @property)
 (direct_field_access_expression  field: [(identifier) (quoted_identifier)] @property)
+(safe_direct_field_access_expression        field: [(identifier) (quoted_identifier)] @property)
+(safe_chain_direct_field_access_expression  field: [(identifier) (quoted_identifier)] @property)
+(spread_direct_field_access_expression      field: [(identifier) (quoted_identifier)] @property)
 (method_pointer_expression      method: [(identifier) (quoted_identifier)] @function)
 ; `Foo::new` — the `new` literal is captured as @keyword.operator at
 ; layer 4 instead of @function here.

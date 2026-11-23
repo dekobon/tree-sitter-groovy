@@ -647,6 +647,33 @@
           },
           "named": true,
           "value": "direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_command_path_safe_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "safe_direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_command_path_safe_chain_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "safe_chain_direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_command_path_spread_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "spread_direct_field_access_expression"
         }
       ]
     },
@@ -902,6 +929,132 @@
         }
       ]
     },
+    "_command_path_safe_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "?.@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_command_path_safe_chain_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "??.@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_command_path_spread_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "identifier"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "*.@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
     "_statement_command_path": {
       "type": "CHOICE",
       "members": [
@@ -958,6 +1111,33 @@
           },
           "named": true,
           "value": "direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_statement_command_path_safe_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "safe_direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_statement_command_path_safe_chain_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "safe_chain_direct_field_access_expression"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_statement_command_path_spread_direct_field_access_expression"
+          },
+          "named": true,
+          "value": "spread_direct_field_access_expression"
         }
       ]
     },
@@ -1198,6 +1378,132 @@
         {
           "type": "STRING",
           "value": ".@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_statement_command_path_safe_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "?.@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_statement_command_path_safe_chain_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "??.@"
+        },
+        {
+          "type": "FIELD",
+          "name": "field",
+          "content": {
+            "type": "RESERVED",
+            "content": {
+              "type": "SYMBOL",
+              "name": "identifier"
+            },
+            "context_name": "property"
+          }
+        }
+      ]
+    },
+    "_statement_command_path_spread_direct_field_access_expression": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_object"
+              }
+            },
+            {
+              "type": "FIELD",
+              "name": "object",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_statement_command_path"
+              }
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": "*.@"
         },
         {
           "type": "FIELD",
@@ -7815,6 +8121,18 @@
         },
         {
           "type": "SYMBOL",
+          "name": "safe_direct_field_access_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "safe_chain_direct_field_access_expression"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "spread_direct_field_access_expression"
+        },
+        {
+          "type": "SYMBOL",
           "name": "method_reference_expression"
         },
         {
@@ -9811,6 +10129,93 @@
           {
             "type": "STRING",
             "value": ".@"
+          },
+          {
+            "type": "FIELD",
+            "name": "field",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_property_name"
+            }
+          }
+        ]
+      }
+    },
+    "safe_direct_field_access_expression": {
+      "type": "PREC_LEFT",
+      "value": 20,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "object",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "?.@"
+          },
+          {
+            "type": "FIELD",
+            "name": "field",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_property_name"
+            }
+          }
+        ]
+      }
+    },
+    "safe_chain_direct_field_access_expression": {
+      "type": "PREC_LEFT",
+      "value": 20,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "object",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "??.@"
+          },
+          {
+            "type": "FIELD",
+            "name": "field",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_property_name"
+            }
+          }
+        ]
+      }
+    },
+    "spread_direct_field_access_expression": {
+      "type": "PREC_LEFT",
+      "value": 20,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "object",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_expression"
+            }
+          },
+          {
+            "type": "STRING",
+            "value": "*.@"
           },
           {
             "type": "FIELD",

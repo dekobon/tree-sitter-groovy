@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   annotated loop. At v0.6.0 `@A while (x) { }` was a method with the
   return type `while` and a missing name, and `@A for (x in xs) { }` an
   `ERROR`. (#106)
+- `?.@`, `??.@` and `*.@`, a direct field access after a safe
+  navigation, a safe chain dot or a spread dot, as Apache's
+  `pathElement` takes `@` after `SAFE_DOT`, `SAFE_CHAIN_DOT` and
+  `SPREAD_DOT`: a node kind each, `safe_direct_field_access_expression`,
+  `safe_chain_direct_field_access_expression` and
+  `spread_direct_field_access_expression`, with the `object` and
+  `field` of `direct_field_access_expression`, so that `people*.@name`
+  (each element's field) and `people*.name` (each getter) stay apart.
+  Each was an `ERROR` under the access without `@`, as at v0.6.0. They
+  join a parenthesis-free call's receiver (`obj?.@handler 1`), which the
+  scanner reads for the statement's start and after a closure call
+  (`SPECIFICATION.md` §6.14, §6.24). `highlights.scm` captures the
+  operators as `@operator` and the field as `@property`. No corpus tree
+  changes; 12 of 21,667 real files parse without an `ERROR`, and every
+  tree that changes had an `ERROR` before (`SPECIFICATION.md` §3.2)
+  (#112).
 - An interpolation takes the lazy form `"${-> x}"`, a closure without
   parameters, as Apache's `gstringValue` takes a `closure`: the `->` is a
   `closure_parameters` leaf before the `value`

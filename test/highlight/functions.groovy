@@ -110,6 +110,18 @@ obj.@field(x)
 obj.@field 'x'
 //   ^ property
 
+obj?.@field
+//    ^ property
+
+obj??.@field
+//     ^ property
+
+list*.@field
+//     ^ property
+
+list*.@field
+//  ^ operator
+
 String::length
 //      ^ function
 
