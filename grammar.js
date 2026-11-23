@@ -1287,6 +1287,9 @@ module.exports = grammar({
     // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
+    // `{ @A x = 1, y -> }` against `{ @A x = 1, y }`, the annotated
+    // declaration with no type; the `->` decides.
+    [$._valued_declarator, $.closure_parameter],
     // `{ final String a, b -> }` vs. `{ final String a, b }`, the same fork
     // after a blank final's name.
     [$.local_variable_declaration, $.closure_parameter],
@@ -2078,6 +2081,14 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
+      // Annotations alone, Spock's `@Subject svc = new Svc()`: Apache's
+      // `modifiers` takes an annotation as a modifier. As for a local, the
+      // first name needs a value (`_placeholder_declarator`).
+      seq(
+        repeat1($.annotation),
+        alias($._valued_declarator, $.variable_declarator),
+        repeat(seq(',', $.variable_declarator)),
+      ),
     ),
 
     // §4 — `def name(params) body`, or a return type in place of
@@ -2519,6 +2530,15 @@ module.exports = grammar({
         repeat1($.annotation),
         alias($._placeholder_declarator, $.variable_declarator),
       )),
+      // Annotations with no `def`, modifier or type (`@Field FOO = [:]` in
+      // a script), as Apache's `variableModifiers variableDeclarators`
+      // takes them. The first name needs a value, for the reason
+      // `_placeholder_declarator` gives.
+      seq(
+        repeat1($.annotation),
+        alias($._valued_declarator, $.variable_declarator),
+        repeat(seq(',', $.variable_declarator)),
+      ),
       // `def String s = 'a'`: `def` is a modifier before the type, as in
       // Apache's `variableDeclaration`, and the scanner decides the type
       // after it as at a statement's start, so `def String` then `s = 1`
@@ -2559,6 +2579,12 @@ module.exports = grammar({
     variable_declarator: $ => seq(
       field('name', $.identifier),
       optional(seq('=', field('value', enhancedStatementExpression($)))),
+    ),
+
+    _valued_declarator: $ => seq(
+      field('name', $.identifier),
+      '=',
+      field('value', enhancedStatementExpression($)),
     ),
 
     // The names of a multi-assignment declaration, Apache `typeNamePairs`.

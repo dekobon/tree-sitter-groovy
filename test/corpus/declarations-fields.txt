@@ -166,6 +166,56 @@ class C {
           value: (string_literal (string_fragment)))))))
 
 ==================
+Field with annotations and no type, def or modifier
+==================
+
+class S extends Specification {
+    @Subject svc = new Svc()
+    @Shared @AutoCleanup db = open(), other
+    @Inject
+    repo = null
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (superclass
+      (type_identifier))
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (object_creation_expression
+            type: (type_identifier)
+            arguments: (argument_list))))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (null_literal))))))
+
+==================
 Typed field before a constructor retains its type
 ==================
 
