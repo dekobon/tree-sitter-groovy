@@ -146,7 +146,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `foo()`); with a token that starts no statement in place of the `=`
   (`def (a, b) : l`) its names are an `ERROR` and the statements after
   the line stay statements too. At v0.6.0 the declaration and those
-  statements were one `ERROR`. A rest binding's name is a local
+  statements were one `ERROR`. So was `def (a, b) =,` with the line
+  after it, which is the declaration with a missing value, its `,` and
+  that line. A rest binding's name is a local
   definition and `@variable`, as the other names are; a key is
   `@property`. Each was an `ERROR`.
   Annotations alone (`@A (a, b) = l`) and modifiers other than `final`
@@ -750,9 +752,9 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `compact_constructor_declaration`, `dimensions`, `dimensions_expr`,
   `lambda_expression`, `multi_assignment_expression`,
   `rest_declarator`) and one field, `dimensions`; none is removed.
-  `SYMBOL_COUNT` goes from 321 to 424, `FIELD_COUNT` from 45 to 46,
-  `STATE_COUNT` from 4,025 to 4,847 and `LARGE_STATE_COUNT` from 1,758
-  to 1,853, so most symbol ids and the field ids after `dimensions`
+  `SYMBOL_COUNT` goes from 321 to 426, `FIELD_COUNT` from 45 to 46,
+  `STATE_COUNT` from 4,025 to 4,883 and `LARGE_STATE_COUNT` from 1,758
+  to 1,865, so most symbol ids and the field ids after `dimensions`
   change. In `node-types.json`: every expression position adds
   `array_creation_expression`, `array_type`, `lambda_expression` and
   `multi_assignment_expression`; `command_chain` is added to the
@@ -793,14 +795,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   4,717 of the Java files, 8,683 at v0.6.0. The lexer asks for 1.914
   bytes per byte of the real files, 1.601 at v0.6.0, as the scanner's
   look-aheads read ahead of the in-grammar lexer. The compiled parser
-  is 41% larger (2.04 MB, 1.45 MB at v0.6.0), and `src/parser.c`
-  9.94 MB (7.88 MB).
+  is 42% larger (2.06 MB, 1.45 MB at v0.6.0), and `src/parser.c`
+  10.00 MB (7.88 MB).
 - A few edit sequences still reparse incrementally to a tree that
   differs from a parse from scratch. `SPECIFICATION.md` §6.17 to §6.22,
   `docs/divergences-from-spec.md` §20 for an edit of a `default`
   modifier after a field with modifiers only and §29 for an edit after
   the statement that follows a multi-assignment declaration whose two
-  recoveries cost the same, and `SPECIFICATION.md`
+  recoveries cost the same and for an error typed before a list of
+  names that holds one, and `SPECIFICATION.md`
   §6.14 for `def` typed and deleted before a dotted call of an
   interpolated string (`obj.Bar $/$a/$() { }`), give an example of each
   kind known but one, a closure whose two readings weigh the same

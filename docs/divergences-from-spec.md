@@ -2381,22 +2381,26 @@ the forms of the declaration (6f0ae10) had made its names a rule of
 their own. The parser reduced that rule before the `=`, so at the `,`
 recovery could no longer go back into the list, as it did at v0.6.0.
 The parentheses, the `=` and the value stand in one rule now, which
-keeps the list on the stack until the value ends: the run takes 0.22,
-0.44 and 0.83 ms, with 2 reductions a repeat (206 at 100) in at most 3
-versions. So it does after `final` or `var`, with typed names or a rest
+keeps the list on the stack until the value ends: the run takes 0.21,
+0.43 and 0.82 ms, with 5 reductions a repeat (506 at 100) in at most 4
+versions, 2 of them the list's and 3 those of a version that ends the
+declaration at each `=,` (below) and is dropped at the `)`. So it does
+after `final` or `var`, with typed names or a rest
 binding, in a type body, as a `for` init, and after an annotation
 (`@A def (a, b) =`), where v0.6.0 took 217, 995 and 4,378 ms (4,864
-reductions at 100). No tree of the corpus or of the 118 real files at
-hand changes, and the real files take the same instructions.
+reductions at 100). No tree without an `ERROR` changes, of the corpus
+or of the 118 real files at hand, and the real files take the same
+instructions.
 
 That left the run after a list of keyed pairs (764de3b), which took no
 plain name, so `, b` did not continue it: `def (k: a, j: b) =`, then
 `, b) =` repeated, took 229, 1,035 and 4,276 ms (0.20, 0.39 and 0.76 ms
 at v0.6.0, where each pair was a name whose key was an `ERROR`). One
-list takes names and pairs alike now, and the run takes 0.20, 0.40 and
-0.84 ms. Groovy's `typeNamePairs` holds names or pairs, not both, so
+list takes names and pairs alike now, and the run takes 0.21, 0.41 and
+0.81 ms. Groovy's `typeNamePairs` holds names or pairs, not both, so
 `def (name: n, b) = m` and `def (name: n, *rest) = m`, which Groovy
-rejects, parse with no `ERROR`; no other tree of the corpus changes.
+rejects, parse with no `ERROR`; no other tree of the corpus that had
+none changes.
 An error production for a plain name among pairs, which would keep the
 `ERROR`, was tried: recovery by a missing token costs what skipping
 does, and the run stayed quadratic.
@@ -2417,24 +2421,89 @@ method is the declaration and the method). Where it cannot
 tries no missing token while another stack version can go on, and
 recovery wraps the names in an `ERROR` and reads on after `def`, as it
 did while they were a rule before the `=`: `def (a, b) : l` then
-`foo()` is a declaration of `l` with that `ERROR`, and the call. Of
-1,248 texts, 26 unfinished or wrong declarations before 8 continuations
-in 6 places, 224 have a smaller `ERROR` than with the names before the
-`=` and 42 a larger one, 18 of them `def (a, b) =,` before a line that
-the list then goes on with.
+`foo()` is a declaration of `l` with that `ERROR`, and the call.
 
-The list of names is left-recursive, not a name and a repeat. A repeat
-makes two rules, `(a)` and `(a, b…)`, and two parse states after a
-list. Two recoveries of one cost from an error in the list
-(`def (a::, b) = l` is the name `a` before two skipped tokens, and the
-key `a` before two others) then met only after the value, at the first
-token of the next statement, and a reparse that reused that statement
-kept the other recovery, at every later edit. With one state they meet
-at the `)`, where the parser keeps one. Over the single edits of 244
-texts with a wrong multi-assignment between two statements (each
-offset, 0 to 3 bytes removed, one of 10 insertions), 1,441 reparses
-differed from a parse from scratch with the repeat; 7 do now, and 5 did
-with the names before the `=`.
+One more recovery was lost with the list on the stack. Recovery from
+`def (a, b) =,` went back into the list at the `,`, as the run above
+needs, and took the next line as names (`def c = 1`, or `class D { }`,
+where a keyword before a name is its type), which left both lines an
+`ERROR`. The error productions take a `,` after them, and a second one
+is a declaration whose `=` comes and whose value does not:
+`def (a, b) =,` then `def c = 1` is the declaration with a missing
+value and the declaration of `c`, and so is `def (a, b),` before it.
+On one line the list still goes on (`def (a, b) =, c) = 1` declares
+three names), as that version is dropped at the `)` after the next
+name. A `,` after a value stays an `ERROR`.
+
+The cost was measured on 1,248 texts, 26 unfinished or wrong
+declarations before 8 continuations in 6 places, by the bytes under
+`ERROR` nodes. Against the names as a rule before the `=`, 270 texts
+have fewer and 74 more (245 and 27 by more than two bytes); against
+v0.6.0, 565 and 126 (403 and 107). The 27 are:
+
+- 12 lists that are not closed before a line with an `=` (`def (a,`
+  then `def c = 1`). With the names as a rule the runtime inserted a
+  missing `)` there, and the two lines were one declaration of `a` and
+  `c`; they are one `ERROR` and the statement `1`. The runtime inserts
+  a missing token only where the next token then reduces a rule, and
+  after a `)` in the rule of the value the `=` is shifted. A rule for
+  the `)` gave the missing `)` back and was not kept: it made `for`
+  headers with such a list one `ERROR` with the statement after them
+  (`for(def(a,b b=`, then `x)o();;){}`, then `bar()`; 22 of 25,500
+  texts of another probe got a larger `ERROR`), and a reparse reused a
+  declaration with a missing `)` where a parse from scratch found a
+  cheaper recovery.
+- 14 `for` headers with a line break after an unfinished declaration
+  (`for (def (a, b)`, then `foo(); ;) { }`), and a `,` after the value
+  in a type body before lines that are no members. In each a later `)`
+  or `,` goes on with the list at less cost than the recovery that
+  keeps the statement, and the runtime drops the dearer one before the
+  cheaper one fails. A rule of the names before the `=` has no list to
+  go back into; that is the quadratic run above.
+
+The names are a rule of their own inside the parentheses, so that a
+list of one name and a list of more end in one parse state. Written
+out where they are used, a name and a repeat make two rules, `(a)` and
+`(a, b…)`, with a state each. Two recoveries of one cost from an error
+in the list (`def (a::, b) = l` is the name `a` before two skipped
+tokens, and the key `a` before two others) then met only after the
+value, at the first token of the next statement, and a reparse that
+reused that statement kept the other recovery, at every later edit.
+With one state they meet at the `)`, where the parser keeps one. Over
+the single edits of 244 texts with a wrong multi-assignment between
+two statements (each offset, 0 to 3 bytes removed, one of 10
+insertions), 1,441 reparses differed from a parse from scratch with the
+names written out; 7 do now, and 5 did with the names before the `=`.
+Over those of 3,168 texts (11 lists with 4 ends, 8 tokens in place of
+the `=`, 3 values and 3 next lines), 2 do, as before.
+
+Once the rule is reduced, a `,` cannot go on with it, so the rules that
+use it take names after it, which no text without an error reaches: the
+rule takes every `,` after a name (`prec.right`). They are what the run
+above goes on with. For a few commits the rule was left-recursive
+instead (`list , name`), which takes a `,` after it by itself. It
+nested a node for each name, where the runtime balances the nodes of a
+repeat, and `ts_node_child`, `ts_node_next_sibling` and
+`ts_tree_get_changed_ranges` took time quadratic in the names: 2 s to
+walk the siblings of 8,000 names and 35 s for the changed ranges of
+100,000 after an edit, against 0.02 s each.
+`bindings/rust/tests/multi_assignment_comma_cost.rs` reads the shape of
+the rule from the parser's log.
+
+The rule costs a reparse difference of its own. Its node is one that a
+reparse reuses as a whole, also when it holds an `ERROR` and the parser
+recovers from another error typed before it, where a parse from scratch
+may find a cheaper recovery. In `def(a,l(a,b)` the `(` after `l` is an
+`ERROR` in a typed name, `l a`; with `,` typed after `def` the reparse
+keeps the list with that name, and a parse from scratch has one `ERROR`
+over the comma and the names up to `l`. With the left-recursive list
+the runtime reused none of the list's nodes after an error in it (its
+log names them fragile), so the reparse recovered as a parse from
+scratch does. Over the single edits of 232 texts with an error inside
+the list, 238 reparses differ, 18 with the left-recursive list and none
+at v0.6.0; each of the 220 more types `,`, `:`, `=` or `)` between the
+keyword and the `(`. `bindings/rust/tests/incremental_reparse.rs` pins
+the first.
 
 One tie is left, between the error production and skipping. A word of
 ten characters before the `=` (`def (a, b) abcdefghij = l`) costs as
@@ -2442,7 +2511,7 @@ much to skip as the missing value does. The production weighs half a
 step less (`MISSING_VALUE_WEIGHT` in `grammar.js`), so the word is
 skipped, from scratch and on reparse: of the 1,998 single edits of
 `x = foo new Foo()`, `def (a, b) abcdefghij = f new Pair()` and
-`def s = 1`, 772 reparsed otherwise without the weight and 1 does with
+`def s = 1`, 773 reparsed otherwise without the weight and 1 does with
 it. Both recoveries are alive until the statement after the line, and
 while two stack versions are alive the runtime does not break down a
 node that it reused when the token after it has changed. So where the
@@ -2451,10 +2520,10 @@ can reparse otherwise: ` instanceof ` typed after `def s = 1` goes on
 with the value from scratch and is a statement of its own on reparse.
 `bindings/rust/tests/incremental_reparse.rs` pins it.
 
-The rules take 12 parse states fewer than the names as a rule of their
-own did (STATE_COUNT 4,859 to 4,847, LARGE_STATE_COUNT 1,860 to 1,853,
-`parser.c` 9.97 to 9.94 MB); the error production has 6 of them, and a
-repeat in place of the left recursion takes 124 more.
+The rules take 24 parse states more than the names as a rule before
+the `=` did (STATE_COUNT 4,859 to 4,883, LARGE_STATE_COUNT 1,860 to
+1,865, `parser.c` 9.97 to 10.00 MB), 18 of them the error
+productions'.
 
 Where no such list takes it, that run is quadratic at v0.6.0 as well:
 `, q) =` repeated with nothing before it takes 222, 1,043 and
