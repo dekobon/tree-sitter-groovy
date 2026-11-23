@@ -163,21 +163,13 @@ record Point (int x) { }
     body: (class_body)))
 
 ==================
-Command-style call named record with a call argument reads as a record header
+Command-style call named record with a call argument reads as a record header (Groovy reads a call)
 :error
 ==================
 
 record Point(1, 2)
 
 ---
-
-(source_file
-  (record_declaration
-    name: (identifier)
-    components: (record_components
-      (ERROR
-        (number_literal)
-        (number_literal)))))
 
 ==================
 Field named record then a comment then a nested record
@@ -472,17 +464,6 @@ class C {
 
 ---
 
-(source_file
-  (class_declaration
-    name: (identifier)
-    body: (class_body
-      (record_declaration
-        name: (identifier)
-        components: (record_components)
-        body: (class_body
-          (ERROR
-            (number_literal)))))))
-
 ==================
 Record headers with comments and a line break before the components
 ==================
@@ -764,7 +745,7 @@ trait T {
         body: (class_body)))))
 
 ==================
-Nested record recovers after a rejected field named sealed
+Nested record after a field named sealed (#73)
 ==================
 
 class C {
@@ -780,9 +761,9 @@ class C {
     name: (identifier)
     body: (class_body
       (field_declaration
+        type: (type_identifier)
         (variable_declarator
           name: (identifier)))
-      (ERROR)
       (record_declaration
         name: (identifier)
         components: (record_components
@@ -794,3 +775,1278 @@ class C {
         type: (type_identifier)
         (variable_declarator
           name: (identifier))))))
+
+==================
+Compact constructor with a modifier
+==================
+
+record Warning(String message) {
+    public Warning {
+        Objects.requireNonNull(message)
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (field_access
+                object: (identifier)
+                field: (identifier))
+              arguments: (argument_list
+                (identifier)))))))))
+
+==================
+Compact constructor without a modifier
+==================
+
+record Warning(String message) {
+    Warning {
+        Objects.requireNonNull(message)
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (field_access
+                object: (identifier)
+                field: (identifier))
+              arguments: (argument_list
+                (identifier)))))))))
+
+==================
+Compact constructor with its body on the next line
+==================
+
+record Warning(String message) {
+    public Warning
+    {
+        assert message
+    }
+}
+record Note(String text) {
+    Note
+    {
+        assert text
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (assert_statement
+            (identifier))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (assert_statement
+            (identifier)))))))
+
+==================
+Modifier-only field then a block on the next line in a record is a compact constructor
+==================
+
+record Counter(int n) {
+    static count
+    {
+        count++
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (update_expression
+              operand: (identifier))))))))
+
+==================
+Compact constructors with annotations and several modifiers
+==================
+
+record Warning(String message) {
+    @Deprecated Warning { }
+}
+record Note(String text) {
+    @Deprecated
+    @SuppressWarnings('unchecked') public final Note { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (block))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (string_literal)))
+        name: (identifier)
+        body: (block)))))
+
+==================
+Compact constructor among fields and methods
+==================
+
+record Warning(String message, int level) {
+    String describe() { message }
+    static final int MAX = 5
+    private static String prefix = 'W'
+    Warning {
+        assert level <= MAX
+    }
+    static Warning of(String m) { new Warning(m, 0) }
+    private final int v
+    public Warning {
+    }
+    abstract void f()
+    Warning { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier))
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (assert_statement
+            (binary_expression
+              left: (identifier)
+              right: (identifier)))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list
+                (identifier)
+                (number_literal))))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))
+
+==================
+Canonical constructor in a record stays a constructor
+==================
+
+record Warning(String message) {
+    Warning(String message) {
+        this.message = message
+    }
+    public Warning(int code) {
+        this(code.toString())
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (field_access
+                object: (identifier)
+                field: (identifier))
+              right: (identifier)))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (method_invocation
+                  function: (field_access
+                    object: (identifier)
+                    field: (identifier))
+                  arguments: (argument_list))))))))))
+
+==================
+Compact constructors in nested records but not in types nested in a record
+==================
+
+class Outer {
+    record Inner(int x) {
+        Inner {
+            assert x > 0
+        }
+        class Deep {
+            public Deep { }
+        }
+    }
+    public Outer { }
+}
+record Top(int y) {
+    record Nested(int z) {
+        public Nested { }
+    }
+    enum Kind { A; public Kind { } }
+    interface Shape { public Shape { } }
+    def make() {
+        new Runnable() {
+            public Runnable { }
+            void run() { }
+        }
+    }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (compact_constructor_declaration
+            name: (identifier)
+            body: (block
+              (assert_statement
+                (binary_expression
+                  left: (identifier)
+                  right: (number_literal)))))
+          (class_declaration
+            name: (identifier)
+            body: (class_body
+              (field_declaration
+                (variable_declarator
+                  name: (identifier)))
+              (block)))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block)))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (compact_constructor_declaration
+            name: (identifier)
+            body: (block))))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))
+          (field_declaration
+            (variable_declarator
+              name: (identifier)))
+          (block)))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body
+          (field_declaration
+            (variable_declarator
+              name: (identifier)))
+          (block)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (object_creation_expression
+              type: (type_identifier)
+              arguments: (argument_list)
+              body: (class_body
+                (field_declaration
+                  (variable_declarator
+                    name: (identifier)))
+                (block)
+                (method_declaration
+                  return_type: (type_identifier)
+                  name: (identifier)
+                  parameters: (formal_parameters)
+                  body: (block))))))))))
+
+==================
+Field named record before a compact constructor and a nested record
+==================
+
+record Holder(Record record) {
+    static record = null
+    Holder {
+        assert record != null
+    }
+    record Inner(int x) { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (null_literal)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (assert_statement
+            (binary_expression
+              left: (identifier)
+              right: (null_literal)))))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body)))))
+
+==================
+Initializer blocks in a record that no name precedes
+==================
+
+record Warning(String message) {
+    static {
+        init()
+    }
+    {
+        init()
+    }
+    public Warning; {
+        init()
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (static_initializer
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+A type and a name then a block in a record split only after a modifier
+==================
+
+record Warning(String message) {
+    static Foo bar {
+        init()
+    }
+    String name {
+        init()
+    }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+Modifier-only field then a bare compact constructor on the next line
+==================
+
+record Counter(int n) {
+    static count
+    Counter {
+        count++
+    }
+}
+record Note(String text) {
+    @Deprecated private static count
+    Note { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (update_expression
+              operand: (identifier)))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))
+
+==================
+Compact constructor after def
+==================
+
+record Warning(String message) {
+    def Warning {
+        init()
+    }
+}
+record Note(String text) {
+    public def Note { }
+    @Deprecated def Note
+    {
+    }
+    def name
+    def other = 1
+    def m() { }
+    static def s() { 1 }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block))
+      (compact_constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (number_literal)))))))
+
+==================
+Typed field with modifiers then a bare compact constructor on the next line
+==================
+
+record R(int x) {
+    private static String NAME
+    R { }
+    private static List<String> names
+    R { }
+    private static String[] codes
+    R { }
+    private static java.util.Map map
+    R { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block))
+      (field_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block))
+      (field_declaration
+        type: (array_type
+          (type_identifier))
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block))
+      (field_declaration
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))
+
+==================
+Semicolon after a modifier-only field before a bare compact constructor
+==================
+
+record R(int x) {
+    static count;
+    R { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))
+
+==================
+Nested types after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    class C { }
+}
+record B(int x) {
+    private static final String NAME
+    enum E { A }
+}
+record D(int x) {
+    private static int count
+    interface I { }
+}
+record F(int x) {
+    private final String y
+    trait V { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Nested types with a superclass or interfaces after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    class C extends B { }
+    private final String z
+    class D implements I { }
+    private final String w
+    class E<T> extends B implements I { }
+}
+record G(int x) {
+    private static int count
+    interface I extends J permits K { }
+    private static int total
+    enum E implements I { A }
+    private static int rest
+    trait V extends W implements X { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (super_interfaces
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        type_parameters: (type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        (superclass
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (interface_declaration
+        name: (identifier)
+        (extends_interfaces
+          (type_identifier))
+        (permits_clause
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        (super_interfaces
+          (type_identifier))
+        body: (enum_body
+          (enum_constant
+            name: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (trait_declaration
+        name: (identifier)
+        (extends_interfaces
+          (type_identifier))
+        (super_interfaces
+          (type_identifier))
+        body: (class_body)))))
+
+==================
+Nested types with modifiers or annotations after a typed field with modifiers in a record
+==================
+
+record A(int x) {
+    private final String y
+    sealed class S permits T { }
+    private final String z
+    static class C { }
+    private final String w
+    @Deprecated abstract class D { }
+    private final String v
+    record N(int z) { }
+    private final String u
+    @interface Tag { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (permits_clause
+          (type_identifier))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Nested type after a typed field in a record nested in a class
+==================
+
+class K {
+    record R(int a) {
+        private String y
+        class C extends B { }
+    }
+    private String z
+    class D extends B { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (record_declaration
+        name: (identifier)
+        components: (record_components
+          (record_component
+            type: (type_identifier)
+            name: (identifier)))
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (class_declaration
+            name: (identifier)
+            (superclass
+              (type_identifier))
+            body: (class_body))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        (superclass
+          (type_identifier))
+        body: (class_body)))))
+
+==================
+Modifier, name and block in other type bodies stay a field and an initializer
+==================
+
+class C {
+    public C {
+        init()
+    }
+    static count
+    {
+        init()
+    }
+}
+interface I {
+    public I {
+        init()
+    }
+}
+trait T {
+    public T {
+        init()
+    }
+}
+enum E {
+    A;
+    public E {
+        init()
+    }
+}
+@interface N {
+    public N { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (block))))
+
+==================
+Name and block in a class body is not a compact constructor
+:error
+==================
+
+class C {
+    C {
+        init()
+    }
+}
+
+---
+
+==================
+Name and block in an interface body is not a compact constructor
+:error
+==================
+
+interface I {
+    I {
+        init()
+    }
+}
+
+---
+
+==================
+Name and block in a trait body is not a compact constructor
+:error
+==================
+
+trait T {
+    T {
+        init()
+    }
+}
+
+---
+
+==================
+Name and block in an enum body is not a compact constructor
+:error
+==================
+
+enum E {
+    A;
+    E {
+        init()
+    }
+}
+
+---
+
+==================
+Name and block in an annotation type body is not a compact constructor
+:error
+==================
+
+@interface N {
+    N { }
+}
+
+---
+
+==================
+Name and block in an anonymous class body is not a compact constructor
+:error
+==================
+
+def r = new Runnable() {
+    Runnable { }
+}
+
+---
+
+==================
+Field named trait at the end of a line before a compact constructor (#73)
+==================
+
+record R(int x) {
+    private static String trait
+    R { }
+}
+
+---
+
+(source_file
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (compact_constructor_declaration
+        name: (identifier)
+        body: (block)))))

@@ -1,0 +1,37 @@
+==================
+A line escape before CRLF continues a string
+==================
+
+x = 'a\
+b'
+y = "a\
+${b}c"
+z = /a\
+b/
+foo 'a\
+b', 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          value: (identifier))
+        (string_fragment))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment))))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (number_literal)))

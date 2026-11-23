@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: "24"
       - run: npm ci
       - run: npm run lint
 
@@ -88,6 +88,25 @@ jobs:
           test-rust: true
           rust-version: "1.90"
           # test-node: true
+
+  node:
+    name: Node binding (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor of package.json `engines.node` (>=22) and the
+        # version release.yml builds the npm prebuilds with.
+        node-version: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+      # The `install` script compiles the addon with node-gyp, as a
+      # checkout has no prebuilds, so this builds the binding too.
+      - run: npm ci
+      - run: npm test
 
   rust-lint:
     name: Rust lint (clippy)

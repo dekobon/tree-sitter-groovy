@@ -141,3 +141,227 @@ def r = !inside
       name: (identifier)
       value: (unary_expression
         operand: (identifier)))))
+
+==================
+in as a name, a key and the operator
+==================
+
+foo()
+in.read()
+x = 1
+in.close()
+foo in: 1
+foo in : 2
+it in xs
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier))))
+
+==================
+in and !in after parentheses test the parentheses
+==================
+
+return (x) in y
+(x) !in y
+return (n) in 1..10
+return (s) in "abc"
+(x) !in(y)
+return (x) !in[1, 2]
+
+---
+
+(source_file
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (identifier)))
+  (expression_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (identifier)))
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (range_expression
+        start: (number_literal)
+        end: (number_literal))))
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (string_literal
+        (string_fragment))))
+  (expression_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (parenthesized_expression
+        (identifier))))
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+in after parentheses before a list of several elements tests the parentheses, before one element it casts a subscript
+==================
+
+(x) in [1, 2]
+def ok = (a.b) in ['main', 'dev']
+if ((x) in [
+  f(a, b),
+  2]) { }
+return (x) in [/a,b/, c] && (y) in [3, 4]
+out[i] = (float) in[i]
+(Foo) in [f(a, b)]
+
+---
+
+(source_file
+  (expression_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (list_literal
+        (number_literal)
+        (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (parenthesized_expression
+          (field_access
+            object: (identifier)
+            field: (identifier)))
+        collection: (list_literal
+          (string_literal)
+          (string_literal)))))
+  (if_statement
+    condition: (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      collection: (list_literal
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))
+        (number_literal)))
+    consequence: (block))
+  (return_statement
+    (binary_expression
+      left: (membership_expression
+        element: (parenthesized_expression
+          (identifier))
+        collection: (list_literal
+          (string_literal
+            (string_fragment))
+          (identifier)))
+      right: (membership_expression
+        element: (parenthesized_expression
+          (identifier))
+        collection: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (subscript_expression
+          object: (identifier)
+          index: (identifier)))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (subscript_expression
+        object: (identifier)
+        index: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier)))))))
+
+==================
+in after parentheses at the end of a line, or before a member access, a subscript or an operator, is a cast of the name
+==================
+
+(Foo) in
+(Foo) in.read()
+out[i] = (float) in[i]
+(x) in -1
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (method_invocation
+        function: (field_access
+          object: (identifier)
+          field: (identifier))
+        arguments: (argument_list))))
+  (expression_statement
+    (assignment_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (identifier))
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (subscript_expression
+          object: (identifier)
+          index: (identifier)))))
+  (expression_statement
+    (binary_expression
+      left: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (identifier))
+      right: (number_literal))))

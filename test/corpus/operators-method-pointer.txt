@@ -44,3 +44,20 @@ list.collect(obj.&method)
         (method_pointer_expression
           object: (identifier)
           method: (identifier))))))
+
+==================
+Method pointer to an array constructor
+==================
+
+def h = String[].&new
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_pointer_expression
+        object: (array_type
+          (type_identifier))
+        method: (identifier)))))

@@ -186,6 +186,206 @@ z = (a) (b)
           (identifier))))))
 
 ==================
+A cast of a name in a field's value ends where the next member starts
+==================
+
+class C {
+  def a = (Foo) x
+  def m() { }
+  def b = (int) x
+  void n() { }
+  def c = (a.b.Foo) x
+  String o() { }
+  def d = (Foo) x
+  C() { }
+  def e = (Foo) x
+  public C(int i) { }
+  def f = (Foo) x
+  static { }
+  def g = (Foo) x
+  static int y = 1
+  def h = (Foo) x.y
+  private String z
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (qualified_type
+              (type_identifier)
+              (type_identifier)
+              (type_identifier))
+            value: (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (static_initializer
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (field_access
+              object: (identifier)
+              field: (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+A cast of a name that as or in follows in a field's value splits into members (known divergence)
+==================
+
+class C {
+  def k = (Foo) x as Bar
+  def m() { }
+  def n = (Foo) x in y
+  private int z
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+A cast of a name before closures on the next lines takes them
+==================
+
+x = (Foo) y
+{ -> 1 }
+{ foo() }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (method_invocation
+          function: (method_invocation
+            function: (identifier)
+            closure: (closure
+              (closure_parameters)
+              (expression_statement
+                (number_literal))))
+          closure: (closure
+            (expression_statement
+              (method_invocation
+                function: (identifier)
+                arguments: (argument_list)))))))))
+
+==================
 Parentheses before something that cannot start a cast operand
 ==================
 
@@ -388,3 +588,402 @@ foo((a)
           left: (parenthesized_expression
             (identifier))
           right: (identifier))))))
+
+==================
+Lines that open with parentheses after a parenthesized name are statements of their own
+==================
+
+(Foo)
+(x)
+(a.b)
+(x + ')')
+(y) = (z)
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (field_access
+        object: (identifier)
+        field: (identifier))))
+  (expression_statement
+    (parenthesized_expression
+      (binary_expression
+        left: (identifier)
+        right: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (parenthesized_expression
+        (identifier))
+      right: (parenthesized_expression
+        (identifier)))))
+
+==================
+A cast inside a call keeps its operand in parentheses on the next line
+==================
+
+def r = foo((List<String>)
+  (x))
+def s = foo((Foo)
+  (Bar) y)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (parenthesized_type_cast
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            value: (parenthesized_expression
+              (identifier)))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (parenthesized_type_cast
+            type: (type_identifier)
+            value: (parenthesized_type_cast
+              type: (type_identifier)
+              value: (identifier))))))))
+
+==================
+A cast inside a call keeps its operand on the next line before a division after an update
+==================
+
+def s = foo((Foo)
+  (Bar) y++ / 2)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (binary_expression
+            left: (parenthesized_type_cast
+              type: (type_identifier)
+              value: (parenthesized_type_cast
+                type: (type_identifier)
+                value: (update_expression
+                  operand: (identifier))))
+            right: (number_literal)))))))
+
+==================
+Brackets in strings and comments after a cast's operand on the next line are not counted
+==================
+
+foo((Foo)
+  (Bar) '(')
+foo((Foo)
+  (Bar) "${')'}")
+foo((Foo)
+  (Bar) """(""")
+foo((Foo)
+  (Bar) ~/a(b/)
+foo((Foo)
+  (Bar) $/a(b/$)
+foo((Foo)
+  (Bar) /* ( */ y)
+foo((Foo)
+  (Bar) y // (
+)
+def r = [(Foo)
+  (Bar) '[']
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (gstring_brace_interpolation
+                value: (string_literal))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (string_fragment)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (unary_expression
+              operand: (string_literal
+                (string_fragment))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal
+              (string_fragment)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            (block_comment)
+            value: (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier)))
+        (line_comment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (list_literal
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (string_literal)))))))
+
+==================
+A cast inside a call whose closing parenthesis is more than 256 characters on is turned down (known divergence)
+==================
+
+foo((Foo)
+  (Bar) y, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (method_invocation
+          function: (parenthesized_expression
+            (identifier))
+          arguments: (argument_list
+            (identifier)))
+        (ERROR
+          (identifier))
+        (string_literal)))))
+
+==================
+A cast inside a call whose closing parenthesis is more than 256 characters on reads as a call (known divergence)
+==================
+
+foo((Foo)
+  (bar) + 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+foo((Foo)
+  (bar)[0], 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          right: (number_literal))
+        (string_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (subscript_expression
+          object: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          index: (number_literal))
+        (string_literal)))))
+
+==================
+A cast inside a call whose closing parenthesis is 256 characters on keeps its operand on the next line
+==================
+
+foo((Foo)
+  (Bar) y, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+foo((Foo)
+  (bar) + 1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+foo((Foo)
+  (bar)[0], 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (identifier)))
+        (string_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (unary_expression
+              operand: (number_literal))))
+        (string_literal))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (list_literal
+              (number_literal))))
+        (string_literal)))))
+
+==================
+A lambda on the line after a parenthesized name is the operand of a cast, where Groovy calls (known divergence)
+==================
+
+(Foo)
+(x) -> x
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (identifier)))))
+
+==================
+A cast of a cast on the next line as a list's first element
+==================
+
+[(Foo)
+  (y)(z)]
+x = [(int)
+  (a)(b), 1]
+
+---
+
+(source_file
+  (expression_statement
+    (list_literal
+      (parenthesized_type_cast
+        type: (type_identifier)
+        value: (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_expression
+            (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (parenthesized_expression
+              (identifier))))
+        (number_literal)))))
+
+==================
+A cast of a cast on the next line as a subscript's index reads as calls (known divergence)
+==================
+
+a[(Foo)
+  (y)(z)]
+x = a?[(int)
+  (a)(b)]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (method_invocation
+        function: (method_invocation
+          function: (parenthesized_expression
+            (identifier))
+          arguments: (argument_list
+            (identifier)))
+        arguments: (argument_list
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (safe_subscript_expression
+        object: (identifier)
+        index: (method_invocation
+          function: (method_invocation
+            function: (parenthesized_expression
+              (identifier))
+            arguments: (argument_list
+              (identifier)))
+          arguments: (argument_list
+            (identifier)))))))

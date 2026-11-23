@@ -15,3 +15,6 @@ test/corpus/expressions-command-chain-crlf.txt -text
 
 # A lone CR inside a line is the test input here.
 test/corpus/comments-cr.txt -text
+
+# CRLF line endings after a line escape in strings are the test input here.
+test/corpus/expressions-strings-crlf.txt -text

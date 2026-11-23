@@ -81,6 +81,171 @@ continue inner
     label: (identifier)))
 
 ==================
+A line break after break or continue ends the statement
+==================
+
+for (f in fs) {
+  if (c) continue
+  process(f)
+  if (d) break
+  foo = 1
+  continue
+  label
+  break // c
+  x
+  break /* c */
+  y
+}
+while (x) break
+foo()
+
+---
+
+(source_file
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (continue_statement))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier))))
+      (if_statement
+        condition: (identifier)
+        consequence: (break_statement))
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (number_literal)))
+      (continue_statement)
+      (expression_statement
+        (identifier))
+      (break_statement)
+      (line_comment)
+      (expression_statement
+        (identifier))
+      (break_statement)
+      (block_comment)
+      (expression_statement
+        (identifier))))
+  (while_statement
+    condition: (identifier)
+    body: (break_statement))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A label after a comment or a line escape on the keyword's line
+==================
+
+outer:
+while (x) {
+  continue outer
+  break /* c */ outer
+  break /* c
+  */ outer
+  break \
+    outer
+}
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (while_statement
+      condition: (identifier)
+      body: (block
+        (continue_statement
+          label: (identifier))
+        (break_statement
+          (block_comment)
+          label: (identifier))
+        (break_statement
+          (block_comment)
+          label: (identifier))
+        (break_statement
+          label: (identifier))))))
+
+==================
+An empty Groovydoc comment after break or return ends the statement before it
+==================
+
+while (x) {
+  break /**/
+  y
+}
+def f() {
+  return /**/
+  x
+}
+
+---
+
+(source_file
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement)
+      (groovydoc_comment)
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement)
+      (groovydoc_comment)
+      (expression_statement
+        (identifier)))))
+
+==================
+A var after return or break on its line is the value or the label
+==================
+
+def f() {
+  if (c) return var
+  else x
+  return var
+  y
+}
+while (a) {
+  break var
+  z
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (return_statement
+          (identifier))
+        alternative: (expression_statement
+          (identifier)))
+      (return_statement
+        (identifier))
+      (expression_statement
+        (identifier))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement
+        label: (identifier))
+      (expression_statement
+        (identifier)))))
+
+==================
 Throw
 ==================
 
@@ -134,6 +299,48 @@ assert x == 1 : 'x must be one'
     message: (string_literal)))
 
 ==================
+Assert with a comma before the message
+==================
+
+assert x == 1, 'x must be one'
+assert foo(a, b), "got ${a}"
+assert a, b ?: c
+assert x
+, 'm'
+assert y,
+  'm'
+
+---
+
+(source_file
+  (assert_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal))
+    message: (string_literal))
+  (assert_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier)
+        (identifier)))
+    message: (string_literal
+      (string_fragment)
+      (gstring_brace_interpolation
+        value: (identifier))))
+  (assert_statement
+    (identifier)
+    message: (elvis_expression
+      value: (identifier)
+      default: (identifier)))
+  (assert_statement
+    (identifier)
+    message: (string_literal))
+  (assert_statement
+    (identifier)
+    message: (string_literal)))
+
+==================
 Do while
 ==================
 
@@ -173,3 +380,64 @@ if (x) return y
     condition: (identifier)
     consequence: (return_statement
       (identifier))))
+
+==================
+A line break after return ends it
+==================
+
+def f() {
+  return
+  foo()
+}
+def g() {
+  return // c
+  x
+}
+def h() {
+  if (a) return
+  else return 1
+}
+def k() {
+  return
+  { foo() }
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement)
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement)
+      (line_comment)
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (return_statement)
+        alternative: (return_statement
+          (number_literal)))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement)
+      (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))

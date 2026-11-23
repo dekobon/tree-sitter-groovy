@@ -123,6 +123,1804 @@ def (a, b, c) = source
     value: (identifier)))
 
 ==================
+Multi-assignment with typed names
+==================
+
+def (int a, String b) = [1, 'x']
+def (int a, b) = list
+def (List<String> xs, Map.Entry e, int[] arr) = f()
+def (String s, n) = foo 1
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (string_literal)))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)))
+      name: (identifier))
+    (variable_declarator
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))
+      name: (identifier))
+    (variable_declarator
+      type: (array_type
+        (type_identifier))
+      name: (identifier))
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (command_chain
+      receiver: (identifier)
+      argument: (number_literal))))
+
+==================
+Multi-assignment with final, final var and annotations
+==================
+
+final def (a, b) = list
+final (a, b) = list
+final var (int a, b) = list
+final(a, b) = list
+@Field def (a, b) = [1, 2]
+@Lazy final (int a, String b) = list
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (number_literal)))
+  (multi_assignment_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Typed and final multi-assignment in a method, a closure and a for init
+==================
+
+def m() {
+    foo()
+    final (int a, b) = [1, 2]
+}
+xs.each { final var (String k, v) = it }
+for (def (int i, n) = [0, 5]; i < n; i++) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (multi_assignment_declaration
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (multi_assignment_declaration
+          (variable_declarator
+            type: (type_identifier)
+            name: (identifier))
+          (variable_declarator
+            name: (identifier))
+          value: (identifier)))))
+  (for_statement
+    init: (multi_assignment_declaration
+      (variable_declarator
+        type: (type_identifier)
+        name: (identifier))
+      (variable_declarator
+        name: (identifier))
+      value: (list_literal
+        (number_literal)
+        (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block)))
+
+==================
+Multi-assignment in a class body
+==================
+
+class C {
+    static final def (a, b) = [1, 2]
+    @Lazy private (int x, String y) = load()
+    def m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Multi-assignment with a rest binding (Groovy 6)
+==================
+
+def (a, *b) = list
+def (h, List<Integer> *t) = list
+final (*init, last) = list
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment rest binding keeps its star in the declarator
+:cst
+==================
+
+def (h, List<Integer> *t) = l
+
+---
+
+1:0  - 2:0    source_file
+1:0  - 1:29     multi_assignment_declaration
+1:0  - 1:3        "def"
+1:4  - 1:5        "("
+1:5  - 1:6        variable_declarator
+1:5  - 1:6          name: identifier `h`
+1:6  - 1:7        ","
+1:8  - 1:24       rest_declarator
+1:8  - 1:21         type: generic_type
+1:8  - 1:12           base: type_identifier `List`
+1:12 - 1:21           arguments: type_arguments
+1:12 - 1:13             "<"
+1:13 - 1:20             type_identifier `Integer`
+1:20 - 1:21             ">"
+1:22 - 1:23         "*"
+1:23 - 1:24         name: identifier `t`
+1:24 - 1:25       ")"
+1:26 - 1:27       "="
+1:28 - 1:29       value: identifier `l`
+
+==================
+Multi-assignment rest binding in each place and with each kind of type (Groovy 6)
+==================
+
+def (*a) = l
+def (*a, b) = l
+def (a, *b, c) = l
+def (int a, List *b) = l
+def (a, String[] *b) = l
+def (a, java.util.List *b) = l
+var (a, *b) = l
+final var (a, *b) = l
+for (def (a, *b) = l; a; ) { }
+class C {
+    private (a, *b) = l
+}
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (rest_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      type: (array_type
+        (type_identifier))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (for_statement
+    init: (multi_assignment_declaration
+      (variable_declarator
+        name: (identifier))
+      (rest_declarator
+        name: (identifier))
+      value: (identifier))
+    condition: (identifier)
+    body: (block))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (rest_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+Multi-assignment with two rest bindings parses, which Groovy rejects after parsing (known divergence)
+==================
+
+def (*a, *b) = l
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (rest_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment with keyed pairs (Groovy 6)
+==================
+
+def (name: n, age: int a) = person
+final (x: px, y: py) = point
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment declaration after a parenthesized name at the end of a line
+==================
+
+def y = (x)
+def (h, *t) = l
+x = (b)
+final (a, b) = m
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (parenthesized_expression
+        (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Multi-assignment member after a field ending in a parenthesized name
+==================
+
+class C {
+    def y = (x)
+    private (a, b) = m
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (identifier))))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+Multi-assignment reads a keyword before a name as its type
+==================
+
+def (def a, b) = l
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+Locals named var, yield, in and as
+==================
+
+int var = 1
+String yield = 'a'
+InputStream in = open()
+String as = 'x'
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+A final local named var
+==================
+
+def m() {
+  final var = (1)
+  foo()
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_expression
+            (number_literal))))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+A var before a keyword that starts a statement is a name
+==================
+
+if (c) var
+else x
+var
+if (a) b
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))
+    alternative: (expression_statement
+      (identifier)))
+  (expression_statement
+    (identifier))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))))
+
+==================
+Multi-assignment with var alone
+==================
+
+var (a, b) = l
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+A call of a method named var is not a multi-assignment
+==================
+
+def m() {
+  var(a, b)
+  var (a, b).foo()
+  var (a, b) == c
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier)
+            (identifier))))
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (identifier)
+                (identifier)))
+            field: (identifier))
+          arguments: (argument_list)))
+      (expression_statement
+        (binary_expression
+          left: (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (identifier)
+              (identifier)))
+          right: (identifier))))))
+
+==================
+Multi-assignment with annotations alone is not accepted
+:error
+==================
+
+@A (a, b) = l
+
+---
+
+==================
+Multi-assignment with static where a statement starts is not accepted
+:error
+==================
+
+static def (a, b) = l
+
+---
+
+==================
+Multi-assignment with var in a class body
+==================
+
+class C {
+  var (a, b) = l
+  private var (c, d) = l
+  var x = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+A typed field after var
+==================
+
+class A {
+  var String s = "a"
+  private var List<String> xs, ys
+  var t
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (string_fragment))))
+      (field_declaration
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+A var return type in a type body
+==================
+
+class A {
+  var m() { }
+  @Deprecated
+  static final var n(int a) { a }
+  var o()
+  def p() { }
+}
+interface I { var m() }
+trait T { private var m() { } }
+enum E { X; var m() { } }
+record R() { var m() { } }
+new Object() { var m() { } }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body
+        (method_declaration
+          return_type: (type_identifier)
+          name: (identifier)
+          parameters: (formal_parameters)
+          body: (block))))))
+
+==================
+Multi-assignment mixing names and keyed pairs is accepted, which Groovy rejects (known divergence)
+==================
+
+def (name: n, b) = m
+def (a, age: int b) = m
+def (name: n, *rest) = m
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      key: (identifier)
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier))
+  (multi_assignment_declaration
+    (variable_declarator
+      key: (identifier)
+      name: (identifier))
+    (rest_declarator
+      name: (identifier))
+    value: (identifier)))
+
+==================
+A multi-assignment declaration without its = misses its value and keeps the statements after it (error recovery)
+==================
+
+def (a, b)
+foo()
+def (c, d) l
+bar()
+class C {
+    private (e, f)
+    void m() { }
+}
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+A multi-assignment declaration with a token that starts no statement in place of its = keeps the statements after it (error recovery)
+==================
+
+def (a, b) : l
+foo()
+def f() {
+    def (c, d).x
+    bar()
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (ERROR
+      (variable_declarator
+        name: (identifier))
+      (variable_declarator
+        name: (identifier)))
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (ERROR
+          (variable_declarator
+            name: (identifier))
+          (variable_declarator
+            name: (identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+A multi-assignment declaration before a comma in place of its value, or of its = and its value, misses the value and keeps the next line (error recovery)
+==================
+
+def (a, b) =,
+def c = 1
+def (d, e),
+class D { }
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (MISSING identifier))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+A comma after the value of a multi-assignment declaration is an error (error recovery)
+==================
+
+def (a, b) = l,
+foo()
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (identifier))
+  (ERROR)
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+A comma, a name and a ) after the = of a multi-assignment declaration go on with its names (error recovery)
+==================
+
+def (c, d) =, e) = 1
+bar()
+
+---
+
+(source_file
+  (multi_assignment_declaration
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    (ERROR)
+    (variable_declarator
+      name: (identifier))
+    value: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Multi-assignment without def (#94)
+==================
+
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Multi-assignment without def, three names from a method call
+==================
+
+(a, b, c) = f()
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+Multi-assignment without def from a range
+==================
+
+(a, b) = 1..2
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (range_expression
+        start: (number_literal)
+        end: (number_literal)))))
+
+==================
+Multi-assignment without def from a closure call, with a placeholder name
+==================
+
+(_, b) = { [1, 2] }()
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (method_invocation
+        function: (closure
+          (expression_statement
+            (list_literal
+              (number_literal)
+              (number_literal))))
+        arguments: (argument_list)))))
+
+==================
+Multi-assignment without def across line breaks
+==================
+
+(a,
+ b)
+    =
+    [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Multi-assignment without def with comments between its names
+==================
+
+(a /* c */, b) = l
+(a, // c
+  b) = l
+(a, b)
+= l
+(a, b) /* c */ = l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (block_comment)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (line_comment)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      (block_comment)
+      value: (identifier))))
+
+==================
+Multi-assignment without def with other identifier characters in its names
+==================
+
+(a, $b, _c, é) = l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (identifier))))
+
+==================
+Multi-assignment without def with form feeds and vertical tabs between its names (Groovy rejects them)
+==================
+
+(a,b) = l;
+(a, b) = l;
+(a, b)= l;
+(a,b) = l;
+(a, b) = l;
+(a, b)= l
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier))))
+
+==================
+Multi-assignment without def and a method head with more names than the scanner reads ahead
+==================
+
+(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) = l
+def f(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) { }
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))
+
+==================
+Multi-assignment without def in a method, a closure and an if branch
+==================
+
+def m() {
+    (a, b) = [1, 2]
+}
+def c = { (a, b) = it }
+if (x) (a, b) = [1, 2]
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (list_literal
+            (number_literal)
+            (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (multi_assignment_expression
+            name: (identifier)
+            name: (identifier)
+            value: (identifier))))))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (multi_assignment_expression
+        name: (identifier)
+        name: (identifier)
+        value: (list_literal
+          (number_literal)
+          (number_literal))))))
+
+==================
+Multi-assignment without def nested in other expressions
+==================
+
+x = (a, b) = [1, 2]
+foo((a, b) = list)
+for ((a, b) = [0, 5]; a < b; a++) { }
+def m() { return (a, b) = [1, 2] }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (multi_assignment_expression
+        name: (identifier)
+        name: (identifier)
+        value: (list_literal
+          (number_literal)
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (identifier)))))
+  (for_statement
+    init: (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (return_statement
+        (multi_assignment_expression
+          name: (identifier)
+          name: (identifier)
+          value: (list_literal
+            (number_literal)
+            (number_literal)))))))
+
+==================
+Multi-assignment without def after a def with no initializer
+==================
+
+def f
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Script method with untyped parameters is not a multi-assignment
+==================
+
+def add(a, b) { a + b }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+==================
+Script methods with untyped parameters in other head forms are not multi-assignments
+==================
+
+def f(a, b, c, d) { }
+final g(a, b) { }
+@A def h(a, /* c */ b)
+{ }
+def k(a,
+  b) throws E { }
+def m(a, int b) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (block_comment)
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    (throws_clause
+      (type_identifier))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier))
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block)))
+
+==================
+Assignment to one parenthesized name is not a multi-assignment
+==================
+
+(a) = 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (parenthesized_expression
+        (identifier))
+      right: (number_literal))))
+
+==================
+Cast to a generic type with two arguments is not a multi-assignment
+==================
+
+(Map<K, V>) m
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (type_identifier)))
+      value: (identifier))))
+
+==================
+Call with a space before its arguments, then an equals sign, is not a multi-assignment
+==================
+
+foo (a, b) = c
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)
+          (identifier)))
+      right: (identifier))))
+
+==================
+Parenthesized names on the line after a call start a multi-assignment
+==================
+
+foo()
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Two multi-assignments without def on consecutive lines are two statements
+==================
+
+(a, b) = [1, 2]
+(c, d) = [3, 4]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal))))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Method head followed by an equals sign reads as a declaration and a multi-assignment (divergence 3)
+==================
+
+def f(a, b) = [1, 2]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Method head followed by an equals sign after line breaks and comments reads as a declaration and a multi-assignment (divergence 3)
+==================
+
+def f(a,
+  b)
+= l
+def g(a /* c */, b) = l
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      (block_comment)
+      name: (identifier)
+      value: (identifier))))
+
+==================
+Multi-assignment without def after a call ended by a semicolon
+==================
+
+foo();
+(a, b) = [1, 2]
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (list_literal
+        (number_literal)
+        (number_literal)))))
+
+==================
+Parenthesized names with no equals sign are not accepted
+:error
+==================
+
+(a, b)
+
+---
+
+==================
+Multi-assignment with a compound operator is not accepted
+:error
+==================
+
+(a, b) += x
+
+---
+
+==================
+An unfinished list of names in a closure keeps the closure (error recovery)
+==================
+
+list.each {
+  (a, b,
+}
+println 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (ERROR
+          (identifier)
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
+
+==================
+A compound operator after a list of names in a closure keeps the multi-assignment (error recovery)
+==================
+
+list.each {
+  (a, b) +=
+}
+println 1
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (multi_assignment_expression
+            name: (identifier)
+            name: (identifier)
+            (ERROR)
+            value: (MISSING identifier))))))
+  (command_chain
+    receiver: (identifier)
+    argument: (number_literal)))
+
+==================
+Broken parentheses with more than names after a comma are no multi-assignment (error recovery)
+==================
+
+foo((Ab, Cd>)y)
+bar()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_expression
+          (identifier)
+          (MISSING ")"))
+        (binary_expression
+          left: (identifier)
+          (ERROR)
+          right: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+An unclosed list of names in an argument is no multi-assignment (error recovery)
+==================
+
+def f() {
+  list.sort((a, b
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (field_access
+            object: (identifier)
+            field: (identifier))
+          arguments: (argument_list
+            (parenthesized_expression
+              (identifier)
+              (MISSING ")"))
+            (identifier)
+            (MISSING ")")))))))
+
+==================
 Typed local variable declaration
 ==================
 
@@ -454,7 +2252,7 @@ foo()
       arguments: (argument_list))))
 
 ==================
-Untyped blank final before a typed local reads as a typed blank final
+Untyped blank final before a typed local is two declarations
 ==================
 
 final a
@@ -464,12 +2262,93 @@ String b = 'y'
 
 (source_file
   (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
     type: (type_identifier)
-    name: (identifier))
+    name: (identifier)
+    value: (string_literal)))
+
+==================
+Untyped blank final before a typed local whose value is a lambda is two declarations
+==================
+
+final a
+Runnable r = () -> { foo() }
+final b
+Comparator c = (x, y) -> 0
+final d
+String e = x -> y
+final f
+String[] g = x -> y
+xs.each {
+    final h
+    String i = x -> y
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters)
+      body: (block
+        (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier))
+        (formal_parameter
+          name: (identifier)))
+      body: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (identifier)
+      body: (identifier)))
   (expression_statement
-    (assignment_expression
-      left: (identifier)
-      right: (string_literal))))
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (variable_declarator
+            name: (identifier)))
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)
+          value: (lambda_expression
+            parameters: (identifier)
+            body: (identifier)))))))
 
 ==================
 Annotated local declarations in a script
@@ -623,10 +2502,9 @@ pipeline { agent any }
       name: (identifier)))
   (pipeline_statement
     body: (closure
-      (expression_statement
-        (identifier))
-      (expression_statement
-        (identifier)))))
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier)))))
 
 ==================
 Annotated declaration and annotated parameter at the start of a closure
@@ -689,3 +2567,1980 @@ Annotation on a name other than the placeholder is not accepted
 @Field x
 
 ---
+
+==================
+Variables and parameters named trait and sealed (#73)
+==================
+
+def trait = 'brave'
+String sealed = 'no'
+void level(String trait, sealed) {
+    def c = { trait -> trait }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (closure
+            (closure_parameters
+              (closure_parameter
+                name: (identifier)))
+            (expression_statement
+              (identifier))))))))
+
+==================
+Typed local without an initializer
+==================
+
+String s
+int i;
+List<String> xs
+Map<String, List<Integer>> m
+String[] arr
+int[][] grid
+foo.Bar q
+java.util.List<String> l
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (array_type
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)))
+
+==================
+Typed locals without an initializer in a list
+==================
+
+String a, b
+String a, b = 1
+String a = 1, b
+int x, y, z;
+List<String> xs, ys = []
+String c,
+  d
+String e, f
+  = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Typed local without an initializer whose type Groovy reads by its spelling
+==================
+
+Été x
+foo<T> x
+foo[] x
+foo [] y
+foo.bar.Baz q
+a<b>c
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)))
+
+==================
+Two names that start no typed local (known divergence)
+==================
+
+foo bar
+foo.bar x
+foo.Bar.baz q
+void x
+String this
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (identifier))
+  (command_chain
+    receiver: (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier))
+    argument: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+Type arguments after a space start no typed local (known divergence)
+==================
+
+a < b > c
+List <String> xs
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Typed local without an initializer ends at a semicolon, a brace, a comment or an else
+==================
+
+String a; String b
+{ String c }
+String d // note
+String e /* note */
+String f /* note */ = 1
+if (x) String g else String h
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (block
+    (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (line_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (block_comment)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    (block_comment)
+    value: (number_literal))
+  (if_statement
+    condition: (identifier)
+    consequence: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    alternative: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))))
+
+==================
+Typed local without an initializer before a line that starts a statement
+==================
+
+String a
+x
+String b
+(c, d) = l
+String e
+{ }
+String f
+[1]
+String g
++ 1
+String h
+/x/
+InputStream in
+open()
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (block)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (list_literal
+      (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Typed local without an initializer before a parenthesis-free call in parentheses on the next line
+==================
+
+String s
+(foo 1)
+List<String> xs
+(sh 'ls').trim()
+int a, b
+(println x)
+@Field String t
+(foo 1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (string_literal)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (identifier))))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (number_literal)))))
+
+==================
+Typed local without an initializer before a call of a capitalized name with new in parentheses on the next line
+==================
+
+String s
+(Foo new Bar())
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (identifier)
+        argument: (object_creation_expression
+          type: (type_identifier)
+          arguments: (argument_list))))))
+
+==================
+A line that goes on with the name ends no typed local (known divergence)
+==================
+
+String s
+.trim()
+String t
+* 2
+String u
+= 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Typed local without an initializer before parameters on the next line stays a method (known divergence)
+==================
+
+Foo f
+(int a) { }
+String g
+(a) { }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (closure))))
+
+==================
+A typed local or field before a generic method on the next line; before a comparison it is no declaration (known divergence)
+==================
+
+String s
+<T> T foo(T x) { return x }
+class C {
+    def String t
+    <T extends A, U> void m() { }
+}
+String u
+< limit
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (method_declaration
+    type_parameters: (method_type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block
+      (return_statement
+        (identifier))))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)
+            (type_identifier))
+          (type_parameter
+            name: (type_identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+A parenthesized range or cast on the next line ends a typed local
+==================
+
+int total
+(MIN..MAX).each { total += it }
+List<String> names
+(ITEMS as List).each { names << it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (range_expression
+            start: (identifier)
+            end: (identifier)))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (assignment_expression
+            left: (identifier)
+            right: (identifier))))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (cast_expression
+            value: (identifier)
+            type: (type_identifier)))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (identifier)))))))
+
+==================
+Typed declaration before a line that opens with a slashy string in parentheses
+==================
+
+Foo foo
+(/x/).each { println it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (parenthesized_expression
+          (string_literal
+            (string_fragment)))
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier))))))
+
+==================
+Typed locals without an initializer in bodies
+==================
+
+def m() {
+  String a
+  int b, c
+}
+xs.each { String s }
+x = { -> String t }
+def f = x -> { String u }
+switch (x) {
+  case 1: String v; break
+  default: int w
+}
+lbl: String y
+while (c) String z
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)
+        name: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters)
+        (local_variable_declaration
+          type: (type_identifier)
+          name: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (block
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))
+          (break_statement))
+        (switch_default
+          (local_variable_declaration
+            type: (type_identifier)
+            name: (identifier))))))
+  (labeled_statement
+    label: (identifier)
+    statement: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)))
+  (while_statement
+    condition: (identifier)
+    body: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))))
+
+==================
+Closure parameters are not typed locals without an initializer
+==================
+
+f = { String a, b -> a }
+g = { String a, b = 1 -> a }
+h = { String a
+  -> a }
+k = { String a,
+  b -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+Typed local without an initializer in a for header
+==================
+
+for (int i; i < n; i++) { }
+for (int j, k; j < n; j++) { }
+for (String s : xs) { }
+for (String t
+  : xs) { }
+for (String u in xs) { }
+
+---
+
+(source_file
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_statement
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      name: (identifier))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+Annotated typed locals without an initializer
+==================
+
+@Field String v
+@Field int a, b
+@Field
+List<String> xs
+@A(1) @B Foo f
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (number_literal)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Blank final locals in a list
+==================
+
+final String a, b
+final String c, d = 1
+final String e = 1, f
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)
+    name: (identifier)))
+
+==================
+Typed local without an initializer after an untyped blank final
+==================
+
+final x
+String s
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Typed local without an initializer after a blank final
+==================
+
+final String u
+String s
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+A blank final with several names is closure parameters before an arrow, and a declaration whose later name holds a lambda
+==================
+
+def c1 = { final String a, b = (T) (x, y) -> z }
+def c2 = { final String a, b = (x, y) -> (z) -> w }
+final String c, d = (x) -> y
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (method_invocation
+              function: (parenthesized_expression
+                (identifier))
+              arguments: (argument_list
+                (identifier)
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (lambda_expression
+              parameters: (formal_parameters
+                (formal_parameter
+                  name: (identifier))
+                (formal_parameter
+                  name: (identifier)))
+              body: (parenthesized_expression
+                (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (lambda_expression
+      parameters: (formal_parameters
+        (formal_parameter
+          name: (identifier)))
+      body: (identifier))))
+
+==================
+A typed local on the line after return, break and continue is a declaration
+==================
+
+return
+String s
+while (c) {
+  break
+  String t
+  continue
+  String u
+}
+
+---
+
+(source_file
+  (return_statement)
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (break_statement)
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier))
+      (continue_statement)
+      (local_variable_declaration
+        type: (type_identifier)
+        name: (identifier)))))
+
+==================
+Typed local without an initializer after a statement on its line (known divergence)
+==================
+
+foo() String s
+x = 1 String t
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+Method declarations are not typed locals without an initializer
+==================
+
+String f()
+String g() { }
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+A def with a type declares a typed local
+==================
+
+def String s = "a"
+def String t
+def int a, b = 1
+final def List<String> xs = []
+@Field def String[] names
+def RouterConfigurable config = mock(RouterConfigurable)
+def
+String u = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (array_type
+      (type_identifier))
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+A line break after the type of a def ends the declaration
+==================
+
+def String
+s = 1
+def x
+y = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A def with a lowercase type, before another modifier or before a method is not a typed declaration (known divergence)
+==================
+
+def foo bar
+def final String x = 1
+def String m() { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure))))
+
+==================
+A var before a type declares a typed local, as def does
+==================
+
+var String s = 'a'
+var String t
+final var List<String> xs = []
+var
+String u = 1
+var String
+v = 1
+var var = 1
+var(1)
+var.x
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal))))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Command chains whose first argument is capitalized stay command chains
+==================
+
+println Foo
+assertEquals Expected, actual
+compile Libs.guava
+sourceCompatibility JavaVersion.VERSION_1_8
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier)))
+  (command_chain
+    receiver: (identifier)
+    argument: (field_access
+      object: (identifier)
+      field: (identifier))))
+
+==================
+Typed local without an initializer in an interpolation is an error (Groovy 3 reads a closure that declares s)
+:error
+==================
+
+"${String s}"
+
+---
+
+==================
+Typed declarations elsewhere keep their nodes
+==================
+
+class C { String s; int a, b }
+try (R r = open()) { } catch (E e) { }
+def f = (String s) -> s
+def (String a, int b) = l
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))))
+  (try_statement
+    resources: (resource_specification
+      (resource
+        type: (type_identifier)
+        name: (identifier)
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        type: (type_identifier)
+        name: (identifier))
+      body: (block)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (identifier))))
+  (multi_assignment_declaration
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    (variable_declarator
+      type: (type_identifier)
+      name: (identifier))
+    value: (identifier)))
+
+==================
+A dotted name that starts with this is no type of a typed local (known divergence)
+==================
+
+this.Foo x
+this.foo.Bar x
+this.Foo<T> x
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (field_access
+          object: (identifier)
+          field: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+==================
+A dotted name that starts with super is no type of a typed local (known divergence)
+==================
+
+super.Foo x
+super.foo.Bar x
+super.Foo<T> x
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (field_access
+        object: (identifier)
+        field: (identifier))
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (field_access
+          object: (identifier)
+          field: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+==================
+Shifts after a name start no typed local
+==================
+
+Foo<<Baz>> result
+x<<y
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+A division on the next line ends no typed local
+==================
+
+Foo foo
+/ 2
+String s
+/x
+String t
+/= 2
+String u
+/= 2 // c
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (line_comment))
+
+==================
+A line that starts with in or as starts a statement after a typed local (known divergence)
+==================
+
+String s
+in xs
+InputStream in
+in.close()
+String t
+as T
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+A typed local whose dotted or generic type starts with in or as declares after an expression
+==================
+
+foo()
+in.gov.Foo x
+bar()
+as.b.Foo<T> y
+baz()
+in<T> q
+in.close()
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (qualified_type
+      (type_identifier)
+      (type_identifier)
+      (type_identifier))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (generic_type
+      base: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list))))
+
+==================
+A line that starts with an operator goes on with a typed local's name (Groovy reads a call)
+==================
+
+String a
+? 1 : 2
+String b
+% 2
+String c
+^ 1
+String d
+| 1
+String e
+& 1
+String f
+< 1
+String g
+> 1
+String h
++= 1
+String i
+-= 1
+String j
+!= 1
+String k
+!in xs
+String l
+instanceof T
+String n
+.x
+String o
+:: x
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (number_literal)
+      alternative: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (method_reference_expression
+      target: (identifier)
+      name: (identifier))))
+
+==================
+A negation or a complement on the next line starts a statement after a typed local
+==================
+
+String m
+!x
+String p
+~x
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier)))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (unary_expression
+      operand: (identifier))))
+
+==================
+A comma that opens the next line ends no typed local (error recovery)
+==================
+
+String s
+, b
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+A parenthesis that closes on the next line ends no typed local (error recovery)
+==================
+
+String s
+) x
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+A bracket that closes on the next line ends no typed local (error recovery)
+==================
+
+String s
+] x
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (identifier)
+    (identifier)))
+
+==================
+Reserved words name no variable of a typed local (known divergence)
+==================
+
+foo.Bar this
+String super
+String int
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (identifier)))
+
+==================
+A reserved word in a typed local's list of names is no name (error recovery) (Groovy reads a call)
+==================
+
+String a, this
+
+---
+
+(source_file
+  (ERROR
+    (type_identifier)
+    (ERROR
+      (identifier))
+    (identifier)))
+
+==================
+A typed local with a long list of names and long type arguments
+==================
+
+String a1, a2, a3, a4, a5, a6, a7, a8, a9, a10
+Map<String, Map<String, List<Integer>>> m
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)
+        (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))))))
+    name: (identifier)))
+
+==================
+Form feeds and vertical tabs after a typed local's name are whitespace (Groovy rejects them)
+==================
+
+String s
+x
+String t;
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier))
+  (expression_statement
+    (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+An equality after a typed local's name is no initializer (Groovy reads a call)
+==================
+
+String s == 1
+String t
+== 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+A name after a lowercase word in a for init opens no call (error recovery)
+==================
+
+for (foo bar;;) {}
+
+---
+
+(source_file
+  (for_statement
+    (ERROR
+      (type_identifier)
+      (identifier))
+    body: (block)))
+
+==================
+A typed local at the end of the input
+==================
+
+String s
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)))
+
+==================
+A block comment between a declaration's type and its name is trivia
+==================
+
+String /* c */ s
+int/*unsigned*/ a, b
+String[] /* c */ xs
+String /* a
+b */ t
+def String /* c */ u = 1
+foo /* c */ bar
+class C {
+  private def Foo /* c */ foo
+  def m() { }
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier)
+    name: (identifier))
+  (local_variable_declaration
+    type: (array_type
+      (type_identifier))
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier))
+  (local_variable_declaration
+    type: (type_identifier)
+    (block_comment)
+    name: (identifier)
+    value: (number_literal))
+  (expression_statement
+    (identifier))
+  (block_comment)
+  (expression_statement
+    (identifier))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (block_comment)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

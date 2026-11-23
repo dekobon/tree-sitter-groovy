@@ -341,3 +341,123 @@ a | b && c
         left: (identifier)
         right: (identifier))
       right: (identifier))))
+
+==================
+A comparison right after a name in parentheses and where a statement starts
+==================
+
+(i<n)
+x = (i<n) ? a : b
+if ((i<n && j>m)) foo()
+i<n
+[1].each { it<2 }
+x = (i<n)
+y = 1
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (parenthesized_expression
+          (binary_expression
+            left: (identifier)
+            right: (identifier)))
+        consequence: (identifier)
+        alternative: (identifier))))
+  (if_statement
+    condition: (parenthesized_expression
+      (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (binary_expression
+          left: (identifier)
+          right: (identifier))))
+    consequence: (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (number_literal))
+        field: (identifier))
+      closure: (closure
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_expression
+        (binary_expression
+          left: (identifier)
+          right: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+Type arguments that close after a name in parentheses and where a statement starts
+==================
+
+x = (List<String>) y
+x = (Map<String, List<Integer>>) m
+List<String> xs = []
+x = new HashMap<>()
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        value: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (parenthesized_type_cast
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))))
+        value: (identifier))))
+  (local_variable_declaration
+    type: (generic_type
+      base: (type_identifier)
+      arguments: (type_arguments
+        (type_identifier)))
+    name: (identifier)
+    value: (list_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (object_creation_expression
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments))
+        arguments: (argument_list)))))

@@ -258,6 +258,53 @@ Double-quoted with brace expression interpolation
           right: (identifier))))))
 
 ==================
+A lazy interpolation without parameters
+==================
+
+x = "${-> count}"
+y = """a ${-> foo 1} b"""
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          (closure_parameters)
+          value: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (gstring_brace_interpolation
+          (closure_parameters)
+          value: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)))
+        (string_fragment)))))
+
+==================
+An interpolation with closure parameters is unsupported (known divergence)
+==================
+
+x = "${y -> y}"
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (gstring_brace_interpolation
+          value: (identifier)
+          (ERROR
+            (identifier)))))))
+
+==================
 Triple-double-quoted empty
 ==================
 
@@ -480,6 +527,30 @@ def url = /path\/to\/file/
         (string_fragment)))))
 
 ==================
+Slashy string with more escaped slashes than the look-ahead reads past
+==================
+
+def url = /a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/a\/b/
+def n = x / 2 / y
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (identifier)))))
+
+==================
 Slashy string with dollar interpolation
 ==================
 
@@ -559,6 +630,336 @@ a / b
     (binary_expression
       left: (identifier)
       right: (identifier))))
+
+==================
+A slash after an operand on its line is division, also where a statement may follow
+==================
+
+x = w/2 + h/2
+w/2 + h/2
+x = a/b/c
+x = (a)/2 + f()/2 + a[0]/2 + i++/2
+x = a/b // c
+x = a/2 + (s =~ /re/)
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (binary_expression
+          left: (identifier)
+          right: (number_literal)))))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (number_literal))
+      right: (binary_expression
+        left: (identifier)
+        right: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (parenthesized_expression
+                (identifier))
+              right: (number_literal))
+            right: (binary_expression
+              left: (method_invocation
+                function: (identifier)
+                arguments: (argument_list))
+              right: (number_literal)))
+          right: (binary_expression
+            left: (subscript_expression
+              object: (identifier)
+              index: (number_literal))
+            right: (number_literal)))
+        right: (binary_expression
+          left: (update_expression
+            operand: (identifier))
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (line_comment)
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (parenthesized_expression
+          (regex_find_expression
+            subject: (identifier)
+            pattern: (string_literal
+              (string_fragment))))))))
+
+==================
+A slashy string may open the line after an operand
+==================
+
+x = a
+/re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A block comment on the next line before a slashy string
+==================
+
+x = a
+/* c */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A slashy string after a comment in a method block
+==================
+
+def f() {
+  x = a
+  /* c */ /re/
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (assignment_expression
+          left: (identifier)
+          right: (identifier)))
+      (block_comment)
+      (expression_statement
+        (string_literal
+          (string_fragment))))))
+
+==================
+A Groovydoc comment on the next line before a slashy string
+==================
+
+x = a
+/** c */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (groovydoc_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+Two comments after a newline before a slashy string
+==================
+
+x = a
+/* one */ /* two */ /re/
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (block_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment))))
+
+==================
+A division after a comment inside a call does not turn later divisions into a slashy string
+==================
+
+foo(a
+/*c*/ /2)
+x = b/3 + c/4
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (identifier)
+          (block_comment)
+          right: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (number_literal))
+        right: (binary_expression
+          left: (identifier)
+          right: (number_literal))))))
+
+==================
+A division after a comment inside a call does not turn an outer division into a slashy string
+==================
+
+foo(a
+/*c*/ /2) /3 + b/4
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (binary_expression
+              left: (identifier)
+              (block_comment)
+              right: (number_literal))))
+        right: (number_literal))
+      right: (binary_expression
+        left: (identifier)
+        right: (number_literal)))))
+
+==================
+Slash after a same-line comment or a name following a comment still divides
+==================
+
+x = a /* c */ /re/ d
+x = a
+/* c */ b /c/ d
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          (block_comment)
+          right: (identifier))
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (block_comment)
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
+
+==================
+A slash after a name opens no slashy string argument
+:error
+==================
+
+println /abc/
+
+---
+
+==================
+A slash after a member access opens no slashy string argument
+:error
+==================
+
+obj.m /x/
+
+---
+
+==================
+A slash after class or a primitive type is division, as Groovy 6 reads it
+==================
+
+x = A.class /b/ 2
+y = a as int /b/ 2
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (field_access
+            object: (identifier)
+            field: (identifier))
+          right: (identifier))
+        right: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (binary_expression
+          left: (cast_expression
+            value: (identifier)
+            type: (type_identifier))
+          right: (identifier))
+        right: (number_literal)))))
+
+==================
+A slash after the parentheses of a cast opens no slashy string operand
+:error
+==================
+
+x = (String) /a/
+
+---
 
 ==================
 Double-quoted string that starts with two slashes
@@ -985,3 +1386,86 @@ def w = """cost "$5" """
         (string_fragment)
         (string_fragment)
         (string_fragment)))))
+
+==================
+An interpolation without its closing brace in a field's value keeps the class (error recovery)
+==================
+
+class C {
+    String a = "${x"
+    String b = 'b'
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (gstring_brace_interpolation
+              value: (identifier)
+              (MISSING "}")))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal))))))
+
+==================
+An interpolation without its closing brace in a string argument keeps the call (error recovery)
+==================
+
+sh "make ${version"
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal
+      (string_fragment)
+      (gstring_brace_interpolation
+        value: (identifier)
+        (MISSING "}")))))
+
+==================
+A string argument of a call that is a value goes on in an interpolation across lines
+==================
+
+def v = foo "a ${
+  b
+}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (string_literal
+          (string_fragment)
+          (gstring_brace_interpolation
+            value: (identifier)))))))
+
+==================
+A name that is a dollar before a comment reads as a dollar-slashy string (known divergence)
+==================
+
+x = $/* c */ -> 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (string_literal
+        (string_fragment)
+        (MISSING "/$")))))

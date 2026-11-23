@@ -109,3 +109,561 @@ x as a.b.c.d.E
         (type_identifier)
         (type_identifier)))))
 
+==================
+as as a name next to the operator
+==================
+
+x = y as String
+as = x as int
+int as = 1
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+as cast to a qualified type inside an expression
+==================
+
+y = x as a.b.C
+[x as a.b.C, 1]
+f(x as a.b.C)
+x as a.b.C ? 1 : 2
+return x as a.b.C
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (expression_statement
+    (list_literal
+      (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))))))
+  (expression_statement
+    (ternary_expression
+      condition: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      consequence: (number_literal)
+      alternative: (number_literal)))
+  (return_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+as cast to a qualified type with lowercase names
+==================
+
+x as a.b.c
+x as foo.bar + 1
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (number_literal))))
+
+==================
+as with a dotted type after parentheses is a coercion, before a typed local
+==================
+
+def v = (x) as a.b.c y
+y = 1
+f(1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (cast_expression
+        value: (parenthesized_expression
+          (identifier))
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)))))
+
+==================
+as with a dotted type on the last line but one is a cast, not a method head
+==================
+
+x
+f() as a.B
+y = 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (cast_expression
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+as cast to a qualified array type
+==================
+
+x as a.b.C[]
+y = x as a.B[][]
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (array_type
+        (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (array_type
+          (array_type
+            (qualified_type
+              (type_identifier)
+              (type_identifier))))))))
+
+==================
+as cast to a qualified generic type
+==================
+
+x as java.util.Map<String, List<Integer>>
+y = x as a.b.C<D<E>, ?>
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier)
+          (generic_type
+            base: (type_identifier)
+            arguments: (type_arguments
+              (type_identifier)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            (wildcard)))))))
+
+==================
+as cast to an array of a qualified generic type
+==================
+
+x as a.b.C<D>[]
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (array_type
+        (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier)))))))
+
+==================
+as cast to a qualified type before an index or a comparison
+==================
+
+x as a.b[0]
+x as a.B < c
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      index: (number_literal)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier))))
+
+==================
+as cast to a generic type with a dotted base before an operator
+==================
+
+x as Map.Entry<C> + x
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier))))
+      right: (identifier))))
+
+==================
+as cast to a generic type with a dotted base on the last line but one
+==================
+
+x //
+f() as a.b.C<T>
+y = 1
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (line_comment)
+  (expression_statement
+    (cast_expression
+      value: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (number_literal))))
+
+==================
+as after parentheses is a coercion of the parentheses
+==================
+
+return (x) as Foo
+(x) as Foo
+return (a.b) as java.util.List<String>
+
+---
+
+(source_file
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      type: (type_identifier)))
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (field_access
+          object: (identifier)
+          field: (identifier)))
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (type_identifier))))))
+
+==================
+as after parentheses at the end of a line or before new is a cast of the name
+==================
+
+(x) as
+Foo
+(Foo) as new Bar()
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list))))
+
+==================
+as cast type arguments that do not close are a comparison
+==================
+
+x as B<c
+x as a.B<c
+x as java.math.BigDecimal<limit
+if (v as java.lang.Integer<max && min>v) { }
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (type_identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    consequence: (block)))
+
+==================
+as cast to a dotted type before comparisons with spaces
+==================
+
+x as java.math.BigDecimal < limit
+if (v as java.lang.Integer < max && min > v) { }
+x as a.b.C < y
+return x as a.B < c > d
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    consequence: (block))
+  (expression_statement
+    (binary_expression
+      left: (cast_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (return_statement
+    (binary_expression
+      left: (binary_expression
+        left: (cast_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)))
+        right: (identifier))
+      right: (identifier))))
+
+==================
+as cast type arguments across a line and a comment
+==================
+
+x as Map<String,
+  List<Integer>>
+y = x as Map</* key */ String, Integer>
+
+---
+
+(source_file
+  (expression_statement
+    (cast_expression
+      value: (identifier)
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)
+          (generic_type
+            base: (type_identifier)
+            arguments: (type_arguments
+              (type_identifier)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (block_comment)
+            (type_identifier)
+            (type_identifier)))))))
+
+==================
+as after parentheses at the end of a line before a dotted name is a cast of the name
+==================
+
+(x) as
+a.b
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (field_access
+      object: (identifier)
+      field: (identifier))))

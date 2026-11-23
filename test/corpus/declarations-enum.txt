@@ -695,6 +695,82 @@ enum E { A(), B(x), C }
       (enum_constant name: (identifier)))))
 
 ==================
+Enum first constant with a lambda without parentheses, or a name that starts like var
+==================
+
+enum A { X(v -> v), Y(v -> v) }
+enum B { X(value -> value) }
+enum C { X(val -> val) }
+enum D { X(var) }
+enum E { X(yield -> yield), Y(yield) }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (identifier)))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (lambda_expression
+            parameters: (identifier)
+            body: (identifier))))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
+Enum first constant with a lambda whose parameter is named var is not accepted (divergence 22)
+:error
+==================
+
+enum E { A(var -> var) }
+
+---
+
+==================
 Enum field and constructor after a blank line
 ==================
 
@@ -1128,6 +1204,30 @@ enum F { A, record }
         name: (identifier)))))
 
 ==================
+A call of a method named var and the name var in an enum constant's arguments
+==================
+
+enum E { A(var(1)), B(var) }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (number_literal)))))
+      (enum_constant
+        name: (identifier)
+        arguments: (argument_list
+          (identifier))))))
+
+==================
 Annotated enum constants
 ==================
 
@@ -1321,3 +1421,26 @@ Enum with type parameters is an error
 enum E<T> { A }
 
 ---
+
+==================
+Enum constant named trait before a member on the next line (#73)
+==================
+
+enum E {
+    trait
+    int f() { }
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

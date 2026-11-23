@@ -37,10 +37,12 @@ The full design is in [`SPECIFICATION.md`](SPECIFICATION.md).
 
 ## Status
 
-Fully functional Groovy 2.x--4.x parser with complete operator
-coverage, GString interpolation, generics, closures, command chains,
-and six language bindings. See [Known limitations](#known-limitations)
-for deferred items.
+Targets the Groovy 6.x grammar; code written for earlier versions
+parses where its syntax is a subset of it. Complete operator coverage,
+GString interpolation, generics, closures, lambdas, command chains,
+and six language bindings. The syntax Groovy 5 and 6 added is covered
+in part only: `async`, `await`, `defer` and `val`, for one, parse as
+names. See [Known limitations](#known-limitations) for deferred items.
 
 ## Operator coverage
 
@@ -156,12 +158,20 @@ let tree = parser.parse(source, None).unwrap();
 These are documented in detail in
 [`docs/divergences-from-spec.md`](docs/divergences-from-spec.md).
 
-- **Groovy 5 contextual keywords** (`val`, `async`, `await`, `defer`)
+- **Groovy 6 contextual keywords** (`val`, `async`, `await`, `defer`)
   are not yet exposed as keyword tokens. They parse as plain
-  identifiers, matching Groovy 2.x--4.x compiler behavior.
-- **Typed local declarations require an initializer** -- `String x`
-  is ambiguous with `String(x)` (method call). Use `String x = ...`
-  or `def x` instead.
+  identifiers, matching Groovy 2.x--5.x compiler behavior.
+- **Typed local declarations without an initializer follow Groovy's
+  rule on the spelling** -- `String x`, `int a, b`, `foo.Bar q` and,
+  with a comment before the name, `String /* c */ x` declare, while
+  `foo bar` is a call. A lowercase type after annotations
+  (`@A foo bar`) and a type with a space before `<` (`List <String> x`)
+  are not declarations here, and a declaration followed by a line that
+  goes on from its name (`String s` then `.trim()` or `== 1`) reads as
+  two statements, where Groovy reads a call. A type and a name after another
+  statement on its line declare (`move left By steps` is the call
+  `move left` and the declaration `By steps`), where Groovy goes on with
+  the call (`move(left).By(steps)`).
 - **Leading-operator line continuation** -- `a\n+ b` greedily joins
   as `a + b` rather than splitting into two statements. Idiomatic
   Groovy places continuation operators at the end of the previous
@@ -174,20 +184,22 @@ These are documented in detail in
   `new ArrayList().call { ... }` to keep the call.
 - **A `{ ... }` straight after a field with no initializer is an
   instance initializer block** -- `int x { ... }` parses with no
-  `ERROR`. A record's compact constructor (`public Name { ... }`),
-  which is unsupported, takes the same reading. After a field *with*
-  an initializer a next-line `{` is that expression's trailing
-  closure, as in Groovy: end the field with `;` to get an
-  initializer block.
-- **`sealed` and `trait` are keywords where a class member can
-  start** -- a field named `sealed` or `trait` is an `ERROR` when it
-  follows a modifier (`private boolean sealed`) or opens the member
-  (`static trait = 1`). `boolean sealed` and `String trait`, with no
-  modifier, parse, and so does an enum constant with either name
-  (`enum E { trait, sealed }`).
-  `record` is not affected: it is a keyword only directly before a
-  record header (`record Name(`), so `private Record record` and
-  `record.key()` parse.
+  `ERROR`. In a record body a name with only modifiers or `def` before
+  it is a compact constructor instead (`public Name { ... }`), with the
+  `{` on the same line or the next, so `static count` followed by a
+  block is a constructor named `count`, and `static Foo bar { ... }` is
+  a field `Foo` and a constructor `bar`. After a field *with* an
+  initializer a next-line `{` is that expression's trailing closure,
+  as in Groovy: end the field with `;` to get an initializer block.
+- **A name `sealed` at the end of a line before a nested type is
+  the modifier** -- `record`, `trait` and `sealed` are keywords only
+  before the declaration each opens, so `private Record record`,
+  `private String trait` and `return sealed` parse as names. A line
+  break is whitespace, though, so `private boolean sealed` followed by
+  `class Inner { }` on the next line is a field `boolean` and a sealed
+  class, where Groovy reads a field `sealed` and a class. `sealed`
+  must come directly before `class`, `interface` or `trait`:
+  `sealed abstract class S { }` is an `ERROR`.
 - **A member after an enum's trailing comma must start with a
   modifier, `def` or a keyword** -- Groovy up to 4.x takes any member
   there. `A,` followed by `String x` or by `E() { }` is an `ERROR`
@@ -195,9 +207,12 @@ These are documented in detail in
 - **Parameter modifiers have one order** -- annotations, then `final`,
   then `def`, `var` or a type. `def String x`, `final @A x` and a
   varargs parameter with no type (`... xs`) are an `ERROR` (#98).
-- **A line break does not end a statement** -- a newline is whitespace
-  to the grammar. Most code is unaffected, because the next token
-  cannot continue the statement. Known cases that read wrongly with no
+- **A line break ends a statement only in some places** -- after
+  `return`, `break` and `continue`, before a `(` that can open a
+  statement, and after a typed local declaration with no initializer.
+  Elsewhere a newline is whitespace to the grammar. Most code is
+  unaffected, because the next token cannot continue the statement.
+  Known cases that read wrongly with no
   `ERROR`: a bare name followed by a literal on the next line is one
   parenthesis-free call (#90); a field with a modifier and no type
   followed by a typed method is a typed field and a constructor (#96);

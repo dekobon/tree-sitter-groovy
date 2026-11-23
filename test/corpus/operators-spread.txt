@@ -49,6 +49,118 @@ f(*[1, 2, 3])
             (number_literal)))))))
 
 ==================
+Spread elements in a list literal
+==================
+
+x = [*a]
+x = [*a, *b]
+x = [1, *a]
+x = [*a, 1, *b]
+x = [*(a), *[1],]
+x = [
+  *a,
+  *b
+]
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (spread_arguments
+          value: (identifier))
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (number_literal)
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (spread_arguments
+          value: (identifier))
+        (number_literal)
+        (spread_arguments
+          value: (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (spread_arguments
+          value: (parenthesized_expression
+            (identifier)))
+        (spread_arguments
+          value: (list_literal
+            (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (spread_arguments
+          value: (identifier))
+        (spread_arguments
+          value: (identifier))))))
+
+==================
+Spread map entries as arguments
+==================
+
+foo(*:m)
+foo(*:m, x: 1)
+foo(a: 1, *:m)
+foo(1, *:m, *:n)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (spread_map_entry
+          value: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (spread_map_entry
+          value: (identifier))
+        (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (named_argument
+          key: (identifier)
+          value: (number_literal))
+        (spread_map_entry
+          value: (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)
+        (spread_map_entry
+          value: (identifier))
+        (spread_map_entry
+          value: (identifier))))))
+
+==================
 Spread map entry single
 ==================
 
