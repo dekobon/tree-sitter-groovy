@@ -1756,3 +1756,109 @@ class C { private int y; @A void f() { } }
         name: (identifier)
         parameters: (formal_parameters)
         body: (block)))))
+
+==================
+Annotations among the modifiers of members
+==================
+
+class C {
+  private @Autowired Foo foo
+  public @Override String toString() { "c" }
+  protected @Deprecated C() { }
+  static @Lazy final x = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal
+              (string_fragment)))))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Modifiers before an annotation type
+==================
+
+public @interface X { }
+public @Deprecated @interface Y { }
+class O { protected @interface Z { } }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body))
+  (annotation_type_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+An annotation after several modifiers, its type on the next line
+==================
+
+class C {
+  final transient Foo s
+
+  protected final transient @Delegate
+  GraphAdapter g
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))

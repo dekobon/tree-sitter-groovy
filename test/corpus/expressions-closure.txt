@@ -1220,13 +1220,28 @@ xs.each { def String x -> x }
 ---
 
 ==================
-Closure parameter with an annotation after final is not accepted (divergence 14)
-:error
+Closure parameter with an annotation after final
 ==================
 
 xs.each { final @Deprecated x -> x }
 
 ---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
 
 ==================
 Closure varargs parameter with no type is not accepted (divergence 14)

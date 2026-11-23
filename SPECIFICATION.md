@@ -2609,20 +2609,16 @@ literals. `non-sealed` is not an identifier in Apache's grammar and
 stays an in-grammar token.
 
 Groovy's parser takes `sealed` among the other class modifiers in any
-order, and before an annotation. The grammar accepts no modifier after
-`sealed`, nor `sealed record` or `sealed enum` (which Groovy rejects
-later), so `sealed abstract class S { }`, `sealed @A class S { }` and
-`class O { sealed static class C { } }` are an `ERROR` at `sealed`
-until modifiers are accepted in any order. The keyword is still
-emitted there, so that the `ERROR` stays at the word and the
-declaration keeps its node: read as a name, the word gave trees with
-no `ERROR`, such as a field of type `sealed` named `static`, or lost
-the class to the `ERROR`. That is done only on the same line. Across a
-line break the same words also start the member after a field named
-`sealed` (`private boolean sealed`, then `static class D { }` or
-`public int size`), which the keyword would turn into an `ERROR`; a
-modifier after `sealed` can only be an `ERROR` while the order is
-fixed, so the field keeps its reading.
+order, and before an annotation, and so does the grammar:
+`sealed abstract class S { }`, `sealed @A class S { }` and
+`class O { sealed static class C { } }` are declarations, `sealed`
+among their modifiers (`sealedModifier` in `grammar.js`). `sealed record`
+and `sealed enum`, which Groovy rejects later, stay an `ERROR` at
+`sealed`, as before. A modifier or an annotation after `sealed` makes it the
+keyword only on the same line. Across a line break the same words also
+start the member after a field named `sealed` (`private boolean sealed`,
+then `static class D { }` or `public int size`), which the keyword
+would fold into one sealed declaration, so the field keeps its reading.
 
 A line break is whitespace to the grammar, so the scanner's look-ahead
 is what tells a declaration from a name. Groovy also sees the line

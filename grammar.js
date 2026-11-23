@@ -434,17 +434,40 @@ function typeDeclarations($) {
 }
 
 /**
+ * One or more modifiers, with annotations among them after the first:
+ * Apache's `modifiers` and `classOrInterfaceModifiers` take annotations
+ * and modifiers in any order: a field's `private` may come before its
+ * annotation, as may a method's `public`. Annotations before the first
+ * modifier stay in the declaration's own `repeat($.annotation)`, so each
+ * annotation has one place to go. One hidden rule, `_modifiers`, holds the
+ * list for every declaration, so that after a modifier the `@` of an
+ * annotation and of `@interface` meet in one state (see `conflicts`).
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} The modifier list.
+ */
+function modifierList($) {
+  return $._modifiers;
+}
+
+/**
  * The optional Groovy 4 `sealed` or `non-sealed` before `class`,
- * `interface` or `trait`. `sealed` comes from the scanner, which emits
- * it only when one of those words follows (SPECIFICATION.md §6.13).
- * `non-sealed` is a single token so that its dash is not lexed as
- * subtraction.
+ * `interface` or `trait`, with the modifiers and annotations that may
+ * follow it (`sealed abstract class W { }`, Groovy's own
+ * `SealedSpecificationTest`): Apache's `classOrInterfaceModifiers` takes
+ * them in any order. `sealed` comes from the scanner, which emits it
+ * before one of those words, a modifier or an annotation on its line
+ * (SPECIFICATION.md §6.13). `non-sealed` is a single token so that its
+ * dash is not lexed as subtraction.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The optional modifier.
  */
 function sealedModifier($) {
-  return optional(choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')));
+  return optional(seq(
+    choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')),
+    repeat(choice($._modifier, $.annotation)),
+  ));
 }
 
 /**
@@ -501,14 +524,14 @@ function constructorDeclaration($, modifiers) {
 function methodHead($, beforeParameters = choice(
   seq(
     repeat($.annotation),
-    repeat($._modifier),
+    optional(modifierList($)),
     optional(field('type_parameters', $.method_type_parameters)),
     choice('def', field('return_type', $._type)),
     field('name', $._property_name),
   ),
   seq(
     repeat($.annotation),
-    repeat1($._modifier),
+    modifierList($),
     $._untyped_method_name,
   ),
 )) {
@@ -543,7 +566,7 @@ function untypedMethodHead($) {
       ),
       seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        modifierList($),
         field('type_parameters', $.method_type_parameters),
       ),
     ),
@@ -587,7 +610,7 @@ function parameter($, value = $._expression) {
   return choice(
     seq(
       repeat($.annotation),
-      optional('final'),
+      optional(seq('final', repeat($.annotation))),
       optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
       defaultValue,
@@ -1209,6 +1232,15 @@ module.exports = grammar({
   ],
 
   conflicts: $ => [
+    // After a modifier an `@` opens an annotation among the modifiers or
+    // `@interface` (`public @Deprecated @interface X { }`): the word after
+    // it decides, one token past what the table sees.
+    [$._modifiers],
+    [$._type_modifiers],
+    // An annotation among a field's modifiers before the parentheses of a
+    // multi-assignment (`private @Lazy (int x, String y) = load()`): the
+    // `(` opens its arguments or the names, and the `=` after them decides.
+    [$.annotation],
     // `final def x` / `final x = 1` in a block vs. a modified member at top level.
     [$._modifier, $.local_variable_declaration],
     // `final def (a, b) = …` takes the same fork at `final`: the
@@ -1286,6 +1318,10 @@ module.exports = grammar({
     // `{ final x -> }` vs. a body opening with a final local (#56) or
     // with a modified declaration; all three stay alive at `final`.
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
+    // `{ final @A x -> }`: an annotation after `final` in a closure's first
+    // parameter, as in a method's (Apache `variableModifiers`), against
+    // `final` as the modifier of a member with annotations after it.
+    [$._modifier, $.closure_parameter],
     // `{ final def (a, b) = … }`: the same fork, no wider.
     [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration, $.closure_parameter],
     // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
@@ -1934,9 +1970,13 @@ module.exports = grammar({
     // declaration keyword, so the header after it has one production
     // whether or not `default` is there.
     _type_modifiers: $ => choice(
-      repeat1($._modifier),
-      seq(repeat($._modifier), 'default', repeat($._modifier)),
+      modifierList($),
+      seq(optional(modifierList($)), 'default', repeat(choice($._modifier, $.annotation))),
     ),
+
+    // One or more modifiers with annotations among them after the first
+    // (`modifierList`).
+    _modifiers: $ => seq($._modifier, repeat(choice($._modifier, $.annotation))),
 
     permits_clause: $ => seq(
       'permits',
@@ -1951,6 +1991,7 @@ module.exports = grammar({
     // cannot fire here.
     annotation_type_declaration: $ => seq(
       repeat($.annotation),
+      optional($._type_modifiers),
       '@',
       'interface',
       field('name', $.identifier),
@@ -2037,7 +2078,7 @@ module.exports = grammar({
     // tell constructors apart from methods. `prec(3, …)` wins over
     // both field and method when the identifier is followed by `(`
     // and no return type precedes it.
-    constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
+    constructor_declaration: $ => constructorDeclaration($, optional(modifierList($))),
 
     // The constructor form for the member directly after an enum's
     // trailing comma (see `enum_declaration`). Only access modifiers
@@ -2075,7 +2116,7 @@ module.exports = grammar({
       // method (`v C() {}`), which would otherwise tie.
       weighted(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat($._modifier),
+        optional(modifierList($)),
         // `def` is a modifier in Apache's `variableDeclaration`, so a type
         // may follow it (`private def Foo foo`). The scanner opens that
         // type as it opens a typed local's (§6.21), so `def x` keeps its
@@ -2098,7 +2139,7 @@ module.exports = grammar({
       // a comment between the two members made the split win.
       weighted(MODIFIER_ONLY_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        modifierList($),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
@@ -2176,9 +2217,9 @@ module.exports = grammar({
     // outrank it.
     _default_method_declaration: $ => methodDeclaration($, methodHead($, seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional(modifierList($)),
       'default',
-      repeat($._modifier),
+      repeat(choice($._modifier, $.annotation)),
       optional(field('type_parameters', $.method_type_parameters)),
       optional(choice('def', field('return_type', $._type))),
       field('name', $._property_name),
@@ -2413,7 +2454,7 @@ module.exports = grammar({
     // then `R { }`; see COMPACT_CONSTRUCTOR_WEIGHT for its value.
     compact_constructor_declaration: $ => weighted(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional(modifierList($)),
       optional('def'),
       field('name', $.identifier),
       field('body', $.block),
@@ -2701,8 +2742,8 @@ module.exports = grammar({
     _multi_assignment_field: $ => seq(
       repeat($.annotation),
       choice(
-        seq(repeat($._modifier), choice('def', alias($._var_names_keyword, 'var'))),
-        repeat1($._modifier),
+        seq(optional(modifierList($)), choice('def', alias($._var_names_keyword, 'var'))),
+        modifierList($),
       ),
       $._multi_assignment_tail,
     ),

@@ -239,12 +239,37 @@ record R(int x) {
         body: (class_body)))))
 
 ==================
-Sealed before another modifier or an annotation is an error (known divergence)
+Sealed before another modifier or an annotation
 ==================
 
 sealed public class C { }
 sealed @Ann class C { }
 sealed final class F { }
+non-sealed static class G { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Sealed and non-sealed together is an error
+==================
+
 sealed non-sealed class N { }
 
 ---
@@ -253,26 +278,10 @@ sealed non-sealed class N { }
   (ERROR)
   (class_declaration
     name: (identifier)
-    body: (class_body))
-  (ERROR)
-  (class_declaration
-    (annotation
-      name: (qualified_name
-        (identifier)))
-    name: (identifier)
-    body: (class_body))
-  (class_declaration
-    (ERROR
-      (identifier))
-    name: (identifier)
-    body: (class_body))
-  (ERROR)
-  (class_declaration
-    name: (identifier)
     body: (class_body)))
 
 ==================
-Sealed before abstract, with permits, is an error that keeps the class (known divergence)
+Sealed before abstract, with permits
 ==================
 
 sealed abstract class A permits B { }
@@ -285,7 +294,6 @@ public sealed abstract class P permits Q { }
 ---
 
 (source_file
-  (ERROR)
   (class_declaration
     name: (identifier)
     (permits_clause
@@ -295,7 +303,6 @@ public sealed abstract class P permits Q { }
     (annotation
       name: (qualified_name
         (identifier)))
-    (ERROR)
     name: (identifier)
     (permits_clause
       (type_identifier)
@@ -306,15 +313,13 @@ public sealed abstract class P permits Q { }
         (variable_declarator
           name: (identifier)))))
   (class_declaration
-    (ERROR
-      (identifier))
     name: (identifier)
     (permits_clause
       (type_identifier))
     body: (class_body)))
 
 ==================
-Sealed before another modifier in a class body is an error (known divergence)
+Sealed before another modifier in a class body
 ==================
 
 class O {
@@ -328,7 +333,6 @@ class O {
   (class_declaration
     name: (identifier)
     body: (class_body
-      (ERROR)
       (class_declaration
         name: (identifier)
         body: (class_body))
