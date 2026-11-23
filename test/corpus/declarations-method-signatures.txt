@@ -687,3 +687,29 @@ def c = { @A _ x -> x }
             name: (identifier)))
         (expression_statement
           (identifier))))))
+
+==================
+Methods named var and as with a return type, where a statement starts
+==================
+
+void var() { }
+int as(int x) { x }
+
+---
+
+(source_file
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))

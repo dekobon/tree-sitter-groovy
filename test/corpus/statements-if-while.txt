@@ -56,6 +56,42 @@ if (x) foo else bar
     alternative: (expression_statement (identifier))))
 
 ==================
+A parenthesized consequence before else on its line is no cast of else
+==================
+
+if (a) (b) else c
+if (a) (b) else if (d) e
+while (a) if (b) (C) else break
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (parenthesized_expression
+        (identifier)))
+    alternative: (expression_statement
+      (identifier)))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (parenthesized_expression
+        (identifier)))
+    alternative: (if_statement
+      condition: (identifier)
+      consequence: (expression_statement
+        (identifier))))
+  (while_statement
+    condition: (identifier)
+    body: (if_statement
+      condition: (identifier)
+      consequence: (expression_statement
+        (parenthesized_expression
+          (identifier)))
+      alternative: (break_statement))))
+
+==================
 If else if else chain
 ==================
 

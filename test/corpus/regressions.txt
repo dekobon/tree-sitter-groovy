@@ -4,8 +4,8 @@
 ; closure surfaces as a single localised test failure.
 ;
 ; Cross-reference notes:
-; - The murtaza64 #5 (juxt_function_call) anchor is pending: it
-;   requires command-chain support which is not yet implemented.
+; - The murtaza64 #5 (juxt_function_call) anchor is not here:
+;   command chains are pinned in expressions-command-chain.txt.
 
 ==================
 murtaza64 #16 empty groovydoc and block comment

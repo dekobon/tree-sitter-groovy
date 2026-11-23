@@ -87,6 +87,50 @@ arr?[0]
       index: (number_literal))))
 
 ==================
+Several indices in a subscript, any of them a spread
+==================
+
+x[*a]
+y[1, *a]
+y?[*a]
+y[1, 2] = 3
+z?[a..b, c]
+
+---
+
+(source_file
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (spread_arguments
+        value: (identifier))))
+  (expression_statement
+    (subscript_expression
+      object: (identifier)
+      index: (number_literal)
+      index: (spread_arguments
+        value: (identifier))))
+  (expression_statement
+    (safe_subscript_expression
+      object: (identifier)
+      index: (spread_arguments
+        value: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (subscript_expression
+        object: (identifier)
+        index: (number_literal)
+        index: (number_literal))
+      right: (number_literal)))
+  (expression_statement
+    (safe_subscript_expression
+      object: (identifier)
+      index: (range_expression
+        start: (identifier)
+        end: (identifier))
+      index: (identifier))))
+
+==================
 Chained safe subscript
 ==================
 
@@ -230,7 +274,7 @@ Subscript continued on a new line inside brackets is unsupported
 ---
 
 ==================
-List literal on the same line after a block is not a subscript
+List literal on the same line after a block is not a subscript (Groovy subscripts a closure)
 ==================
 
 if (a) { } [1].each { }
@@ -250,7 +294,7 @@ if (a) { } [1].each { }
       closure: (closure))))
 
 ==================
-Subscript after a block comment on the next line
+Subscript after a block comment on the next line (known divergence)
 ==================
 
 a

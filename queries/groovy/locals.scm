@@ -12,8 +12,10 @@
   (record_declaration)
   (block)
   (closure)
+  (lambda_expression)
   (method_declaration)
   (constructor_declaration)
+  (compact_constructor_declaration)
   (static_initializer)
   (for_statement)
   (for_in_statement)
@@ -24,7 +26,12 @@
 ; Definitions — bound names introduced inside their enclosing scope.
 (formal_parameter name: (identifier) @local.definition.parameter)
 (closure_parameter name: (identifier) @local.definition.parameter)
+; A lambda's one parameter without parentheses (`x -> x`); with them it is a
+; `formal_parameter`.
+(lambda_expression parameters: (identifier) @local.definition.parameter)
 (variable_declarator name: (identifier) @local.definition.var)
+; A multi-assignment's rest binding: `def (a, *b) = l`.
+(rest_declarator name: (identifier) @local.definition.var)
 ; A typed local has its name on the declaration itself, with no
 ; `variable_declarator`: `String s = 'a'`, `final String s`.
 (local_variable_declaration name: (identifier) @local.definition.var)

@@ -338,7 +338,7 @@ class A {
               right: (identifier))))))))
 
 ==================
-Modified field with no initializer before a comment and a modifier-only method
+Modified field with no initializer before a comment and a modifier-only method (Groovy reads a method)
 ==================
 
 class A {
@@ -417,6 +417,453 @@ class A {
         (variable_declarator
           name: (identifier)))
       (line_comment)
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Field named trait after a modifier and a type (#73)
+==================
+
+class Hero {
+    private String trait
+    private int level
+    String describe() {
+        if (level > 3) { return trait }
+        return 'novice'
+    }
+    void train() { level++ }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (identifier)
+              right: (number_literal))
+            consequence: (block
+              (return_statement
+                (identifier))))
+          (return_statement
+            (string_literal))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (update_expression
+              operand: (identifier))))))))
+
+==================
+Field named sealed after a modifier, before more members (#73)
+==================
+
+class Box {
+    private boolean sealed
+    private int size
+    boolean isOpen() { !sealed }
+    void close() { sealed = true }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (unary_expression
+              operand: (identifier)))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (boolean_literal))))))))
+
+==================
+Fields named trait and sealed with initializers, several declarators and annotations (#73)
+==================
+
+class A {
+    private String trait = 'brave', other
+    protected int count, sealed
+}
+class B {
+    public static final boolean sealed = true
+}
+class C {
+    @Lazy private List trait
+    @Deprecated final String sealed
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (boolean_literal)))))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Fields named trait and sealed in interface, trait, enum, record and anonymous class bodies (#73)
+==================
+
+interface I {
+    public static final String trait = 'x'
+}
+trait T {
+    private boolean sealed
+    boolean check() { sealed }
+}
+enum E {
+    A
+    private String trait
+}
+record R(int x) {
+    private static String sealed
+}
+def o = new Object() {
+    private String trait
+    String toString() { trait }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal)))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (identifier))))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list)
+        body: (class_body
+          (field_declaration
+            type: (type_identifier)
+            (variable_declarator
+              name: (identifier)))
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            body: (block
+              (expression_statement
+                (identifier)))))))))
+
+==================
+Methods named trait and sealed after modifiers (#73)
+==================
+
+class M {
+    private String trait() { 'x' }
+    public boolean sealed() { true }
+    static void trait(int level) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (string_literal))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (boolean_literal))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Members that open with trait or sealed (#73) (known divergence)
+==================
+
+class N {
+    static trait = 1
+    private sealed
+    def run() { trait + sealed }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block
+          (expression_statement
+            (binary_expression
+              left: (identifier)
+              right: (identifier))))))))
+
+==================
+Field named sealed before modifier-led members on the next line (#73)
+==================
+
+class O {
+    private boolean sealed
+    static class D { }
+    public int size
+    @Lazy List items
+    enum E { A }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier)))))))
+
+==================
+A def with a type declares a typed field
+==================
+
+class C {
+  def RouterConfigurable config = mock(RouterConfigurable)
+  private def String s = "a"
+  static def int a, b
+  @Inject def Map<String, Object> m
+  def
+  long where = 1
+  def x = 1
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (method_invocation
+            function: (identifier)
+            arguments: (argument_list
+              (identifier)))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (string_literal
+            (string_fragment))))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)
+            (type_identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+A def before another modifier or a method's return type is not a typed member (known divergence)
+==================
+
+class C {
+  def static String s = 1
+  def String m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
       (constructor_declaration
         name: (identifier)
         parameters: (formal_parameters)

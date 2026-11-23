@@ -107,3 +107,400 @@ x
   (expression_statement
     (unary_expression
       operand: (identifier))))
+
+==================
+instanceof after var, yield and in tests the name
+==================
+
+var instanceof T
+yield instanceof T
+yield !instanceof T
+x
+in instanceof T
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier)))
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (type_identifier))))
+
+==================
+instanceof with a qualified type inside an expression
+==================
+
+x instanceof a.b.C && y
+x !instanceof a.b.C || z
+!(x instanceof a.b.C)
+def v = x instanceof a.b.c
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (parenthesized_expression
+        (instanceof_expression
+          value: (identifier)
+          type: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (instanceof_expression
+        value: (identifier)
+        type: (qualified_type
+          (type_identifier)
+          (type_identifier)
+          (type_identifier))))))
+
+==================
+instanceof with a dotted type after a cast of the name as
+==================
+
+(x) as instanceof x.a
+x = T
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (parenthesized_type_cast
+        type: (type_identifier)
+        value: (identifier))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+instanceof with a dotted type after a cast to a generic type
+==================
+
+x //
+y as a.B<C> instanceof c.D
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (line_comment)
+  (expression_statement
+    (instanceof_expression
+      value: (cast_expression
+        value: (identifier)
+        type: (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier))))
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)))))
+
+==================
+instanceof with a qualified array type
+==================
+
+if ((o != null) && (o instanceof JTextComponent.KeyBinding[])) { }
+
+---
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (parenthesized_expression
+        (binary_expression
+          left: (identifier)
+          right: (null_literal)))
+      right: (parenthesized_expression
+        (instanceof_expression
+          value: (identifier)
+          type: (array_type
+            (qualified_type
+              (type_identifier)
+              (type_identifier))))))
+    consequence: (block)))
+
+==================
+instanceof and not-instanceof with qualified generic types
+==================
+
+x instanceof a.B<?>
+x !instanceof java.util.List<String>[]
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (generic_type
+        base: (qualified_type
+          (type_identifier)
+          (type_identifier))
+        arguments: (type_arguments
+          (wildcard)))))
+  (expression_statement
+    (instanceof_expression
+      value: (identifier)
+      type: (array_type
+        (generic_type
+          base: (qualified_type
+            (type_identifier)
+            (type_identifier)
+            (type_identifier))
+          arguments: (type_arguments
+            (type_identifier)))))))
+
+==================
+instanceof and not-instanceof after parentheses test the parentheses
+==================
+
+return (x) instanceof Foo
+def ok = (a.b) !instanceof Foo
+(x) instanceof Foo && y
+
+---
+
+(source_file
+  (return_statement
+    (instanceof_expression
+      value: (parenthesized_expression
+        (identifier))
+      type: (type_identifier)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (instanceof_expression
+        value: (parenthesized_expression
+          (field_access
+            object: (identifier)
+            field: (identifier)))
+        type: (type_identifier))))
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (parenthesized_expression
+          (identifier))
+        type: (type_identifier))
+      right: (identifier))))
+
+==================
+instanceof after parentheses before a line a method could start
+==================
+
+def ok = (x) instanceof Foo
+bar() { }
+(a.b) instanceof C
+baz() { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (instanceof_expression
+        value: (parenthesized_expression
+          (identifier))
+        type: (type_identifier))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure)))
+  (expression_statement
+    (instanceof_expression
+      value: (parenthesized_expression
+        (field_access
+          object: (identifier)
+          field: (identifier)))
+      type: (type_identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure))))
+
+==================
+names that start like a relational operator after parentheses are a cast operand
+==================
+
+(x) instanceofFoo
+(x) !instanceofFoo
+(x) inside
+(x) index
+(x) !inside
+(x) !in.y
+(x) asked
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (unary_expression
+        operand: (identifier))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier)))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (unary_expression
+        operand: (identifier))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (unary_expression
+        operand: (field_access
+          object: (identifier)
+          field: (identifier)))))
+  (expression_statement
+    (parenthesized_type_cast
+      type: (type_identifier)
+      value: (identifier))))
+
+==================
+!instanceof before a bracket after parentheses starts no cast operand, which Groovy rejects
+==================
+
+(x) !instanceof(Foo)
+(x) !instanceof[Foo]
+
+---
+
+(source_file
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)))))
+  (expression_statement
+    (parenthesized_expression
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (subscript_expression
+        object: (identifier)
+        index: (identifier)))))
+
+==================
+relational operators after parentheses with comments around them
+==================
+
+(x) /* c */ instanceof Foo
+return (x) in /* c */ y
+return (x) /* a */ as /* b */ Foo
+
+---
+
+(source_file
+  (expression_statement
+    (instanceof_expression
+      value: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      type: (type_identifier)))
+  (return_statement
+    (membership_expression
+      element: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      collection: (identifier)))
+  (return_statement
+    (cast_expression
+      value: (parenthesized_expression
+        (identifier))
+      (block_comment)
+      (block_comment)
+      type: (type_identifier))))
+
+==================
+A block on the line after an instanceof test or an as cast is a closure of the result (known divergence)
+==================
+
+def b = x instanceof Foo
+{ y }
+c = x as Foo
+{ y }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (instanceof_expression
+          value: (identifier)
+          type: (type_identifier))
+        closure: (closure
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (cast_expression
+          value: (identifier)
+          type: (type_identifier))
+        closure: (closure
+          (expression_statement
+            (identifier)))))))

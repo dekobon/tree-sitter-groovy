@@ -19,6 +19,121 @@ Range and shift share the same level — left assoc wins
       right: (number_literal))))
 
 ==================
+instanceof and as are tighter than the relational operators
+==================
+
+1 < 2 instanceof Boolean
+1 in [1] as String
+a < b as T < c
+a !in b instanceof T
+a + b as T
+a instanceof T < b
+x as T as U
+
+---
+
+(source_file
+  (expression_statement
+    (binary_expression
+      left: (number_literal)
+      right: (instanceof_expression
+        value: (number_literal)
+        type: (type_identifier))))
+  (expression_statement
+    (membership_expression
+      element: (number_literal)
+      collection: (cast_expression
+        value: (list_literal
+          (number_literal))
+        type: (type_identifier))))
+  (expression_statement
+    (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (cast_expression
+          value: (identifier)
+          type: (type_identifier)))
+      right: (identifier)))
+  (expression_statement
+    (membership_expression
+      element: (identifier)
+      collection: (instanceof_expression
+        value: (identifier)
+        type: (type_identifier))))
+  (expression_statement
+    (cast_expression
+      value: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      type: (type_identifier)))
+  (expression_statement
+    (binary_expression
+      left: (instanceof_expression
+        value: (identifier)
+        type: (type_identifier))
+      right: (identifier)))
+  (expression_statement
+    (cast_expression
+      value: (cast_expression
+        value: (identifier)
+        type: (type_identifier))
+      type: (type_identifier))))
+
+==================
+Regex find and match are looser than equality and tighter than bitwise and
+==================
+
+"x" =~ "x" == 1
+1 == 1 =~ "x"
+a ==~ b != c
+a =~ b <=> c
+a =~ b & c
+a & b ==~ c
+
+---
+
+(source_file
+  (expression_statement
+    (regex_find_expression
+      subject: (string_literal
+        (string_fragment))
+      pattern: (binary_expression
+        left: (string_literal
+          (string_fragment))
+        right: (number_literal))))
+  (expression_statement
+    (regex_find_expression
+      subject: (binary_expression
+        left: (number_literal)
+        right: (number_literal))
+      pattern: (string_literal
+        (string_fragment))))
+  (expression_statement
+    (regex_match_expression
+      subject: (identifier)
+      pattern: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (regex_find_expression
+      subject: (identifier)
+      pattern: (spaceship_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (binary_expression
+      left: (regex_find_expression
+        subject: (identifier)
+        pattern: (identifier))
+      right: (identifier)))
+  (expression_statement
+    (binary_expression
+      left: (identifier)
+      right: (regex_match_expression
+        subject: (identifier)
+        pattern: (identifier)))))
+
+==================
 Ternary and Elvis share the conditional level
 ==================
 
@@ -68,7 +183,7 @@ a ==> b ==> c
         right: (identifier)))))
 
 ==================
-Power is right-associative
+Power is left-associative
 ==================
 
 1 ** 2 ** 3
@@ -78,10 +193,10 @@ Power is right-associative
 (source_file
   (expression_statement
     (power_expression
-      left: (number_literal)
-      right: (power_expression
+      left: (power_expression
         left: (number_literal)
-        right: (number_literal)))))
+        right: (number_literal))
+      right: (number_literal))))
 
 ==================
 Unary plus and minus are looser than power

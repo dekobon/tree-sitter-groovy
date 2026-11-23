@@ -70,3 +70,332 @@ sealed trait T permits A { }
     (permits_clause
       (type_identifier))
     body: (class_body)))
+
+==================
+Sealed and non-sealed declarations with modifiers and annotations
+==================
+
+abstract sealed class A permits B { }
+@Immutable sealed class S { }
+public sealed interface I { }
+private static non-sealed class N { }
+public sealed trait T { }
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Sealed declarations nested in each kind of body
+==================
+
+class C {
+    private static sealed class A { }
+    sealed interface I { }
+}
+interface J {
+    sealed trait T { }
+}
+trait U {
+    non-sealed class N { }
+}
+enum E {
+    X
+    static sealed class S { }
+}
+record R(int x) {
+    @Foo sealed interface Q { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (trait_declaration
+        name: (identifier)
+        body: (class_body))))
+  (trait_declaration
+    name: (identifier)
+    body: (class_body
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (interface_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Sealed with its declaration keyword on the next line (#73)
+==================
+
+sealed // why
+class S permits A { }
+
+---
+
+(source_file
+  (class_declaration
+    (line_comment)
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Modifier-only field before a nested sealed declaration (#73)
+==================
+
+class C {
+    static count
+    sealed class S { }
+    private String name
+    sealed interface I { }
+}
+record R(int x) {
+    static count
+    sealed trait T { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (interface_declaration
+        name: (identifier)
+        body: (class_body))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (trait_declaration
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+Sealed before another modifier or an annotation is an error (known divergence)
+==================
+
+sealed public class C { }
+sealed @Ann class C { }
+sealed final class F { }
+sealed non-sealed class N { }
+
+---
+
+(source_file
+  (ERROR)
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (ERROR)
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (ERROR
+      (identifier))
+    name: (identifier)
+    body: (class_body))
+  (ERROR)
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Sealed before abstract, with permits, is an error that keeps the class (known divergence)
+==================
+
+sealed abstract class A permits B { }
+@CompileStatic
+sealed abstract class Shape permits Circle, Square {
+    int sides
+}
+public sealed abstract class P permits Q { }
+
+---
+
+(source_file
+  (ERROR)
+  (class_declaration
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (ERROR)
+    name: (identifier)
+    (permits_clause
+      (type_identifier)
+      (type_identifier))
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))))
+  (class_declaration
+    (ERROR
+      (identifier))
+    name: (identifier)
+    (permits_clause
+      (type_identifier))
+    body: (class_body)))
+
+==================
+Sealed before another modifier in a class body is an error (known divergence)
+==================
+
+class O {
+    sealed static class C { }
+    int after
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (ERROR)
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Sealed record and sealed enum are errors
+==================
+
+sealed record R(int x) { }
+sealed enum E { A }
+
+---
+
+(source_file
+  (ERROR)
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (ERROR)
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier)))))
+
+==================
+Sealed alone on a line before another modifier is a name (known divergence)
+==================
+
+sealed
+public class C { }
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (class_declaration
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Field named sealed at the end of a line before a nested class (known divergence)
+==================
+
+class O {
+    private boolean sealed
+    class Inner { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (variable_declarator
+          name: (identifier)))
+      (class_declaration
+        name: (identifier)
+        body: (class_body)))))
