@@ -1014,6 +1014,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A slashy string may span lines and start with whitespace where no
+  division may follow, as Groovy's `SlashyStringCharacter` takes both:
+  `def a = /a` then `b/` on the next line, `foo(/x` then `y/, 1)` and
+  `s.replaceFirst(/ in [ \dms]+/, '')` parse. Each was an `ERROR`, as
+  at v0.6.0. Where a `/` may divide, a string still needs a body that
+  does not start with whitespace and closes on its line, so `a` then
+  `/ 2` on the next line stays a division, and `yield / 2` in a closure
+  a division by 2. The look-ahead stops at the first unescaped `/`, and
+  the bound on escaped slashes holds across lines
+  (`bindings/rust/tests/slashy_string_cost.rs`). 13 of 21,667 real
+  files parse without an `ERROR`, none gains one, and every tree that
+  changes had an `ERROR` before (`SPECIFICATION.md` §6.2). (#119)
 - Annotations alone before a declared name with a value make a
   declaration, as Apache's `variableModifiers` and `modifiers` take an
   annotation as a modifier: `@Field FOO = [a: 1]` in a script,
