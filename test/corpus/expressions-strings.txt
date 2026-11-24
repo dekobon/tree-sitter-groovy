@@ -1469,3 +1469,49 @@ x = $/* c */ -> 1
       right: (string_literal
         (string_fragment)
         (MISSING "/$")))))
+
+==================
+A slashy string runs across lines where an operand starts
+==================
+
+def a = /a
+b/
+foo(/x
+  y/, 1)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (string_fragment))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (string_literal
+          (string_fragment))
+        (number_literal)))))
+
+==================
+A slashy string may start with a space where an operand starts
+==================
+
+def c = s.replaceFirst(/ in [ \dms]+/, "")
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (field_access
+          object: (identifier)
+          field: (identifier))
+        arguments: (argument_list
+          (string_literal
+            (string_fragment))
+          (string_literal))))))

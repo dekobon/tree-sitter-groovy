@@ -78,3 +78,18 @@ fn a_slashy_string_of_escaped_slashes_is_read_a_bounded_number_of_times() {
 fn escaped_slashes_in_error_recovery_are_read_a_bounded_number_of_times() {
     assert_linear(|n| format!("@ {}\n", "/\\".repeat(n)));
 }
+
+// Where no division may follow, the look-ahead runs past line breaks to the
+// closing `/` (a slashy string may span lines). It still stops at the first
+// unescaped `/`, so each line's `/` below is read from the one before it
+// only, and the escaped slashes stay bounded across lines.
+
+#[test]
+fn unclosed_slashy_strings_on_many_lines_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| "x = /a\n".repeat(n));
+}
+
+#[test]
+fn escaped_slashes_across_lines_are_read_a_bounded_number_of_times() {
+    assert_linear(|n| format!("x = /{}\n", "\\/\n".repeat(n)));
+}
