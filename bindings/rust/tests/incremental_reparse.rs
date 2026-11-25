@@ -1455,3 +1455,18 @@ fn deleting_a_name_after_a_forked_call_flips_the_cast_before_it() {
         );
     }
 }
+
+#[test]
+fn reparse_after_excluded_method_name_edits_matches_parse_from_scratch() {
+    const EXCLUDED_NAME_TEXTS: &[&str] = &[
+        "@A this(x) { }\n@A int x = 1\nthis(1)\n",
+        "private int(x) { }\nprivate int x\nprivate foo(x) { }\n",
+        "class C {\n  @A <T> void (x) { }\n  private this(x) { }\n  C(x) { this(x) }\n  private trait(x) { }\n}\n",
+        "@A\nthis (x) { }\nprivate <T> goto(x) { }\n@A var(x) { }\n",
+        "x = 1\nthis(x)\nint(x)\nprivate sealed(x) { }\n",
+    ];
+    const EXCLUDED_NAME_INSERTIONS: &[&str] = &[
+        "", " ", "\n", "(", "s", "@A ", "private ", "<T> ", "this", "int", ".",
+    ];
+    assert_every_edit_reparses(EXCLUDED_NAME_TEXTS, EXCLUDED_NAME_INSERTIONS);
+}

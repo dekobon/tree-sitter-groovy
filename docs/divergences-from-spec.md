@@ -2668,12 +2668,13 @@ field or a local declared by modifiers alone (`private case = 1` is an
 `ERROR`, as in Groovy). `this`, `void` and the primitive types are
 identifiers in this grammar, and `goto`, `const` and `threadsafe` are
 no tokens of it, so none can be reserved: tree-sitter takes only tokens
-as reserved words. Making them tokens would take a token for each
-wherever it stands today, `this` in every expression, key and
-receiver position and the types in every type position, which is not
-attempted here. At v0.6.0 the annotated forms (`@A this(x) { }`,
-`@A void(x) { }`) were a return type before a missing name; now they
-are methods.
+as reserved words, and making them tokens would take a token for each
+wherever it stands today, `this` in every expression, key and receiver
+position and the types in every type position. The scanner turns them
+down instead: before one of them and a `(` on its line it emits
+`_excluded_method_name` (spec §6.25), the word is the return type and
+the name is missing, the tree `@A this(x) { }` had at v0.6.0. Past a
+line break or a comment before the `(` they are still names.
 
 A quoted name there is `_constant_string_literal`, `string_literal`
 with no interpolation and no fallback `$`, which would take the one of
@@ -2689,7 +2690,8 @@ type the name is any `string_literal`, as before.
 |---|---|---|
 | `private case(x) { }`, `@A true(x) { }`, `private <T> static(x) { }` | rejected | an `ERROR` |
 | `@A in(x) { }`, `private record(x) { }`, `@A var(x) { }` | a method | the same |
-| `@A this(x) { }`, `private int(x) { }`, `@A void(x) { }`, `private goto(x) { }` | rejected | a method named `this`, `int`, `void` or `goto` |
+| `@A this(x) { }`, `private int(x) { }`, `@A void(x) { }`, `private goto(x) { }` | rejected | a return type before a missing name |
+| `@A this` then `(x) { }` on the next line, `private int /* c */ (x) { }` | rejected | a method named `this` or `int` |
 | `def case() { }`, `def true() { }` | rejected | a method named `case` or `true`: after `def` or a return type no word is reserved (spec §5.2, #93) |
 | `@A "a${x}"(n) { }`, `private "a$x"(n) { }` | rejected | an `ERROR` |
 | `@A 'a b'(n) { }`, `@A "a b"(n) { }`, `@A $/a b/$(n) { }` | a method | the same |
@@ -2699,9 +2701,9 @@ type the name is any `string_literal`, as before.
 | `@A $/a $— b/$(n) { }` | a method: no interpolation starts at `—` | an `ERROR`: a character past ASCII after the `$` is read as a letter |
 | `def "a${x}"(n) { }` | rejected | a method whose name holds the interpolation |
 
-**Action**: none planned for the names this grammar reads as
-identifiers or for a slashy name after type parameters; a keyword
-after `def` or a return type is #93.
+**Action**: none planned for a word before a line break or a comment,
+or for a slashy name after type parameters; a keyword after `def` or a
+return type is #93.
 
 ## 34. Method declarations in a block or a closure
 

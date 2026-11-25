@@ -599,8 +599,10 @@ it also covers the type that may stand in the name's place
 modifiers alone, so `class C { private case = 1 }` is an `ERROR` too,
 as in Groovy. `this`, `void` and the primitive types, which are
 identifiers here, and `goto`, `const` and `threadsafe`, which are no
-tokens of this grammar, cannot be reserved and stay names in that
-position (`docs/divergences-from-spec.md` §33). Only `case` is a key
+tokens of this grammar, cannot be reserved; the scanner turns them down
+there instead where `(` follows on their line (§6.25), so
+`@A this(x) { }` is a return type before a missing name
+(`docs/divergences-from-spec.md` §33). Only `case` is a key
 everywhere: `[new: 1]` is an `ERROR`, and `new` is a key after a comma
 only on the comma's line (§6.8). A
 keyed multi-assignment pair takes neither as its key
@@ -5184,6 +5186,49 @@ changes, from an `ERROR` to no `ERROR`
 30 runs (5 for the Java files): unchanged on the real files, 0.6% more
 on the Java files and on Gradle- and Jenkins-style files, 0.7% more on a
 file of nested empty blocks.
+
+### 6.25 EXCLUDED_METHOD_NAME — implementation contract
+
+```text
+Where EXCLUDED_METHOD_NAME is valid (the name of a method with no `def`
+and no return type may come: after a method's annotations or modifiers
+or its type parameters; no error recovery) and no value, bare lambda or
+array type may start:
+  read the word;
+  `record`, `trait`, `sealed`, `var`, `yield`, `in`, `as`: decided as in
+    §6.7, §6.13 and §6.16;
+  `this`, `void`, `boolean`, `byte`, `char`, `short`, `int`, `long`,
+  `float`, `double`, `goto`, `const`, `threadsafe`, then `(` past
+  spaces, tabs and line escapes:
+    emit EXCLUDED_METHOD_NAME, empty;
+  otherwise emit nothing, and the in-grammar lexer reads the word.
+After annotations where a statement starts, the read of its first name
+(§6.14, §6.21) decides the same words before `(`.
+```
+
+Apache's `methodName` takes an `identifier`, which is no keyword of
+Groovy's lexer but the contextual ones. The thirteen words above are
+the keywords that this grammar reads as identifiers, so the reserved set
+of §5.2 cannot hold them: tree-sitter reserves only tokens. Before them,
+`_untyped_method_name` takes the token in an error production, the
+word as the `return_type` and the name a `_missing_value`, which never
+comes, so recovery inserts a missing `identifier`: `@A this(x) { }`,
+`private int(x) { }` and `class C { @A <T> void(x) { } }` have the tree
+`@A this(x) { }` had at v0.6.0. Only that name takes a `(` after such a
+word there, as a type is followed by a name, so the token comes in no
+valid input. Past a line break or a comment between the word and the
+`(` the scanner does not read, and the word stays a name there
+(`@A this` then `(x) { }`, `private int /* c */ (x) { }`); this grammar
+takes a line break before the parameters of any such method, which
+Groovy rejects.
+
+Measured against the grammar before: STATE_COUNT 5169 to 5211,
+SYMBOL_COUNT 435 to 436, one external token and no conflict. No corpus
+tree and none of 11,476 real files changes; of invalid inputs probed,
+`final int (a, b) = [1, 2]`, a local named `int` and a multi-assignment
+before, is an `ERROR`. `bindings/rust/tests/incremental_reparse.rs`
+checks every single edit of five texts that mix these words with the
+names around them.
 
 ---
 

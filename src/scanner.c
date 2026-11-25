@@ -151,6 +151,7 @@ enum TokenType {
     UNREACHABLE,
     TYPE_ARGUMENTS_OPEN,
     CAST_WORD_CLOSE,
+    EXCLUDED_METHOD_NAME,
     ERROR_SENTINEL,
 };
 
@@ -411,6 +412,17 @@ static bool is_primitive_type(const char *word, unsigned len) {
         || word_is(word, len, "char") || word_is(word, len, "double")
         || word_is(word, len, "float") || word_is(word, len, "int")
         || word_is(word, len, "long") || word_is(word, len, "short");
+}
+
+// Whether a word that `read_word` returned is one that Groovy's lexer
+// makes a keyword and Apache's `identifier` does not take, and that this
+// grammar reads as a name: `this`, `void`, a primitive type name and the
+// reserved `goto`, `const` and `threadsafe`. None names a method that has
+// no `def` and no return type (Apache `methodName`).
+static bool is_excluded_method_name(const char *word, unsigned len) {
+    return is_primitive_type(word, len) || word_is(word, len, "this")
+        || word_is(word, len, "void") || word_is(word, len, "goto")
+        || word_is(word, len, "const") || word_is(word, len, "threadsafe");
 }
 
 // Consumes a name and returns whether it is a primitive type name. It
@@ -3475,6 +3487,13 @@ static bool scan_statement_start(
         || (as_word && !is_identifier_start(lexer->lookahead))) {
         return false;
     }
+    // After annotations, a word that names no method before the `(` of
+    // parameters: the empty token ends the reading as a method's name.
+    if (lexer->lookahead == '(' && valid_symbols[EXCLUDED_METHOD_NAME]
+        && is_excluded_method_name(word, len)) {
+        lexer->result_symbol = EXCLUDED_METHOD_NAME;
+        return true;
+    }
     // §6.24 — a call with a closure that a member access goes on with.
     if (lexer->lookahead == '{') {
         return scan_closure_call_start(lexer, valid_symbols, no_close_ahead);
@@ -3514,6 +3533,53 @@ static bool scan_statement_start(
         return false;
     }
     lexer->result_symbol = COMMAND_STATEMENT_START;
+    return true;
+}
+
+// The word after a modifier, or after the annotations or the type
+// parameters of a member: `record`, `trait`, `sealed` and `var` as the
+// branches of the scan function decide them, and EXCLUDED_METHOD_NAME,
+// empty, before a word that names no method and that the `(` of
+// parameters follows on its line (`private this(x) { }`,
+// `@A <T> int(x) { }`). Only the name of a method with no `def` and no
+// return type takes a `(` there, so no valid reading has the token; the
+// parser takes it and reads the word as the return type, and the name
+// after it, `_missing_value`, never comes, so recovery inserts it as
+// missing (SPECIFICATION.md §6.25). On false the in-grammar lexer reads
+// the word.
+//
+// The caller has skipped whitespace and seen an identifier start.
+static bool scan_untyped_method_name(
+    TSLexer *lexer,
+    const bool *valid_symbols,
+    bool no_close_ahead
+) {
+    lexer->mark_end(lexer);
+    char word[sizeof "threadsafe"];
+    unsigned len = read_word(lexer, word, sizeof word);
+    if (word_is(word, len, "record") && valid_symbols[RECORD_KEYWORD]) {
+        lexer->result_symbol = RECORD_KEYWORD;
+        return scan_record_header(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "trait") && valid_symbols[TRAIT_KEYWORD]) {
+        lexer->result_symbol = TRAIT_KEYWORD;
+        return scan_trait_header(lexer, no_close_ahead);
+    }
+    if (word_is(word, len, "sealed") && valid_symbols[SEALED_KEYWORD]) {
+        lexer->result_symbol = SEALED_KEYWORD;
+        return scan_sealed_target(lexer, no_close_ahead);
+    }
+    if (is_contextual_word(word, len)
+        && contextual_word_may_start(word[0], valid_symbols)) {
+        lexer->mark_end(lexer);
+        return scan_contextual_word(lexer, word, len, valid_symbols,
+                                    no_close_ahead);
+    }
+    if (!is_excluded_method_name(word, len)
+        || !skip_same_line_space(lexer, false) || lexer->lookahead != '(') {
+        return false;
+    }
+    lexer->result_symbol = EXCLUDED_METHOD_NAME;
     return true;
 }
 
@@ -6265,7 +6331,8 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !valid_symbols[MULTI_ASSIGNMENT_COMMA]
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
-        && !valid_symbols[AS_KEYWORD]) {
+        && !valid_symbols[AS_KEYWORD]
+        && !valid_symbols[EXCLUDED_METHOD_NAME]) {
         return false;
     }
 
@@ -6300,6 +6367,14 @@ bool tree_sitter_groovy_external_scanner_scan(
                 && !valid_symbols[COMMAND_STATEMENT_START]);
         return scan_statement_start(lexer, valid_symbols, wants_array,
                                     declaration_type, no_close_ahead);
+    }
+    // Where the name of a method with no `def` and no return type may
+    // come, and no statement's first name (above), one read of the word
+    // decides the keywords below and the words that name no method.
+    if (valid_symbols[EXCLUDED_METHOD_NAME] && !valid_symbols[ERROR_SENTINEL]
+        && !wants_value_start && !wants_bare_lambda && !wants_array
+        && is_identifier_start(lexer->lookahead)) {
+        return scan_untyped_method_name(lexer, valid_symbols, no_close_ahead);
     }
     if (lexer->lookahead == 'r' && wants_record) {
         if (!consume_keyword(lexer, "record")

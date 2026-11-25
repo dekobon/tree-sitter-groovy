@@ -997,14 +997,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a missing name, are an `ERROR`. The set also holds for the name of a
   field or a local declared by modifiers alone, so
   `class C { private case = 1 }` and `final null = 1`, accepted at
-  v0.6.0, are an `ERROR`, as in Groovy. `@A this(x) { }`,
-  `@A void(x) { }` and `@A int(x) { }`, a return type before a missing
-  name at v0.6.0, are methods: `this`, `void` and the primitive types
-  are names in this grammar and cannot be reserved
-  (`docs/divergences-from-spec.md` §33). A quoted name of such a
-  method holds no interpolation, as Apache's `methodName` takes the
-  `StringLiteral` token: `private "a${x}"(n) { }`, a method at
-  v0.6.0, and `@A "a${x}"(n) { }` are an `ERROR`, and
+  v0.6.0, are an `ERROR`, as in Groovy. `this`, `void`, the primitive
+  types, `goto`, `const` and `threadsafe` are names in this grammar,
+  and a new external token, `_excluded_method_name`, turns them down
+  there before a `(` on their line (`SPECIFICATION.md` §6.25): so
+  `@A this(x) { }` is a return type before a missing name, as at
+  v0.6.0, and so is `private int(x) { }`, a method named `int` at
+  v0.6.0. A quoted name of such a method holds no interpolation, as
+  Apache's `methodName` takes the `StringLiteral` token:
+  `private "a${x}"(n) { }`, a method at v0.6.0, and
+  `@A "a${x}"(n) { }` are an `ERROR`, and
   `@A 'a b'(n) { }`, an `ERROR` at v0.6.0, is a method. Nor is a
   slashy string such a name, as Groovy 6 reads a `/` after a name, a
   `)` or a modifier as division: `private /a/(n) { }`, a method at

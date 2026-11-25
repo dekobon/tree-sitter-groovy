@@ -509,7 +509,7 @@ function methodHead($, beforeParameters = choice(
   seq(
     repeat($.annotation),
     repeat1($._modifier),
-    field('name', $._untyped_method_name),
+    $._untyped_method_name,
   ),
 )) {
   return [
@@ -547,7 +547,7 @@ function untypedMethodHead($) {
         field('type_parameters', $.method_type_parameters),
       ),
     ),
-    field('name', $._untyped_method_name),
+    $._untyped_method_name,
   ));
 }
 
@@ -976,7 +976,8 @@ module.exports = grammar({
   // local declared by modifiers alone, so `private case = 1` is an ERROR
   // too, as in Groovy. The set holds the global words, and leaves out
   // `this`, `void` and the primitive types: tree-sitter reserves only
-  // tokens, and in this grammar they are identifiers.
+  // tokens, and in this grammar they are identifiers. The scanner turns
+  // them down there instead (`_excluded_method_name`, §6.25).
   reserved: {
     global: _ => ['new', 'case'],
     property: _ => [],
@@ -1188,6 +1189,11 @@ module.exports = grammar({
     // Groovy, and could also start a member that would split the line
     // (see `parenthesized_expression`).
     $._cast_word_close,
+    // §6.25 — an empty token before `this`, `void`, a primitive type,
+    // `goto`, `const` or `threadsafe` where the name of a method with no
+    // `def` and no return type may come and `(` follows on the line: Groovy
+    // takes none of them as that name (see `_untyped_method_name`).
+    $._excluded_method_name,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -3410,9 +3416,23 @@ module.exports = grammar({
     // A quoted name is Apache's `stringLiteral`, the `StringLiteral`
     // token, which holds no interpolation: `@A "a${x}"(n) { }` is no
     // method in Groovy, and was a clean one here.
+    //
+    // The third alternative is an error production. The scanner emits
+    // `_excluded_method_name`, empty, before a word that Groovy takes as
+    // no such name and that this grammar reads as an identifier
+    // (`this`, `void`, `int`, `goto`, …) where `(` follows it: the word
+    // is then the return type, and the name, a token that matches no
+    // input, is always missing, as it was before this name was taken
+    // after annotations alone. The fields are set here, not where the
+    // rule is used, so that the return type is not a name.
     _untyped_method_name: $ => choice(
-      reserved('untyped_method_name', $.identifier),
-      alias($._constant_string_literal, $.quoted_identifier),
+      field('name', reserved('untyped_method_name', $.identifier)),
+      field('name', alias($._constant_string_literal, $.quoted_identifier)),
+      seq(
+        $._excluded_method_name,
+        field('return_type', alias($.identifier, $.type_identifier)),
+        field('name', alias($._missing_value, $.identifier)),
+      ),
     ),
 
     // `string_literal` without `$x` or `${x}`, with the same children.
