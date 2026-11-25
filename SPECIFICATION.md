@@ -588,8 +588,19 @@ as a map key or a named argument's key (`[case: 1]`, `foo(case: 1)`,
 `elementValuePairName`). Where a method's name may follow, no word is
 reserved either, so `def case = 1`, `def case() { }` and
 `class C { int case }` parse, which Groovy rejects, as they do with
-`new`. Only `case` is a key everywhere: `[new: 1]` is an `ERROR`, and
-`new` is a key after a comma only on the comma's line (§6.8). A
+`new`. The name of a method with no `def` and no return type, after
+modifiers, annotations or type parameters (`_untyped_method_name`),
+reserves every keyword above that is a token of this grammar, as
+Apache's `methodName` takes an `identifier`: `private case(x) { }`,
+`@A true(x) { }` and `private <T> static(x) { }` are an `ERROR`. A
+parse state takes the reserved set of one of its positions, and there
+it also covers the type that may stand in the name's place
+(`private int x`), so `this`, `void` and the primitive types, which are
+identifiers here, and `goto`, `const` and `threadsafe`, which are no
+tokens of this grammar, stay names in that position
+(`docs/divergences-from-spec.md` §33). Only `case` is a key
+everywhere: `[new: 1]` is an `ERROR`, and `new` is a key after a comma
+only on the comma's line (§6.8). A
 keyed multi-assignment pair takes neither as its key
 (`def (case: n) = m` is an `ERROR`; Groovy 6's `keyedPair` takes an
 `identifier`). `case` is reserved because, as a name, error recovery

@@ -1188,3 +1188,180 @@ An annotated loop is not a method named after its keyword
     condition: (boolean_literal)
     body: (block
       (break_statement))))
+
+==================
+A reserved word is no method name after annotations (case)
+:error
+==================
+
+@A case(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (default)
+:error
+==================
+
+@A default(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (super)
+:error
+==================
+
+@A super(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (true)
+:error
+==================
+
+@A true(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (null)
+:error
+==================
+
+@A null(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (instanceof)
+:error
+==================
+
+@A instanceof(x) { x }
+
+---
+
+==================
+A reserved word is no method name after type parameters
+:error
+==================
+
+private <T> static(x) { x }
+
+---
+
+==================
+A reserved word is no method name after modifiers
+:error
+==================
+
+private false(x) { x }
+
+---
+
+==================
+Contextual keywords name a method after annotations
+==================
+
+@A in(x) { x }
+@A as(x) { x }
+@A record(x) { x }
+@A yield(x) { x }
+@A var(x) { x }
+@A trait(x) { x }
+@A sealed(x) { x }
+@A permits(x) { x }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))

@@ -2645,3 +2645,34 @@ power after it.
 
 **Action**: a sign that binds tighter than `**` inside a cast's operand
 only, which needs a second unary rule for that operand; not attempted.
+
+## 33. Keywords as the name of a method with no return type
+
+**Apache `GroovyParser.g4`** (`GROOVY_6_0_X`): `methodName` is
+`identifier | stringLiteral`, and `identifier` takes `Identifier`,
+`CapitalizedIdentifier` and the contextual keywords `as`, `async`,
+`await`, `defer`, `in`, `module`, `permits`, `record`, `sealed`,
+`trait`, `val`, `var` and `yield`. Every other keyword is no method
+name, `this`, `void` and the primitive types included.
+
+**Current implementation**: the name of a method with no `def` and no
+return type (`_untyped_method_name`) reserves the
+`untyped_method_name` set, every keyword that is a token of this
+grammar and no Apache `identifier` (spec §5.2). `this`, `void` and the
+primitive types are identifiers in this grammar, and `goto`, `const`
+and `threadsafe` are no tokens of it, so none can be reserved:
+tree-sitter takes only tokens as reserved words. Reserving the types
+as tokens would not help either. A parse state takes the reserved set
+of one of its positions, and after `private` or `@A` the same state
+holds the type of a field or a method (`private int x`,
+`@A void f() { }`), which would then be an `ERROR`.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `private case(x) { }`, `@A true(x) { }`, `private <T> static(x) { }` | rejected | an `ERROR` |
+| `@A in(x) { }`, `private record(x) { }`, `@A var(x) { }` | a method | the same |
+| `@A this(x) { }`, `private int(x) { }`, `@A void(x) { }`, `private goto(x) { }` | rejected | a method named `this`, `int`, `void` or `goto` |
+| `def case() { }`, `def true() { }` | rejected | a method named `case` or `true`: after `def` or a return type no word is reserved (spec §5.2, #93) |
+
+**Action**: none planned for the names this grammar reads as
+identifiers; a keyword after `def` or a return type is #93.

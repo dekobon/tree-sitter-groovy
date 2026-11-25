@@ -975,10 +975,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   as the modifier-only form has had since #56. Previously
   these parsed with no `ERROR`, the name as `return_type` and a
   zero-width `name`. `foo(x) { }`, with neither, is still a call with
-  a trailing closure. A statement keyword is reserved as that name, so
-  an annotated loop, `@A while (x) { }`, is an `ERROR` over the
-  annotation followed by the `while_statement`, and no longer a method
-  named `while` with a missing name. (#106)
+  a trailing closure. Every keyword of the grammar but the contextual
+  ones (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`) is
+  reserved as the name of a method with no `def` and no return type,
+  after modifiers too, as Apache's `methodName` takes an `identifier`:
+  `private true(x) { }` and `private case(x) { }`, methods named `true`
+  and `case` with no `ERROR` at v0.6.0, and `@A true(x) { }`, a return
+  type `true` before a missing name, are an `ERROR`. So is an annotated
+  loop, `@A while (x) { }`: an `ERROR` over the annotation followed by
+  the `while_statement`, where v0.6.0 read a method with the return
+  type `while` and a missing name. `this`, `void` and the primitive
+  types, which are names in this grammar, are still taken there
+  (`docs/divergences-from-spec.md` §33). (#106)
 
 ### Fixed
 

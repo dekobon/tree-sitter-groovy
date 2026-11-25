@@ -13831,55 +13831,7 @@
     "untyped_method_name": [
       {
         "type": "STRING",
-        "value": "new"
-      },
-      {
-        "type": "STRING",
-        "value": "if"
-      },
-      {
-        "type": "STRING",
-        "value": "else"
-      },
-      {
-        "type": "STRING",
-        "value": "for"
-      },
-      {
-        "type": "STRING",
-        "value": "while"
-      },
-      {
-        "type": "STRING",
-        "value": "do"
-      },
-      {
-        "type": "STRING",
-        "value": "switch"
-      },
-      {
-        "type": "STRING",
-        "value": "try"
-      },
-      {
-        "type": "STRING",
-        "value": "catch"
-      },
-      {
-        "type": "STRING",
-        "value": "finally"
-      },
-      {
-        "type": "STRING",
-        "value": "synchronized"
-      },
-      {
-        "type": "STRING",
-        "value": "return"
-      },
-      {
-        "type": "STRING",
-        "value": "throw"
+        "value": "abstract"
       },
       {
         "type": "STRING",
@@ -13891,7 +13843,159 @@
       },
       {
         "type": "STRING",
+        "value": "case"
+      },
+      {
+        "type": "STRING",
+        "value": "catch"
+      },
+      {
+        "type": "STRING",
+        "value": "class"
+      },
+      {
+        "type": "STRING",
         "value": "continue"
+      },
+      {
+        "type": "STRING",
+        "value": "def"
+      },
+      {
+        "type": "STRING",
+        "value": "default"
+      },
+      {
+        "type": "STRING",
+        "value": "do"
+      },
+      {
+        "type": "STRING",
+        "value": "else"
+      },
+      {
+        "type": "STRING",
+        "value": "enum"
+      },
+      {
+        "type": "STRING",
+        "value": "extends"
+      },
+      {
+        "type": "STRING",
+        "value": "false"
+      },
+      {
+        "type": "STRING",
+        "value": "final"
+      },
+      {
+        "type": "STRING",
+        "value": "finally"
+      },
+      {
+        "type": "STRING",
+        "value": "for"
+      },
+      {
+        "type": "STRING",
+        "value": "if"
+      },
+      {
+        "type": "STRING",
+        "value": "implements"
+      },
+      {
+        "type": "STRING",
+        "value": "import"
+      },
+      {
+        "type": "STRING",
+        "value": "instanceof"
+      },
+      {
+        "type": "STRING",
+        "value": "interface"
+      },
+      {
+        "type": "STRING",
+        "value": "native"
+      },
+      {
+        "type": "STRING",
+        "value": "new"
+      },
+      {
+        "type": "STRING",
+        "value": "null"
+      },
+      {
+        "type": "STRING",
+        "value": "package"
+      },
+      {
+        "type": "STRING",
+        "value": "private"
+      },
+      {
+        "type": "STRING",
+        "value": "protected"
+      },
+      {
+        "type": "STRING",
+        "value": "public"
+      },
+      {
+        "type": "STRING",
+        "value": "return"
+      },
+      {
+        "type": "STRING",
+        "value": "static"
+      },
+      {
+        "type": "STRING",
+        "value": "strictfp"
+      },
+      {
+        "type": "STRING",
+        "value": "super"
+      },
+      {
+        "type": "STRING",
+        "value": "switch"
+      },
+      {
+        "type": "STRING",
+        "value": "synchronized"
+      },
+      {
+        "type": "STRING",
+        "value": "throw"
+      },
+      {
+        "type": "STRING",
+        "value": "throws"
+      },
+      {
+        "type": "STRING",
+        "value": "transient"
+      },
+      {
+        "type": "STRING",
+        "value": "true"
+      },
+      {
+        "type": "STRING",
+        "value": "try"
+      },
+      {
+        "type": "STRING",
+        "value": "volatile"
+      },
+      {
+        "type": "STRING",
+        "value": "while"
       }
     ]
   }

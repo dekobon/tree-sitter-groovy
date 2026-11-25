@@ -876,13 +876,31 @@ module.exports = grammar({
   // a comma and of an annotation's `name = value`, and the empty
   // `property` set for a key after `_command_named_key` and a name after
   // a member access (`x.case`, `x::case`).
+  //
+  // `untyped_method_name` is the name of a method with no `def` and no
+  // return type (`_untyped_method_name`). Apache's `methodName` takes
+  // an `identifier`, which admits no keyword but the contextual ones
+  // (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`, …), so
+  // every other keyword of this grammar is reserved there: without it a
+  // keyword with no action lexed as the name, and `@A while (x) { }` or
+  // `@A true(x) { }` was a clean method. A parse state takes one set,
+  // the highest-numbered of its positions', not a union, and after
+  // `private` or `@A` the type that may come instead of the name
+  // (`private int x`) shares the state. So this set holds the global
+  // words too, and leaves out `int`, `void` and `this`: they are
+  // identifiers in this grammar, not tokens, and the types would be
+  // reserved in that type's place as well.
   reserved: {
     global: _ => ['new', 'case'],
     property: _ => [],
     untyped_method_name: _ => [
-      'new', 'if', 'else', 'for', 'while', 'do', 'switch', 'try', 'catch',
-      'finally', 'synchronized', 'return', 'throw', 'assert', 'break',
-      'continue',
+      'abstract', 'assert', 'break', 'case', 'catch', 'class', 'continue',
+      'def', 'default', 'do', 'else', 'enum', 'extends', 'false', 'final',
+      'finally', 'for', 'if', 'implements', 'import', 'instanceof',
+      'interface', 'native', 'new', 'null', 'package', 'private',
+      'protected', 'public', 'return', 'static', 'strictfp', 'super',
+      'switch', 'synchronized', 'throw', 'throws', 'transient', 'true',
+      'try', 'volatile', 'while',
     ],
   },
 
@@ -3271,10 +3289,11 @@ module.exports = grammar({
       alias($.string_literal, $.quoted_identifier),
     ),
 
-    // The name of a method with no `def` and no return type. A
-    // statement keyword is reserved here: with nothing else in that
-    // position it would lex as an identifier, and `@A while (x) { }`
-    // would be a method named `while` with no ERROR.
+    // The name of a method with no `def` and no return type. Every
+    // keyword that Apache's `identifier` does not take is reserved
+    // here (`untyped_method_name` above): with no action in that
+    // position it would lex as an identifier, and `@A true(x) { }`
+    // would be a method named `true` with no ERROR.
     _untyped_method_name: $ => choice(
       reserved('untyped_method_name', $.identifier),
       alias($.string_literal, $.quoted_identifier),
