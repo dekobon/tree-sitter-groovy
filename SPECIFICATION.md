@@ -595,10 +595,12 @@ Apache's `methodName` takes an `identifier`: `private case(x) { }`,
 `@A true(x) { }` and `private <T> static(x) { }` are an `ERROR`. A
 parse state takes the reserved set of one of its positions, and there
 it also covers the type that may stand in the name's place
-(`private int x`), so `this`, `void` and the primitive types, which are
+(`private int x`) and the name of a field or a local declared by
+modifiers alone, so `class C { private case = 1 }` is an `ERROR` too,
+as in Groovy. `this`, `void` and the primitive types, which are
 identifiers here, and `goto`, `const` and `threadsafe`, which are no
-tokens of this grammar, stay names in that position
-(`docs/divergences-from-spec.md` §33). Only `case` is a key
+tokens of this grammar, cannot be reserved and stay names in that
+position (`docs/divergences-from-spec.md` §33). Only `case` is a key
 everywhere: `[new: 1]` is an `ERROR`, and `new` is a key after a comma
 only on the comma's line (§6.8). A
 keyed multi-assignment pair takes neither as its key

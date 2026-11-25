@@ -980,24 +980,30 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   with annotations alone (`@Memoized fib(n) { }`) or with modifiers and
   type parameters (`private <T> first(List<T> xs) { }`), has its name
   as `name` at a script's top level and in a type body, as the
-  modifier-only form has had since #56. Previously these parsed with
-  no `ERROR`, the name as `return_type` and a zero-width `name`. At a
-  script's top level such a method needs a body, as in Groovy, so
-  `@A foo(x)` alone is an `ERROR`. In a class body `@A setX(a) { }`
-  stays a `constructor_declaration` (#91), and in a block or a
-  closure, where Groovy declares no method, each form keeps its v0.6.0
-  tree. `foo(x) { }`, with neither, is still a call with a trailing
-  closure. Every keyword of the grammar but the contextual
-  ones (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`) is
-  reserved as the name of a method with no `def` and no return type,
-  after modifiers too, as Apache's `methodName` takes an `identifier`:
-  `private true(x) { }` and `private case(x) { }`, methods named `true`
-  and `case` with no `ERROR` at v0.6.0, and `@A true(x) { }`, a return
-  type `true` before a missing name, are an `ERROR`. `this`, `void`
-  and the primitive types, which are names in this grammar, are still
-  taken there (`docs/divergences-from-spec.md` §33). A quoted name of
-  such a method holds no interpolation, as Apache's `methodName` takes
-  the `StringLiteral` token: `private "a${x}"(n) { }`, a method at
+  modifier-only form has had since #56. Previously the name was the
+  `return_type`, followed by a missing `name`. At a script's top level
+  such a method needs a body, as in Groovy, so `@A foo(x)` alone is an
+  `ERROR`. In a type body `@A setX(a) { }` stays a
+  `constructor_declaration`, and `interface I { @A foo(x) }` an `ERROR`
+  (#91); in a block or a closure, where Groovy declares no method, each
+  form keeps its v0.6.0 tree. `foo(x) { }`, with neither, is still a
+  call with a trailing closure. Every keyword of the grammar but the
+  contextual ones (`as`, `in`, `permits`, `record`, `trait`, `var`,
+  `yield`) and `pipeline` is reserved as the name of a method with no
+  `def` and no return type, after modifiers too, as Apache's
+  `methodName` takes an `identifier`: `private true(x) { }` and
+  `private case(x) { }`, methods named `true` and `case` with no
+  `ERROR` at v0.6.0, and `@A true(x) { }`, a return type `true` before
+  a missing name, are an `ERROR`. The set also holds for the name of a
+  field or a local declared by modifiers alone, so
+  `class C { private case = 1 }` and `final null = 1`, accepted at
+  v0.6.0, are an `ERROR`, as in Groovy. `@A this(x) { }`,
+  `@A void(x) { }` and `@A int(x) { }`, a return type before a missing
+  name at v0.6.0, are methods: `this`, `void` and the primitive types
+  are names in this grammar and cannot be reserved
+  (`docs/divergences-from-spec.md` §33). A quoted name of such a
+  method holds no interpolation, as Apache's `methodName` takes the
+  `StringLiteral` token: `private "a${x}"(n) { }`, a method at
   v0.6.0, and `@A "a${x}"(n) { }` are an `ERROR`, and
   `@A 'a b'(n) { }`, an `ERROR` at v0.6.0, is a method. Nor is a
   slashy string such a name, as Groovy 6 reads a `/` after a name, a

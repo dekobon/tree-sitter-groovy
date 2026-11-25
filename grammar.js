@@ -528,8 +528,8 @@ function methodHead($, beforeParameters = choice(
  * none), and a script method needs a body (AstBuilder's
  * `validateMethodDeclaration`), so only `_script_method_declaration`, with
  * a body, and `_untyped_method_declaration`, in a type body, take it.
- * Elsewhere `@A foo(x) { }` keeps the reading of v0.6.0: `foo` the return
- * type and the name missing.
+ * Elsewhere each form keeps its tree of v0.6.0, an ERROR or a missing
+ * name.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {RuleOrLiteral[]} The rules of the head, in order.
@@ -968,14 +968,15 @@ module.exports = grammar({
   // an `identifier`, which admits no keyword but the contextual ones
   // (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`, …), so
   // every other keyword of this grammar is reserved there: without it a
-  // keyword with no action lexed as the name, and `@A while (x) { }` or
-  // `@A true(x) { }` was a clean method. A parse state takes one set,
-  // the highest-numbered of its positions', not a union, and after
-  // `private` or `@A` the type that may come instead of the name
-  // (`private int x`) shares the state. So this set holds the global
-  // words too, and leaves out `int`, `void` and `this`: they are
-  // identifiers in this grammar, not tokens, and the types would be
-  // reserved in that type's place as well.
+  // keyword with no action lexed as the name, and `@A true(x) { }` or
+  // `private <T> static(x) { }` was a clean method. A parse state takes
+  // one set, the highest-numbered of its positions', not a union, and
+  // after `private` or `@A` the state also holds the type that may come
+  // instead of the name (`private int x`) and the name of a field or a
+  // local declared by modifiers alone, so `private case = 1` is an ERROR
+  // too, as in Groovy. The set holds the global words, and leaves out
+  // `this`, `void` and the primitive types: tree-sitter reserves only
+  // tokens, and in this grammar they are identifiers.
   reserved: {
     global: _ => ['new', 'case'],
     property: _ => [],
@@ -1606,8 +1607,9 @@ module.exports = grammar({
     // Annotations may come before any loop (`@A while (x) { }`), as
     // Groovy 6's `loopStatement` takes `annotationsOpt` before `for`,
     // `while` and `do`; Groovy 4 and 5 reject them. They are children of
-    // the loop. A keyword is reserved as the name of a method with no
-    // return type, so `while` after `@A` is no such name either.
+    // the loop. A type body takes no loop, and there `while` after `@A`
+    // is reserved as the name of a method with no return type, so
+    // `class C { @A while (x) { } }` is an ERROR.
     while_statement: $ => seq(
       repeat($.annotation),
       'while',
@@ -2080,7 +2082,9 @@ module.exports = grammar({
     // Modifiers alone (no `def`, no return type) also introduce a
     // method outside a class body: `final f() { }`. Apache's AstBuilder
     // requires modifiers or a return type ("Modifiers or return type is
-    // required"), counting an annotation as a modifier, which keeps
+    // required"), counting an annotation as a modifier, and a script
+    // statement that starts with a name and `(` is no method
+    // (`SemanticPredicates.isInvalidMethodDeclaration`), which keeps
     // `foo(x) { }` a call with a trailing closure. Annotations alone and
     // modifiers with type parameters (`@Memoized fib(n) { }`,
     // `private <T> first(xs) { }`) are `_script_method_declaration` and

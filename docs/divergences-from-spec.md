@@ -2661,14 +2661,19 @@ dollar-slashy string one does where a letter or `{` follows it.
 **Current implementation**: the name of a method with no `def` and no
 return type (`_untyped_method_name`) reserves the
 `untyped_method_name` set, every keyword that is a token of this
-grammar and no Apache `identifier` (spec §5.2). `this`, `void` and the
-primitive types are identifiers in this grammar, and `goto`, `const`
-and `threadsafe` are no tokens of it, so none can be reserved:
-tree-sitter takes only tokens as reserved words. Reserving the types
-as tokens would not help either. A parse state takes the reserved set
-of one of its positions, and after `private` or `@A` the same state
-holds the type of a field or a method (`private int x`,
-`@A void f() { }`), which would then be an `ERROR`.
+grammar and no Apache `identifier` (spec §5.2). A parse state takes
+the reserved set of one of its positions, so after `private` or `@A`
+the set also covers the type of a field or a method and the name of a
+field or a local declared by modifiers alone (`private case = 1` is an
+`ERROR`, as in Groovy). `this`, `void` and the primitive types are
+identifiers in this grammar, and `goto`, `const` and `threadsafe` are
+no tokens of it, so none can be reserved: tree-sitter takes only tokens
+as reserved words. Making them tokens would take a token for each
+wherever it stands today, `this` in every expression, key and
+receiver position and the types in every type position, which is not
+attempted here. At v0.6.0 the annotated forms (`@A this(x) { }`,
+`@A void(x) { }`) were a return type before a missing name; now they
+are methods.
 
 A quoted name there is `_constant_string_literal`, `string_literal`
 with no interpolation and no fallback `$`, which would take the one of
