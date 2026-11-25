@@ -16,7 +16,7 @@ switch (x) { case 1: foo }
           (expression_statement (identifier)))))))
 
 ==================
-Classic switch with default
+Classic switch with default (known divergence)
 ==================
 
 switch (x) { case 1: foo default: bar }
@@ -119,6 +119,127 @@ switch (x) { case 1 -> a default -> b }
           body: (expression_statement (identifier)))))))
 
 ==================
+Arrow cases with several values
+==================
+
+def r = switch (x) {
+    case 1, 2 -> "a"
+    case a, b -> { yield c }
+    case String, Integer -> "t"
+    case [1, 2] -> "l"
+    case 3,
+        4 -> switch (y) { case 5, 6 -> "n" }
+    default -> "d"
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_arrow_case
+            value: (number_literal)
+            value: (number_literal)
+            body: (expression_statement
+              (string_literal
+                (string_fragment))))
+          (switch_arrow_case
+            value: (identifier)
+            value: (identifier)
+            body: (block
+              (yield_statement
+                (identifier))))
+          (switch_arrow_case
+            value: (identifier)
+            value: (identifier)
+            body: (expression_statement
+              (string_literal
+                (string_fragment))))
+          (switch_arrow_case
+            value: (list_literal
+              (number_literal)
+              (number_literal))
+            body: (expression_statement
+              (string_literal
+                (string_fragment))))
+          (switch_arrow_case
+            value: (number_literal)
+            value: (number_literal)
+            body: (expression_statement
+              (switch_expression
+                value: (identifier)
+                body: (switch_block
+                  (switch_arrow_case
+                    value: (number_literal)
+                    value: (number_literal)
+                    body: (expression_statement
+                      (string_literal
+                        (string_fragment))))))))
+          (switch_default
+            body: (expression_statement
+              (string_literal
+                (string_fragment)))))))))
+
+==================
+A colon case with several values
+==================
+
+def r = switch (x) {
+    case 1, 2: yield 'a'
+    default: yield 'b'
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (switch_expression
+        value: (identifier)
+        body: (switch_block
+          (switch_case
+            value: (number_literal)
+            value: (number_literal)
+            (yield_statement
+              (string_literal)))
+          (switch_default
+            (yield_statement
+              (string_literal))))))))
+
+==================
+A comma on the next line and default among a case's values are accepted, which Groovy rejects (known divergence)
+==================
+
+switch (x) {
+  case 1
+  , 2 -> a
+  case 3, default -> b
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          value: (number_literal)
+          body: (expression_statement
+            (identifier)))
+        (switch_arrow_case
+          value: (number_literal)
+          value: (identifier)
+          body: (expression_statement
+            (identifier)))))))
+
+==================
 Empty switch body
 ==================
 
@@ -158,3 +279,328 @@ switch (c) {
             object: (identifier)
             field: (identifier))
           body: (expression_statement (string_literal)))))))
+
+==================
+Default on the line after a case body is the next branch
+==================
+
+switch (x) {
+    case 1:
+        foo()
+    default:
+        bar()
+}
+switch (x) {
+    case 1: foo()
+    default: bar()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Default after an empty case is the next branch
+==================
+
+switch (x) { case 1: default: c() }
+switch (x) {
+    case 1:
+    default:
+        c()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list)))))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Default after a statement in a case is the next branch, not a named argument (known divergence)
+==================
+
+switch (x) {
+    case 1:
+        foo default: 1
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (identifier)))
+        (switch_default
+          (expression_statement
+            (number_literal)))))))
+
+==================
+Blocks in colon cases
+==================
+
+switch (v) {
+case 1: { a }; break
+case 2:
+    { b }
+    { c }
+default: { d }
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (block
+            (expression_statement
+              (identifier)))
+          (break_statement))
+        (switch_case
+          value: (number_literal)
+          (block
+            (expression_statement
+              (identifier)))
+          (block
+            (expression_statement
+              (identifier))))
+        (switch_default
+          (block
+            (expression_statement
+              (identifier))))))))
+
+==================
+An unclosed switch with a colon case at the end of the input recovers as one ERROR
+==================
+
+switch (x) {
+  case 1:
+    foo()
+
+---
+
+(ERROR
+  (identifier)
+  (switch_case
+    value: (number_literal)
+    (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list)))))
+
+==================
+An unclosed switch with an arrow case at the end of the input
+==================
+
+switch (x) {
+  case 1 -> foo()
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_arrow_case
+          value: (number_literal)
+          body: (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))
+        (MISSING "}")))))
+
+==================
+Case labels outside a switch are statements that miss a switch
+==================
+
+case A:
+case B:
+  foo()
+  break
+case 1: bar()
+
+---
+
+(source_file
+  (expression_statement
+    (identifier)
+    (MISSING "switch"))
+  (expression_statement
+    (identifier)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (break_statement)
+  (expression_statement
+    (number_literal)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
+Case labels under a broken switch header keep the statements after them
+==================
+
+def m() {
+  swit (x) {
+    case A:
+    case B: {
+      foo 1
+    }
+    default:
+      bar()
+  }
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list
+            (identifier))
+          closure: (closure
+            (expression_statement
+              (identifier)
+              (MISSING "switch"))
+            (expression_statement
+              (identifier)
+              (MISSING "switch"))
+            (block
+              (command_chain
+                receiver: (identifier)
+                argument: (number_literal)))
+            (labeled_statement
+              label: (identifier)
+              statement: (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list))))))))))
+
+==================
+A case label in a block inside a case misses a switch and the next case goes on
+==================
+
+switch (x) {
+  case 1:
+    if (y) {
+      case 2:
+        foo()
+    }
+  case 3: bar()
+}
+
+---
+
+(source_file
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (if_statement
+            condition: (identifier)
+            consequence: (block
+              (expression_statement
+                (number_literal)
+                (MISSING "switch"))
+              (expression_statement
+                (method_invocation
+                  function: (identifier)
+                  arguments: (argument_list))))))
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+A case label with several values outside a switch misses a switch
+==================
+
+case 1, 2:
+foo()
+
+---
+
+(source_file
+  (expression_statement
+    (ERROR
+      (number_literal))
+    (number_literal)
+    (MISSING "switch"))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))

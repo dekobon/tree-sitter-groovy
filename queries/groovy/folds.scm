@@ -10,8 +10,10 @@
 (switch_block) @fold
 (block) @fold
 (closure) @fold
+(lambda_expression) @fold
 (list_literal) @fold
 (map_literal) @fold
+(array_initializer) @fold
 (argument_list) @fold
 
 (groovydoc_comment) @fold

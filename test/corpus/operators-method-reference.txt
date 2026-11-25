@@ -57,3 +57,63 @@ list.stream(String::length)
         (method_reference_expression
           target: (identifier)
           name: (identifier))))))
+
+==================
+Constructor reference to an array type
+==================
+
+def f = String[]::new
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_reference_expression
+        target: (array_type
+          (type_identifier))))))
+
+==================
+Constructor references to array types as arguments
+==================
+
+xs.toArray(int[]::new)
+ys.toArray(String[][]::new)
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (method_reference_expression
+          target: (array_type
+            (type_identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      arguments: (argument_list
+        (method_reference_expression
+          target: (array_type
+            (array_type
+              (type_identifier))))))))
+
+==================
+Constructor reference to an array type as a statement
+==================
+
+int[]::new
+
+---
+
+(source_file
+  (expression_statement
+    (method_reference_expression
+      target: (array_type
+        (type_identifier)))))

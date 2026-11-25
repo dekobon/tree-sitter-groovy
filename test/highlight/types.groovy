@@ -15,3 +15,89 @@ record R()
 
 @interface Marker { }
 //         ^ type.definition
+
+@Foo(x = @Bar(1))
+// <- attribute
+//       ^ attribute
+// ^ attribute
+//          ^ attribute
+class Baz { }
+
+@groovy.transform.CompileStatic
+//      ^ attribute
+//               ^ attribute
+//                 ^ attribute
+class Qux { }
+
+def c = String[].class
+//      ^ type
+//               ^ property
+
+def f = int[]::new
+//      ^ type.builtin
+//             ^ keyword.operator
+
+@Foo(String[])
+//   ^ type
+class Arr { }
+
+String name
+// <- type
+//     ^ variable
+
+int count, total;
+// <- type.builtin
+//  ^ variable
+//         ^ variable
+
+List<String> items, more = []
+// <- type
+//   ^ type
+//           ^ variable
+//                  ^ variable
+
+foo.Bar bar
+// <- type
+//  ^ type
+//      ^ variable
+
+@Field String field
+//     ^ type
+//            ^ variable
+
+final String first, second
+//    ^ type
+//           ^ variable
+//                  ^ variable
+
+def list = x as java.util.List<String>
+//              ^ type
+//                   ^ type
+//                        ^ type
+//                             ^ type
+
+if (o instanceof JTextComponent.KeyBinding[]) { }
+//               ^ type
+//                              ^ type
+
+if (o instanceof java.util.Map.Entry<K, V>[]) { }
+//                             ^ type
+//                                   ^ type
+//                                      ^ type
+
+def maps = x as a.b.Map<K, V>[]
+//              ^ type
+//                  ^ type
+//                      ^ type
+//                         ^ type
+
+def String typed = "a"
+// <- keyword
+//  ^ type
+
+class Mocks {
+  private def RouterConfigurable config = null
+  //      ^ keyword
+  //          ^ type
+  //                             ^ property
+}

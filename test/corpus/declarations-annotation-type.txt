@@ -44,3 +44,693 @@ Annotation type with annotation on the type itself
       name: (qualified_name (identifier)))
     name: (identifier)
     body: (class_body)))
+
+==================
+Annotation element with a string default
+==================
+
+@interface Tag { String value() default "x" }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal
+          (string_fragment))))))
+
+==================
+Annotation element with a number default
+==================
+
+@interface Tag { int count() default 1 }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (number_literal)))))
+
+==================
+Array-typed annotation element with an empty list default
+==================
+
+@interface Tag { String[] names() default [] }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (list_literal)))))
+
+==================
+Annotation element with a class name default
+==================
+
+@interface Tag { Class<?> kind() default Object }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (wildcard)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (identifier)))))
+
+==================
+Annotation element with a list default
+==================
+
+@interface Tag { String[] names() default ['a', 'b'] }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (list_literal
+          (string_literal)
+          (string_literal))))))
+
+==================
+Annotation element with an annotation default
+==================
+
+@interface Outer {
+    Inner first() default @Inner(1)
+    Inner second() default @Inner
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal))))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (annotation
+          name: (qualified_name
+            (identifier)))))))
+
+==================
+Annotation element with a list of annotations default
+==================
+
+@interface Outer { Inner[] all() default [@Inner(1), @Inner(2),] }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (number_literal)))
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (number_literal))))))))
+
+==================
+Annotation element with a nested annotation default
+==================
+
+@interface Outer {
+    Inner first() default @Inner(@Leaf)
+    Inner[] all() default [@Inner(x = @Leaf), @Inner([@Leaf])]
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (annotation
+              name: (qualified_name
+                (identifier))))))
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (annotation
+                  name: (qualified_name
+                    (identifier))))))
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (list_literal
+                (annotation
+                  name: (qualified_name
+                    (identifier)))))))))))
+
+==================
+Annotation element with a negative number default
+==================
+
+@interface Range { int min() default -1 }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (unary_expression
+          operand: (number_literal))))))
+
+==================
+Annotation element with a qualified constant default
+==================
+
+@interface Tag { Level level() default Level.HIGH }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (identifier)
+          field: (identifier))))))
+
+==================
+Annotation element with a class literal default
+==================
+
+@interface Tag { Class<?> type() default String.class }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (wildcard)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (identifier)
+          field: (identifier))))))
+
+==================
+Annotation element with a string concatenation default
+==================
+
+@interface Tag { String text() default 'a' + 'b' }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (binary_expression
+          left: (string_literal)
+          right: (string_literal))))))
+
+==================
+Annotation element default on the next line
+==================
+
+@interface Tag {
+    String value() default
+        'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Annotation elements with and without defaults on following lines
+==================
+
+@interface Config {
+    String name()
+    int size() default 10
+    boolean enabled() default true
+    String[] tags()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (number_literal))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (boolean_literal))
+      (method_declaration
+        return_type: (array_type
+          (type_identifier))
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+Annotation elements separated by semicolons
+==================
+
+@interface Config { int a() default 1; int b(); int c() default 3; }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (number_literal))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (number_literal)))))
+
+==================
+Annotation element with annotations and modifiers
+==================
+
+@interface Tag {
+    @Deprecated
+    public abstract String value() default 'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Annotation type with a constant and nested types beside elements
+==================
+
+@interface Config {
+    int MAX = 10
+    Level level() default Level.LOW
+    enum Level { LOW, HIGH }
+    @interface Inner { int value() default 0 }
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (identifier)
+          field: (identifier)))
+      (enum_declaration
+        name: (identifier)
+        body: (enum_body
+          (enum_constant
+            name: (identifier))
+          (enum_constant
+            name: (identifier))))
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            default: (number_literal)))))))
+
+==================
+Annotation type with element defaults nested in a class
+==================
+
+class Holder {
+    @interface Tag { String value() default 'x' }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body
+          (method_declaration
+            return_type: (type_identifier)
+            name: (identifier)
+            parameters: (formal_parameters)
+            default: (string_literal)))))))
+
+==================
+Default stays a switch label, property and map key beside an annotation type
+==================
+
+@interface Tag { String value() default Names.default }
+switch (x) {
+    case 1: m = [default: y.default]
+    default: z()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (identifier)
+          field: (identifier)))))
+  (expression_statement
+    (switch_expression
+      value: (identifier)
+      body: (switch_block
+        (switch_case
+          value: (number_literal)
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (map_literal
+                (map_entry
+                  key: (identifier)
+                  value: (field_access
+                    object: (identifier)
+                    field: (identifier)))))))
+        (switch_default
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list))))))))
+
+==================
+Annotation element with a closure default
+==================
+
+@interface Requires { Class a() default { -> true } }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (closure
+          (closure_parameters)
+          (expression_statement
+            (boolean_literal)))))))
+
+==================
+Annotation element with comments around default
+==================
+
+@interface Tag {
+    String a() /* before */ default /* after */ 'x'
+    String b() // before
+        default // after
+        'y'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        (block_comment)
+        (block_comment)
+        default: (string_literal))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        (line_comment)
+        (line_comment)
+        default: (string_literal)))))
+
+==================
+Default after a class method is not an element default
+:error
+==================
+
+class C { String v() default 'x' }
+
+---
+
+==================
+Annotation element with the default modifier
+==================
+
+@interface Tag {
+    default String value()
+    String other() default 'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Default on the line after an element stays its default, which Groovy rejects
+==================
+
+@interface Tag {
+    String value()
+    default 'x'
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal)))))
+
+==================
+Default modifier and element default on one element is an error (limitation)
+:error
+==================
+
+@interface Tag { default String value() default 'x' }
+
+---
+
+==================
+Default-modifier element on the line after an element default
+==================
+
+@interface Tag {
+    String a() default 'x'
+    default String b()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (string_literal))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))
+
+==================
+Annotation elements with array type defaults
+==================
+
+@interface Tag {
+  Class a() default String[]
+  Class b() default int[][].class
+  String c()
+}
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (array_type
+          (type_identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        default: (field_access
+          object: (array_type
+            (array_type
+              (type_identifier)))
+          field: (identifier)))
+      (method_declaration
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)))))

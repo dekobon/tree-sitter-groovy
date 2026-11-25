@@ -27,6 +27,82 @@ path = "bindings/rust/lib.rs"
 name = "parse_stress"
 path = "bindings/rust/tests/parse_stress.rs"
 
+[[test]]
+name = "incremental_reparse"
+path = "bindings/rust/tests/incremental_reparse.rs"
+
+[[test]]
+name = "unterminated_comment_cost"
+path = "bindings/rust/tests/unterminated_comment_cost.rs"
+
+[[test]]
+name = "scanner_keywords"
+path = "bindings/rust/tests/scanner_keywords.rs"
+
+[[test]]
+name = "scanner_states"
+path = "bindings/rust/tests/scanner_states.rs"
+
+[[test]]
+name = "name_argument_cost"
+path = "bindings/rust/tests/name_argument_cost.rs"
+
+[[test]]
+name = "lambda_parameters_cost"
+path = "bindings/rust/tests/lambda_parameters_cost.rs"
+
+[[test]]
+name = "statement_paren_cost"
+path = "bindings/rust/tests/statement_paren_cost.rs"
+
+[[test]]
+name = "lambda_body_end_cost"
+path = "bindings/rust/tests/lambda_body_end_cost.rs"
+
+[[test]]
+name = "multi_assignment_comma_cost"
+path = "bindings/rust/tests/multi_assignment_comma_cost.rs"
+
+[[test]]
+name = "declaration_start_cost"
+path = "bindings/rust/tests/declaration_start_cost.rs"
+
+[[test]]
+name = "relational_close_cost"
+path = "bindings/rust/tests/relational_close_cost.rs"
+
+[[test]]
+name = "dotted_cast_type_cost"
+path = "bindings/rust/tests/dotted_cast_type_cost.rs"
+
+[[test]]
+name = "slashy_string_cost"
+path = "bindings/rust/tests/slashy_string_cost.rs"
+
+[[test]]
+name = "if_chain_cost"
+path = "bindings/rust/tests/if_chain_cost.rs"
+
+[[test]]
+name = "dollar_slashy_string_cost"
+path = "bindings/rust/tests/dollar_slashy_string_cost.rs"
+
+[[test]]
+name = "next_line_cast_cost"
+path = "bindings/rust/tests/next_line_cast_cost.rs"
+
+[[test]]
+name = "literal_argument_cost"
+path = "bindings/rust/tests/literal_argument_cost.rs"
+
+[[test]]
+name = "error_recovery_cost"
+path = "bindings/rust/tests/error_recovery_cost.rs"
+
+[[test]]
+name = "closure_call_cost"
+path = "bindings/rust/tests/closure_call_cost.rs"
+
 [dependencies]
 tree-sitter-language = "0.1.7"
 

@@ -1,0 +1,666 @@
+==================
+Array creation with one sized dimension
+==================
+
+def a = new int[3]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions_expr
+          (number_literal))))))
+
+==================
+A same-line bracket after a dimension is another dimension
+==================
+
+def b = new String[2][4]
+new int[n] [m]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions_expr
+          (number_literal))
+        dimensions: (dimensions_expr
+          (number_literal)))))
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (identifier))
+      dimensions: (dimensions_expr
+        (identifier)))))
+
+==================
+Sized dimensions followed by empty dimensions
+==================
+
+int[][] c = new int[2][]
+new Foo[a][b][][]
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (array_type
+      (array_type
+        (type_identifier)))
+    name: (identifier)
+    value: (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (number_literal))
+      dimensions: (dimensions)))
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (identifier))
+      dimensions: (dimensions_expr
+        (identifier))
+      dimensions: (dimensions))))
+
+==================
+Empty dimension with an initializer
+==================
+
+def d = new int[] {1, 2, 3}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions)
+        value: (array_initializer
+          (number_literal)
+          (number_literal)
+          (number_literal))))))
+
+==================
+Nested initializers after two empty dimensions, as in Groovy 5
+==================
+
+def e = new int[][] {{1, 2}, {3}, {},}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions)
+        value: (array_initializer
+          (array_initializer
+            (number_literal)
+            (number_literal))
+          (array_initializer
+            (number_literal))
+          (array_initializer))))))
+
+==================
+Initializer on the next line with comments
+==================
+
+def names = new String[]
+{
+    'a', // first
+    /* second */ 'b',
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions)
+        value: (array_initializer
+          (string_literal)
+          (line_comment)
+          (block_comment)
+          (string_literal))))))
+
+==================
+Qualified and generic element types
+==================
+
+new java.lang.String[n]
+new List<String>[] {null}
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (qualified_type
+        (type_identifier)
+        (type_identifier)
+        (type_identifier))
+      dimensions: (dimensions_expr
+        (identifier))))
+  (expression_statement
+    (array_creation_expression
+      type: (generic_type
+        base: (type_identifier)
+        arguments: (type_arguments
+          (type_identifier)))
+      dimensions: (dimensions)
+      value: (array_initializer
+        (null_literal)))))
+
+==================
+Dimension sizes are expressions
+==================
+
+new int[list.size() + 1]
+new byte[a ? 1 : 2][]
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (binary_expression
+          left: (method_invocation
+            function: (field_access
+              object: (identifier)
+              field: (identifier))
+            arguments: (argument_list))
+          right: (number_literal)))))
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions_expr
+        (ternary_expression
+          condition: (identifier)
+          consequence: (number_literal)
+          alternative: (number_literal)))
+      dimensions: (dimensions))))
+
+==================
+Member access and calls on an array creation
+==================
+
+new int[3].length
+new Foo[n].size()
+new int[] {1, 2}.each { }
+
+---
+
+(source_file
+  (expression_statement
+    (field_access
+      object: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions_expr
+          (number_literal)))
+      field: (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions)
+          value: (array_initializer
+            (number_literal)
+            (number_literal)))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+Subscript after an initializer or a parenthesized creation
+==================
+
+def x = new int[] {1, 2}[0]
+def y = (new int[3])[0]
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (subscript_expression
+        object: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions)
+          value: (array_initializer
+            (number_literal)
+            (number_literal)))
+        index: (number_literal))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (subscript_expression
+        object: (parenthesized_expression
+          (array_creation_expression
+            type: (type_identifier)
+            dimensions: (dimensions_expr
+              (number_literal))))
+        index: (number_literal)))))
+
+==================
+A bracket on the next line after an array creation starts a list
+==================
+
+def a = new int[3]
+[1, 2].each { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions_expr
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (list_literal
+          (number_literal)
+          (number_literal))
+        field: (identifier))
+      closure: (closure))))
+
+==================
+A member access on the next line continues an array creation
+==================
+
+def n = new int[3]
+    .length
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (field_access
+        object: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (number_literal)))
+        field: (identifier)))))
+
+==================
+Braces after sized dimensions are a trailing closure, which Groovy rejects
+==================
+
+def a = new int[3] { it }
+def b = new int[2][3] {1}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (number_literal)))
+        closure: (closure
+          (expression_statement
+            (identifier))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (number_literal))
+          dimensions: (dimensions_expr
+            (number_literal)))
+        closure: (closure
+          (expression_statement
+            (number_literal)))))))
+
+==================
+Braces on the next line after sized dimensions are a trailing closure, which Groovy rejects
+==================
+
+def a = new int[3]
+{ it }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (method_invocation
+        function: (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (number_literal)))
+        closure: (closure
+          (expression_statement
+            (identifier)))))))
+
+==================
+Array creation with an initializer inside a GString interpolation
+==================
+
+def s = "${new int[] {1, 2}}"
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (string_literal
+        (gstring_brace_interpolation
+          value: (array_creation_expression
+            type: (type_identifier)
+            dimensions: (dimensions)
+            value: (array_initializer
+              (number_literal)
+              (number_literal))))))))
+
+==================
+Braces after arguments are a class body and after dimensions an initializer
+==================
+
+new Foo() { }
+new Foo[] { }
+new Foo()[0]
+
+---
+
+(source_file
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list)
+      body: (class_body)))
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer)))
+  (expression_statement
+    (subscript_expression
+      object: (object_creation_expression
+        type: (type_identifier)
+        arguments: (argument_list))
+      index: (number_literal))))
+
+==================
+Closures with parameters inside an initializer
+==================
+
+new Closure[] { {-> 1}, {a, b -> a}, {String s -> s} }
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (closure
+          (closure_parameters)
+          (expression_statement
+            (number_literal)))
+        (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier))
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier)))
+        (closure
+          (closure_parameters
+            (closure_parameter
+              type: (type_identifier)
+              name: (identifier)))
+          (expression_statement
+            (identifier)))))))
+
+==================
+Braces in a one-dimensional initializer are closures, as in Groovy 3 and 4
+==================
+
+def c = new Closure[] { { it * 2 } }
+new Object[] { {x}, {}, { foo(y) }, {x = 1} }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (array_creation_expression
+        type: (type_identifier)
+        dimensions: (dimensions)
+        value: (array_initializer
+          (closure
+            (expression_statement
+              (binary_expression
+                left: (identifier)
+                right: (number_literal))))))))
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (closure
+          (expression_statement
+            (identifier)))
+        (closure)
+        (closure
+          (expression_statement
+            (method_invocation
+              function: (identifier)
+              arguments: (argument_list
+                (identifier)))))
+        (closure
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (number_literal))))))))
+
+==================
+Braces in a nesting initializer that may be a closure are an initializer
+==================
+
+new Object[][] { {x}, {a, b}, {} }
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (array_initializer
+          (identifier))
+        (array_initializer
+          (identifier)
+          (identifier))
+        (array_initializer)))))
+
+==================
+Closures with parameters inside a nesting initializer
+==================
+
+new Closure[][] { {-> 1}, {a, b -> a} }
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (closure
+          (closure_parameters)
+          (expression_statement
+            (number_literal)))
+        (closure
+          (closure_parameters
+            (closure_parameter
+              name: (identifier))
+            (closure_parameter
+              name: (identifier)))
+          (expression_statement
+            (identifier)))))))
+
+==================
+An assignment in braces in a nesting initializer is a closure
+==================
+
+new Object[][] { {x = 1} }
+
+---
+
+(source_file
+  (expression_statement
+    (array_creation_expression
+      type: (type_identifier)
+      dimensions: (dimensions)
+      value: (array_initializer
+        (closure
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (number_literal))))))))
+
+==================
+Array creation as an argument, a field initializer and a cast operand
+==================
+
+class C {
+    int n
+    private static final String[] NAMES = new String[] {'a'}
+    def buf = (Object) new byte[n]
+}
+foo(new int[n], *new int[0])
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        type: (array_type
+          (type_identifier))
+        (variable_declarator
+          name: (identifier)
+          value: (array_creation_expression
+            type: (type_identifier)
+            dimensions: (dimensions)
+            value: (array_initializer
+              (string_literal)))))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (array_creation_expression
+              type: (type_identifier)
+              dimensions: (dimensions_expr
+                (identifier))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (array_creation_expression
+          type: (type_identifier)
+          dimensions: (dimensions_expr
+            (identifier)))
+        (spread_arguments
+          value: (array_creation_expression
+            type: (type_identifier)
+            dimensions: (dimensions_expr
+              (number_literal))))))))
+
+==================
+Empty dimensions without an initializer
+:error
+==================
+
+def a = new int[]
+
+---
+
+==================
+A lone comma in an initializer
+:error
+==================
+
+def a = new int[] {,}
+
+---
+
+==================
+Arguments after array dimensions
+:error
+==================
+
+def a = new int[]()
+
+---
+
+==================
+A sized dimension after an empty one
+:error
+==================
+
+def a = new int[][3]
+
+---
+
+==================
+A subscript directly after empty dimensions is unsupported
+:error
+==================
+
+def a = new int[2][][0]
+
+---

@@ -52,4 +52,52 @@ mod tests {
             .set_language(&super::LANGUAGE.into())
             .expect("Error loading Groovy parser");
     }
+
+    /// Returns the text of each node of `source` that `capture` of the
+    /// locals query takes, in the order of the query's matches.
+    fn locals_captures(source: &str, capture: &str) -> Vec<String> {
+        use tree_sitter::StreamingIterator;
+
+        let language = super::LANGUAGE.into();
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&language)
+            .expect("Error loading Groovy parser");
+        let tree = parser.parse(source, None).expect("parse");
+        assert!(!tree.root_node().has_error(), "{source:?}");
+        let query =
+            tree_sitter::Query::new(&language, include_str!("../../queries/groovy/locals.scm"))
+                .expect("locals query");
+        let index = query
+            .capture_index_for_name(capture)
+            .expect("a capture of the locals query");
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut texts = Vec::new();
+        let mut captures = cursor.captures(&query, tree.root_node(), source.as_bytes());
+        while let Some((found, capture_index)) = captures.next() {
+            let capture = found.captures()[*capture_index];
+            if capture.index == index {
+                texts.push(source[capture.node.byte_range()].to_owned());
+            }
+        }
+        texts
+    }
+
+    /// The rest binding of a multi-assignment, a `rest_declarator`, defines
+    /// its name as the other names do (`queries/groovy/locals.scm`). The
+    /// CLI's `tree-sitter test` runs no locals query.
+    #[test]
+    fn a_rest_binding_defines_its_name() {
+        for (source, names) in [
+            ("def (a, *b) = l\n", ["a", "b"]),
+            ("final (*init, last) = l\n", ["init", "last"]),
+            ("def (h, List<Integer> *t) = l\n", ["h", "t"]),
+        ] {
+            assert_eq!(
+                locals_captures(source, "local.definition.var"),
+                names,
+                "{source:?}"
+            );
+        }
+    }
 }

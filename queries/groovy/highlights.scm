@@ -33,6 +33,10 @@
 (gstring_brace_interpolation
   "${" @punctuation.special
   "}" @punctuation.special)
+; The `->` of a lazy interpolation (`"${-> x}"`) is a `closure_parameters`
+; leaf of its own, which the operator list below does not reach.
+(gstring_brace_interpolation
+  (closure_parameters) @operator)
 (gstring_dollar_interpolation
   value: (identifier) @variable)
 
@@ -100,6 +104,11 @@
   "->"
   "..."
 ] @operator
+
+; A slashy string's closing `/` is the same anonymous symbol as the
+; division operator, so the list above captures it too; this later
+; match gives it back to the string, like the hidden opening `/`.
+(string_literal "/" @string)
 
 ; -- Layer 3: generic identifier fallback --------------------------
 
@@ -178,6 +187,20 @@
 ; everywhere else.
 (synchronized_statement "synchronized" @keyword)
 
+; `default` is a branch label in a `switch` and a modifier on a method
+; or a type declaration (`default void run() { }`). On a method that has
+; a `default` field it gives an annotation element its default
+; (`String value() default 'x'`) instead; a method never has both.
+(method_declaration !default "default" @keyword.modifier)
+(method_declaration "default" @keyword default: (_))
+[
+  (class_declaration "default" @keyword.modifier)
+  (interface_declaration "default" @keyword.modifier)
+  (trait_declaration "default" @keyword.modifier)
+  (enum_declaration "default" @keyword.modifier)
+  (record_declaration "default" @keyword.modifier)
+]
+
 (shebang) @keyword.directive
 
 ; -- Layer 5: dot-family property captures -------------------------
@@ -203,10 +226,16 @@
 (enum_constant name: (identifier) @constant)
 (method_declaration name: [(identifier) (quoted_identifier)] @function)
 (constructor_declaration name: (identifier) @constructor)
+(compact_constructor_declaration name: (identifier) @constructor)
 (formal_parameter name: (identifier) @variable.parameter)
 (closure_parameter name: (identifier) @variable.parameter)
+(lambda_expression parameters: (identifier) @variable.parameter)
 (record_component name: (identifier) @variable.parameter)
 (variable_declarator name: (identifier) @variable)
+; The key of a keyed pair names the entry or property it takes from the
+; value, not a variable: `def (name: n, age: int a) = person`.
+(variable_declarator key: (identifier) @property)
+(rest_declarator name: (identifier) @variable)
 (field_declaration (variable_declarator name: (identifier) @property))
 
 ; Labels (declaration + use sites)
@@ -216,15 +245,31 @@
 
 ; -- Layer 7: call sites (after layer 5 so method-named fields win) -
 
+; A call through `.`, `?.`, `??.` or `*.` names its method in the
+; access's last name, which layer 5 made a @property. A call through
+; `.&` keeps @function, as the name is a method pointer; a call through
+; `.@` keeps @property, as it calls the value of the field.
 (method_invocation
   function: (identifier) @function.call)
 
 (method_invocation
-  function: (field_access
-              field: (identifier) @function.call))
+  function: [
+    (field_access field: (identifier) @function.call)
+    (safe_navigation_expression property: (identifier) @function.call)
+    (safe_chain_dot_expression property: (identifier) @function.call)
+    (spread_dot_expression property: (identifier) @function.call)
+  ])
 
 (command_chain
   receiver: (identifier) @function.call)
+
+(command_chain
+  receiver: [
+    (field_access field: (identifier) @function.call)
+    (safe_navigation_expression property: (identifier) @function.call)
+    (safe_chain_dot_expression property: (identifier) @function.call)
+    (spread_dot_expression property: (identifier) @function.call)
+  ])
 
 ; -- Layer 8: types (after @variable so aliased identifier wins) ---
 
@@ -239,3 +284,8 @@
 (annotation
   "@" @attribute
   name: (qualified_name) @attribute)
+
+; The names and dots inside the qualified name are nodes of their own,
+; which layers 2 and 3 captured as @operator and @variable.
+(annotation
+  name: (qualified_name [(identifier) "."] @attribute))

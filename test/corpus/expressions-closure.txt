@@ -2,25 +2,30 @@
 Empty closure
 ==================
 
-{ }
+def c = { }
 
 ---
 
 (source_file
-  (expression_statement (closure)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure))))
 
 ==================
 Closure with single statement body
 ==================
 
-{ x }
+def c = { x }
 
 ---
 
 (source_file
-  (expression_statement
-    (closure
-      (expression_statement (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement (identifier))))))
 
 ==================
 Closure with explicit empty parameter list
@@ -71,16 +76,275 @@ Closure with multiple parameters
 Closure with multiple statements in body
 ==================
 
-{ a b c }
+def c = { a; b; c }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement (identifier))
+        (expression_statement (identifier))
+        (expression_statement (identifier))))))
+
+==================
+A brace that opens a statement is a block
+==================
+
+{ }
+{ a }
+{ it }
+{ a: 1 }
+{ int x = 1; x }
+{ { b } }
+def m() {
+    { a }
+}
+foo {
+    { a }
+}
+
+---
+
+(source_file
+  (block)
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (labeled_statement
+      label: (identifier)
+      statement: (expression_statement
+        (number_literal))))
+  (block
+    (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    (expression_statement
+      (identifier)))
+  (block
+    (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (block
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (block
+        (expression_statement
+          (identifier))))))
+
+==================
+A brace that opens a statement is a closure where an expression continues it
+==================
+
+{ a }();
+{ a }.call();
+{ a } as Runnable;
+{ a } + 1;
+{ a }[0];
+{ a } { b };
+{ a }
+.call();
+{ a }
+* 2;
+{ a -> };
+{ -> 1 };
 
 ---
 
 (source_file
   (expression_statement
+    (method_invocation
+      function: (closure
+        (expression_statement
+          (identifier)))
+      arguments: (argument_list)))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (closure
+          (expression_statement
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (cast_expression
+      value: (closure
+        (expression_statement
+          (identifier)))
+      type: (type_identifier)))
+  (expression_statement
+    (binary_expression
+      left: (closure
+        (expression_statement
+          (identifier)))
+      right: (number_literal)))
+  (expression_statement
+    (subscript_expression
+      object: (closure
+        (expression_statement
+          (identifier)))
+      index: (number_literal)))
+  (expression_statement
+    (method_invocation
+      function: (closure
+        (expression_statement
+          (identifier)))
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (closure
+          (expression_statement
+            (identifier)))
+        field: (identifier))
+      arguments: (argument_list)))
+  (expression_statement
+    (binary_expression
+      left: (closure
+        (expression_statement
+          (identifier)))
+      right: (number_literal)))
+  (expression_statement
     (closure
-      (expression_statement (identifier))
-      (expression_statement (identifier))
-      (expression_statement (identifier)))))
+      (closure_parameters
+        (closure_parameter
+          name: (identifier)))))
+  (expression_statement
+    (closure
+      (closure_parameters)
+      (expression_statement
+        (number_literal)))))
+
+==================
+A block that opens a statement before a line that starts a statement
+==================
+
+{ a }
+(1);
+{ a }
+{ b };
+{ a }
+[0];
+{ a }
++ 1;
+{ a }; foo();
+{ a } // c
+
+---
+
+(source_file
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (parenthesized_expression
+      (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (list_literal
+      (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (unary_expression
+      operand: (number_literal)))
+  (block
+    (expression_statement
+      (identifier)))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block
+    (expression_statement
+      (identifier)))
+  (line_comment))
+
+==================
+A brace on the line after an expression is its trailing closure, after a semicolon a block
+==================
+
+foo()
+{ a }
+foo
+{ b }
+x = 1
+{ c }
+foo(); { d }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)
+      closure: (closure
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (number_literal)
+        closure: (closure
+          (expression_statement
+            (identifier))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (block
+    (expression_statement
+      (identifier))))
+
+==================
+A block that opens a statement before a block comment that does not close
+==================
+
+{ foo() } /* c
+
+---
+
+(source_file
+  (block
+    (expression_statement
+      (method_invocation
+        function: (identifier)
+        arguments: (argument_list))))
+  (ERROR)
+  (expression_statement
+    (identifier)))
 
 ==================
 Closure as list element
@@ -320,6 +584,77 @@ xs.each { @Lazy x, String... rest -> x }
             name: (identifier)))
         (expression_statement
           (identifier))))))
+
+==================
+An annotated typed closure parameter with a default, and the same braces as the body of an if
+==================
+
+def c1 = { @A String a = b -> c }
+def c2 = { @A String a = 1 -> a }
+def c3 = { @A(x) String a, b = 1 -> a }
+if (x) { @A String a = b -> c }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)
+            default: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (number_literal)))
+        (expression_statement
+          (identifier)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        name: (identifier)
+        value: (lambda_expression
+          parameters: (identifier)
+          body: (identifier))))))
 
 ==================
 Closure body opening with an assignment
@@ -698,6 +1033,73 @@ xs.each { a = switch (x) { case 1 -> 2 } -> a }
           (identifier))))))
 
 ==================
+Closure parameter defaults and call arguments that are triple-quoted strings
+==================
+
+{ String a = '''x
+y''' -> a }
+c = { foo a, b = '''x
+y''' -> a }
+c = { String a = """x
+${y}""" -> a }
+xs.each { foo a, '''x' -> ''' }
+foo a, '''it's -> ok'''
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          type: (type_identifier)
+          name: (identifier)
+          default: (string_literal)))
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            name: (identifier)
+            default: (string_literal)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment)
+              (gstring_brace_interpolation
+                value: (identifier)))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (string_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (string_literal)))
+
+==================
 Closure parameter list with the arrow on the next line
 ==================
 
@@ -905,5 +1307,167 @@ xs.each { a, var -> a }
             name: (identifier))
           (closure_parameter
             name: (identifier)))
+        (expression_statement
+          (identifier))))))
+
+==================
+A closure parameter on the line after its annotation or after var
+==================
+
+def c1 = {
+    String a = 1,
+    @A
+    String b -> a
+}
+def c2 = {
+    foo a,
+    @a.b.C(x = 1)
+    String b -> a
+}
+def c3 = { String a = 1, var
+    b -> a }
+println a, var
+def f = x -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier))
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)
+                (identifier)
+                (identifier))
+              arguments: (argument_list
+                (assignment_expression
+                  left: (identifier)
+                  right: (number_literal))))
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier)
+    argument: (identifier))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (identifier)))))
+
+==================
+Closure parameters named var and yield, used in the body
+==================
+
+xs.each { var -> var }
+xs.each { int yield -> yield.abs() }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        (expression_statement
+          (method_invocation
+            function: (field_access
+              object: (identifier)
+              field: (identifier))
+            arguments: (argument_list)))))))
+
+==================
+Closure first parameter with a dollar-slashy default after a type
+==================
+
+xs.each { String a = $//x/$ -> a }
+xs.each { String a = $/*x/$ -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        (expression_statement
+          (identifier)))))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            type: (type_identifier)
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
         (expression_statement
           (identifier))))))

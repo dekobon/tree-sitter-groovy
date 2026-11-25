@@ -112,3 +112,840 @@ class Foo {
           (formal_parameter name: (identifier)))
         body: (block
           (expression_statement (identifier)))))))
+
+==================
+Annotation as an annotation argument
+==================
+
+@Foo(@Bar)
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier)))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation with arguments as an annotation argument
+==================
+
+@Foo(@Bar(1))
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal)))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation as a named annotation value
+==================
+
+@Foo(x = @Bar)
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (annotation
+            name: (qualified_name
+              (identifier))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+List of annotations as an annotation argument
+==================
+
+@Foo([@Bar, @Baz])
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          (annotation
+            name: (qualified_name
+              (identifier))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+List of annotations as a named annotation value
+==================
+
+@Foo(value = [@A(1), @A(2)])
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (list_literal
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (number_literal)))
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (number_literal)))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation list with named values in each element
+==================
+
+@NamedQueries([@NamedQuery(name = 'a', query = 'b'), @NamedQuery(name = 'c', query = 'd')])
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (string_literal))
+              (assignment_expression
+                left: (identifier)
+                right: (string_literal))))
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (string_literal))
+              (assignment_expression
+                left: (identifier)
+                right: (string_literal)))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Named annotation value with a list inside it
+==================
+
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = ['a', 'b']))
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (list_literal
+                  (string_literal)
+                  (string_literal))))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Closure as an annotation argument
+==================
+
+@Requires({ it > 1 })
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (closure
+          (expression_statement
+            (binary_expression
+              left: (identifier)
+              right: (number_literal))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotations nested three and four deep
+==================
+
+@A(@B(@C))
+@D(x = @E(y = @F(z = [@G])))
+class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (annotation
+              name: (qualified_name
+                (identifier)))))))
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (annotation
+                  name: (qualified_name
+                    (identifier))
+                  arguments: (argument_list
+                    (assignment_expression
+                      left: (identifier)
+                      right: (list_literal
+                        (annotation
+                          name: (qualified_name
+                            (identifier)))))))))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Nested annotation with its own named values and list
+==================
+
+@A(@B(x = 1, y = [1, 2], z = @C))
+class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (number_literal))
+            (assignment_expression
+              left: (identifier)
+              right: (list_literal
+                (number_literal)
+                (number_literal)))
+            (assignment_expression
+              left: (identifier)
+              right: (annotation
+                name: (qualified_name
+                  (identifier))))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation list with a trailing comma
+==================
+
+@A([@B, @C,])
+class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          (annotation
+            name: (qualified_name
+              (identifier))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Nested annotations with qualified names
+==================
+
+@a.b.A(@c.d.B(x = @e.F))
+class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)
+        (identifier)
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier)
+            (identifier)
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (annotation
+                name: (qualified_name
+                  (identifier)
+                  (identifier))))))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Nested annotation values across lines
+==================
+
+@A(x =
+    @B)
+@C(
+    @D
+)
+@E(@F
+    (1))
+class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (annotation
+            name: (qualified_name
+              (identifier))))))
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier)))))
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal)))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Nested annotations on members and parameters
+==================
+
+class C {
+    @A(@B) @D
+    String f
+
+    @A(x = [@B])
+    C() { }
+
+    @A(x = @B)
+    void m(@A(@B) String p, @A([@B, @C]) q) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (annotation
+              name: (qualified_name
+                (identifier)))))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (list_literal
+                (annotation
+                  name: (qualified_name
+                    (identifier)))))))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (annotation
+                name: (qualified_name
+                  (identifier))))))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (annotation
+                  name: (qualified_name
+                    (identifier)))))
+            type: (type_identifier)
+            name: (identifier))
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (list_literal
+                  (annotation
+                    name: (qualified_name
+                      (identifier)))
+                  (annotation
+                    name: (qualified_name
+                      (identifier))))))
+            name: (identifier)))
+        body: (block)))))
+
+==================
+Nested annotation on a local declaration
+==================
+
+@A(@B) def x = 1
+@A(x = @B) String y = 'a'
+@A([@B]) _
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier)))))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (annotation
+            name: (qualified_name
+              (identifier))))))
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (annotation
+            name: (qualified_name
+              (identifier))))))
+    (variable_declarator
+      name: (identifier))))
+
+==================
+Nested annotation on package and import
+==================
+
+@A(@B)
+package a.b
+
+@A(x = [@B])
+import c.D
+
+---
+
+(source_file
+  (package_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (annotation
+          name: (qualified_name
+            (identifier)))))
+    name: (qualified_name
+      (identifier)
+      (identifier)))
+  (import_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (list_literal
+            (annotation
+              name: (qualified_name
+                (identifier)))))))
+    name: (qualified_name
+      (identifier)
+      (identifier))))
+
+==================
+Nested annotation on an enum constant
+==================
+
+enum E { @A(@B) X, Y }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (annotation
+              name: (qualified_name
+                (identifier)))))
+        name: (identifier))
+      (enum_constant
+        name: (identifier)))))
+
+==================
+Nested annotation on a closure parameter
+==================
+
+{ @A(x = @B) a -> a }
+
+---
+
+(source_file
+  (expression_statement
+    (closure
+      (closure_parameters
+        (closure_parameter
+          (annotation
+            name: (qualified_name
+              (identifier))
+            arguments: (argument_list
+              (assignment_expression
+                left: (identifier)
+                right: (annotation
+                  name: (qualified_name
+                    (identifier))))))
+          name: (identifier)))
+      (expression_statement
+        (identifier)))))
+
+==================
+Annotation named value that is a command chain
+==================
+
+@Foo(x = foo 1, 2)
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)
+            argument: (number_literal)))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation argument assigning a field
+==================
+
+@Foo(a.b = 1)
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (field_access
+            object: (identifier)
+            field: (identifier))
+          right: (number_literal))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation named value that is an assignment
+==================
+
+@Foo(x = y = 1)
+class A { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (assignment_expression
+            left: (identifier)
+            right: (number_literal)))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation in a call argument is an error
+:error
+==================
+
+foo(@A)
+
+---
+
+==================
+Annotation as a call's named value is an error
+:error
+==================
+
+foo(x = @A)
+
+---
+
+==================
+List of annotations outside an annotation is an error
+:error
+==================
+
+x = [@A]
+
+---
+
+==================
+Annotation list mixed with an expression is an error (Groovy's parser takes it, its annotation check rejects it)
+:error
+==================
+
+@A([@B, 1])
+class X { }
+
+---
+
+==================
+Nested annotation list is an error (Groovy's parser takes it, its annotation check rejects it)
+:error
+==================
+
+@A([[@B]])
+class X { }
+
+---
+
+==================
+Parenthesized annotation value is an error
+:error
+==================
+
+@A((@B))
+class X { }
+
+---
+
+==================
+Annotation value as an operand is an error
+:error
+==================
+
+@A(x = @B ?: 1)
+class X { }
+
+---
+
+==================
+Colon after an annotation's named value is an error
+:error
+==================
+
+@Foo(x = a: 1)
+class X { }
+
+---
+
+==================
+Annotation argument that is an array class literal
+==================
+
+@Foo(String[].class) class X { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (field_access
+          object: (array_type
+            (type_identifier))
+          field: (identifier))))
+    name: (identifier)
+    body: (class_body)))
+
+==================
+Annotation arguments that are bare array types
+==================
+
+@Foo(String[]) class X { }
+@Foo(value = int[]) class Y { }
+@Foo([String[], int[][].class]) class Z { }
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (array_type
+          (type_identifier))))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (array_type
+            (type_identifier)))))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (list_literal
+          (array_type
+            (type_identifier))
+          (field_access
+            object: (array_type
+              (array_type
+                (type_identifier)))
+            field: (identifier)))))
+    name: (identifier)
+    body: (class_body)))
