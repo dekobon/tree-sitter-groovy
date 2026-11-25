@@ -187,3 +187,84 @@ while (a) { if (b) c }
       (if_statement
         condition: (identifier)
         consequence: (expression_statement (identifier))))))
+
+==================
+While with an annotation on the line before (Groovy 6)
+==================
+
+foo()
+@A
+while (x) { }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list)))
+  (while_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    condition: (identifier)
+    body: (block)))
+
+==================
+Annotated do-while (Groovy 6)
+==================
+
+@A do { x } while (y)
+
+---
+
+(source_file
+  (do_while_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))
+    condition: (identifier)))
+
+==================
+Annotated while in a method body (Groovy 6)
+==================
+
+def f() { @A while (c) y() }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (while_statement
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        condition: (identifier)
+        body: (expression_statement
+          (method_invocation
+            function: (identifier)
+            arguments: (argument_list)))))))
+
+==================
+An annotated if is an error
+:error
+==================
+
+@A if (x) { }
+
+---
+
+==================
+An annotated loop in a class body is an error
+:error
+==================
+
+class C { @A while (x) { } }
+
+---

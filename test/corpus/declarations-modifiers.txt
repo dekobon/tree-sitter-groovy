@@ -1172,7 +1172,7 @@ foo(x) { x }
           (identifier))))))
 
 ==================
-An annotated loop is not a method named after its keyword
+An annotated loop is a loop, not a method named after its keyword
 ==================
 
 @Test1 while (true) { break }
@@ -1180,11 +1180,10 @@ An annotated loop is not a method named after its keyword
 ---
 
 (source_file
-  (ERROR
+  (while_statement
     (annotation
       name: (qualified_name
-        (identifier))))
-  (while_statement
+        (identifier)))
     condition: (boolean_literal)
     body: (block
       (break_statement))))

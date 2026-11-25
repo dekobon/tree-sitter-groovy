@@ -454,3 +454,93 @@ items.each { item ->
           (identifier)
           (identifier)
           (identifier))))))
+
+==================
+For-in with annotations (Groovy 6)
+==================
+
+@SuppressWarnings('unused') for (x in xs) { }
+
+---
+
+(source_file
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (string_literal)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+C-style for with stacked annotations (Groovy 6)
+==================
+
+@A @B(1) for (int i = 0; i < n; i++) { }
+
+---
+
+(source_file
+  (for_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (number_literal)))
+    init: (local_variable_declaration
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block)))
+
+==================
+Annotated for-in after a label (Groovy 6)
+==================
+
+outer: @A for (x in xs) { continue outer }
+
+---
+
+(source_file
+  (labeled_statement
+    label: (identifier)
+    statement: (for_in_statement
+      (annotation
+        name: (qualified_name
+          (identifier)))
+      variable: (identifier)
+      value: (identifier)
+      body: (block
+        (continue_statement
+          label: (identifier))))))
+
+==================
+Annotated for-in in a closure (Groovy 6)
+==================
+
+def c = { @A for (x in xs) { } }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (for_in_statement
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          variable: (identifier)
+          value: (identifier)
+          body: (block))))))

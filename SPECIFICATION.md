@@ -498,7 +498,7 @@ fix relative to *both* parent grammars.
 | Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. A typed declaration needs no initializer where a statement starts, after annotations and as a `for` init (`String s`, `int i;`, `List<String> xs`, `foo.Bar q`, `@Field int a, b`, `for (int i; i < n; i++)`), and after the first declarator any declarator may go without one (`String a, b = 1`, `String a = 1, b`, `final String a, b`); which statements are such declarations the scanner decides by Apache's rule (§6.21). The node is `local_variable_declaration` with one `type` field, a `name` field per declared name and a `value` field after the name it belongs to, as for a typed declaration with initializers. |
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
-| `while` / `do-while` | port | |
+| `while` / `do-while` | port | Annotations may come first (`@A while (x) { … }`), as in Groovy 6's `loopStatement`, and are children of the loop; Groovy 4 and 5 reject them. The same goes for both `for` forms below. |
 | `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`), a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators) or a `multi_assignment_declaration` (`def (i, n) = [0, 5]`). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`). |
@@ -1204,6 +1204,12 @@ and `@Foo([@Bar, @Baz])` nest to any depth. The argument list is an
 `argument_list`; a pair is an `assignment_expression` whose `left` is
 an `identifier`, the shape `k=v` has in a call. An annotation is a
 value only there: `foo(@Bar)` and `[@Bar]` elsewhere are errors.
+
+Annotations come before a declaration, an `import` or a `package`,
+and before a `for`, `while` or `do` loop, as Groovy 6's
+`loopStatement` takes `annotationsOpt` (Groovy 4 and 5 reject an
+annotated loop). Before any other statement they are an `ERROR`
+(`@A if (x) { }`), as in Groovy.
 
 ### 5.10 Statement terminators
 

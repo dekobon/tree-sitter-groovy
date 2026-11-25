@@ -1599,7 +1599,14 @@ module.exports = grammar({
     )),
 
     // §4 — while loop. do-while lands separately.
+    //
+    // Annotations may come before any loop (`@A while (x) { }`), as
+    // Groovy 6's `loopStatement` takes `annotationsOpt` before `for`,
+    // `while` and `do`; Groovy 4 and 5 reject them. They are children of
+    // the loop. A keyword is reserved as the name of a method with no
+    // return type, so `while` after `@A` is no such name either.
     while_statement: $ => seq(
+      repeat($.annotation),
       'while',
       '(',
       field('condition', $._statement_expression),
@@ -1616,6 +1623,7 @@ module.exports = grammar({
     // comma-separated expression list (`i = 0, j = 1`); that form is
     // not yet supported.
     for_statement: $ => seq(
+      repeat($.annotation),
       'for',
       '(',
       optional(field('init', choice(
@@ -1636,6 +1644,7 @@ module.exports = grammar({
     // `while` (`do a(); while (c)`, the Java/Groovy `do S while (e);`
     // form); without it the `;` errors since `while` is required next.
     do_while_statement: $ => seq(
+      repeat($.annotation),
       'do',
       field('body', choice($._body_block, $._statement)),
       optional(';'),
@@ -2795,6 +2804,7 @@ module.exports = grammar({
     // operator's scanner token (§6.16), so the loop variable and an
     // expression in a classic `for` init still fork on one token.
     for_in_statement: $ => seq(
+      repeat($.annotation),
       'for',
       '(',
       optional('final'),
