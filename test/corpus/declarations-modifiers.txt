@@ -1365,3 +1365,90 @@ Contextual keywords name a method after annotations
     body: (block
       (expression_statement
         (identifier)))))
+
+==================
+An interpolated string is no method name after annotations
+:error
+==================
+
+@A "gstring ${x}"(n) { n }
+
+---
+
+==================
+An interpolated string is no method name after modifiers
+:error
+==================
+
+private "g$x"(n) { n }
+
+---
+
+==================
+An interpolated string is no method name in a class body
+:error
+==================
+
+class C { @A "g${x}"(n) { n } }
+
+---
+
+==================
+A string without interpolation names a method after annotations
+==================
+
+@A 'quoted name'(n) { n }
+@A "quoted name"(n) { n }
+@A """triple name"""(n) { n }
+@A "a\$b"(n) { n }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))

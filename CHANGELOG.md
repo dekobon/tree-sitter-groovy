@@ -986,7 +986,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   the `while_statement`, where v0.6.0 read a method with the return
   type `while` and a missing name. `this`, `void` and the primitive
   types, which are names in this grammar, are still taken there
-  (`docs/divergences-from-spec.md` §33). (#106)
+  (`docs/divergences-from-spec.md` §33). A quoted name of such a method
+  holds no interpolation, as Apache's `methodName` takes the
+  `StringLiteral` token: `private "a${x}"(n) { }`, a method at v0.6.0,
+  and `@A "a${x}"(n) { }` are an `ERROR`, and `@A 'a b'(n) { }`, an
+  `ERROR` at v0.6.0, is a method. (#106)
 
 ### Fixed
 

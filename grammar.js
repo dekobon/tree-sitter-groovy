@@ -318,16 +318,64 @@ function identifierPattern(dollar) {
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} textRule The flavour-specific literal-text rule.
+ * @param {boolean} [interpolates] Whether `$x` and `${x}` are
+ *   interpolations. Without them the body takes no `$` but those of
+ *   its text (`$$` and `$/` in a dollar-slashy string), as the
+ *   fallback `$` would take the one of `${x}` as text: in `"…"` and
+ *   `"""…"""` Groovy reads every `$` as an interpolation.
  * @returns {ChoiceRule} The shared body-segment choice.
  */
-function gstringPart($, textRule) {
+function gstringPart($, textRule, interpolates = true) {
   return choice(
     alias(textRule, $.string_fragment),
-    $.gstring_dollar_interpolation,
-    $.gstring_brace_interpolation,
-    alias($._gstring_literal_dollar, $.string_fragment),
+    ...(interpolates ? [
+      $.gstring_dollar_interpolation,
+      $.gstring_brace_interpolation,
+      alias($._gstring_literal_dollar, $.string_fragment),
+    ] : []),
     $._string_body,
   );
+}
+
+/**
+ * The string flavours that may interpolate, from their opening to their
+ * closing delimiter. `string_literal` takes them with interpolation, and
+ * `_constant_string_literal` without, so the two read the same text.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {boolean} interpolates See `gstringPart`.
+ * @returns {{double: SeqRule, tripleDouble: SeqRule,
+ *   dollarSlashy: SeqRule, slashy: SeqRule}} The flavours.
+ */
+function interpolatingStrings($, interpolates) {
+  return {
+    double: seq(
+      '"',
+      repeat(gstringPart($, $._gstring_text, interpolates)),
+      token.immediate('"'),
+    ),
+    tripleDouble: seq(
+      '"""',
+      repeat(choice(
+        gstringPart($, $._triple_gstring_text, interpolates),
+        alias(token.immediate('"'), $.string_fragment),
+      )),
+      token.immediate('"""'),
+    ),
+    dollarSlashy: seq(
+      '$/',
+      repeat(choice(
+        gstringPart($, $._dollar_slashy_text, interpolates),
+        alias(token.immediate('/'), $.string_fragment),
+      )),
+      token.immediate('/$'),
+    ),
+    slashy: seq(
+      $._slashy_string_start,
+      repeat(gstringPart($, $._slashy_text, interpolates)),
+      token.immediate('/'),
+    ),
+  };
 }
 
 /**
@@ -3294,10 +3342,27 @@ module.exports = grammar({
     // here (`untyped_method_name` above): with no action in that
     // position it would lex as an identifier, and `@A true(x) { }`
     // would be a method named `true` with no ERROR.
+    //
+    // A quoted name is Apache's `stringLiteral`, the `StringLiteral`
+    // token, which holds no interpolation: `@A "a${x}"(n) { }` is no
+    // method in Groovy, and was a clean one here.
     _untyped_method_name: $ => choice(
       reserved('untyped_method_name', $.identifier),
-      alias($.string_literal, $.quoted_identifier),
+      alias($._constant_string_literal, $.quoted_identifier),
     ),
+
+    // `string_literal` without `$x` or `${x}`, with the same children.
+    _constant_string_literal: $ => {
+      const strings = interpolatingStrings($, false);
+      return choice(
+        $._single_quoted_string,
+        $._triple_single_quoted_string,
+        strings.double,
+        strings.tripleDouble,
+        strings.dollarSlashy,
+        strings.slashy,
+      );
+    },
 
     // §5.14 — method reference. Groovy 3+. The RHS is either an
     // identifier (`String::length`) or the `new` keyword
@@ -3940,11 +4005,7 @@ module.exports = grammar({
     // `${expr}` segments expose the same structured children as
     // double-quoted GStrings. The closing `/` is `token.immediate`
     // so it cannot skip whitespace between the body and the closer.
-    _slashy_string: $ => seq(
-      $._slashy_string_start,
-      repeat(gstringPart($, $._slashy_text)),
-      token.immediate('/'),
-    ),
+    _slashy_string: $ => interpolatingStrings($, true).slashy,
 
     // A `\` takes the character after it, and a line break whole, `\r\n`
     // too, as Groovy's LineEscape does (`'a\` then `b'` on the next line is
@@ -3981,11 +4042,7 @@ module.exports = grammar({
     // fragment stops before any `$`, so `$identifier` and `${expr}`
     // get a chance to match; literal `$` (followed by `"` or a
     // digit etc.) is recovered as `$` plus the fallback shape.
-    _double_quoted_string: $ => seq(
-      '"',
-      repeat(gstringPart($, $._gstring_text)),
-      token.immediate('"'),
-    ),
+    _double_quoted_string: $ => interpolatingStrings($, true).double,
 
     _gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$\n\r]/,
@@ -4007,14 +4064,7 @@ module.exports = grammar({
     // starts an interpolation (`"""say "$name"""`), and a regex
     // cannot look ahead. The closer is longer than one quote, so it
     // still wins at `"""`.
-    _triple_double_quoted_string: $ => seq(
-      '"""',
-      repeat(choice(
-        gstringPart($, $._triple_gstring_text),
-        alias(token.immediate('"'), $.string_fragment),
-      )),
-      token.immediate('"""'),
-    ),
+    _triple_double_quoted_string: $ => interpolatingStrings($, true).tripleDouble,
 
     _triple_gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$]/,
@@ -4070,14 +4120,7 @@ module.exports = grammar({
     // that ends at `$` are lexed one at a time: for `//$` the single
     // `/` matches first, then `/$` is the longer match and closes
     // the string. Each such slash is its own `string_fragment`.
-    _dollar_slashy_string: $ => seq(
-      '$/',
-      repeat(choice(
-        gstringPart($, $._dollar_slashy_text),
-        alias(token.immediate('/'), $.string_fragment),
-      )),
-      token.immediate('/$'),
-    ),
+    _dollar_slashy_string: $ => interpolatingStrings($, true).dollarSlashy,
 
     _dollar_slashy_text: _ => token.immediate(repeat1(choice(
       /[^/$]/,

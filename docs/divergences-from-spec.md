@@ -2646,14 +2646,17 @@ power after it.
 **Action**: a sign that binds tighter than `**` inside a cast's operand
 only, which needs a second unary rule for that operand; not attempted.
 
-## 33. Keywords as the name of a method with no return type
+## 33. Keywords and strings as the name of a method with no return type
 
 **Apache `GroovyParser.g4`** (`GROOVY_6_0_X`): `methodName` is
 `identifier | stringLiteral`, and `identifier` takes `Identifier`,
 `CapitalizedIdentifier` and the contextual keywords `as`, `async`,
 `await`, `defer`, `in`, `module`, `permits`, `record`, `sealed`,
 `trait`, `val`, `var` and `yield`. Every other keyword is no method
-name, `this`, `void` and the primitive types included.
+name, `this`, `void` and the primitive types included. `stringLiteral`
+is the `StringLiteral` token, a string with no interpolation: a `$` in
+`"…"` or `"""…"""` always starts one, and in a slashy or
+dollar-slashy string one does where a letter or `{` follows it.
 
 **Current implementation**: the name of a method with no `def` and no
 return type (`_untyped_method_name`) reserves the
@@ -2667,12 +2670,25 @@ of one of its positions, and after `private` or `@A` the same state
 holds the type of a field or a method (`private int x`,
 `@A void f() { }`), which would then be an `ERROR`.
 
+A quoted name there is `_constant_string_literal`, `string_literal`
+with no interpolation and no fallback `$`, which would take the one of
+`${x}` as text. It takes no `$` but those of a dollar-slashy string's
+text (`$$`, `$/`), so a literal `$` in a slashy or dollar-slashy name,
+which Groovy takes before a character that is no letter, is an
+`ERROR`. After `def` or a return type the name is any `string_literal`,
+as before.
+
 | Input | Groovy | This grammar |
 |---|---|---|
 | `private case(x) { }`, `@A true(x) { }`, `private <T> static(x) { }` | rejected | an `ERROR` |
 | `@A in(x) { }`, `private record(x) { }`, `@A var(x) { }` | a method | the same |
 | `@A this(x) { }`, `private int(x) { }`, `@A void(x) { }`, `private goto(x) { }` | rejected | a method named `this`, `int`, `void` or `goto` |
 | `def case() { }`, `def true() { }` | rejected | a method named `case` or `true`: after `def` or a return type no word is reserved (spec §5.2, #93) |
+| `@A "a${x}"(n) { }`, `private "a$x"(n) { }` | rejected | an `ERROR` |
+| `@A 'a b'(n) { }`, `@A "a b"(n) { }`, `@A $/a b/$(n) { }` | a method | the same |
+| `private /a $ b/(n) { }`, `@A $/a $ b/$(n) { }` | a method | an `ERROR` |
+| `def "a${x}"(n) { }` | rejected | a method whose name holds the interpolation |
 
 **Action**: none planned for the names this grammar reads as
-identifiers; a keyword after `def` or a return type is #93.
+identifiers or for a literal `$` in a slashy name; a keyword after
+`def` or a return type is #93.
