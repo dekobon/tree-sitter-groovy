@@ -1452,3 +1452,165 @@ A string without interpolation names a method after annotations
     body: (block
       (expression_statement
         (identifier)))))
+
+==================
+A script method with annotations alone needs a body
+:error
+==================
+
+@A foo(x)
+
+---
+
+==================
+A script method with annotations alone needs a body (expression after it)
+:error
+==================
+
+@A foo(x) + 1
+
+---
+
+==================
+A script method with type parameters and no return type needs a body
+:error
+==================
+
+private <T> first(xs)
+
+---
+
+==================
+An annotated method with no return type is no statement in a closure
+:error
+==================
+
+def host = { @Memoized fib(n) { n } }
+
+---
+
+==================
+An annotated method with no return type is no statement in a block
+:error
+==================
+
+if (c) { @Memoized fib(n) { n } }
+
+---
+
+==================
+A generic method with no return type is no statement in a method body
+:error
+==================
+
+def m() { private <T> first(xs) { xs } }
+
+---
+
+==================
+An annotated script method takes its body on the next line
+==================
+
+@A foo(x)
+{ n }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Annotated and generic methods with no return type in type bodies
+==================
+
+class C {
+  @A <T> first(List<T> xs) { xs }
+  @A 'quoted name'(n) { n }
+}
+interface I {
+  @A <T> first(xs)
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (quoted_identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))))))
+
+==================
+An annotated member with no return type in a class body is a constructor (known divergence, #91)
+==================
+
+class C {
+  @Autowired setX(a) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))

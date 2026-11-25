@@ -968,14 +968,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a name (`SPECIFICATION.md` §6.11). No tree of the corpus or of 266
   real files changes; of 24,548 Java files one with an `ERROR` does, and
   of 4,000 shape inputs two do, each to Groovy's reading.
-- **BREAKING:** outside a class body, a method declared with
-  annotations only and no return type (`@Memoized fib(n) { }`), or
-  with modifiers and type parameters
-  (`private <T> first(List<T> xs) { }`), now has its name as `name`,
-  as the modifier-only form has had since #56. Previously
-  these parsed with no `ERROR`, the name as `return_type` and a
-  zero-width `name`. `foo(x) { }`, with neither, is still a call with
-  a trailing closure. Every keyword of the grammar but the contextual
+- **BREAKING:** a method with no `def` and no return type, declared
+  with annotations alone (`@Memoized fib(n) { }`) or with modifiers and
+  type parameters (`private <T> first(List<T> xs) { }`), has its name
+  as `name` at a script's top level and in a type body, as the
+  modifier-only form has had since #56. Previously these parsed with
+  no `ERROR`, the name as `return_type` and a zero-width `name`. At a
+  script's top level such a method needs a body, as in Groovy, so
+  `@A foo(x)` alone is an `ERROR`. In a class body `@A setX(a) { }`
+  stays a `constructor_declaration` (#91), and in a block or a
+  closure, where Groovy declares no method, each form keeps its v0.6.0
+  tree. `foo(x) { }`, with neither, is still a call with a trailing
+  closure. Every keyword of the grammar but the contextual
   ones (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`) is
   reserved as the name of a method with no `def` and no return type,
   after modifiers too, as Apache's `methodName` takes an `identifier`:

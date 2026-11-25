@@ -2692,3 +2692,31 @@ as before.
 **Action**: none planned for the names this grammar reads as
 identifiers or for a literal `$` in a slashy name; a keyword after
 `def` or a return type is #93.
+
+## 34. Method declarations in a block or a closure
+
+**Apache `GroovyParser.g4`** (`GROOVY_6_0_X`): `scriptStatement` takes
+`methodDeclaration[3, 9]`, and `classBodyDeclaration` takes a method as
+a member. `blockStatement` is `statement`, which takes no method
+declaration, so a block, a closure and a method's body declare no
+method. AstBuilder's `validateMethodDeclaration` rejects a script
+method without a body.
+
+**Current implementation**: `method_declaration` is a `_statement`, so
+a method with `def`, a return type or modifiers is taken in any list of
+statements, a block's and a closure's included, with a body or
+without. A method with no `def` and no return type and annotations
+alone or type parameters (`untypedMethodHead`) is taken only at a
+script's top level, with a body (`_script_method_declaration`), and
+in a type body (`_untyped_method_declaration`).
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `{ def f() { } }`, `if (c) { private g(x) { } }` | rejected | a method |
+| `private foo(x)` in a script | rejected: a script method needs a body | a method without a body |
+| `{ @A f(x) { } }`, `def m() { private <T> f(x) { } }` | rejected | an `ERROR` or a missing node, as at v0.6.0 |
+| `@A f(x)` or `private <T> f(x)` in a script | rejected | an `ERROR` |
+
+**Action**: none planned here. Taking the older forms out of blocks
+and closures, or requiring their body in a script, changes trees that
+parse with no `ERROR` today.

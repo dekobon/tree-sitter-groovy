@@ -405,6 +405,7 @@ function memberDeclarations($, constructor) {
   return [
     $.method_declaration,
     alias($._default_method_declaration, $.method_declaration),
+    alias($._untyped_method_declaration, $.method_declaration),
     $.field_declaration,
     alias($._multi_assignment_field, $.multi_assignment_declaration),
     ...(constructor ? [constructor] : []),
@@ -482,15 +483,16 @@ function constructorDeclaration($, modifiers) {
  * modifiers, type parameters, `def` or a return type, the name and the
  * parameters. `method_declaration` and an annotation type element with
  * a default (`_annotation_type_element`) share it; a method with the
- * `default` modifier (`_default_method_declaration`) passes its own
- * rules before the parameters.
+ * `default` modifier (`_default_method_declaration`) and one with no
+ * return type that only a script or a type body takes
+ * (`untypedMethodHead`) pass their own rules before the parameters.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} [beforeParameters] What comes before the
  *   parameter list, the name included. By default, annotations,
  *   modifiers, type parameters, `def` or a return type and the name; or
- *   annotations or modifiers, or both, type parameters and a name in
- *   which a statement keyword is reserved (`_untyped_method_name`).
+ *   annotations and modifiers, at least one modifier, and a name in
+ *   which a keyword is reserved (`_untyped_method_name`).
  * @returns {RuleOrLiteral[]} The rules of the head, in order.
  */
 function methodHead($, beforeParameters = choice(
@@ -502,11 +504,8 @@ function methodHead($, beforeParameters = choice(
     field('name', $._property_name),
   ),
   seq(
-    choice(
-      seq(repeat1($.annotation), repeat($._modifier)),
-      repeat1($._modifier),
-    ),
-    optional(field('type_parameters', $.method_type_parameters)),
+    repeat($.annotation),
+    repeat1($._modifier),
     field('name', $._untyped_method_name),
   ),
 )) {
@@ -517,19 +516,53 @@ function methodHead($, beforeParameters = choice(
 }
 
 /**
+ * The head of a method with no `def` and no return type that the
+ * default head (`methodHead`) does not take: annotations alone, with
+ * type parameters or without (`@Memoized fib(n)`, `@A <T> f(xs)`), or
+ * modifiers with type parameters (`private <T> first(xs)`). Groovy
+ * declares a method only in a script and a type body (Apache's
+ * `scriptStatement` and `classBodyDeclaration`; `blockStatement` takes
+ * none), and a script method needs a body (AstBuilder's
+ * `validateMethodDeclaration`), so only `_script_method_declaration`, with
+ * a body, and `_untyped_method_declaration`, in a type body, take it.
+ * Elsewhere `@A foo(x) { }` keeps the reading of v0.6.0: `foo` the return
+ * type and the name missing.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral[]} The rules of the head, in order.
+ */
+function untypedMethodHead($) {
+  return methodHead($, seq(
+    choice(
+      seq(
+        repeat1($.annotation),
+        optional(field('type_parameters', $.method_type_parameters)),
+      ),
+      seq(
+        repeat($.annotation),
+        repeat1($._modifier),
+        field('type_parameters', $.method_type_parameters),
+      ),
+    ),
+    field('name', $._untyped_method_name),
+  ));
+}
+
+/**
  * A method declaration from its head: the head and a throws clause,
  * then a body or nothing. See `method_declaration` for the weights.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral[]} head The rules of the head (`methodHead`).
+ * @param {boolean} [bodyRequired] Whether the body may not be left out.
  * @returns {PrecRightRule} The declaration rule body.
  */
-function methodDeclaration($, head) {
+function methodDeclaration($, head, bodyRequired = false) {
   const signature = seq(...head, optional($.throws_clause));
-  return prec.right(2, choice(
-    weighted(-1, signature),
-    weighted(3, seq(signature, field('body', $.block))),
-  ));
+  const withBody = weighted(3, seq(signature, field('body', $.block)));
+  return prec.right(2, bodyRequired ?
+    withBody :
+    choice(weighted(-1, signature), withBody));
 }
 
 /**
@@ -836,10 +869,12 @@ function statementBlock($, wrap = (rule) => rule) {
  * case: a statement may be a block there.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {...RuleOrLiteral} only Statements that only this list takes,
+ *   such as a script method (`source_file`).
  * @returns {RepeatRule} The list rule.
  */
-function statementList($) {
-  return repeat(choice($._statement, statementBlock($), ';'));
+function statementList($, ...only) {
+  return repeat(choice($._statement, statementBlock($), ';', ...only));
 }
 
 /**
@@ -1280,7 +1315,7 @@ module.exports = grammar({
     // SPECIFICATION.md §4 (statement and declaration coverage).
     source_file: $ => seq(
       optional($.shebang),
-      statementList($),
+      statementList($, alias($._script_method_declaration, $.method_declaration)),
     ),
 
     // §4 — `#!/usr/bin/env groovy` line at file start. Single
@@ -2030,13 +2065,16 @@ module.exports = grammar({
     // wins over local_variable_declaration when `(` follows the name,
     // so `def f() { … }` at script-top-level parses as a method
     // rather than a `def f` variable followed by `(…) { … }`.
-    // Modifiers or annotations alone (no `def`, no return type) also
-    // introduce a method outside a class body: `final f() { }`,
-    // `@Memoized fib(n) { }`, `private <T> first(xs) { }`. Apache's
-    // AstBuilder requires one of them ("Modifiers or return type is
+    // Modifiers alone (no `def`, no return type) also introduce a
+    // method outside a class body: `final f() { }`. Apache's AstBuilder
+    // requires modifiers or a return type ("Modifiers or return type is
     // required"), counting an annotation as a modifier, which keeps
-    // `foo(x) { }` a call with a trailing closure. In a class body
-    // that shape stays a constructor_declaration.
+    // `foo(x) { }` a call with a trailing closure. Annotations alone and
+    // modifiers with type parameters (`@Memoized fib(n) { }`,
+    // `private <T> first(xs) { }`) are `_script_method_declaration` and
+    // `_untyped_method_declaration`, which only a script and a type body
+    // take (see `untypedMethodHead`). In a class body `@A f(x) { }` stays
+    // a constructor_declaration.
     //
     // A method with a body carries a dynamic precedence because its
     // tokens also parse as statements: `String f() { }` as the
@@ -2055,6 +2093,15 @@ module.exports = grammar({
     // body. In a class body nothing competes, so abstract and
     // interface methods are unaffected.
     method_declaration: $ => methodDeclaration($, methodHead($)),
+
+    // §4 — `@Memoized fib(n) { }` and `private <T> first(xs) { }` in a
+    // script, where a method needs a body, and in a type body; see
+    // `untypedMethodHead`.
+    _script_method_declaration: $ =>
+      methodDeclaration($, untypedMethodHead($), true),
+
+    _untyped_method_declaration: $ =>
+      methodDeclaration($, untypedMethodHead($)),
 
     // §4 — a method with the `default` modifier, aliased to
     // `method_declaration` (divergence 20). Apache's `modifier` takes
