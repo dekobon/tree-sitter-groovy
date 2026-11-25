@@ -1613,3 +1613,53 @@ class C {
           (formal_parameter
             name: (identifier)))
         body: (block)))))
+
+==================
+A slashy string is no method name after annotations
+:error
+==================
+
+@A /a b/(n) { }
+
+---
+
+==================
+A slashy string is no method name after modifiers
+:error
+==================
+
+private /a b/(n) { }
+
+---
+
+==================
+A dollar-slashy method name takes a literal dollar
+==================
+
+private $/a $ b/$(n) { }
+@A $/a $1 b/$(n) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (quoted_identifier
+      (string_fragment)
+      (string_fragment)
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment)
+      (string_fragment)
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))

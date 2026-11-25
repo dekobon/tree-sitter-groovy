@@ -322,7 +322,8 @@ function identifierPattern(dollar) {
  *   interpolations. Without them the body takes no `$` but those of
  *   its text (`$$` and `$/` in a dollar-slashy string), as the
  *   fallback `$` would take the one of `${x}` as text: in `"…"` and
- *   `"""…"""` Groovy reads every `$` as an interpolation.
+ *   `"""…"""` Groovy reads every `$` as an interpolation. A
+ *   dollar-slashy string adds its literal `$` (`interpolatingStrings`).
  * @returns {ChoiceRule} The shared body-segment choice.
  */
 function gstringPart($, textRule, interpolates = true) {
@@ -367,6 +368,8 @@ function interpolatingStrings($, interpolates) {
       repeat(choice(
         gstringPart($, $._dollar_slashy_text, interpolates),
         alias(token.immediate('/'), $.string_fragment),
+        ...(interpolates ? [] :
+          [alias($._dollar_slashy_literal_dollar, $.string_fragment)]),
       )),
       token.immediate('/$'),
     ),
@@ -3409,6 +3412,10 @@ module.exports = grammar({
     ),
 
     // `string_literal` without `$x` or `${x}`, with the same children.
+    // A slashy string is not one: Groovy 6's lexer reads a `/` after a
+    // name, a `)` or a modifier as division (`REGEX_CHECK_SET`), so no
+    // slashy string can open such a method's name but after the `>` of
+    // its type parameters (`@A <T> /a/(n) { }`), which is not taken.
     _constant_string_literal: $ => {
       const strings = interpolatingStrings($, false);
       return choice(
@@ -3417,9 +3424,18 @@ module.exports = grammar({
         strings.double,
         strings.tripleDouble,
         strings.dollarSlashy,
-        strings.slashy,
       );
     },
+
+    // A `$` that is text in a dollar-slashy string with no interpolation:
+    // Groovy's `DollarSlashyStringCharacter` takes a `$` that no letter
+    // or `{` follows (`$/a $ b/$`). The token takes that next character
+    // too, as a regex cannot look ahead. Any character past ASCII is
+    // taken as a letter, so `$/a $— b/$`, which Groovy takes, is an
+    // ERROR; `$` before `/` or `$` is the text of `_dollar_slashy_text`.
+    _dollar_slashy_literal_dollar: _ => token.immediate(
+      /\$[^A-Za-z_$\{\/\u0080-\uffff]/,
+    ),
 
     // §5.14 — method reference. Groovy 3+. The RHS is either an
     // identifier (`String::length`) or the `new` keyword

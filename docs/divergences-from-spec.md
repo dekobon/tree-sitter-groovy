@@ -2672,11 +2672,13 @@ holds the type of a field or a method (`private int x`,
 
 A quoted name there is `_constant_string_literal`, `string_literal`
 with no interpolation and no fallback `$`, which would take the one of
-`${x}` as text. It takes no `$` but those of a dollar-slashy string's
-text (`$$`, `$/`), so a literal `$` in a slashy or dollar-slashy name,
-which Groovy takes before a character that is no letter, is an
-`ERROR`. After `def` or a return type the name is any `string_literal`,
-as before.
+`${x}` as text, and no slashy string. Groovy 6's lexer reads a `/`
+after a name, a `)` or a modifier as division (`REGEX_CHECK_SET` in
+`GroovyLexer.g4`), so only the `>` of type parameters could come
+before a slashy name, and that is not taken. A dollar-slashy name
+takes a literal `$` where no letter, `_`, `$`, `{` or `/` follows it,
+any character past ASCII counted as a letter. After `def` or a return
+type the name is any `string_literal`, as before.
 
 | Input | Groovy | This grammar |
 |---|---|---|
@@ -2686,12 +2688,15 @@ as before.
 | `def case() { }`, `def true() { }` | rejected | a method named `case` or `true`: after `def` or a return type no word is reserved (spec §5.2, #93) |
 | `@A "a${x}"(n) { }`, `private "a$x"(n) { }` | rejected | an `ERROR` |
 | `@A 'a b'(n) { }`, `@A "a b"(n) { }`, `@A $/a b/$(n) { }` | a method | the same |
-| `private /a $ b/(n) { }`, `@A $/a $ b/$(n) { }` | a method | an `ERROR` |
+| `@A /a b/(n) { }`, `private /a b/(n) { }` | rejected: the `/` is division | an `ERROR` |
+| `@A <T> /a/(n) { }` | a method | an `ERROR` |
+| `private $/a $ b/$(n) { }`, `@A $/a $1 b/$(n) { }` | a method | the same |
+| `@A $/a $— b/$(n) { }` | a method: no interpolation starts at `—` | an `ERROR`: a character past ASCII after the `$` is read as a letter |
 | `def "a${x}"(n) { }` | rejected | a method whose name holds the interpolation |
 
 **Action**: none planned for the names this grammar reads as
-identifiers or for a literal `$` in a slashy name; a keyword after
-`def` or a return type is #93.
+identifiers or for a slashy name after type parameters; a keyword
+after `def` or a return type is #93.
 
 ## 34. Method declarations in a block or a closure
 

@@ -999,7 +999,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   such a method holds no interpolation, as Apache's `methodName` takes
   the `StringLiteral` token: `private "a${x}"(n) { }`, a method at
   v0.6.0, and `@A "a${x}"(n) { }` are an `ERROR`, and
-  `@A 'a b'(n) { }`, an `ERROR` at v0.6.0, is a method. (#106)
+  `@A 'a b'(n) { }`, an `ERROR` at v0.6.0, is a method. Nor is a
+  slashy string such a name, as Groovy 6 reads a `/` after a name, a
+  `)` or a modifier as division: `private /a/(n) { }`, a method at
+  v0.6.0, is an `ERROR`. (#106)
 
 ### Fixed
 

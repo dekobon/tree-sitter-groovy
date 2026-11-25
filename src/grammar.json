@@ -9821,6 +9821,15 @@
                     },
                     "named": true,
                     "value": "string_fragment"
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_dollar_slashy_literal_dollar"
+                    },
+                    "named": true,
+                    "value": "string_fragment"
                   }
                 ]
               }
@@ -9833,45 +9842,15 @@
               }
             }
           ]
-        },
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "_slashy_string_start"
-            },
-            {
-              "type": "REPEAT",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_slashy_text"
-                    },
-                    "named": true,
-                    "value": "string_fragment"
-                  },
-                  {
-                    "type": "SYMBOL",
-                    "name": "_string_body"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "IMMEDIATE_TOKEN",
-              "content": {
-                "type": "STRING",
-                "value": "/"
-              }
-            }
-          ]
         }
       ]
+    },
+    "_dollar_slashy_literal_dollar": {
+      "type": "IMMEDIATE_TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "\\$[^A-Za-z_$\\{\\/\\u0080-\\uffff]"
+      }
     },
     "method_reference_expression": {
       "type": "PREC_LEFT",
