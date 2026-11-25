@@ -1198,11 +1198,11 @@ A reserved word is no method name after annotations (case)
 ---
 
 ==================
-A reserved word is no method name after annotations (default)
+A reserved word is no method name after type parameters (default)
 :error
 ==================
 
-@A default(x) { x }
+private <T> default(x) { x }
 
 ---
 
