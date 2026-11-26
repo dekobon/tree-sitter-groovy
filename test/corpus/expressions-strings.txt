@@ -1578,6 +1578,8 @@ def m = x in / a/
 def n = x in / a
 b/
 def f = { yield / 2 }
+def p = x in / 2
+y = b / 3
 
 ---
 
@@ -1603,7 +1605,16 @@ def f = { yield / 2 }
         (expression_statement
           (binary_expression
             left: (identifier)
-            right: (number_literal)))))))
+            right: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (identifier)
+        collection: (string_literal
+          (string_fragment)))))
+  (expression_statement
+    (number_literal)))
 
 ==================
 A slashy string runs across lines in the look-aheads that read past it
