@@ -1451,16 +1451,15 @@ modifiers, in a type body or as a statement. The rule,
 `_default_method_declaration`, is aliased to `method_declaration` and
 has its weights (§6). Other modifiers may come before and after
 `default`, and annotations after the first of them, as they come in
-any order among themselves. After them the
-return type is optional, and a member with none is a method, where
+any order among themselves. After them the return type is optional, and a member with none is a method, where
 after other modifiers it is a constructor (`public m() { }`): the
 modifier is meaningless on a constructor. The modifier is an anonymous
 `default` child before the `name`; an `@interface` element's default
 is the `default` field after the parameters, and no method has both.
 A class, interface, trait, enum or record declaration takes `default`
 among its modifiers too, at the top level or nested, through the
-hidden `_type_modifiers`. An `@interface` declaration takes no
-modifiers. Fields, constructors, compact constructors, initializers
+hidden `_type_modifiers`, and so does an `@interface` declaration
+(`public @interface X { }`, `default @interface Z { }`; #92). Fields, constructors, compact constructors, initializers
 and local variables do not take it, and each is an `ERROR` with it.
 
 `default` is therefore a keyword wherever a member or a statement can

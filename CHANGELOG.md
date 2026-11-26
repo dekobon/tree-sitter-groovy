@@ -1053,21 +1053,29 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   No corpus tree changes. 61 of 21,667 real files parse without an
   `ERROR`. In that sample 62 trees change, and each had an `ERROR`
   before (`SPECIFICATION.md` §4) (#114).
-- Annotations and modifiers come in any order, as Apache's
-  `modifiers`, `classOrInterfaceModifiers` and `variableModifiers` take
-  them: `private @Autowired Foo foo`, `public @Override String m()`,
+- Annotations and modifiers come in any order, as Apache's `modifiers`,
+  `classOrInterfaceModifiers` and `variableModifiers` take them:
+  `private @Autowired Foo foo`, `public @Override String m()`,
   `protected final @Delegate` then `Adapter a` on the next line,
   `public @interface X { }`, `sealed abstract class W permits V { }`,
-  `sealed @A class S { }`, `default @Override void b() { }`, and
-  `final @A x` in a method's or a closure's parameters parse. Each was
-  an `ERROR`, as at v0.6.0. Annotations after the first modifier are
-  children of the declaration, as those before it are, so no node kind
-  changes. One hidden rule, `_modifiers`, holds the list for every
-  declaration. `sealed record`, `sealed enum`, `def String x` and
-  `... xs` in parameters, and modifiers other than `final` before a
-  declaration where a statement starts, stay an `ERROR`. 37 of 21,667
-  real files parse without an `ERROR`, none gains one, and every tree
-  that changes had an `ERROR` before (`SPECIFICATION.md` §6.13,
+  `sealed @A class S { }`, `default @Override void b() { }`,
+  `enum F { A, private @Foo F() { } }`, and `final @A x` in a method's,
+  a closure's or a lambda's parameters and in a local
+  (`final @Foo String s = 'a'`) parse. Each was an `ERROR`, as at
+  v0.6.0. A type with `default` (divergence 20) takes annotations after
+  it, so `default @interface Z { }` is an annotation type too.
+  Annotations after the first modifier are children of the declaration,
+  as those before it are, so no node kind changes. `_modifiers` holds
+  the modifiers of every declaration, and one rule,
+  `_annotated_modifiers`, the modifiers and annotations after its first
+  modifier, after `sealed` and after `default`. `sealed record`,
+  `sealed enum`, `def String x` and `... xs` in parameters, and
+  modifiers other than `final` before a declaration where a statement
+  starts (`@Field public static Integer x = 2` in a script), stay an
+  `ERROR`. 37 of 21,667 real files parse without an `ERROR` and none
+  gains one; of the files that had an `ERROR`, 4 have a longer one, each
+  a modifier other than `final` where a statement starts or recovery
+  after an earlier `ERROR` (`SPECIFICATION.md` §6.13,
   `docs/divergences-from-spec.md` §12, §14). (#92)
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
