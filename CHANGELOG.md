@@ -1020,12 +1020,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `@Lazy y = 2` in a block, and the field `@Subject svc = new Svc()` in
   a type body, also with the annotation on its own line. The script and
   block forms were an `ERROR`, the field a method with an `ERROR`, as at
-  v0.6.0. A name without a value after annotations alone is still the
+  v0.6.0. The placeholder takes a value too (`@A _ = 1`), which was an
+  `ERROR`. A name without a value after annotations alone is still the
   type of a typed declaration (`@A x` then `y = 1` is `x y = 1`), and
-  only `_` is declared alone (`@Library('lib') _`). No corpus tree
-  changes; 61 of 21,667 real files parse without an `ERROR`, and every
-  tree that changes had an `ERROR` before (`SPECIFICATION.md` §4)
-  (#114).
+  only `_` is declared alone (`@Library('lib') _`). A keyword other
+  than a contextual one is no such name (`@A true = 1` is an `ERROR`).
+  No corpus tree changes. 61 of 21,667 real files parse without an
+  `ERROR`. In that sample 62 trees change, and each had an `ERROR`
+  before (`SPECIFICATION.md` §4) (#114).
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
   on the next line in a CRLF file is one string, as Groovy reads it
