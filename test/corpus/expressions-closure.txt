@@ -1486,3 +1486,29 @@ xs.each { String a = $/*x/$ -> a }
               (string_fragment))))
         (expression_statement
           (identifier))))))
+
+==================
+Closure body opening with a final local with annotations after final
+==================
+
+xs.each { final @Foo String s = "a"; s }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          type: (type_identifier)
+          name: (identifier)
+          value: (string_literal
+            (string_fragment)))
+        (expression_statement
+          (identifier))))))

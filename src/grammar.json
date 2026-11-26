@@ -6021,8 +6021,20 @@
                 "type": "CHOICE",
                 "members": [
                   {
-                    "type": "STRING",
-                    "value": "final"
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "final"
+                      },
+                      {
+                        "type": "REPEAT",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "annotation"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "BLANK"
@@ -6086,8 +6098,20 @@
                   "type": "CHOICE",
                   "members": [
                     {
-                      "type": "STRING",
-                      "value": "final"
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "STRING",
+                          "value": "final"
+                        },
+                        {
+                          "type": "REPEAT",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "annotation"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "BLANK"
@@ -6136,8 +6160,20 @@
                 }
               },
               {
-                "type": "STRING",
-                "value": "final"
+                "type": "SEQ",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "final"
+                  },
+                  {
+                    "type": "REPEAT",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "annotation"
+                    }
+                  }
+                ]
               },
               {
                 "type": "SYMBOL",
@@ -6175,8 +6211,20 @@
                   }
                 },
                 {
-                  "type": "STRING",
-                  "value": "final"
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "final"
+                    },
+                    {
+                      "type": "REPEAT",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "annotation"
+                      }
+                    }
+                  ]
                 },
                 {
                   "type": "FIELD",
@@ -6223,8 +6271,20 @@
                   }
                 },
                 {
-                  "type": "STRING",
-                  "value": "final"
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "final"
+                    },
+                    {
+                      "type": "REPEAT",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "annotation"
+                      }
+                    }
+                  ]
                 },
                 {
                   "type": "FIELD",
@@ -6355,8 +6415,20 @@
                         "type": "CHOICE",
                         "members": [
                           {
-                            "type": "STRING",
-                            "value": "final"
+                            "type": "SEQ",
+                            "members": [
+                              {
+                                "type": "STRING",
+                                "value": "final"
+                              },
+                              {
+                                "type": "REPEAT",
+                                "content": {
+                                  "type": "SYMBOL",
+                                  "name": "annotation"
+                                }
+                              }
+                            ]
                           },
                           {
                             "type": "BLANK"
@@ -6803,8 +6875,20 @@
                   "type": "CHOICE",
                   "members": [
                     {
-                      "type": "STRING",
-                      "value": "final"
+                      "type": "SEQ",
+                      "members": [
+                        {
+                          "type": "STRING",
+                          "value": "final"
+                        },
+                        {
+                          "type": "REPEAT",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "annotation"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "BLANK"
@@ -6821,8 +6905,20 @@
               "type": "SEQ",
               "members": [
                 {
-                  "type": "STRING",
-                  "value": "final"
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": "final"
+                    },
+                    {
+                      "type": "REPEAT",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "annotation"
+                      }
+                    }
+                  ]
                 },
                 {
                   "type": "CHOICE",
@@ -14520,10 +14616,6 @@
     [
       "_modifier",
       "local_variable_declaration",
-      "closure_parameter"
-    ],
-    [
-      "_modifier",
       "closure_parameter"
     ],
     [

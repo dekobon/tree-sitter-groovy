@@ -592,6 +592,19 @@ function methodDeclaration($, head, bodyRequired = false) {
 }
 
 /**
+ * `final` before a parameter or a local, with the annotations that may
+ * follow it. Apache's `variableModifier` takes `final` and annotations
+ * in any order; annotations before `final` stay in the declaration's
+ * own `repeat($.annotation)`, so each annotation has one place to go.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} `final` and its annotations.
+ */
+function finalModifier($) {
+  return seq('final', repeat($.annotation));
+}
+
+/**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
  * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
@@ -610,7 +623,7 @@ function parameter($, value = $._expression) {
   return choice(
     seq(
       repeat($.annotation),
-      optional(seq('final', repeat($.annotation))),
+      optional(finalModifier($)),
       optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
       defaultValue,
@@ -1316,12 +1329,10 @@ module.exports = grammar({
     // the first token that only one reading accepts.
     //
     // `{ final x -> }` vs. a body opening with a final local (#56) or
-    // with a modified declaration; all three stay alive at `final`.
+    // with a modified declaration; all three stay alive at `final`, and
+    // past the annotations that may follow it (`{ final @A x -> }`, a
+    // final local `final @A String s = …`, Apache `variableModifiers`).
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
-    // `{ final @A x -> }`: an annotation after `final` in a closure's first
-    // parameter, as in a method's (Apache `variableModifiers`), against
-    // `final` as the modifier of a member with annotations after it.
-    [$._modifier, $.closure_parameter],
     // `{ final def (a, b) = … }`: the same fork, no wider.
     [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration, $.closure_parameter],
     // `{ String a = 'x', b -> }` vs. `{ String a = 'x', b = 'y' }`, and
@@ -2554,21 +2565,21 @@ module.exports = grammar({
     local_variable_declaration: $ => prec.right(choice(
       seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         choice('def', varKeyword($)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._typed_declarator)),
       )),
       seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
@@ -2577,7 +2588,7 @@ module.exports = grammar({
       // (§6.14); `final String s new Foo()` still declares `s`.
       weighted(2, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2589,7 +2600,7 @@ module.exports = grammar({
       // the closure with two parameters, and the declaration won.
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2615,7 +2626,7 @@ module.exports = grammar({
       // (Apache's `modifier` lists `VAR`): `var String s = 'a'`.
       seq(
         repeat($.annotation),
-        optional(seq(optional('final'), choice('def', varKeyword($)))),
+        optional(seq(optional(finalModifier($)), choice('def', varKeyword($)))),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,
@@ -2727,8 +2738,8 @@ module.exports = grammar({
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
       choice(
-        seq(optional('final'), 'def'),
-        seq('final', optional(varKeyword($))),
+        seq(optional(finalModifier($)), 'def'),
+        seq(finalModifier($), optional(varKeyword($))),
         alias($._var_names_keyword, 'var'),
       ),
       $._multi_assignment_tail,
