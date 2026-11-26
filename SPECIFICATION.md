@@ -1792,11 +1792,16 @@ and the scanner emits only SLASHY_STRING_START, after the `/`; the
 grammar reads the body and the closing `/`. The opener needs a body
 that is not empty and reaches a closing `/`, an escaped character
 (`\/` among them) read as one (`slashy_body_follows`). Where no
-division may follow, which is where NOT_IN is not valid (an operand
-starts, below), the body may start with whitespace and run across
-lines, as Groovy's `SlashyStringCharacter` takes both:
+expression ends, which is where NOT_IN is not valid (an operand
+starts, below) or BODY_BLOCK_END is (after the `}` of an `if` or loop
+body, where Groovy's lexer reads a string too: `if (c) { a }` then
+`/ 2` on the next line), the body may start with whitespace and run
+across lines, as Groovy's `SlashyStringCharacter` takes both:
 `x = /a` then `b/` on the next line, and
-`s.replaceFirst(/ in [ \dms]+/, '')`. Where a division may follow,
+`s.replaceFirst(/ in [ \dms]+/, '')`. During error recovery, where
+every symbol is valid, the one-line rule holds, so a stray `/` does not
+turn the lines after it into string text (`x = a @@ / b` then
+`y = c / d`). Where a division may follow,
 the `/` starts a string only with a body that does not start with
 whitespace and closes on its line: a `/` that starts the next
 statement on a later line, after an expression (`next_line_continues`,
