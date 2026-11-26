@@ -1287,9 +1287,6 @@ module.exports = grammar({
     // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
-    // `{ @A x = 1, y -> }` against `{ @A x = 1, y }`, the annotated
-    // declaration with no type; the `->` decides.
-    [$._valued_declarator, $.closure_parameter],
     // `{ final String a, b -> }` vs. `{ final String a, b }`, the same fork
     // after a blank final's name.
     [$.local_variable_declaration, $.closure_parameter],
@@ -2086,7 +2083,7 @@ module.exports = grammar({
       // first name needs a value (`_placeholder_declarator`).
       seq(
         repeat1($.annotation),
-        alias($._valued_declarator, $.variable_declarator),
+        alias($._initialized_declarator, $.variable_declarator),
         repeat(seq(',', $.variable_declarator)),
       ),
     ),
@@ -2536,7 +2533,7 @@ module.exports = grammar({
       // `_placeholder_declarator` gives.
       seq(
         repeat1($.annotation),
-        alias($._valued_declarator, $.variable_declarator),
+        alias($._initialized_declarator, $.variable_declarator),
         repeat(seq(',', $.variable_declarator)),
       ),
       // `def String s = 'a'`: `def` is a modifier before the type, as in
@@ -2579,12 +2576,6 @@ module.exports = grammar({
     variable_declarator: $ => seq(
       field('name', $.identifier),
       optional(seq('=', field('value', enhancedStatementExpression($)))),
-    ),
-
-    _valued_declarator: $ => seq(
-      field('name', $.identifier),
-      '=',
-      field('value', enhancedStatementExpression($)),
     ),
 
     // The names of a multi-assignment declaration, Apache `typeNamePairs`.

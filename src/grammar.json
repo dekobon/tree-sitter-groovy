@@ -3753,7 +3753,7 @@
               "type": "ALIAS",
               "content": {
                 "type": "SYMBOL",
-                "name": "_valued_declarator"
+                "name": "_initialized_declarator"
               },
               "named": true,
               "value": "variable_declarator"
@@ -6080,7 +6080,7 @@
                 "type": "ALIAS",
                 "content": {
                   "type": "SYMBOL",
-                  "name": "_valued_declarator"
+                  "name": "_initialized_declarator"
                 },
                 "named": true,
                 "value": "variable_declarator"
@@ -6388,59 +6388,6 @@
               "type": "BLANK"
             }
           ]
-        }
-      ]
-    },
-    "_valued_declarator": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "FIELD",
-          "name": "name",
-          "content": {
-            "type": "SYMBOL",
-            "name": "identifier"
-          }
-        },
-        {
-          "type": "STRING",
-          "value": "="
-        },
-        {
-          "type": "FIELD",
-          "name": "value",
-          "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "SYMBOL",
-                    "name": "_expression"
-                  },
-                  {
-                    "type": "ALIAS",
-                    "content": {
-                      "type": "SYMBOL",
-                      "name": "_value_command_chain"
-                    },
-                    "named": true,
-                    "value": "command_chain"
-                  }
-                ]
-              },
-              {
-                "type": "ALIAS",
-                "content": {
-                  "type": "SYMBOL",
-                  "name": "_bare_lambda_expression"
-                },
-                "named": true,
-                "value": "lambda_expression"
-              }
-            ]
-          }
         }
       ]
     },
@@ -14244,10 +14191,6 @@
     ],
     [
       "variable_declarator",
-      "closure_parameter"
-    ],
-    [
-      "_valued_declarator",
       "closure_parameter"
     ],
     [
