@@ -1549,6 +1549,37 @@ z = e / f
         right: (identifier)))))
 
 ==================
+A slash after a stray operator opens no slashy string across lines
+==================
+
+x = a ?? / b
+y = c / d
+z = e / f
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        (ERROR)
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
 A slash on the line after a body block opens a slashy string
 ==================
 
