@@ -25,7 +25,7 @@ reasoning here.
 | §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, in parentheses and in an interpolation. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. The lazy form `"${-> x}"` takes its `->` as a `closure_parameters` leaf; a closure with parameters (`"${w -> w << x}"`, which Groovy passes the writer) is an `ERROR` (spec §5.5 item 1). |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
-| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations. Not supported, each an `ERROR`: an annotation on a `catch` parameter (`catch (@A Exception e)`), a for-in variable (`for (@A x in xs)`), a record component (`record R(@A int a)`) or a type parameter (`class C<@A T>`). An annotated typed local with no initializer parses (`@Field String x`, `@Field int a, b`), as one without annotations does (see #27 below). An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`; a lowercase type after annotations takes no name either (`@A foo bar`, Groovy's declaration). An annotation's arguments, the value of each `name = value` in them, and an `@interface` element's `default` (#101) take Apache's `elementValue`: an expression, an annotation, or a list of annotations, nested to any depth (`@Foo(x = [@Bar(@Baz)])`). A list that mixes annotations and expressions (`[@A, 1]`) or holds a list of annotations inside a list (`[[@A]]`) is an `ERROR`: Apache's parser takes both, and Groovy rejects them when it checks the annotation. Outside those three places an annotation is not a value, so `foo(@A)` and `x = [@A]` stay `ERROR`s. The arguments also take the forms of a call's arguments that Apache's one value or list of pairs does not (`@Foo(1, 2)`, `@Foo(x: 1)`, a trailing comma), and an annotation goes wherever an expression does among them (`@A(@B, @C)`, `@A(@B, a = 1)`, `@A(@B,)`), except as the value of `x:`, which stays an expression. One call form is not taken: in a call, `x = a: 1` is a named argument whose key is the assignment `x = a`, while in an annotation `name =` starts a pair, so `@Foo(x = a: 1)` is an `ERROR`, as it is in Groovy. Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
+| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations, and on `for`, `while` and `do` loops, as in Groovy 6 (Groovy 4 and 5 reject an annotated loop). Not supported, each an `ERROR`: an annotation on a `catch` parameter (`catch (@A Exception e)`), a for-in variable (`for (@A x in xs)`), a record component (`record R(@A int a)`) or a type parameter (`class C<@A T>`). An annotated typed local with no initializer parses (`@Field String x`, `@Field int a, b`), as one without annotations does (see #27 below). An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local declaration takes only the name `_`; a lowercase type after annotations takes no name either (`@A foo bar`, Groovy's declaration). An annotation's arguments, the value of each `name = value` in them, and an `@interface` element's `default` (#101) take Apache's `elementValue`: an expression, an annotation, or a list of annotations, nested to any depth (`@Foo(x = [@Bar(@Baz)])`). A list that mixes annotations and expressions (`[@A, 1]`) or holds a list of annotations inside a list (`[[@A]]`) is an `ERROR`: Apache's parser takes both, and Groovy rejects them when it checks the annotation. Outside those three places an annotation is not a value, so `foo(@A)` and `x = [@A]` stay `ERROR`s. The arguments also take the forms of a call's arguments that Apache's one value or list of pairs does not (`@Foo(1, 2)`, `@Foo(x: 1)`, a trailing comma), and an annotation goes wherever an expression does among them (`@A(@B, @C)`, `@A(@B, a = 1)`, `@A(@B,)`), except as the value of `x:`, which stays an expression. One call form is not taken: in a call, `x = a: 1` is a named argument whose key is the assignment `x = a`, while in an annotation `name =` starts a pair, so `@Foo(x = a: 1)` is an `ERROR`, as it is in Groovy. Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
 | §5.10 Statement terminators | **Equivalent** | newline-as-terminator via `repeat($._statement)` rather than a scanner token (see #3 below). |
 | §5.11 Spread (three positions) | **Done** | `spread_arguments`, also as a list literal's element (`[*a, *b]`) and a subscript's index (`y[1, *a]`), `spread_dot_expression`, `spread_map_entry`, also as an argument (`foo(*:m, x: 1)`). The first argument of a parenthesis-free call is neither (`foo *a, 1`, `foo *:m`; see §5.5 above). |
 | §5.12 `def` positions | **Mostly done** | a typed local without an initializer (`String x`, `int a, b`) is a declaration by Apache's rule (see #27 below); `def` before a type declares a typed local or field (`def String s`, `private def Foo foo`), where the scanner reads the declaration after `def` (spec §6.21). Not taken: a lowercase type with no `<` or `[` (`def foo bar`), a modifier after `def` (`def final String x`), a return type after `def` (`def String m() { }`), and `def` with a type in a parameter (§14 below), each read as before. `var` and `final var` before a type declare as `def` does (`var String s = 'a'`). |
@@ -2645,3 +2645,90 @@ power after it.
 
 **Action**: a sign that binds tighter than `**` inside a cast's operand
 only, which needs a second unary rule for that operand; not attempted.
+
+## 33. Keywords and strings as the name of a method with no return type
+
+**Apache `GroovyParser.g4`** (`GROOVY_6_0_X`): `methodName` is
+`identifier | stringLiteral`, and `identifier` takes `Identifier`,
+`CapitalizedIdentifier` and the contextual keywords `as`, `async`,
+`await`, `defer`, `in`, `module`, `permits`, `record`, `sealed`,
+`trait`, `val`, `var` and `yield`. Every other keyword is no method
+name, `this`, `void` and the primitive types included. `stringLiteral`
+is the `StringLiteral` token, a string with no interpolation: a `$` in
+`"…"` or `"""…"""` always starts one, and in a slashy or
+dollar-slashy string one does where a letter or `{` follows it.
+
+**Current implementation**: the name of a method with no `def` and no
+return type (`_untyped_method_name`) reserves the
+`untyped_method_name` set, every keyword that is a token of this
+grammar and no Apache `identifier` (spec §5.2). A parse state takes
+the reserved set of one of its positions, so after `private` or `@A`
+the set also covers the type of a field or a method and the name of a
+field or a local declared by modifiers alone (`private case = 1` is an
+`ERROR`, as in Groovy). `this`, `void` and the primitive types are
+identifiers in this grammar, and `goto`, `const` and `threadsafe` are
+no tokens of it, so none can be reserved: tree-sitter takes only tokens
+as reserved words, and making them tokens would take a token for each
+wherever it stands today, `this` in every expression, key and receiver
+position and the types in every type position. The scanner turns them
+down instead: before one of them and a `(` on its line it emits
+`_excluded_method_name` (spec §6.25), the word is the return type and
+the name is missing, the tree `@A this(x) { }` had at v0.6.0. Past a
+line break or a comment before the `(` they are still names.
+
+A quoted name there is `_constant_string_literal`, `string_literal`
+with no interpolation and no fallback `$`, which would take the one of
+`${x}` as text, and no slashy string. Groovy 6's lexer reads a `/`
+after a name, a `)` or a modifier as division (`REGEX_CHECK_SET` in
+`GroovyLexer.g4`), so only the `>` of type parameters could come
+before a slashy name, and that is not taken. A dollar-slashy name
+takes a literal `$` where no letter, `_`, `$`, `{` or `/` follows it,
+any character past ASCII counted as a letter. After `def` or a return
+type the name is any `string_literal`, as before.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `private case(x) { }`, `@A true(x) { }`, `private <T> static(x) { }` | rejected | an `ERROR` |
+| `@A in(x) { }`, `private record(x) { }`, `@A var(x) { }` | a method | the same |
+| `@A this(x) { }`, `private int(x) { }`, `@A void(x) { }`, `private goto(x) { }` | rejected | a return type before a missing name |
+| `@A this` then `(x) { }` on the next line, `private int /* c */ (x) { }` | rejected | a method named `this` or `int` |
+| `def case() { }`, `def true() { }` | rejected | a method named `case` or `true`: after `def` or a return type no word is reserved (spec §5.2, #93) |
+| `@A "a${x}"(n) { }`, `private "a$x"(n) { }` | rejected | an `ERROR` |
+| `@A 'a b'(n) { }`, `@A "a b"(n) { }`, `@A $/a b/$(n) { }` | a method | the same |
+| `@A /a b/(n) { }`, `private /a b/(n) { }` | rejected: the `/` is division | an `ERROR` |
+| `@A <T> /a/(n) { }` | a method | an `ERROR` |
+| `private $/a $ b/$(n) { }`, `@A $/a $1 b/$(n) { }` | a method | the same |
+| `@A $/a $— b/$(n) { }` | a method: no interpolation starts at `—` | an `ERROR`: a character past ASCII after the `$` is read as a letter |
+| `def "a${x}"(n) { }` | rejected | a method whose name holds the interpolation |
+
+**Action**: none planned for a word before a line break or a comment,
+or for a slashy name after type parameters; a keyword after `def` or a
+return type is #93.
+
+## 34. Method declarations in a block or a closure
+
+**Apache `GroovyParser.g4`** (`GROOVY_6_0_X`): `scriptStatement` takes
+`methodDeclaration[3, 9]`, and `classBodyDeclaration` takes a method as
+a member. `blockStatement` is `statement`, which takes no method
+declaration, so a block, a closure and a method's body declare no
+method. AstBuilder's `validateMethodDeclaration` rejects a script
+method without a body.
+
+**Current implementation**: `method_declaration` is a `_statement`, so
+a method with `def`, a return type or modifiers is taken in any list of
+statements, a block's and a closure's included, with a body or
+without. A method with no `def` and no return type and annotations
+alone or type parameters (`untypedMethodHead`) is taken only at a
+script's top level, with a body (`_script_method_declaration`), and
+in a type body (`_untyped_method_declaration`).
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `{ def f() { } }`, `if (c) { private g(x) { } }` | rejected | a method |
+| `private foo(x)` in a script | rejected: a script method needs a body | a method without a body |
+| `{ @A f(x) { } }`, `def m() { private <T> f(x) { } }` | rejected | an `ERROR` or a missing node, as at v0.6.0 |
+| `@A f(x)` or `private <T> f(x)` in a script | rejected | an `ERROR` |
+
+**Action**: none planned here. Taking the older forms out of blocks
+and closures, or requiring their body in a script, changes trees that
+parse with no `ERROR` today.

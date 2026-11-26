@@ -260,3 +260,10 @@ case A:
 //   ^ variable
 foo()
 // <- function.call
+
+// An annotation before a loop (Groovy 6) is an attribute, and the loop's
+// keyword keeps its capture.
+@Unroll for (i in xs) y
+// <- attribute
+// ^ attribute
+//      ^ keyword.control

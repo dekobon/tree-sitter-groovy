@@ -318,16 +318,67 @@ function identifierPattern(dollar) {
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} textRule The flavour-specific literal-text rule.
+ * @param {boolean} [interpolates] Whether `$x` and `${x}` are
+ *   interpolations. Without them the body takes no `$` but those of
+ *   its text (`$$` and `$/` in a dollar-slashy string), as the
+ *   fallback `$` would take the one of `${x}` as text: in `"…"` and
+ *   `"""…"""` Groovy reads every `$` as an interpolation. A
+ *   dollar-slashy string adds its literal `$` (`interpolatingStrings`).
  * @returns {ChoiceRule} The shared body-segment choice.
  */
-function gstringPart($, textRule) {
+function gstringPart($, textRule, interpolates = true) {
   return choice(
     alias(textRule, $.string_fragment),
-    $.gstring_dollar_interpolation,
-    $.gstring_brace_interpolation,
-    alias($._gstring_literal_dollar, $.string_fragment),
+    ...(interpolates ? [
+      $.gstring_dollar_interpolation,
+      $.gstring_brace_interpolation,
+      alias($._gstring_literal_dollar, $.string_fragment),
+    ] : []),
     $._string_body,
   );
+}
+
+/**
+ * The string flavours that may interpolate, from their opening to their
+ * closing delimiter. `string_literal` takes them with interpolation, and
+ * `_constant_string_literal` without, so the two read the same text.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {boolean} interpolates See `gstringPart`.
+ * @returns {{double: SeqRule, tripleDouble: SeqRule,
+ *   dollarSlashy: SeqRule, slashy: SeqRule}} The flavours.
+ */
+function interpolatingStrings($, interpolates) {
+  return {
+    double: seq(
+      '"',
+      repeat(gstringPart($, $._gstring_text, interpolates)),
+      token.immediate('"'),
+    ),
+    tripleDouble: seq(
+      '"""',
+      repeat(choice(
+        gstringPart($, $._triple_gstring_text, interpolates),
+        alias(token.immediate('"'), $.string_fragment),
+      )),
+      token.immediate('"""'),
+    ),
+    dollarSlashy: seq(
+      '$/',
+      repeat(choice(
+        gstringPart($, $._dollar_slashy_text, interpolates),
+        alias(token.immediate('/'), $.string_fragment),
+        ...(interpolates ? [] :
+          [alias($._dollar_slashy_literal_dollar, $.string_fragment)]),
+      )),
+      token.immediate('/$'),
+    ),
+    slashy: seq(
+      $._slashy_string_start,
+      repeat(gstringPart($, $._slashy_text, interpolates)),
+      token.immediate('/'),
+    ),
+  };
 }
 
 /**
@@ -357,6 +408,7 @@ function memberDeclarations($, constructor) {
   return [
     $.method_declaration,
     alias($._default_method_declaration, $.method_declaration),
+    alias($._untyped_method_declaration, $.method_declaration),
     $.field_declaration,
     alias($._multi_assignment_field, $.multi_assignment_declaration),
     ...(constructor ? [constructor] : []),
@@ -434,29 +486,69 @@ function constructorDeclaration($, modifiers) {
  * modifiers, type parameters, `def` or a return type, the name and the
  * parameters. `method_declaration` and an annotation type element with
  * a default (`_annotation_type_element`) share it; a method with the
- * `default` modifier (`_default_method_declaration`) passes its own
- * modifiers.
+ * `default` modifier (`_default_method_declaration`) and one with no
+ * return type that only a script or a type body takes
+ * (`untypedMethodHead`) pass their own rules before the parameters.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
- * @param {RuleOrLiteral} [modifiers] What comes between the annotations
- *   and the name. By default, modifiers followed by type parameters and
- *   `def` or a return type, or modifiers alone.
+ * @param {RuleOrLiteral} [beforeParameters] What comes before the
+ *   parameter list, the name included. By default, annotations,
+ *   modifiers, type parameters, `def` or a return type and the name; or
+ *   annotations and modifiers, at least one modifier, and a name in
+ *   which a keyword is reserved (`_untyped_method_name`).
  * @returns {RuleOrLiteral[]} The rules of the head, in order.
  */
-function methodHead($, modifiers = choice(
+function methodHead($, beforeParameters = choice(
   seq(
+    repeat($.annotation),
     repeat($._modifier),
     optional(field('type_parameters', $.method_type_parameters)),
     choice('def', field('return_type', $._type)),
+    field('name', $._property_name),
   ),
-  repeat1($._modifier),
+  seq(
+    repeat($.annotation),
+    repeat1($._modifier),
+    $._untyped_method_name,
+  ),
 )) {
   return [
-    repeat($.annotation),
-    modifiers,
-    field('name', $._property_name),
+    beforeParameters,
     field('parameters', $.formal_parameters),
   ];
+}
+
+/**
+ * The head of a method with no `def` and no return type that the
+ * default head (`methodHead`) does not take: annotations alone, with
+ * type parameters or without (`@Memoized fib(n)`, `@A <T> f(xs)`), or
+ * modifiers with type parameters (`private <T> first(xs)`). Groovy
+ * declares a method only in a script and a type body (Apache's
+ * `scriptStatement` and `classBodyDeclaration`; `blockStatement` takes
+ * none), and a script method needs a body (AstBuilder's
+ * `validateMethodDeclaration`), so only `_script_method_declaration`, with
+ * a body, and `_untyped_method_declaration`, in a type body, take it.
+ * Elsewhere each form keeps its tree of v0.6.0, an ERROR or a missing
+ * name.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral[]} The rules of the head, in order.
+ */
+function untypedMethodHead($) {
+  return methodHead($, seq(
+    choice(
+      seq(
+        repeat1($.annotation),
+        optional(field('type_parameters', $.method_type_parameters)),
+      ),
+      seq(
+        repeat($.annotation),
+        repeat1($._modifier),
+        field('type_parameters', $.method_type_parameters),
+      ),
+    ),
+    $._untyped_method_name,
+  ));
 }
 
 /**
@@ -465,14 +557,15 @@ function methodHead($, modifiers = choice(
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral[]} head The rules of the head (`methodHead`).
+ * @param {boolean} [bodyRequired] Whether the body may not be left out.
  * @returns {PrecRightRule} The declaration rule body.
  */
-function methodDeclaration($, head) {
+function methodDeclaration($, head, bodyRequired = false) {
   const signature = seq(...head, optional($.throws_clause));
-  return prec.right(2, choice(
-    weighted(-1, signature),
-    weighted(3, seq(signature, field('body', $.block))),
-  ));
+  const withBody = weighted(3, seq(signature, field('body', $.block)));
+  return prec.right(2, bodyRequired ?
+    withBody :
+    choice(weighted(-1, signature), withBody));
 }
 
 /**
@@ -779,10 +872,12 @@ function statementBlock($, wrap = (rule) => rule) {
  * case: a statement may be a block there.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {...RuleOrLiteral} only Statements that only this list takes,
+ *   such as a script method (`source_file`).
  * @returns {RepeatRule} The list rule.
  */
-function statementList($) {
-  return repeat(choice($._statement, statementBlock($), ';'));
+function statementList($, ...only) {
+  return repeat(choice($._statement, statementBlock($), ';', ...only));
 }
 
 /**
@@ -867,9 +962,34 @@ module.exports = grammar({
   // a comma and of an annotation's `name = value`, and the empty
   // `property` set for a key after `_command_named_key` and a name after
   // a member access (`x.case`, `x::case`).
+  //
+  // `untyped_method_name` is the name of a method with no `def` and no
+  // return type (`_untyped_method_name`). Apache's `methodName` takes
+  // an `identifier`, which admits no keyword but the contextual ones
+  // (`as`, `in`, `permits`, `record`, `trait`, `var`, `yield`, …), so
+  // every other keyword of this grammar is reserved there: without it a
+  // keyword with no action lexed as the name, and `@A true(x) { }` or
+  // `private <T> static(x) { }` was a clean method. A parse state takes
+  // one set, the highest-numbered of its positions', not a union, and
+  // after `private` or `@A` the state also holds the type that may come
+  // instead of the name (`private int x`) and the name of a field or a
+  // local declared by modifiers alone, so `private case = 1` is an ERROR
+  // too, as in Groovy. The set holds the global words, and leaves out
+  // `this`, `void` and the primitive types: tree-sitter reserves only
+  // tokens, and in this grammar they are identifiers. The scanner turns
+  // them down there instead (`_excluded_method_name`, §6.25).
   reserved: {
     global: _ => ['new', 'case'],
     property: _ => [],
+    untyped_method_name: _ => [
+      'abstract', 'assert', 'break', 'case', 'catch', 'class', 'continue',
+      'def', 'default', 'do', 'else', 'enum', 'extends', 'false', 'final',
+      'finally', 'for', 'if', 'implements', 'import', 'instanceof',
+      'interface', 'native', 'new', 'null', 'package', 'private',
+      'protected', 'public', 'return', 'static', 'strictfp', 'super',
+      'switch', 'synchronized', 'throw', 'throws', 'transient', 'true',
+      'try', 'volatile', 'while',
+    ],
   },
 
   extras: $ => [
@@ -1069,6 +1189,11 @@ module.exports = grammar({
     // Groovy, and could also start a member that would split the line
     // (see `parenthesized_expression`).
     $._cast_word_close,
+    // §6.25 — an empty token before `this`, `void`, a primitive type,
+    // `goto`, `const` or `threadsafe` where the name of a method with no
+    // `def` and no return type may come and `(` follows on the line: Groovy
+    // takes none of them as that name (see `_untyped_method_name`).
+    $._excluded_method_name,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1200,7 +1325,7 @@ module.exports = grammar({
     // SPECIFICATION.md §4 (statement and declaration coverage).
     source_file: $ => seq(
       optional($.shebang),
-      statementList($),
+      statementList($, alias($._script_method_declaration, $.method_declaration)),
     ),
 
     // §4 — `#!/usr/bin/env groovy` line at file start. Single
@@ -1484,7 +1609,15 @@ module.exports = grammar({
     )),
 
     // §4 — while loop. do-while lands separately.
+    //
+    // Annotations may come before any loop (`@A while (x) { }`), as
+    // Groovy 6's `loopStatement` takes `annotationsOpt` before `for`,
+    // `while` and `do`; Groovy 4 and 5 reject them. They are children of
+    // the loop. A type body takes no loop, and there `while` after `@A`
+    // is reserved as the name of a method with no return type, so
+    // `class C { @A while (x) { } }` is an ERROR.
     while_statement: $ => seq(
+      repeat($.annotation),
       'while',
       '(',
       field('condition', $._statement_expression),
@@ -1501,6 +1634,7 @@ module.exports = grammar({
     // comma-separated expression list (`i = 0, j = 1`); that form is
     // not yet supported.
     for_statement: $ => seq(
+      repeat($.annotation),
       'for',
       '(',
       optional(field('init', choice(
@@ -1521,6 +1655,7 @@ module.exports = grammar({
     // `while` (`do a(); while (c)`, the Java/Groovy `do S while (e);`
     // form); without it the `;` errors since `while` is required next.
     do_while_statement: $ => seq(
+      repeat($.annotation),
       'do',
       field('body', choice($._body_block, $._statement)),
       optional(';'),
@@ -1951,8 +2086,17 @@ module.exports = grammar({
     // so `def f() { … }` at script-top-level parses as a method
     // rather than a `def f` variable followed by `(…) { … }`.
     // Modifiers alone (no `def`, no return type) also introduce a
-    // method outside a class body: `final f() { }`. In a class body
-    // that shape stays a constructor_declaration.
+    // method outside a class body: `final f() { }`. Apache's AstBuilder
+    // requires modifiers or a return type ("Modifiers or return type is
+    // required"), counting an annotation as a modifier, and a script
+    // statement that starts with a name and `(` is no method
+    // (`SemanticPredicates.isInvalidMethodDeclaration`), which keeps
+    // `foo(x) { }` a call with a trailing closure. Annotations alone and
+    // modifiers with type parameters (`@Memoized fib(n) { }`,
+    // `private <T> first(xs) { }`) are `_script_method_declaration` and
+    // `_untyped_method_declaration`, which only a script and a type body
+    // take (see `untypedMethodHead`). In a class body `@A f(x) { }` stays
+    // a constructor_declaration.
     //
     // A method with a body carries a dynamic precedence because its
     // tokens also parse as statements: `String f() { }` as the
@@ -1972,6 +2116,15 @@ module.exports = grammar({
     // interface methods are unaffected.
     method_declaration: $ => methodDeclaration($, methodHead($)),
 
+    // §4 — `@Memoized fib(n) { }` and `private <T> first(xs) { }` in a
+    // script, where a method needs a body, and in a type body; see
+    // `untypedMethodHead`.
+    _script_method_declaration: $ =>
+      methodDeclaration($, untypedMethodHead($), true),
+
+    _untyped_method_declaration: $ =>
+      methodDeclaration($, untypedMethodHead($)),
+
     // §4 — a method with the `default` modifier, aliased to
     // `method_declaration` (divergence 20). Apache's `modifier` takes
     // `default` before any declaration; Groovy 3 ignores it except on
@@ -1990,11 +2143,13 @@ module.exports = grammar({
     // the name of a field survives; the weights of `method_declaration`
     // outrank it.
     _default_method_declaration: $ => methodDeclaration($, methodHead($, seq(
+      repeat($.annotation),
       repeat($._modifier),
       'default',
       repeat($._modifier),
       optional(field('type_parameters', $.method_type_parameters)),
       optional(choice('def', field('return_type', $._type))),
+      field('name', $._property_name),
     ))),
 
     // §4 / §5.14 — method-level generic type parameters
@@ -2662,6 +2817,7 @@ module.exports = grammar({
     // operator's scanner token (§6.16), so the loop variable and an
     // expression in a classic `for` init still fork on one token.
     for_in_statement: $ => seq(
+      repeat($.annotation),
       'for',
       '(',
       optional('final'),
@@ -3249,6 +3405,60 @@ module.exports = grammar({
     _property_name: $ => choice(
       reserved('property', $.identifier),
       alias($.string_literal, $.quoted_identifier),
+    ),
+
+    // The name of a method with no `def` and no return type. Every
+    // keyword that Apache's `identifier` does not take is reserved
+    // here (`untyped_method_name` above): with no action in that
+    // position it would lex as an identifier, and `@A true(x) { }`
+    // would be a method named `true` with no ERROR.
+    //
+    // A quoted name is Apache's `stringLiteral`, the `StringLiteral`
+    // token, which holds no interpolation: `@A "a${x}"(n) { }` is no
+    // method in Groovy, and was a clean one here.
+    //
+    // The third alternative is an error production. The scanner emits
+    // `_excluded_method_name`, empty, before a word that Groovy takes as
+    // no such name and that this grammar reads as an identifier
+    // (`this`, `void`, `int`, `goto`, …) where `(` follows it: the word
+    // is then the return type, and the name, a token that matches no
+    // input, is always missing, as it was before this name was taken
+    // after annotations alone. The fields are set here, not where the
+    // rule is used, so that the return type is not a name.
+    _untyped_method_name: $ => choice(
+      field('name', reserved('untyped_method_name', $.identifier)),
+      field('name', alias($._constant_string_literal, $.quoted_identifier)),
+      seq(
+        $._excluded_method_name,
+        field('return_type', alias($.identifier, $.type_identifier)),
+        field('name', alias($._missing_value, $.identifier)),
+      ),
+    ),
+
+    // `string_literal` without `$x` or `${x}`, with the same children.
+    // A slashy string is not one: Groovy 6's lexer reads a `/` after a
+    // name, a `)` or a modifier as division (`REGEX_CHECK_SET`), so no
+    // slashy string can open such a method's name but after the `>` of
+    // its type parameters (`@A <T> /a/(n) { }`), which is not taken.
+    _constant_string_literal: $ => {
+      const strings = interpolatingStrings($, false);
+      return choice(
+        $._single_quoted_string,
+        $._triple_single_quoted_string,
+        strings.double,
+        strings.tripleDouble,
+        strings.dollarSlashy,
+      );
+    },
+
+    // A `$` that is text in a dollar-slashy string with no interpolation:
+    // Groovy's `DollarSlashyStringCharacter` takes a `$` that no letter
+    // or `{` follows (`$/a $ b/$`). The token takes that next character
+    // too, as a regex cannot look ahead. Any character past ASCII is
+    // taken as a letter, so `$/a $— b/$`, which Groovy takes, is an
+    // ERROR; `$` before `/` or `$` is the text of `_dollar_slashy_text`.
+    _dollar_slashy_literal_dollar: _ => token.immediate(
+      /\$[^A-Za-z_$\{\/\u0080-\uffff]/,
     ),
 
     // §5.14 — method reference. Groovy 3+. The RHS is either an
@@ -3892,11 +4102,7 @@ module.exports = grammar({
     // `${expr}` segments expose the same structured children as
     // double-quoted GStrings. The closing `/` is `token.immediate`
     // so it cannot skip whitespace between the body and the closer.
-    _slashy_string: $ => seq(
-      $._slashy_string_start,
-      repeat(gstringPart($, $._slashy_text)),
-      token.immediate('/'),
-    ),
+    _slashy_string: $ => interpolatingStrings($, true).slashy,
 
     // A `\` takes the character after it, and a line break whole, `\r\n`
     // too, as Groovy's LineEscape does (`'a\` then `b'` on the next line is
@@ -3933,11 +4139,7 @@ module.exports = grammar({
     // fragment stops before any `$`, so `$identifier` and `${expr}`
     // get a chance to match; literal `$` (followed by `"` or a
     // digit etc.) is recovered as `$` plus the fallback shape.
-    _double_quoted_string: $ => seq(
-      '"',
-      repeat(gstringPart($, $._gstring_text)),
-      token.immediate('"'),
-    ),
+    _double_quoted_string: $ => interpolatingStrings($, true).double,
 
     _gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$\n\r]/,
@@ -3959,14 +4161,7 @@ module.exports = grammar({
     // starts an interpolation (`"""say "$name"""`), and a regex
     // cannot look ahead. The closer is longer than one quote, so it
     // still wins at `"""`.
-    _triple_double_quoted_string: $ => seq(
-      '"""',
-      repeat(choice(
-        gstringPart($, $._triple_gstring_text),
-        alias(token.immediate('"'), $.string_fragment),
-      )),
-      token.immediate('"""'),
-    ),
+    _triple_double_quoted_string: $ => interpolatingStrings($, true).tripleDouble,
 
     _triple_gstring_text: _ => token.immediate(repeat1(choice(
       /[^"\\$]/,
@@ -4022,14 +4217,7 @@ module.exports = grammar({
     // that ends at `$` are lexed one at a time: for `//$` the single
     // `/` matches first, then `/$` is the longer match and closes
     // the string. Each such slash is its own `string_fragment`.
-    _dollar_slashy_string: $ => seq(
-      '$/',
-      repeat(choice(
-        gstringPart($, $._dollar_slashy_text),
-        alias(token.immediate('/'), $.string_fragment),
-      )),
-      token.immediate('/$'),
-    ),
+    _dollar_slashy_string: $ => interpolatingStrings($, true).dollarSlashy,
 
     _dollar_slashy_text: _ => token.immediate(repeat1(choice(
       /[^/$]/,

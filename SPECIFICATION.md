@@ -492,13 +492,13 @@ fix relative to *both* parent grammars.
 | `enum` declaration | **new** | optional `implements` clause (`super_interfaces`, as on classes); constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55). A member may also follow a trailing `,` directly, which Groovy accepts up to 4.x and Groovy 5 rejects (#88). This grammar takes a narrower set than Groovy there: a member that starts with a modifier, `def` or a declaration keyword, with annotations before it allowed; a constructor needs an access modifier. A member that starts with a bare name is not accepted: `A,` then `String x` or `E() { }` is an `ERROR`, the second because it reads as a constant with an anonymous class body (`docs/divergences-from-spec.md` §13). Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. The body takes the members of a class body plus a compact canonical constructor, Apache's `compactConstructorDeclaration`: `public Name { … }`, with annotations, modifiers, `def` after the modifiers, or none of them, and the `{` on the same line or the next, is a `compact_constructor_declaration` with `name` and `body` (#72). The body node is still `class_body`. Only a record body takes it; Apache's parser takes it in any class body and rejects it afterwards outside a record. Its name is not compared with the record's, so any `Name { … }` there is one. A modifier-only field followed by a block (`static count`, then `{ … }` on the next line) reads as a compact constructor too, and a `;` after the field keeps the field and the block. `static count` followed by `Name { … }` is that field and a compact constructor, by a dynamic precedence, so `static Foo bar { … }` is a field `Foo` and a constructor `bar`. A type nested in a record carries a dynamic precedence too, so after a typed field with modifiers (`private String y`, then `class C extends B { }` on the next line) it stays a type declaration rather than splitting into fields named by its keywords and a compact constructor (`docs/divergences-from-spec.md` §6). A string-literal name is not supported (`docs/divergences-from-spec.md` §17). |
 | `sealed` / `non-sealed` / `permits` modifiers | **new** | parsed as modifier tokens that take a `permits` clause on class/interface. Groovy 4+. |
-| Method declaration | port from murtaza64 | `def` or type, optional throws clause |
+| Method declaration | port from murtaza64 | `def` or type, optional throws clause. Modifiers alone also do (`private foo(x) { … }`), and at a script's top level and in a type body, annotations alone and modifiers with type parameters (`@Memoized fib(n) { … }`, `private <T> first(xs) { … }`), as in Apache's AstBuilder ("Modifiers or return type is required"). A script method of those two forms needs a body, and a block or a closure, which in Groovy declare no method, takes neither (`docs/divergences-from-spec.md` §34). In a class body `@A setX(a) { … }` is a constructor (#91). With no `def` and no return type the name is Apache's `methodName`, an identifier that is no keyword (§5.2) or a string with no interpolation (`@A 'a b'(n) { … }`; `@A "a${x}"(n) { … }` is an `ERROR`, §33 there) |
 | Method definition (with body) | port from murtaza64 | |
 | Multi-assignment | **new** | `def (a, b) = expr` is a `multi_assignment_declaration` (murtaza64 #22). `(a, b) = expr` is a `multi_assignment_expression` (#94), after Apache `#multipleAssignmentExprAlt`: two or more plain names, then `=` and no other operator, with line breaks allowed around the `=`. It is an expression, so it nests: `x = (a, b) = list`, `foo((a, b) = list)`, a `for` init, after `return`. Its names are `identifier`s rather than `variable_declarator`s, as nothing is declared. With one name, `(a) = x` is an `assignment_expression` of a parenthesized expression, as in Apache. A `(` that opens a line after an expression opens the next statement, as in Groovy (§6.18), so two multi-assignments on consecutive lines, `(a, b) = [1, 2]` then `(c, d) = [3, 4]`, are two statements, and so are the swap `def b = 2` then `(a, b) = [b, a]`. One line can be read as two statements: `def f(a, b) = [1, 2]`, which Groovy rejects, is a declaration of `f` followed by a multi-assignment. That reading of a method's head ends at its first `,` where the parentheses go on as a method's parameters, which the scanner reads there (§6.20), so `def f(a, b) { }` takes as many parse steps as before multi-assignments. The value of either form may be a parenthesis-free call, as Apache's `statementExpression` and `variableInitializer` allow: `(a, b) = f 3` and `def (a, b) = f 3` (§5.5, #95). The declaration form follows Apache's `variableDeclaration` with `typeNamePairs`: annotations, then `def`, `final def`, `final var`, `final` alone or `var` alone (`final (a, b) = …`, `@Field def (a, b) = …`, `var (a, b) = …`). `var(a, b)` and `var (a, b).foo()` call a method named `var`, as in Groovy (observed with Groovy 3): the scanner takes `var` alone as the keyword only when names, `)` and `=` follow (§6.16). A name may have a type (`typeNamePair`): `def (int a, String b) = …`, `final (List<String> xs, b) = …`. A typed name is a `variable_declarator` with a `type` field before its `name`; an untyped name keeps the `variable_declarator` with a `name` alone. Two Groovy 6 forms are accepted, after Groovy 6's `GroovyParser.g4` and `AstBuilder`; the Groovy 3 this grammar is checked against rejects both. A rest binding, `def (a, *b) = list` or `def (h, List<Integer> *t) = list`, is a node of its own, a `rest_declarator` with the optional `type` and the `name` of a typed name around its anonymous `*`, in any place of the list (`def (*init, last) = list`, `def (a, *b, c) = list`); the other names stay `variable_declarator`s. A keyed pair, `def (name: n, age: int a) = map`, is a `variable_declarator` with a `key` field before the optional `type` and the `name`. Groovy's list holds names or keyed pairs, not both; here one list takes both, so `def (name: n, b) = m` parses, which Groovy rejects (with a list of pairs alone, recovery from an error after the `=` could not go back into the list at a plain name, and a run of such errors took time quadratic in its length, `docs/divergences-from-spec.md` §29). A declaration whose `=` does not come, as while it is typed (`def (a, b)` before the next statement), is an error production: its `value` is a missing `identifier`, and the statements after it stay statements. Where a token that starts no statement stands in place of the `=` (`def (a, b) : l`), recovery wraps the names in an `ERROR` and reads on after `def`, and the statements after that line stay statements too. A `,` may follow a declaration without a value, with its `=` or without (`def (a, b) =,` or `def (a, b),` before `def c = 1`), so that the next line stays a statement; on one line, before a name and a `)`, the list goes on (`def (a, b) =, c) = 1` declares three names with an `ERROR`). A `,` after a value is an `ERROR`. The declaration is also a `for` init (`for (def (i, n) = [0, 5]; i < n; i++)`) and a member of a type body, Apache's `fieldDeclaration`, with the annotations and modifiers of a field and `def` or `var`, or modifiers alone (`static final def (a, b) = …`, `private var (a, b) = …`, `private (int a, b) = …`). Groovy parses the member and then drops it: it declares no field (Groovy 3 to 6). Not accepted, each an `ERROR`: annotations alone (`@A (a, b) = …`), where the `(` would open the annotation's arguments or the names, and other modifiers where a statement starts (`static def (a, b) = …`), which Groovy 3 takes and ignores where it rejects `static def x = 1`. In a type body `var x = 1` is a field with `var` a modifier, as in Groovy (§6.16). Wider than Groovy: `def (a = 1, b) = …` parses. A keyword or `val` before a name is its type: `def (def a, b)` has the type `def`, and so do `var`, `val`, `final` and `default` in that place, where Groovy 6 reads `def`, `var` and `val` as no type and Groovy rejects `final` and `default`. A reserved word is a key (`def (class: v) = m`, `def (if: v) = m`; `new` and `case` are not, §5.2), as it is a name in `def (a, if) = l`: a keyword with no action lexes as an identifier. More than one rest binding parses (`def (*a, *b) = …`), which Groovy rejects after parsing. As a line break is whitespace, `foo final (a, b) = c` and `foo def (a, b) = c` are a statement `foo` followed by a declaration, where Groovy rejects them. A line that ends in a parenthesized name, dotted name or primitive type (`def y = (x)`, `x = (b)`, `return (x)`, `(Foo.Bar)`, `(int)`) followed by a multi-assignment declaration on a later line is two statements, as in Groovy, when the declaration starts with `final` or with `var` alone, has a rest binding or keyed pairs, or is a member of a type body. Before those forms were accepted the second line was read with no `ERROR` as the operand of a cast, a call of a method named by its first word: `(x) def(h, *t) = l` (`docs/divergences-from-spec.md` §15). After a parenthesized generic type the cast reading remains: `def y = (List<String>)` then `def (a, *b) = l`, or `def (a, b) = l`, is still `(List<String>) def(a, *b) = l`, where Groovy reads two statements. |
 | Local variable declaration | port from both | including `def` and explicit types; annotations may come first (`@Field def x = 1`), and `@Library('shared') _`, an annotation on the placeholder name `_`, is a declaration of `_`. Apache takes any name after annotations alone; only `_` is accepted here, because a newline is whitespace and `@A x` followed by `y = 1` would also be the typed local `x y = 1`. A typed declaration needs no initializer where a statement starts, after annotations and as a `for` init (`String s`, `int i;`, `List<String> xs`, `foo.Bar q`, `@Field int a, b`, `for (int i; i < n; i++)`), and after the first declarator any declarator may go without one (`String a, b = 1`, `String a = 1, b`, `final String a, b`); which statements are such declarations the scanner decides by Apache's rule (§6.21). The node is `local_variable_declaration` with one `type` field, a `name` field per declared name and a `value` field after the name it belongs to, as for a typed declaration with initializers. |
 | Closure expression | port from murtaza64 | `{ a, b -> … }` and `{ … }`; parameters take annotations, `final`, `def` or a type, varargs and a default (§5.8). |
 | `if` / `else` | port | |
-| `while` / `do-while` | port | |
+| `while` / `do-while` | port | Annotations may come first (`@A while (x) { … }`), as in Groovy 6's `loopStatement`, and are children of the loop; Groovy 4 and 5 reject them. The same goes for both `for` forms below. |
 | `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`), a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators) or a `multi_assignment_declaration` (`def (i, n) = [0, 5]`). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
 | `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`). |
@@ -588,8 +588,23 @@ as a map key or a named argument's key (`[case: 1]`, `foo(case: 1)`,
 `elementValuePairName`). Where a method's name may follow, no word is
 reserved either, so `def case = 1`, `def case() { }` and
 `class C { int case }` parse, which Groovy rejects, as they do with
-`new`. Only `case` is a key everywhere: `[new: 1]` is an `ERROR`, and
-`new` is a key after a comma only on the comma's line (§6.8). A
+`new`. The name of a method with no `def` and no return type, after
+modifiers, annotations or type parameters (`_untyped_method_name`),
+reserves every keyword above that is a token of this grammar, as
+Apache's `methodName` takes an `identifier`: `private case(x) { }`,
+`@A true(x) { }` and `private <T> static(x) { }` are an `ERROR`. A
+parse state takes the reserved set of one of its positions, and there
+it also covers the type that may stand in the name's place
+(`private int x`) and the name of a field or a local declared by
+modifiers alone, so `class C { private case = 1 }` is an `ERROR` too,
+as in Groovy. `this`, `void` and the primitive types, which are
+identifiers here, and `goto`, `const` and `threadsafe`, which are no
+tokens of this grammar, cannot be reserved; the scanner turns them down
+there instead where `(` follows on their line (§6.25), so
+`@A this(x) { }` is a return type before a missing name
+(`docs/divergences-from-spec.md` §33). Only `case` is a key
+everywhere: `[new: 1]` is an `ERROR`, and `new` is a key after a comma
+only on the comma's line (§6.8). A
 keyed multi-assignment pair takes neither as its key
 (`def (case: n) = m` is an `ERROR`; Groovy 6's `keyedPair` takes an
 `identifier`). `case` is reserved because, as a name, error recovery
@@ -1193,6 +1208,12 @@ and `@Foo([@Bar, @Baz])` nest to any depth. The argument list is an
 `argument_list`; a pair is an `assignment_expression` whose `left` is
 an `identifier`, the shape `k=v` has in a call. An annotation is a
 value only there: `foo(@Bar)` and `[@Bar]` elsewhere are errors.
+
+Annotations come before a declaration, an `import` or a `package`,
+and before a `for`, `while` or `do` loop, as Groovy 6's
+`loopStatement` takes `annotationsOpt` (Groovy 4 and 5 reject an
+annotated loop). Before any other statement they are an `ERROR`
+(`@A if (x) { }`), as in Groovy.
 
 ### 5.10 Statement terminators
 
@@ -5165,6 +5186,49 @@ changes, from an `ERROR` to no `ERROR`
 30 runs (5 for the Java files): unchanged on the real files, 0.6% more
 on the Java files and on Gradle- and Jenkins-style files, 0.7% more on a
 file of nested empty blocks.
+
+### 6.25 EXCLUDED_METHOD_NAME — implementation contract
+
+```text
+Where EXCLUDED_METHOD_NAME is valid (the name of a method with no `def`
+and no return type may come: after a method's annotations or modifiers
+or its type parameters; no error recovery) and no value, bare lambda or
+array type may start:
+  read the word;
+  `record`, `trait`, `sealed`, `var`, `yield`, `in`, `as`: decided as in
+    §6.7, §6.13 and §6.16;
+  `this`, `void`, `boolean`, `byte`, `char`, `short`, `int`, `long`,
+  `float`, `double`, `goto`, `const`, `threadsafe`, then `(` past
+  spaces, tabs and line escapes:
+    emit EXCLUDED_METHOD_NAME, empty;
+  otherwise emit nothing, and the in-grammar lexer reads the word.
+After annotations where a statement starts, the read of its first name
+(§6.14, §6.21) decides the same words before `(`.
+```
+
+Apache's `methodName` takes an `identifier`, which is no keyword of
+Groovy's lexer but the contextual ones. The thirteen words above are
+the keywords that this grammar reads as identifiers, so the reserved set
+of §5.2 cannot hold them: tree-sitter reserves only tokens. Before them,
+`_untyped_method_name` takes the token in an error production, the
+word as the `return_type` and the name a `_missing_value`, which never
+comes, so recovery inserts a missing `identifier`: `@A this(x) { }`,
+`private int(x) { }` and `class C { @A <T> void(x) { } }` have the tree
+`@A this(x) { }` had at v0.6.0. Only that name takes a `(` after such a
+word there, as a type is followed by a name, so the token comes in no
+valid input. Past a line break or a comment between the word and the
+`(` the scanner does not read, and the word stays a name there
+(`@A this` then `(x) { }`, `private int /* c */ (x) { }`); this grammar
+takes a line break before the parameters of any such method, which
+Groovy rejects.
+
+Measured against the grammar before: STATE_COUNT 5169 to 5211,
+SYMBOL_COUNT 435 to 436, one external token and no conflict. No corpus
+tree and none of 11,476 real files changes; of invalid inputs probed,
+`final int (a, b) = [1, 2]`, a local named `int` and a multi-assignment
+before, is an `ERROR`. `bindings/rust/tests/incremental_reparse.rs`
+checks every single edit of five texts that mix these words with the
+names around them.
 
 ---
 

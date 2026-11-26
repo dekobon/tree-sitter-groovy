@@ -16,3 +16,9 @@ enum Mode { ON; int code }
 
 interface Greeter { default String greet() { 'hi' }; int count }
 //                                 ^ definition.method
+
+@Memoized fib(n) { n }; class Fib { }
+//        ^ definition.method
+
+private <T> first(List<T> xs) { xs }; class First { }
+//          ^ definition.method

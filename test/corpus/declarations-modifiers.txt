@@ -1093,3 +1093,666 @@ Default on a local variable is an error (limitation)
 def f() { default int x = 1 }
 
 ---
+
+==================
+Annotated methods with no return type at script top level
+==================
+
+@Memoized fib(n) { n }
+
+@Memoized private cached(x) { x }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Modifier-only generic method at script top level
+==================
+
+private <T> first(List<T> xs) { xs }
+
+---
+
+(source_file
+  (method_declaration
+    type_parameters: (method_type_parameters
+      (type_parameter
+        name: (type_identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (generic_type
+          base: (type_identifier)
+          arguments: (type_arguments
+            (type_identifier)))
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Call with a trailing closure is not a method declaration
+==================
+
+foo(x) { x }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))
+      closure: (closure
+        (expression_statement
+          (identifier))))))
+
+==================
+An annotated loop is a loop, not a method named after its keyword
+==================
+
+@Test1 while (true) { break }
+
+---
+
+(source_file
+  (while_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    condition: (boolean_literal)
+    body: (block
+      (break_statement))))
+
+==================
+A reserved word is no method name after annotations (case)
+:error
+==================
+
+@A case(x) { x }
+
+---
+
+==================
+A reserved word is no method name after type parameters (default)
+:error
+==================
+
+private <T> default(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (super)
+:error
+==================
+
+@A super(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (true)
+:error
+==================
+
+@A true(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (null)
+:error
+==================
+
+@A null(x) { x }
+
+---
+
+==================
+A reserved word is no method name after annotations (instanceof)
+:error
+==================
+
+@A instanceof(x) { x }
+
+---
+
+==================
+A reserved word is no method name after type parameters
+:error
+==================
+
+private <T> static(x) { x }
+
+---
+
+==================
+A reserved word is no method name after modifiers
+:error
+==================
+
+private false(x) { x }
+
+---
+
+==================
+Contextual keywords name a method after annotations
+==================
+
+@A in(x) { x }
+@A as(x) { x }
+@A record(x) { x }
+@A yield(x) { x }
+@A var(x) { x }
+@A trait(x) { x }
+@A sealed(x) { x }
+@A permits(x) { x }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+An interpolated string is no method name after annotations
+:error
+==================
+
+@A "gstring ${x}"(n) { n }
+
+---
+
+==================
+An interpolated string is no method name after modifiers
+:error
+==================
+
+private "g$x"(n) { n }
+
+---
+
+==================
+An interpolated string is no method name in a class body
+:error
+==================
+
+class C { @A "g${x}"(n) { n } }
+
+---
+
+==================
+A string without interpolation names a method after annotations
+==================
+
+@A 'quoted name'(n) { n }
+@A "quoted name"(n) { n }
+@A """triple name"""(n) { n }
+@A "a\$b"(n) { n }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier))))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+A script method with annotations alone needs a body
+:error
+==================
+
+@A foo(x)
+
+---
+
+==================
+A script method with annotations alone needs a body (expression after it)
+:error
+==================
+
+@A foo(x) + 1
+
+---
+
+==================
+A script method with type parameters and no return type needs a body
+:error
+==================
+
+private <T> first(xs)
+
+---
+
+==================
+An annotated method with no return type is no statement in a closure
+:error
+==================
+
+def host = { @Memoized fib(n) { n } }
+
+---
+
+==================
+An annotated method with no return type is no statement in a block
+:error
+==================
+
+if (c) { @Memoized fib(n) { n } }
+
+---
+
+==================
+A generic method with no return type is no statement in a method body
+:error
+==================
+
+def m() { private <T> first(xs) { xs } }
+
+---
+
+==================
+An annotated script method takes its body on the next line
+==================
+
+@A foo(x)
+{ n }
+
+---
+
+(source_file
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+==================
+Annotated and generic methods with no return type in type bodies
+==================
+
+class C {
+  @A <T> first(List<T> xs) { xs }
+  @A 'quoted name'(n) { n }
+}
+interface I {
+  @A <T> first(xs)
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (generic_type
+              base: (type_identifier)
+              arguments: (type_arguments
+                (type_identifier)))
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (quoted_identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block
+          (expression_statement
+            (identifier))))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type_parameters: (method_type_parameters
+          (type_parameter
+            name: (type_identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))))))
+
+==================
+An annotated member with no return type in a class body is a constructor (known divergence, #91)
+==================
+
+class C {
+  @Autowired setX(a) { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (block)))))
+
+==================
+A slashy string is no method name after annotations
+:error
+==================
+
+@A /a b/(n) { }
+
+---
+
+==================
+A slashy string is no method name after modifiers
+:error
+==================
+
+private /a b/(n) { }
+
+---
+
+==================
+A dollar-slashy method name takes a literal dollar
+==================
+
+private $/a $ b/$(n) { }
+@A $/a $1 b/$(n) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (quoted_identifier
+      (string_fragment)
+      (string_fragment)
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (quoted_identifier
+      (string_fragment)
+      (string_fragment)
+      (string_fragment))
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block)))
+
+==================
+A word that Groovy takes as no method name is none after annotations (this)
+:error
+==================
+
+@A this(x) { }
+
+---
+
+==================
+A word that Groovy takes as no method name is none after type parameters (int)
+:error
+==================
+
+private <T> int(x) { }
+
+---
+
+==================
+A word that Groovy takes as no method name is none after modifiers (goto)
+:error
+==================
+
+private goto(x) { }
+
+---
+
+==================
+A word that Groovy takes as no method name is none in a class body (this)
+:error
+==================
+
+class C { @A <T> this(x) { } }
+
+---
+
+==================
+Names that start like a word that names no method are method names
+==================
+
+private thisx(x) { }
+@A voided(x) { }
+private shorts(x) { }
+@A int x = 1
+class C { private int y; @A void f() { } }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        name: (identifier)))
+    body: (block))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

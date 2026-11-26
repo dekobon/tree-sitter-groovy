@@ -117,7 +117,13 @@ The default branch is **`main`**.
     access follows, so that the call is the access's object
     (`foo { }.bar()`), and another where a first argument follows the
     accesses, which makes them a call's receiver (`foo { }.bar 1`)
-    (§6.24).
+    (§6.24);
+  - an empty token before `this`, `void`, a primitive type, `goto`,
+    `const` or `threadsafe` where the name of a method with no `def` and
+    no return type may come and `(` follows on the line, which makes
+    that name an error, as Groovy's `methodName` takes none of these
+    words and they are identifiers here, so no reserved set can hold
+    them (§6.25).
 
   Seven externals are never emitted. `_unreachable` ends
   `_stray_case`, the error production for a `case` label where a

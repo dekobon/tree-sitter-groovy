@@ -4520,7 +4520,7 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (assert_statement
@@ -4572,13 +4572,10 @@ volatile new Foo()
     (object_creation_expression
       type: (type_identifier)
       arguments: (argument_list)))
-  (local_variable_declaration
-    (variable_declarator
-      name: (identifier)))
-  (expression_statement
-    (method_invocation
-      function: (identifier)
-      arguments: (argument_list)))
+  (method_declaration
+    (ERROR)
+    name: (identifier)
+    parameters: (formal_parameters))
   (expression_statement
     (identifier))
   (expression_statement
@@ -4592,7 +4589,7 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (expression_statement
@@ -4608,15 +4605,15 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (return_statement
@@ -4624,11 +4621,11 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (expression_statement
@@ -4638,7 +4635,7 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (throw_statement
@@ -4652,7 +4649,7 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters))
   (expression_statement
@@ -4662,7 +4659,7 @@ volatile new Foo()
       type: (type_identifier)
       arguments: (argument_list)))
   (method_declaration
-    return_type: (type_identifier)
+    (ERROR)
     name: (identifier)
     parameters: (formal_parameters)))
 

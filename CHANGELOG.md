@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- Annotations before a `for`, `while` or `do` loop
+  (`@Unroll for (x in xs) { }`, `@A while (x) { }`), as Groovy 6's
+  `loopStatement` takes `annotationsOpt`; each `annotation` is a child
+  of the `for_statement`, `for_in_statement`, `while_statement` or
+  `do_while_statement`, before its keyword. Groovy 4 and 5 reject an
+  annotated loop. At v0.6.0 `@A while (x) { }` was a method with the
+  return type `while` and a missing name, and `@A for (x in xs) { }` an
+  `ERROR`. (#106)
 - An interpolation takes the lazy form `"${-> x}"`, a closure without
   parameters, as Apache's `gstringValue` takes a `closure`: the `->` is a
   `closure_parameters` leaf before the `value`
@@ -968,6 +976,41 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   a name (`SPECIFICATION.md` §6.11). No tree of the corpus or of 266
   real files changes; of 24,548 Java files one with an `ERROR` does, and
   of 4,000 shape inputs two do, each to Groovy's reading.
+- **BREAKING:** a method with no `def` and no return type, declared
+  with annotations alone (`@Memoized fib(n) { }`) or with modifiers and
+  type parameters (`private <T> first(List<T> xs) { }`), has its name
+  as `name` at a script's top level and in a type body, as the
+  modifier-only form has had since #56. Previously the name was the
+  `return_type`, followed by a missing `name`. At a script's top level
+  such a method needs a body, as in Groovy, so `@A foo(x)` alone is an
+  `ERROR`. In a type body `@A setX(a) { }` stays a
+  `constructor_declaration`, and `interface I { @A foo(x) }` an `ERROR`
+  (#91); in a block or a closure, where Groovy declares no method, each
+  form keeps its v0.6.0 tree. `foo(x) { }`, with neither, is still a
+  call with a trailing closure. Every keyword of the grammar but the
+  contextual ones (`as`, `in`, `permits`, `record`, `trait`, `var`,
+  `yield`) and `pipeline` is reserved as the name of a method with no
+  `def` and no return type, after modifiers too, as Apache's
+  `methodName` takes an `identifier`: `private true(x) { }` and
+  `private case(x) { }`, methods named `true` and `case` with no
+  `ERROR` at v0.6.0, and `@A true(x) { }`, a return type `true` before
+  a missing name, are an `ERROR`. The set also holds for the name of a
+  field or a local declared by modifiers alone, so
+  `class C { private case = 1 }` and `final null = 1`, accepted at
+  v0.6.0, are an `ERROR`, as in Groovy. `this`, `void`, the primitive
+  types, `goto`, `const` and `threadsafe` are names in this grammar,
+  and a new external token, `_excluded_method_name`, turns them down
+  there before a `(` on their line (`SPECIFICATION.md` §6.25): so
+  `@A this(x) { }` is a return type before a missing name, as at
+  v0.6.0, and so is `private int(x) { }`, a method named `int` at
+  v0.6.0. A quoted name of such a method holds no interpolation, as
+  Apache's `methodName` takes the `StringLiteral` token:
+  `private "a${x}"(n) { }`, a method at v0.6.0, and
+  `@A "a${x}"(n) { }` are an `ERROR`, and
+  `@A 'a b'(n) { }`, an `ERROR` at v0.6.0, is a method. Nor is a
+  slashy string such a name, as Groovy 6 reads a `/` after a name, a
+  `)` or a modifier as division: `private /a/(n) { }`, a method at
+  v0.6.0, is an `ERROR`. (#106)
 
 ### Fixed
 
