@@ -607,12 +607,13 @@ function finalModifier($) {
 /**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
- * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
- * included), the name, and a default value.
+ * annotations, `final` and annotations after it (`finalModifier`), then
+ * `def`, `var` or a type (a `varargs_type` included), the name, and a
+ * default value.
  *
- * Apache's `variableModifiersOpt` is wider: annotations and modifiers
- * in any order, `def` or `var` together with a type, and `...` with no
- * type. Those are not accepted (divergence 14).
+ * Apache's `variableModifiersOpt` is wider: `def` or `var` together
+ * with a type, and `...` with no type. Those are not accepted
+ * (divergence 14).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} [value] The rule of a default value.
@@ -3941,8 +3942,8 @@ module.exports = grammar({
     // has no `->` and an implicit `it` parameter (we do NOT emit a
     // synthetic `it` per §5.8). A parameter takes what a method
     // parameter does (Apache's closure uses `formalParameterList`):
-    // annotations, `final`, then `def`, `var` or a type (varargs
-    // included), and a default; both rules are `parameter()`. The
+    // annotations, `final` and annotations after it, then `def`, `var`
+    // or a type (varargs included), and a default; both rules are `parameter()`. The
     // body may open with the same words, so the `->` decides between
     // the two readings.
     closure: $ => seq(

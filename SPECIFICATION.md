@@ -1169,8 +1169,9 @@ is a dollar-slashy string with a `MISSING` `/$` here, as at v0.6.0.
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
 binds `it`. A parameter has the shape of a method parameter, as in
-Apache's grammar (`formalParameterList`): annotations, `final`, then
-`def`, `var` or a type (varargs included), the name, and a default
+Apache's grammar (`formalParameterList`): annotations, `final` and
+annotations after it, then `def`, `var` or a type (varargs included),
+the name, and a default
 (`{ String sep = ',', def xs -> … }`). `grammar.js` builds
 `formal_parameter` and `closure_parameter` from one helper,
 `parameter()`. `def` and `var` are keywords there, so such a parameter

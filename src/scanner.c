@@ -4844,25 +4844,12 @@ static bool skip_lambda_tokens(
     return false;
 }
 
-// Reads one parameter of a lambda, with the trivia around it, and leaves
-// what follows it: annotations, each a name and arguments in parentheses;
-// words (`final`, `def`, a type's names, the parameter's name) and the
-// punctuation of a type (`.`, `...`, `[]`, type arguments in `<…>`); then a
-// default value after `=`. Apart from the name being last, it does not check
-// the order: what it takes and `formal_parameter` does not is an `ERROR`
-// either way. Returns false where no parameter can be, as at the operator of
-// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
-// keyword is in it (`(if)`) other than a wildcard's bound in type arguments
-// (`(List<? super T> l)`). Where no name ends it (`(String[])`, `(a.b)`,
-// `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
-// types, and the caller reads on past the `)` all the same. A dollar-slashy
-// string where a name may be is a literal as well (`($/a/$)`); there, and
-// inside one that a default value or an annotation's arguments do not read
-// past, it sets `*in_string`.
-static bool lambda_parameter_follows(
+// Skips the annotations of a lambda parameter, each a name and arguments in
+// parentheses, with the trivia around them, for `lambda_parameter_follows`.
+// Returns false where no parameter can be.
+static bool skip_lambda_annotations(
     TSLexer *lexer,
     unsigned *items,
-    bool *named_parameter,
     bool no_close_ahead,
     bool *in_string
 ) {
@@ -4871,7 +4858,7 @@ static bool lambda_parameter_follows(
             return false;
         }
         if (lexer->lookahead != '@') {
-            break;
+            return true;
         }
         if (!spend_lambda_item(items)) {
             return false;
@@ -4903,14 +4890,46 @@ static bool lambda_parameter_follows(
             advance(lexer);
         }
     }
+}
+
+// Reads one parameter of a lambda, with the trivia around it, and leaves
+// what follows it: annotations, each a name and arguments in parentheses
+// (`skip_lambda_annotations`), also after an opening `final` (`final @A x`);
+// words (`final`, `def`, a type's names, the parameter's name) and the
+// punctuation of a type (`.`, `...`, `[]`, type arguments in `<…>`); then a
+// default value after `=`. Apart from the name being last, it does not check
+// the order: what it takes and `formal_parameter` does not is an `ERROR`
+// either way. Returns false where no parameter can be, as at the operator of
+// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
+// keyword is in it (`(if)`) other than a wildcard's bound in type arguments
+// (`(List<? super T> l)`). Where no name ends it (`(String[])`, `(a.b)`,
+// `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
+// types, and the caller reads on past the `)` all the same. A dollar-slashy
+// string where a name may be is a literal as well (`($/a/$)`); there, and
+// inside one that a default value or an annotation's arguments do not read
+// past, it sets `*in_string`.
+static bool lambda_parameter_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool *named_parameter,
+    bool no_close_ahead,
+    bool *in_string
+) {
+    if (!skip_lambda_annotations(lexer, items, no_close_ahead, in_string)) {
+        return false;
+    }
     unsigned angles = 0;
     // Whether the last item is a word that may name the parameter, and how
     // many dots come right before the current item: after one, a word is
     // part of a qualified type (`a.b.C`); after three, a name (`String... a`).
     bool named = false;
     unsigned dots = 0;
+    // Whether the word just read is a `final` that opens the parameter,
+    // which annotations may follow (`final @A x`), as in `parameter()`.
+    bool first_word = true;
     for (;;) {
         int32_t c = lexer->lookahead;
+        bool opening_final = false;
         if (is_identifier_start(c)) {
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
@@ -4932,6 +4951,7 @@ static bool lambda_parameter_follows(
             }
             named = !modifier && angles == 0 && dots != 1
                 && !is_reserved_lambda_name(word, len);
+            opening_final = first_word && word_is(word, len, "final");
             dots = 0;
         } else if (c == '.') {
             named = false;
@@ -4952,6 +4972,12 @@ static bool lambda_parameter_follows(
         }
         if (!spend_lambda_item(items)
             || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        first_word = false;
+        if (opening_final && lexer->lookahead == '@'
+            && !skip_lambda_annotations(lexer, items, no_close_ahead,
+                                        in_string)) {
             return false;
         }
     }

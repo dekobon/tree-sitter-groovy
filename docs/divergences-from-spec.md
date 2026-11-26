@@ -1067,7 +1067,7 @@ name, and a default.
 |---|---|---|
 | `@A final String x = 1`, `def x`, `var x`, `final def x`, `String... xs` | accepted | accepted |
 | `def String x` | accepted | `ERROR` |
-| `final @A x`, `@A final @B String x` | accepted | accepted; `final @A x` was an `ERROR` at v0.6.0 (#92) |
+| `final @A x`, `@A final @B String x`, in a method, a closure or a lambda | accepted | accepted; `final @A x` was an `ERROR` at v0.6.0 (#92) |
 | `... xs`, `def ... xs` | accepted | `ERROR` |
 
 `def` and `var` are keywords in a parameter, so `def f(def x)` has no
