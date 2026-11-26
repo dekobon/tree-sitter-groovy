@@ -1807,9 +1807,13 @@ whitespace and closes on its line: a `/` that starts the next
 statement on a later line, after an expression (`next_line_continues`,
 §6.21), after a lambda body's `}` or after a comment and a line break,
 so that `a` then `/ 2` on the next line stays a division, and
-`yield / 2` in a closure a division by 2. The other look-aheads that
-read past a slashy string to the token after it take the multi-line
-body. That look-ahead runs from every `/` where
+`yield / 2` in a closure a division by 2. After the keyword `in`,
+which decides itself by whether an expression follows (§6.16), no
+division may follow either, so there the `/` opens a string that starts
+with whitespace or runs across lines too (`x in / a/`), as Groovy's
+lexer reads it; `yield` keeps the one-line rule. The other look-aheads
+that read past a slashy string to the token after it take the
+multi-line body. That look-ahead runs from every `/` where
 a slashy string may start, which during error recovery is every `/`,
 and an escaped slash ends none of them, so a line of `\/` was read from
 each of its slashes to its end: 2,505 bytes read per input byte for
