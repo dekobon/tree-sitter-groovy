@@ -1849,8 +1849,10 @@ No tree of the corpus, the real and Java sets and 40,000 fuzzed lines
 of regexes with escaped slashes, long lines and division chains
 changed, but for the inputs with a line past the bound, all of which
 had an `ERROR` before and after (1,583 of 17,762).
-`bindings/rust/tests/slashy_string_cost.rs` checks the two lines, and
-the same across many lines.
+`bindings/rust/tests/slashy_string_cost.rs` checks the two lines, the
+same across many lines, and the look-aheads that read past a slashy
+string, which read an unclosed one across lines on to their item budget
+(`foo()` then `(x =~ / a` on each line, and `def f = (a = /x`).
 
 The valid tokens stand in for `last_token` only where an operand may
 start, and the grammar lets one start right after an operand: the next
