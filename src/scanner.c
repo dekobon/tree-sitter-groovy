@@ -4201,10 +4201,10 @@ static const unsigned CLOSURE_CALL_LOOKAHEAD_CHARACTERS = 128;
 // strings whole (`skip_string`, a `${…}` with the strings in it), a slashy
 // string where Groovy's lexer opens one (`slashy_operand_follows`): after an
 // operator, a bracket that opens or a keyword (`slashy_may_follow_word`),
-// not after an operand or `++` and `--`, and after `yield`, which a division
-// may follow, only one on its line (`slashy_line_follows`, §6.16); a
-// dollar-slashy string (`skip_dollar_slashy_string`) and block comments as
-// trivia. `operand`
+// not after an operand or `++` and `--`, and after `yield` only one that
+// starts with no whitespace, as `yield` before whitespace and `/` is a name
+// that the `/` divides (§6.16); a dollar-slashy string
+// (`skip_dollar_slashy_string`) and block comments as trivia. `operand`
 // says whether an operand may start at the first token. Returns false where
 // the brackets do not close: at the end of the input, which a
 // BoundedLexer's bound or line sets, and at a string, a comment or an
@@ -4238,15 +4238,17 @@ static bool skip_closure_tokens(
                 }
                 slash_state_after_operator(&state);
             } else if (state.operand && input->lookahead != '=') {
-                if (yield ? slashy_line_follows(input)
-                          : slashy_operand_follows(input)) {
-                    advance(input);
-                    slash_state_after_operand(&state);
-                } else if (yield && is_whitespace(input->lookahead)) {
+                if (yield && is_whitespace(input->lookahead)) {
                     // No slashy string opens after `yield` here, so the
                     // grammar reads `yield` as a name and the `/` as
-                    // division (§6.16): `foo { yield / 2 }.bar()`.
+                    // division (§6.16): `foo { yield / 2 }.bar()`. Tested
+                    // before the string is read, which would move the
+                    // lookahead to where that read stopped.
                     slash_state_after_operator(&state);
+                } else if (slashy_operand_follows(input)) {
+                    // After `yield` the keyword, as after any keyword.
+                    advance(input);
+                    slash_state_after_operand(&state);
                 } else {
                     return false;
                 }

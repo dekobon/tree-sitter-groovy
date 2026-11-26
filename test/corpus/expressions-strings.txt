@@ -1854,6 +1854,50 @@ b''' }.baz 1
     (number_literal)))
 
 ==================
+A slashy string across lines after yield in a closure call's arguments reads as a triple-quoted one (known limitation, §6.24)
+==================
+
+foo { }.bar({ yield /a
+}/ }).baz 1
+foo { }.bar({ yield '''a
+}''' }).baz 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (closure
+            (yield_statement
+              (string_literal
+                (string_fragment))))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (closure
+            (yield_statement
+              (string_literal)))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
 A slash with a space after it on the line after a lambda body divides
 ==================
 
