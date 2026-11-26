@@ -1862,3 +1862,37 @@ class C {
         type: (type_identifier)
         (variable_declarator
           name: (identifier))))))
+
+==================
+Default with annotations after it before a type declaration
+==================
+
+default @interface Z { }
+public default @A @interface Y { }
+default @A class K { }
+class O { default @interface X { } }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body))
+  (annotation_type_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (annotation_type_declaration
+        name: (identifier)
+        body: (class_body)))))
