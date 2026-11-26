@@ -2507,6 +2507,34 @@ pipeline { agent any }
         argument: (identifier)))))
 
 ==================
+Annotation on the placeholder name with a value
+==================
+
+@A _ = 1
+@B _ = 2, y = 3
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
 Annotations alone before a name with a value
 ==================
 

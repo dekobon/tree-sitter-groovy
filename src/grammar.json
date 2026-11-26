@@ -6080,7 +6080,7 @@
                 "type": "ALIAS",
                 "content": {
                   "type": "SYMBOL",
-                  "name": "_initialized_declarator"
+                  "name": "_annotated_declarator"
                 },
                 "named": true,
                 "value": "variable_declarator"
@@ -6271,6 +6271,73 @@
         "named": true,
         "value": "identifier"
       }
+    },
+    "_annotated_declarator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "STRING",
+                  "value": "_"
+                },
+                "named": true,
+                "value": "identifier"
+              }
+            ]
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "="
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "SYMBOL",
+                    "name": "_expression"
+                  },
+                  {
+                    "type": "ALIAS",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_value_command_chain"
+                    },
+                    "named": true,
+                    "value": "command_chain"
+                  }
+                ]
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_bare_lambda_expression"
+                },
+                "named": true,
+                "value": "lambda_expression"
+              }
+            ]
+          }
+        }
+      ]
     },
     "_initialized_declarator": {
       "type": "SEQ",
@@ -14191,6 +14258,10 @@
     ],
     [
       "variable_declarator",
+      "closure_parameter"
+    ],
+    [
+      "_annotated_declarator",
       "closure_parameter"
     ],
     [
