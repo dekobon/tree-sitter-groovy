@@ -1014,6 +1014,31 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Fixed
 
+- A slashy string may span lines and start with whitespace where no
+  division may follow, as Groovy's `SlashyStringCharacter` takes both:
+  `def a = /a` then `b/` on the next line, `foo(/x` then `y/, 1)` and
+  `s.replaceFirst(/ in [ \dms]+/, '')` parse. Each was an `ERROR`, as
+  at v0.6.0. After the keyword `in` the same holds: `def m = x in / a/`
+  is a membership test of a string, where it was two statements, the
+  name `in` and a division, with no `ERROR`. After the `}` of an `if` or
+  loop body a `/` on the next line opens a string too, as in Groovy
+  (`if (c) { a }` then `/ 2 /`), where it divided the body. On the line
+  of the `)` of a condition or of a method with no body, and of the `}`
+  of a block or a type's body, a `/` divides, as in Groovy's lexer, so
+  `if (x) / 2` and `def f() { a } / 2` stay an `ERROR` and keep the
+  lines after them (`_slash_divides`, a token the scanner never emits;
+  81 parse states). Where a `/`
+  may divide, and during error recovery, a string still needs a body
+  that does not start with whitespace and closes on its line, so `a`
+  then `/ 2` on the next line stays a division, `yield / 2` in a
+  closure a division by 2, and a stray `/` in invalid code does not
+  turn the lines after it into string text. A string that is not closed
+  yet where an operand starts runs on to the next `/` in the file, as
+  in Groovy's lexer. The look-ahead stops at the first unescaped `/`,
+  and the bound on escaped slashes holds across lines
+  (`bindings/rust/tests/slashy_string_cost.rs`). Of 21,667 real files,
+  14 trees change, all of which had an `ERROR` before: 13 parse without
+  one, none gains one (`SPECIFICATION.md` §6.2). (#119)
 - Annotations alone before a declared name with a value make a
   declaration, as Apache's `variableModifiers` and `modifiers` take an
   annotation as a modifier: `@Field FOO = [a: 1]` in a script,

@@ -1018,11 +1018,13 @@ module.exports = grammar({
   // orders must match. No rule references `_lambda_body_reread` either:
   // the scanner emits it where no rule takes it (§6.19, §6.22). The scanner
   // never emits `_string_body`, `_type_start`, `_closure_parameters_start`,
-  // `_type_only_close` or `_body_block_end`, nor `_error_sentinel`: a string
-  // body, a type, closure parameters, the cast of an array or generic type
-  // whose operand is on a later line and the block that is the body of `if`,
-  // `else`, a loop or an arrow case reference the first five so that the
-  // scanner can tell it is inside one or where one may start or end.
+  // `_type_only_close`, `_body_block_end` or `_slash_divides`, nor
+  // `_error_sentinel`: a string body, a type, closure parameters, the cast
+  // of an array or generic type whose operand is on a later line, the block
+  // that is the body of `if`, `else`, a loop or an arrow case, and the `)`
+  // of a condition or of a method's parameters and the `}` of a block or a
+  // type's body reference the first six so that the scanner can tell it is
+  // inside one or where one may start or end.
   // New tokens go last but for the sentinel, so that they renumber no
   // symbol before them: `_statement_paren`, first listed after
   // `_subscript_open`, renumbered the symbols after it there, which changed
@@ -1194,6 +1196,13 @@ module.exports = grammar({
     // `def` and no return type may come and `(` follows on the line: Groovy
     // takes none of them as that name (see `_untyped_method_name`).
     $._excluded_method_name,
+    // §6.2 — never emitted: valid after the `)` of the condition of `if` or
+    // a loop and of a method's parameters, and after the `}` of a block or
+    // of a type's body, where no expression ends and a statement may start.
+    // Groovy's lexer reads a `/` on the line of such a `)` or `}` as
+    // division, so the scanner opens no slashy string there that starts
+    // with a space or runs across lines.
+    $._slash_divides,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1583,10 +1592,17 @@ module.exports = grammar({
     // (§5.8). A `prec(1, …)` keeps block preferred at use sites where
     // both `block` and a closure-bearing `_statement` are valid
     // alternatives (e.g. the body slot of `if` / `while`).
+    //
+    // `_slash_divides`, which the scanner never emits, is valid after the
+    // `}` (§6.2). It is the last symbol of the rule, so it adds no reduction
+    // and no weight, and the tokens that end a lambda's body or a
+    // statement's block (§6.19, §6.22) are lexed in the same state as
+    // before.
     block: $ => prec(1, seq(
       '{',
       statementList($),
       '}',
+      optional($._slash_divides),
     )),
 
     // §4 — if / else. `prec.right` resolves the dangling-else
@@ -1602,7 +1618,7 @@ module.exports = grammar({
       'if',
       '(',
       field('condition', $._statement_expression),
-      ')',
+      $._condition_close,
       field('consequence', $._if_consequence),
       optional(';'),
       optional(seq(
@@ -1624,7 +1640,7 @@ module.exports = grammar({
       'while',
       '(',
       field('condition', $._statement_expression),
-      ')',
+      $._condition_close,
       field('body', choice($._body_block, $._statement)),
     ),
 
@@ -1649,7 +1665,7 @@ module.exports = grammar({
       optional(field('condition', $._expression)),
       ';',
       optional(field('update', $._expression)),
-      ')',
+      $._condition_close,
       field('body', choice($._body_block, $._statement)),
     ),
 
@@ -1665,7 +1681,7 @@ module.exports = grammar({
       'while',
       '(',
       field('condition', $._statement_expression),
-      ')',
+      $._condition_close,
     ),
 
     // §4 — return / break / continue / throw / assert. A line break
@@ -1956,6 +1972,7 @@ module.exports = grammar({
         ';',
       )),
       '}',
+      optional($._slash_divides),
     ),
 
     // §4 — `String value() default 'x'`, Apache's `methodDeclaration`
@@ -1991,10 +2008,14 @@ module.exports = grammar({
     // plus initializer) and, once that is resolved, silently accepts
     // `A { }` (a constant with an anonymous class body, unsupported)
     // as constant-plus-initializer.
+    //
+    // `_slash_divides`, never emitted, is valid after the `}` of this body
+    // and of an annotation type's and a record's (§6.2).
     class_body: $ => seq(
       '{',
       repeat(choice($._class_member, $.block, ';')),
       '}',
+      optional($._slash_divides),
     ),
 
     // Nested type declarations are members, as in Apache's
@@ -2189,6 +2210,9 @@ module.exports = grammar({
         repeat(seq(',', $.formal_parameter)),
       )),
       ')',
+      // §6.2 — never emitted: a method with no body ends at this `)`, and a
+      // statement may start after it (`def f() / 2`).
+      optional($._slash_divides),
     ),
 
     // §5.13 — formal parameter with optional annotations (Spring's
@@ -2258,6 +2282,9 @@ module.exports = grammar({
       field('name', $.identifier),
       optional($.super_interfaces),
       field('body', $.enum_body),
+      // §6.2 — after the body rather than after its `}`, which took 48 more
+      // states: the body has four shapes, and each would end with the token.
+      optional($._slash_divides),
     ),
 
     enum_body: $ => seq(
@@ -2355,6 +2382,7 @@ module.exports = grammar({
         ';',
       )),
       '}',
+      optional($._slash_divides),
     ),
 
     // A type nested in a record, weighted above the split of its header
@@ -2855,7 +2883,7 @@ module.exports = grammar({
       field('variable', $.identifier),
       choice(alias($._in_keyword, 'in'), ':'),
       field('value', $._expression),
-      ')',
+      $._condition_close,
       field('body', choice($._body_block, $._statement)),
     ),
 
@@ -3956,6 +3984,14 @@ module.exports = grammar({
     // and the token tells the scanner that a `(` there may open a lambda
     // statement, as it does where a reparse that reused the body lexes the
     // `(` at a statement's start (§6.17).
+    // The `)` of the condition of `if`, `while` and `do`-`while` and of the
+    // header of a `for`. `_slash_divides`, which the scanner never emits, is
+    // valid after it (§6.2). A rule of its own keeps the statements that may
+    // follow the `)` in one set of states: the token inline after each `)`
+    // would be lexed in a state before a statement's start, and so would
+    // copy those states.
+    _condition_close: $ => seq(')', optional($._slash_divides)),
+
     _body_block: $ => weighted(BODY_BLOCK_WEIGHT, seq(
       alias($.block, $.block),
       optional($._body_block_end),
@@ -4127,19 +4163,22 @@ module.exports = grammar({
 
     // §5.7 — slashy regex `/.../`. The opening `/` is emitted by
     // the external scanner (after the context guard from §5.4 / §6.2
-    // and a lookahead that confirms a closing `/` exists on the same
-    // line). The body is parsed as `gstringPart` so `$identifier` and
+    // and a lookahead that confirms a closing `/` follows, on the same
+    // line where a division may follow, across lines where none may).
+    // The body is parsed as `gstringPart` so `$identifier` and
     // `${expr}` segments expose the same structured children as
     // double-quoted GStrings. The closing `/` is `token.immediate`
     // so it cannot skip whitespace between the body and the closer.
     _slashy_string: $ => interpolatingStrings($, true).slashy,
 
+    // Line breaks are text: a slashy string may span lines (Groovy's
+    // SlashyStringCharacter), where the scanner opens one that does.
     // A `\` takes the character after it, and a line break whole, `\r\n`
     // too, as Groovy's LineEscape does (`'a\` then `b'` on the next line is
     // `'ab'`): without the pair a CRLF file left the `\n` after the
     // escaped `\r` to end the string.
     _slashy_text: _ => token.immediate(repeat1(choice(
-      /[^\/\\$\n\r]/,
+      /[^\/\\$]/,
       /\\(\r\n|[\s\S])/,
     ))),
 

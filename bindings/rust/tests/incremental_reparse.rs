@@ -275,6 +275,29 @@ fn reparse_after_slash_operand_edits_matches_parse_from_scratch() {
     );
 }
 
+/// Texts with a `/` after the `)` of a condition or of a method with no
+/// body and after the `}` of a block or a type's body (§6.2), on its line,
+/// where it divides, and on the next, where it opens a slashy string that
+/// may run across lines. The scanner tells the two by the line break, so
+/// inserting or deleting one, or a `;`, must lex the `/` again.
+#[test]
+fn reparse_after_closer_slash_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "if (x) / 2\nx = y / z\n",
+            "while (x)\n/ a\nb/\n",
+            "do { } while (x) / 2\nx = y / z\n",
+            "def f() { a } / 2\nx = y / z\n",
+            "def f() { a }\n/ a\nb/\n",
+            "def f() / 2\nx = y / z\n",
+            "class A { } / 2\nx = y / z\n",
+            "enum E { A }\n/ a\nb/\n",
+            "try { } finally { } /* c */ / 2\nx = y / z\n",
+        ],
+        &["", "\n", "/", "x", ";", " "],
+    );
+}
+
 /// Closure parameters that the scanner reads to their `->` past an
 /// annotation or `var` at the end of a line (§6.14, §6.21), a typed local
 /// before a generic method or a call in parentheses on the next line

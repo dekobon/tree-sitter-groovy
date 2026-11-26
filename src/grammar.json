@@ -1551,6 +1551,18 @@
           {
             "type": "STRING",
             "value": "}"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_slash_divides"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
           }
         ]
       }
@@ -1578,8 +1590,8 @@
             }
           },
           {
-            "type": "STRING",
-            "value": ")"
+            "type": "SYMBOL",
+            "name": "_condition_close"
           },
           {
             "type": "FIELD",
@@ -1665,8 +1677,8 @@
           }
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "SYMBOL",
+          "name": "_condition_close"
         },
         {
           "type": "FIELD",
@@ -1775,8 +1787,8 @@
           ]
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "SYMBOL",
+          "name": "_condition_close"
         },
         {
           "type": "FIELD",
@@ -1857,8 +1869,8 @@
           }
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "SYMBOL",
+          "name": "_condition_close"
         }
       ]
     },
@@ -3207,6 +3219,18 @@
         {
           "type": "STRING",
           "value": "}"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -3357,6 +3381,18 @@
         {
           "type": "STRING",
           "value": "}"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -4714,6 +4750,18 @@
         {
           "type": "STRING",
           "value": ")"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -4969,6 +5017,18 @@
             "type": "SYMBOL",
             "name": "enum_body"
           }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -5451,6 +5511,18 @@
         {
           "type": "STRING",
           "value": "}"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -7505,8 +7577,8 @@
           }
         },
         {
-          "type": "STRING",
-          "value": ")"
+          "type": "SYMBOL",
+          "name": "_condition_close"
         },
         {
           "type": "FIELD",
@@ -13084,6 +13156,27 @@
         ]
       }
     },
+    "_condition_close": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": ")"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_slash_divides"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
     "_body_block": {
       "type": "PREC_DYNAMIC",
       "value": 604,
@@ -13685,7 +13778,7 @@
           "members": [
             {
               "type": "PATTERN",
-              "value": "[^\\/\\\\$\\n\\r]"
+              "value": "[^\\/\\\\$]"
             },
             {
               "type": "PATTERN",
@@ -14458,6 +14551,10 @@
     {
       "type": "SYMBOL",
       "name": "_excluded_method_name"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_slash_divides"
     },
     {
       "type": "SYMBOL",

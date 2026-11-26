@@ -1685,7 +1685,10 @@ a parenthesis-free call's receiver (§6.24); `UNREACHABLE` (§5.2), never
 emitted, which ends the error production for a `case` label outside a
 switch, so that error recovery inserts it as a missing `switch`; the
 `<` of a generic type's arguments where they close or run past the
-read (§3.2.2); the `)` of a cast before a name on its line (§6.11); and
+read (§3.2.2); the `)` of a cast before a name on its line (§6.11);
+`SLASH_DIVIDES` (§6.2), never emitted, which marks the `)` of a
+condition or of a method's parameters and the `}` of a block or a
+type's body, on whose line a `/` divides; and
 `ERROR_SENTINEL`, never emitted, which no rule references and which
 only signals error recovery. The tokens listed after the enum in §6.1
 are met in-grammar, see `docs/divergences-from-spec.md`.
@@ -1737,6 +1740,7 @@ enum TokenType {
   UNREACHABLE,            // §5.2 — never emitted; ends the error production for a `case` label outside a switch
   TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
+  SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -1790,9 +1794,62 @@ mid-slashy.
 As implemented, the grammar's valid tokens stand in for `last_token`,
 and the scanner emits only SLASHY_STRING_START, after the `/`; the
 grammar reads the body and the closing `/`. The opener needs a body
-that is not empty, does not start with whitespace, and reaches a
-closing `/` on its line, an escaped character (`\/` among them) read as
-one (`slashy_body_follows`). That look-ahead runs from every `/` where
+that is not empty and reaches a closing `/`, an escaped character
+(`\/` among them) read as one. Where no
+expression ends, which is where NOT_IN is not valid (an operand
+starts, below) or BODY_BLOCK_END is and a line break or a comment
+after one comes before the `/` (after the `}` of an `if` or loop
+body, where Groovy's lexer reads a string too: `if (c) { a }` then
+`/ 2` on the next line; on the line of the `}` it reads division, and
+`if (c) { a } / 2` then `x = y / z` keeps the second line), the body
+may start with whitespace and run
+across lines (`slashy_operand_follows`), as Groovy's
+`SlashyStringCharacter` takes both:
+`x = /a` then `b/` on the next line, and
+`s.replaceFirst(/ in [ \dms]+/, '')`. No expression ends after the `)`
+of the condition of `if` or a loop or of the parameters of a method
+with no body, nor after the `}` of a method's, a `try`'s or another
+statement's block or of a type's body, where a statement may start;
+Groovy's lexer reads a `/` on the line of a `)` or `}` as division
+(`isRegexAllowed`), so `if (x) / 2` and `def f() { a } / 2` are
+invalid, and the multi-line rule read each, with `x = y / z` on the
+next line, as one string from the first `/` to the second and then
+`z`, with no `ERROR`. The valid tokens there are those after `;`, `else`, a
+label's `:` and a closure's `->`, where Groovy opens a regex
+(`a; / b/`, `{ -> / a/ }`), so a token of its own marks the closers:
+SLASH_DIVIDES, never emitted, which the grammar makes valid after
+such a `)` (`_condition_close`, `formal_parameters`) and `}` (`block`,
+`class_body`, the bodies of a record and an annotation type, and after
+an enum's body). Where it is valid the one-line rule holds on the
+closer's line, and the multi-line rule on a later line, as after a
+body block: `if (x)` then `/ a` then `b/` is a string. The token ends
+each of these rules, and `_condition_close` is a rule of its own for
+the `)`, so no state before a statement's start is copied: it costs 81
+parse states (5,235 to 5,316) and 1.7% of `parser.c`. A `/` after
+`import a.b`, `package a.b`, `break lbl` or `def x` on its line is not
+marked: Groovy reads division after a name too. During error recovery, where
+every symbol is valid, the one-line rule holds, so a stray `/` does not
+turn the lines after it into string text (`x = a ?? / b` then
+`y = c / d`). A slashy string that is not closed yet, where an
+operand starts, runs on to the next unescaped `/` in the file, as
+Groovy's lexer reads it: `def r = /abc` then `def total = price / count`
+is the string `abc`, the line break and `def total = price` up to the
+`/`, then the statement `count`, with no `ERROR`, where a string that had to
+close on its line left one `ERROR` on the first line. In an editor a
+regex that is still being typed recolours the code up to the next `/`.
+Where a division may follow, the `/` starts a string only with a body
+that does not start with whitespace and closes on its line
+(`slashy_line_follows`): a `/` that starts the next
+statement on a later line, after an expression (`next_line_continues`,
+§6.21), after a lambda body's `}` or after a comment and a line break,
+so that `a` then `/ 2` on the next line stays a division, and
+`yield / 2` in a closure a division by 2. After the keyword `in`,
+which decides itself by whether an expression follows (§6.16), no
+division may follow either, so there the `/` opens a string that starts
+with whitespace or runs across lines too (`x in / a/`), as Groovy's
+lexer reads it; `yield` keeps the one-line rule. The other look-aheads
+that read past a slashy string to the token after it take the
+multi-line body. That look-ahead runs from every `/` where
 a slashy string may start, which during error recovery is every `/`,
 and an escaped slash ends none of them, so a line of `\/` was read from
 each of its slashes to its end: 2,505 bytes read per input byte for
@@ -1804,15 +1861,26 @@ that many slashes before it: 1.0 and 6.0 bytes per input byte for the
 two lines at 100,000 bytes. Real regexes hold a few escaped slashes (at
 most five on a line of the Java set of 24,548 files, none in the
 Groovy set), and a slashy string that does close reads as before
-however many it holds. Past the bound a `/` with no closing `/` on its
-line is a slashy string whose `/` is missing, an `ERROR`, where it was
-division or another `ERROR`; on the line after a statement it starts
-the next statement rather than continuing the one before (§6.21).
+however many it holds, on one line or several. The look-ahead stops
+at the first unescaped `/`, so across lines too a character is read
+from the `/` before it only, and from at most the bound's slashes
+escaped. Past the bound the look-ahead takes the string to close
+without having found its `/`, so the one-line rule no longer holds
+there: the grammar reads the body on to the next unescaped `/` in the
+file, across lines and with no `ERROR`. `x = /` and a line of 70 `\/`,
+then `y = 1` and `z = a / b`, is a string that ends at the `/` of
+`z = a / b`, and then `b`, and the same line after `foo()` on the line before is a statement
+of its own (§6.21) that runs on as far. Groovy's lexer reads each of
+these as a string to the next `/`. Where no unescaped `/` follows, the
+string's `/` is missing, an `ERROR`.
 No tree of the corpus, the real and Java sets and 40,000 fuzzed lines
 of regexes with escaped slashes, long lines and division chains
 changed, but for the inputs with a line past the bound, all of which
 had an `ERROR` before and after (1,583 of 17,762).
-`bindings/rust/tests/slashy_string_cost.rs` checks the two lines.
+`bindings/rust/tests/slashy_string_cost.rs` checks the two lines, the
+same across many lines, and the look-aheads that read past a slashy
+string, which read an unclosed one across lines on to their item budget
+(`foo()` then `(x =~ / a` on each line, and `def f = (a = /x`).
 
 The valid tokens stand in for `last_token` only where an operand may
 start, and the grammar lets one start right after an operand: the next
@@ -2727,8 +2795,9 @@ A name argument: after spaces, tabs and line escapes, on the line:
         then Groovy's tokens up to `->` (closure parameters): with
         brackets counted; comments, strings, `++` and `--` read whole (a
         string's `${…}` with the strings in it, §6.17), a slashy string
-        where an operand may start, no `=` follows its `/` and it closes
-        on its line read whole, and a dollar-slashy string read whole,
+        where an operand may start, no `=` follows its `/` and a closing
+        `/` does, across lines (§6.2), read whole, and a dollar-slashy
+        string read whole,
         across lines, within 1,024 characters (§5.7; one that does not
         close within them ends the list with no `->`); an element, the
         first item after a `,` outside brackets, that is `(` or a key
@@ -3649,7 +3718,8 @@ call's arguments), and:
     `${…}` read as code with the strings in it, a dollar-slashy one
     across lines within 1,024 characters, §5.7), a slashy string where
     an operand may start and no `=` follows its `/` skipped whole when
-    it closes on its line (one that does not turns the token down), and
+    a closing `/` follows, across lines (§6.2; one with none turns the
+    token down), and
     the `,` of type arguments that a `<` right after a capitalized name
     opens taken for theirs, to the `,` or `)` that ends it. A
     parameter with no such name (`(int)`, `(a.b.C)`, `(String[])`) is
@@ -3885,12 +3955,13 @@ here) and STATEMENT_PAREN is, and:
     a line break continuing a single-quoted or double-quoted one, a
     `${…}` read as code with the strings in it, §6.17), inside an
     element a slashy string where an operand may start and no `=`
-    follows its `/` read whole to its close on its line, so that its
-    `,` and `:` are none of the element's (`(text =~ /a, b/)`), and
+    follows its `/` read whole to its close, across lines (§6.2), so
+    that its `,` and `:` are none of the element's
+    (`(text =~ /a, b/)`), and
     comments skipped, within LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256)
     items (§6.17). Where the reading cannot go on, at the end of the
     budget or the input, at a string or comment that does not close, at
-    such a slashy string that does not close on its line, at a bracket
+    such a slashy string that no closing `/` follows, at a bracket
     that does not match, at a `/` that opens an element, and at the
     `$/` of a dollar-slashy string anywhere in one, which this reading
     does not enter (`(foo $/a/$, 2)`, §5.7), the parentheses are judged
@@ -4451,7 +4522,7 @@ an annotation, then `>`, `,` or `extends`: `String s` then
 `!instanceof` before
 what makes them operators (§6.12), `+=`, `-=`, `->`, `/=`, the word
 `instanceof`, a `/` that opens no comment and no slashy string (the
-string needs a closing `/` on the line, `slashy_body_follows`:
+string needs a closing `/` on the line, `slashy_line_follows`:
 `Foo foo` then `/ 2` is Groovy's `Foo(foo / 2)`), and `(` when the
 parentheses hold parameters (`call_arguments_follow`, §6.14: `Foo f`
 then `(int a) { }`), where a call in parentheses, unlike after a name

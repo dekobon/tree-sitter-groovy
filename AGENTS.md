@@ -125,7 +125,7 @@ The default branch is **`main`**.
     words and they are identifiers here, so no reserved set can hold
     them (§6.25).
 
-  Seven externals are never emitted. `_unreachable` ends
+  Eight externals are never emitted. `_unreachable` ends
   `_stray_case`, the error production for a `case` label where a
   statement starts, so that error recovery inserts it as a missing
   `switch` and each such line recovers on its own (§5.2); the scanner
@@ -144,7 +144,12 @@ The default branch is **`main`**.
   body of `if`, `else`, a loop or an arrow case, where the scanner
   reads a `(` as at a statement's start, so that a lambda statement
   after it (`if (c) { a() }` then `(x) -> x`) parses the same from
-  scratch and after a reparse (§6.17); and `_error_sentinel`, valid
+  scratch and after a reparse (§6.17); `_slash_divides` after the `)`
+  of the condition of `if` or a loop and of a method's parameters, and
+  after the `}` of a block or a type's body, where no expression ends
+  but Groovy's lexer reads a `/` on that line as division, so that the
+  slashy opener keeps the one-line rule there (`if (x) / 2`,
+  `def f() { a } / 2`) (§6.2); and `_error_sentinel`, valid
   only during error recovery, where the scanner emits only the
   comments, the marker of an unterminated `/*`, the slashy opener and
   the contextual keywords.
