@@ -1793,9 +1793,12 @@ grammar reads the body and the closing `/`. The opener needs a body
 that is not empty and reaches a closing `/`, an escaped character
 (`\/` among them) read as one. Where no
 expression ends, which is where NOT_IN is not valid (an operand
-starts, below) or BODY_BLOCK_END is (after the `}` of an `if` or loop
+starts, below) or BODY_BLOCK_END is and a line break or a comment
+after one comes before the `/` (after the `}` of an `if` or loop
 body, where Groovy's lexer reads a string too: `if (c) { a }` then
-`/ 2` on the next line), the body may start with whitespace and run
+`/ 2` on the next line; on the line of the `}` it reads division, and
+`if (c) { a } / 2` then `x = y / z` keeps the second line), the body
+may start with whitespace and run
 across lines (`slashy_operand_follows`), as Groovy's
 `SlashyStringCharacter` takes both:
 `x = /a` then `b/` on the next line, and

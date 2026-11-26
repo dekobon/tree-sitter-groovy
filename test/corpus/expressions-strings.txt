@@ -1602,6 +1602,45 @@ b / 3
     (number_literal)))
 
 ==================
+A slash on the line of a body block's brace opens no slashy string across lines
+==================
+
+if (c) { a } / 2
+x = y / z
+if (c) { a }
+/* c */ / 2 /
+b
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (binary_expression
+        left: (closure
+          (expression_statement
+            (identifier)))
+        right: (number_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (identifier))))
+  (block_comment)
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (expression_statement
+    (identifier)))
+
+==================
 A slashy string after `in` may start with a space and run across lines
 ==================
 

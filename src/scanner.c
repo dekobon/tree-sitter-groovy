@@ -6296,10 +6296,12 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !expression_ends && !valid_symbols[ERROR_SENTINEL];
     // §6.2 — where no expression ends, a slashy string opens as where an
     // operand starts: its body may start with a space and run across lines
-    // (`slashy_operand_follows`). That holds after a body block's `}` too
-    // (`if (c) { a }` then `/ 2` is a string, as in Groovy's lexer), but not
-    // during error recovery, where every symbol is valid and any `/` would
-    // otherwise open a string that swallows the lines after it.
+    // (`slashy_operand_follows`). That holds after a body block's `}` too,
+    // on a later line only (`if (c) { a }` then `/ 2` is a string, as in
+    // Groovy's lexer, which reads a `/` on the line of a `}` as division;
+    // the slashy branch below tells the two), but not during error
+    // recovery, where every symbol is valid and any `/` would otherwise
+    // open a string that swallows the lines after it.
     bool slashy_operand = !expression_ends && !valid_symbols[ERROR_SENTINEL];
     bool wants_named_key = valid_symbols[COMMAND_NAMED_KEY];
     // §6.15 — TYPE_START is never emitted; it is valid where a type may
@@ -6768,13 +6770,19 @@ bool tree_sitter_groovy_external_scanner_scan(
                     while (is_inline_space(lexer->lookahead)) {
                         advance(lexer);
                     }
+                    // The string is read as the slashy branch below reads
+                    // it past a line break, so that after a body block's
+                    // `}` one that starts with a space or spans lines
+                    // follows such a comment as it follows a line break.
                     if (lexer->lookahead == '/') {
                         advance(lexer);
                         scanner->slashy_after_comment_newline =
                             lexer->lookahead == '*'
                             || (lexer->lookahead != '='
                                 && lexer->lookahead != '/'
-                                && slashy_line_follows(lexer));
+                                && (slashy_operand
+                                        ? slashy_operand_follows(lexer)
+                                        : slashy_line_follows(lexer)));
                     }
                 }
             }
@@ -6830,17 +6838,22 @@ bool tree_sitter_groovy_external_scanner_scan(
     // was `x = w` and the string `/2 + h/`. Past a line break one may
     // start, as Groovy's lexer emits a newline token there (`x = a` and
     // `/re/` on the next line).
-    if (!wants_slashy
-        || (expression_ends && !crossed_line
-            && (scanner == NULL || !scanner->slashy_after_comment_newline))) {
+    bool later_line = crossed_line
+        || (scanner != NULL && scanner->slashy_after_comment_newline);
+    if (!wants_slashy || (expression_ends && !later_line)) {
         return false;
     }
+    // After a body block's `}` NOT_IN is valid too, as the braces may be a
+    // closure: on the `}`'s line Groovy's lexer reads the `/` as division,
+    // so the string must start with no space and close on its line, as
+    // before (`if (c) { a } / 2` then `x = y / z` keeps the second line).
+    bool lines = slashy_operand && (!valid_symbols[NOT_IN] || later_line);
     // `lexer->mark_end` records the position where the slashy opener
     // token ends; advancing past it during the look-ahead does not extend
     // the token range as long as we do not call `mark_end` again.
     lexer->mark_end(lexer);
-    if (!(slashy_operand ? slashy_operand_follows(lexer)
-                         : slashy_line_follows(lexer))) {
+    if (!(lines ? slashy_operand_follows(lexer)
+                : slashy_line_follows(lexer))) {
         return false;
     }
     if (scanner != NULL) {
