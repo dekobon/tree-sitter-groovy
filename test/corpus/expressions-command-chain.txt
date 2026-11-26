@@ -1012,21 +1012,38 @@ x = foo 'a': 1, 'b': c = 2
             right: (number_literal)))))))
 
 ==================
-A string before a colon of a ternary stays an argument
+A string before the colon of a ternary stays an argument
 ==================
 
-foo 'a', c ? 'x' : 'y'
+y = c ? x = foo 'a' : 'b'
+y = c ? x = foo 1, 'a' : 'b'
 
 ---
 
 (source_file
-  (command_chain
-    receiver: (identifier)
-    argument: (string_literal)
-    argument: (ternary_expression
-      condition: (identifier)
-      consequence: (string_literal)
-      alternative: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (identifier)
+        consequence: (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (string_literal)))
+        alternative: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (identifier)
+        consequence: (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)
+            argument: (string_literal)))
+        alternative: (string_literal)))))
 
 ==================
 Named arguments with non-ASCII keys
