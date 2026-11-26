@@ -1470,3 +1470,52 @@ fn reparse_after_excluded_method_name_edits_matches_parse_from_scratch() {
     ];
     assert_every_edit_reparses(EXCLUDED_NAME_TEXTS, EXCLUDED_NAME_INSERTIONS);
 }
+
+/// Declarations after annotations alone (`@Field FOO = [a: 1]`, §5.9 in
+/// `docs/divergences-from-spec.md`), whose first name takes a value, in a
+/// script, a method, a closure and a type body, and `@A x` before a line
+/// that goes on with a name, which stays a typed declaration. The reading
+/// is decided at the `=` after the name, so an edit there, or one that
+/// turns the name into a type or the annotation into a name, must parse
+/// the statement again. `= 1` typed inside the first annotation's name is
+/// left out: see
+/// `a_value_typed_inside_an_annotation_name_recovers_differently_on_reparse`.
+#[test]
+fn reparse_after_annotated_untyped_declaration_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "@Field FOO = [a: 1], BAR\n@A x\ny = 1\n",
+            "def m() {\n  @Lazy y = 2\n}\n",
+            "def c = { @A x = 1, y -> x }\ndef d = { @A x = 1, y }\n",
+            "class S {\n  @Subject svc = new Svc()\n  @A int v\n  // c\n  public S() { }\n}\n",
+            "@A _ = 1\n@B _ = 2, y = 3\n",
+        ],
+        &["", " ", "\n", "=", "@A ", "_", ",", "x", "->"],
+    );
+}
+
+/// A known limitation, through the runtime's error recovery. Typing `= 1`
+/// inside the name of the annotation in `@Field FOO = [a: 1], BAR`
+/// (`@F= 1eld FOO …`) leaves an `ERROR` both ways, but not the same one: a
+/// parse from scratch puts the annotation in an `ERROR` and reads `1` as a
+/// statement, while the reparse keeps a declaration with the annotation,
+/// an `ERROR` over `= 1`, and `eld` as the type of `FOO`. Neither tree is
+/// valid Groovy. This test pins the difference. If it fails, the two parses
+/// agree again: move the edit back into
+/// `reparse_after_annotated_untyped_declaration_edits_matches_parse_from_scratch`.
+#[test]
+fn a_value_typed_inside_an_annotation_name_recovers_differently_on_reparse() {
+    const TEXT: &str = "@Field FOO = [a: 1], BAR\n@A x\ny = 1\n";
+    let mut parser = parser();
+    for at in [2, 3] {
+        let (edited, incremental, fresh) = reparse(&mut parser, TEXT, at, at + 1, "= 1");
+        assert!(edited.starts_with("@F"), "{edited:?}");
+        assert!(fresh.root_node().has_error());
+        assert!(incremental.root_node().has_error());
+        assert_ne!(
+            dumped(&incremental),
+            dumped(&fresh),
+            "the reparse now matches the parse from scratch: {edited:?}",
+        );
+    }
+}

@@ -1287,6 +1287,9 @@ module.exports = grammar({
     // of one name does not fork.
     [$._initialized_declarator, $.closure_parameter],
     [$.variable_declarator, $.closure_parameter],
+    // `{ @A _ = 1, y -> }` against `{ @A _ = 1, y }`, the same fork after
+    // annotations alone and `_`.
+    [$._annotated_declarator, $.closure_parameter],
     // `{ final String a, b -> }` vs. `{ final String a, b }`, the same fork
     // after a blank final's name.
     [$.local_variable_declaration, $.closure_parameter],
@@ -2078,6 +2081,14 @@ module.exports = grammar({
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
+      // Annotations alone, Spock's `@Subject svc = new Svc()`: Apache's
+      // `modifiers` takes an annotation as a modifier. As for a local, the
+      // first name needs a value (`_placeholder_declarator`).
+      seq(
+        repeat1($.annotation),
+        alias($._initialized_declarator, $.variable_declarator),
+        repeat(seq(',', $.variable_declarator)),
+      ),
     ),
 
     // §4 — `def name(params) body`, or a return type in place of
@@ -2519,6 +2530,15 @@ module.exports = grammar({
         repeat1($.annotation),
         alias($._placeholder_declarator, $.variable_declarator),
       )),
+      // Annotations with no `def`, modifier or type (`@Field FOO = [:]` in
+      // a script), as Apache's `variableModifiers variableDeclarators`
+      // takes them. The first name needs a value, for the reason
+      // `_placeholder_declarator` gives.
+      seq(
+        repeat1($.annotation),
+        alias($._annotated_declarator, $.variable_declarator),
+        repeat(seq(',', $.variable_declarator)),
+      ),
       // `def String s = 'a'`: `def` is a modifier before the type, as in
       // Apache's `variableDeclaration`, and the scanner decides the type
       // after it as at a statement's start, so `def String` then `s = 1`
@@ -2549,6 +2569,16 @@ module.exports = grammar({
     // `@A x` followed by `y = 1` on the next line would also be a typed
     // local `x y = 1`, and nothing but the line break tells them apart.
     _placeholder_declarator: $ => field('name', alias('_', $.identifier)),
+
+    // `_initialized_declarator` with `_` as a name too: after annotations
+    // `_` lexes as the literal of `_placeholder_declarator`, which
+    // `$.identifier` does not take, so `@A _ = 1` needs it spelled out.
+    // A type body has no placeholder, and `_` is an identifier there.
+    _annotated_declarator: $ => seq(
+      field('name', choice($.identifier, alias('_', $.identifier))),
+      '=',
+      field('value', enhancedStatementExpression($)),
+    ),
 
     _initialized_declarator: $ => seq(
       field('name', $.identifier),

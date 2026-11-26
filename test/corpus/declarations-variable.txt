@@ -2507,6 +2507,127 @@ pipeline { agent any }
         argument: (identifier)))))
 
 ==================
+Annotation on the placeholder name with a value
+==================
+
+@A _ = 1
+@B _ = 2, y = 3
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+Annotations alone before a name with a value
+==================
+
+@Field FOO = [a: 1], BAR
+def m() {
+  @Lazy y = 2
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (number_literal))))
+    (variable_declarator
+      name: (identifier)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
+
+==================
+Annotations alone before a name with no value stay a typed declaration
+==================
+
+@A x
+y = 1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal)))
+
+==================
+Annotated name with a default opens a closure's parameters or its body
+==================
+
+def c = { @A x = 1, y -> x }
+def d = { @A x = 1, y }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)
+            default: (number_literal))
+          (closure_parameter
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (local_variable_declaration
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          (variable_declarator
+            name: (identifier)
+            value: (number_literal))
+          (variable_declarator
+            name: (identifier)))))))
+
+==================
 Annotated declaration and annotated parameter at the start of a closure
 ==================
 
@@ -2560,7 +2681,7 @@ xs.each { @Lazy _ -> 1 }
           (number_literal))))))
 
 ==================
-Annotation on a name other than the placeholder is not accepted
+An annotated name other than the placeholder needs a value
 :error
 ==================
 
