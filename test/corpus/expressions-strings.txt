@@ -1601,3 +1601,158 @@ def f = { yield / 2 }
           (binary_expression
             left: (identifier)
             right: (number_literal)))))))
+
+==================
+A slashy string runs across lines in the look-aheads that read past it
+==================
+
+def c = { foo a, /x
+-> y/ }
+def r = (x) in [/a
+b/, 2]
+foo((Foo)
+  (Bar) ~/a
+(b/)
+def f = (a = /x
+,y/) -> a
+foo()
+(x =~ / a/, c)
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (command_chain
+          receiver: (identifier)
+          argument: (identifier)
+          argument: (string_literal
+            (string_fragment))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (parenthesized_expression
+          (identifier))
+        collection: (list_literal
+          (string_literal
+            (string_fragment))
+          (number_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_type_cast
+          type: (type_identifier)
+          value: (parenthesized_type_cast
+            type: (type_identifier)
+            value: (unary_expression
+              operand: (string_literal
+                (string_fragment))))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)
+            default: (string_literal
+              (string_fragment))))
+        body: (identifier))))
+  (expression_statement
+    (method_invocation
+      function: (method_invocation
+        function: (identifier)
+        arguments: (argument_list))
+      arguments: (argument_list
+        (regex_find_expression
+          subject: (identifier)
+          pattern: (string_literal
+            (string_fragment)))
+        (identifier)))))
+
+==================
+A slashy string across lines in the arguments of a call after a closure call reads as a triple-quoted one (known limitation, §6.24)
+==================
+
+foo { }.bar(/x
+y/).baz 1
+foo { }.bar('''x
+y''').baz 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (string_literal
+            (string_fragment))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (ERROR)
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (identifier)
+        arguments: (argument_list
+          (string_literal)))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
+
+==================
+A slashy string across lines in a closure after a closure call reads as a triple-quoted one (known limitation, §6.24)
+==================
+
+foo { }.each { /a
+b/ }.baz 1
+foo { }.each { '''a
+b''' }.baz 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (field_access
+          object: (MISSING identifier)
+          field: (identifier))
+        closure: (closure
+          (expression_statement
+            (string_literal
+              (string_fragment)))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal))
+  (command_chain
+    receiver: (identifier)
+    argument: (closure))
+  (expression_statement
+    (field_access
+      object: (method_invocation
+        function: (field_access
+          object: (MISSING identifier)
+          field: (identifier))
+        closure: (closure
+          (expression_statement
+            (string_literal))))
+      field: (identifier)))
+  (expression_statement
+    (number_literal)))
