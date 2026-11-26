@@ -2681,7 +2681,7 @@ xs.each { @Lazy _ -> 1 }
           (number_literal))))))
 
 ==================
-Annotation on a name other than the placeholder is not accepted
+An annotated name other than the placeholder needs a value
 :error
 ==================
 

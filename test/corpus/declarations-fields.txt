@@ -216,6 +216,35 @@ class S extends Specification {
           value: (null_literal))))))
 
 ==================
+Annotations alone before a name with no value stay a typed field
+==================
+
+class C {
+  @A int v
+  // c
+  public C() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (line_comment)
+      (constructor_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
 Typed field before a constructor retains its type
 ==================
 
