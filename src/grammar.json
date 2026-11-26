@@ -3662,24 +3662,61 @@
               }
             },
             {
-              "type": "REPEAT1",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "public"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "private"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "protected"
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "REPEAT1",
+                  "content": {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "public"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "private"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "protected"
+                      }
+                    ]
                   }
-                ]
-              }
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "annotation"
+                      },
+                      {
+                        "type": "REPEAT",
+                        "content": {
+                          "type": "CHOICE",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": "public"
+                            },
+                            {
+                              "type": "STRING",
+                              "value": "private"
+                            },
+                            {
+                              "type": "STRING",
+                              "value": "protected"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
             },
             {
               "type": "FIELD",

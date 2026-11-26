@@ -1444,3 +1444,59 @@ enum E {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block)))))
+
+==================
+Enum constructor with annotations among its access modifiers after a trailing comma
+==================
+
+enum F { A, private @Foo F() {} }
+enum G { A, public @A protected @B(1) G(int x) {} }
+enum I { A, private @Foo static f() {} }
+
+---
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal)))
+        name: (identifier)
+        parameters: (formal_parameters
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (block))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))

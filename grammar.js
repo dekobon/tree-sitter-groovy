@@ -2093,12 +2093,21 @@ module.exports = grammar({
 
     // The constructor form for the member directly after an enum's
     // trailing comma (see `enum_declaration`). Only access modifiers
-    // qualify: `static f() { }` there is a method. The weight is above
+    // qualify, with annotations among them after the first
+    // (`private @Foo F() { }`): `static f() { }` and
+    // `private @Foo static f() { }` there are methods. The access
+    // modifiers before the first annotation stay a `repeat1`, so that
+    // `private` forks with `_modifier` as before (see `conflicts`); a
+    // `choice` there lets the rule's precedence settle the fork for the
+    // constructor. The weight is above
     // a method with a body, which matches the same text through its
     // modifier-only form.
     _modified_constructor_declaration: $ => weighted(4, constructorDeclaration(
       $,
-      repeat1(choice('public', 'private', 'protected')),
+      seq(
+        repeat1(choice('public', 'private', 'protected')),
+        repeat(seq($.annotation, repeat(choice('public', 'private', 'protected')))),
+      ),
     )),
 
     // §4 — `static { … }` class-body initializer block. Runs once
