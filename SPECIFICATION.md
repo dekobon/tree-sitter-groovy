@@ -940,9 +940,10 @@ The resolution we adopt:
    A spread map is taken after a comma (`foo a: 1, *:m`, §5.11) and is
    no first argument either (`foo *:m`, an `ERROR`).
    A named-arg key is an identifier or a string (`foo 'a': 1`,
-   `foo "$k": 1`), as in Apache's `namedArgPrimary`; a string key needs
-   no scanner token, since no other argument has a `:` after a string
-   (§6.8). Disallowed:
+   `foo "$k": 1`), as in Apache's `namedArgPrimary`. A string key needs
+   no scanner token: a `:` after a string argument is a key's, except
+   in a ternary's consequence (`y = c ? x = foo 'a' : 'b'`), where the
+   grammar keeps both readings (§6.8). Disallowed:
    nested command chains, other than as the value of an assignment
    (`bar 1, x = foo 2`, item 1). Not yet accepted, though Groovy calls each
    (observed with Groovy 3): `new` after a keyword of the grammar that
@@ -2193,12 +2194,22 @@ as a plain identifier followed by `:` and needs no scanner token.
 
 Known limitations:
 
-- A key that is a number (`foo 1: 'a'`) or, after a comma, an
-  expression in parentheses (`foo x: 1, (k): 2`) is an `ERROR`. Apache's
-  `namedArgPrimary` accepts them; Groovy 4.0.32 runs both. A string key (`foo 'a': 1`, `foo "$k": 1`) is matched in
-  the grammar, after the receiver or a comma, with no scanner token: the
-  `:` after the string decides it, and `prec.right` keeps
-  `foo 'b': c = 2` one argument, as for a name.
+- A key that is a number (`foo 1: 'a'`) is an `ERROR`. Apache takes
+  any literal: `namedArgPrimary` for the first argument and
+  `namedPropertyArgPrimary` after a comma. After a comma
+  `namedPropertyArgPrimary` also takes an expression in parentheses, a
+  list or a map (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`); each is an
+  `ERROR` here. Groovy 4.0.32 runs `foo 1: 'a'` and
+  `foo x: 1, (k): 2`.
+- A string key (`foo 'a': 1`, `foo "$k": 1`) is matched in the
+  grammar, after the receiver or a comma, with no scanner token, and
+  `prec.right` keeps `foo 'b': c = 2` one argument, as for a name. The
+  `:` after a string argument is not always a key's: in a ternary's
+  consequence it may be the ternary's (`y = c ? x = foo 'a' : 'b'`).
+  A `conflicts` entry keeps both readings, and the key's dynamic
+  precedence ranks it first where both complete, so the ternary is
+  read only where the key would leave it with no `:`. That is the one
+  reading that completes in Apache's grammar.
 - `default` cannot be a key as the first argument. Apache's
   `namedArgLabel` accepts every keyword, so `foo default: 1` is a
   named-argument call there and an expression statement plus a label here.

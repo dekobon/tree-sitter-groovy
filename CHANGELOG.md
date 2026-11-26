@@ -1057,14 +1057,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `namedArgPrimary` does: Gradle's `attributes 'Main-Class': 'a.B'`,
   `foo "$k": 1`, `foo a: 1, 'b': 2`, after a dotted receiver and in a
   call that is a value (`def m = foo 'a': 1`). Each was an `ERROR`, as
-  at v0.6.0. The key needs no scanner token: no other argument has a
-  `:` after a string, so the grammar decides it there, and a string
-  before a ternary's `:` stays an argument (`foo 'a', c ? 'x' : 'y'`).
-  A number key (`foo 1: 'a'`) and a parenthesized key after a comma
-  (`foo x: 1, (k): 2`) are still an `ERROR`. The two corpus tests that
-  pinned string keys as unsupported now pin the tree. 24 of 21,667 real
-  files parse without an `ERROR`, and every tree that changes had an
-  `ERROR` before (`SPECIFICATION.md` §6.8) (#113).
+  at v0.6.0. The key needs no scanner token. In a ternary's
+  consequence the `:` after a string argument may be the ternary's, so
+  the grammar keeps both readings and ranks the key first:
+  `y = c ? x = foo 'a' : 'b'` stays a ternary. A number key
+  (`foo 1: 'a'`) and a key after a comma that is an expression in
+  parentheses, a list or a map (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`)
+  are still an `ERROR`. The two corpus tests that pinned string keys as
+  unsupported now pin the tree. 24 of 21,667 real files parse without
+  an `ERROR`; in those files every tree that changes had an `ERROR`
+  before (`SPECIFICATION.md` §6.8) (#113).
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
   on the next line in a CRLF file is one string, as Groovy reads it
