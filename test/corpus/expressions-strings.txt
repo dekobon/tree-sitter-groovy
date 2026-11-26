@@ -1515,3 +1515,54 @@ def c = s.replaceFirst(/ in [ \dms]+/, "")
           (string_literal
             (string_fragment))
           (string_literal))))))
+
+==================
+A slash during error recovery opens no slashy string across lines
+==================
+
+x = a @@ / b
+y = c / d
+z = e / f
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (identifier)))
+  (local_variable_declaration
+    (annotation
+      (ERROR)
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    (ERROR
+      (identifier)
+      (identifier))
+    name: (identifier)
+    value: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+==================
+A slash on the line after a body block opens a slashy string
+==================
+
+if (c) { a }
+/ 2
+b / 3
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (expression_statement
+    (number_literal)))

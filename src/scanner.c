@@ -6780,7 +6780,13 @@ bool tree_sitter_groovy_external_scanner_scan(
     // token ends; advancing past it during the look-ahead does not extend
     // the token range as long as we do not call `mark_end` again.
     lexer->mark_end(lexer);
-    if (!slashy_body_follows(lexer, !expression_ends)) {
+    // The body may run across lines and start with a space where no
+    // expression ends (an operand starts, or a body block's `}` was read:
+    // `if (c) { a }` then `/ 2` is a string, as in Groovy's lexer), but not
+    // during error recovery, where every symbol is valid and any `/` would
+    // otherwise open a string that swallows the lines after it.
+    if (!slashy_body_follows(lexer, !expression_ends
+                                        && !valid_symbols[ERROR_SENTINEL])) {
         return false;
     }
     if (scanner != NULL) {
