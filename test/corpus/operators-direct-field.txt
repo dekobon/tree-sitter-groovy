@@ -128,3 +128,90 @@ obj??.@handler x
       object: (identifier)
       field: (identifier))
     argument: (identifier)))
+
+==================
+Direct field access after safe and spread dots after a closure call
+==================
+
+foo { }?.@bar 1
+foo { }*.@bar 'x'
+
+---
+
+(source_file
+  (command_chain
+    receiver: (safe_direct_field_access_expression
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (spread_direct_field_access_expression
+      object: (method_invocation
+        function: (identifier)
+        closure: (closure))
+      field: (identifier))
+    argument: (string_literal)))
+
+==================
+Direct field access after safe dots after a name after a closure call
+==================
+
+foo { }.bar?.@baz 1
+foo { }.bar??.@baz 1
+foo { }.bar?.@baz x: 1
+
+---
+
+(source_file
+  (command_chain
+    receiver: (safe_direct_field_access_expression
+      object: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (safe_chain_direct_field_access_expression
+      object: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      field: (identifier))
+    argument: (number_literal))
+  (command_chain
+    receiver: (safe_direct_field_access_expression
+      object: (field_access
+        object: (method_invocation
+          function: (identifier)
+          closure: (closure))
+        field: (identifier))
+      field: (identifier))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))))
+
+==================
+Direct field access after a safe dot in a parenthesized command
+==================
+
+foo
+(obj?.@h 1, 2)
+
+---
+
+(source_file
+  (expression_statement
+    (identifier))
+  (expression_statement
+    (parenthesized_expression
+      (command_chain
+        receiver: (safe_direct_field_access_expression
+          object: (identifier)
+          field: (identifier))
+        argument: (number_literal)
+        argument: (number_literal)))))

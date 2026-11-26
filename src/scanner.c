@@ -4465,7 +4465,8 @@ static AccessRest read_closure_access_rest(
     if (c == '?') {
         advance(input);
         if (input->lookahead != '[') {
-            // `?.` or `??.`, as `read_member_access` reads them.
+            // `?.`, `??.`, `?.@` or `??.@`, as `read_member_access` reads
+            // them.
             if (input->lookahead == '?') {
                 advance(input);
             }
@@ -4473,6 +4474,9 @@ static AccessRest read_closure_access_rest(
                 return ACCESS_STOP;
             }
             advance(input);
+            if (input->lookahead == '@') {
+                advance(input);
+            }
             return NEXT_ACCESS;
         }
         c = '[';
