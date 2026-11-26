@@ -980,36 +980,13 @@ foo 'a',
       value: (number_literal))))
 
 ==================
-String key in a command chain that is a value
+String key in a command chain that is a value is an error
+:error
 ==================
 
 def m = foo 'a': 1
-x = foo 'a': 1, 'b': c = 2
 
 ---
-
-(source_file
-  (local_variable_declaration
-    (variable_declarator
-      name: (identifier)
-      value: (command_chain
-        receiver: (identifier)
-        argument: (named_argument
-          key: (string_literal)
-          value: (number_literal)))))
-  (expression_statement
-    (assignment_expression
-      left: (identifier)
-      right: (command_chain
-        receiver: (identifier)
-        argument: (named_argument
-          key: (string_literal)
-          value: (number_literal))
-        argument: (named_argument
-          key: (string_literal)
-          value: (assignment_expression
-            left: (identifier)
-            right: (number_literal)))))))
 
 ==================
 A string before the colon of a ternary stays an argument
@@ -1044,6 +1021,34 @@ y = c ? x = foo 1, 'a' : 'b'
             argument: (number_literal)
             argument: (string_literal)))
         alternative: (string_literal)))))
+
+==================
+A string before the colon of an assert message stays an argument
+==================
+
+assert x = foo 'a' : 'msg'
+assert c ? x = foo 'a' : 'b' : 'msg'
+
+---
+
+(source_file
+  (assert_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (string_literal)))
+    message: (string_literal))
+  (assert_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (assignment_expression
+        left: (identifier)
+        right: (command_chain
+          receiver: (identifier)
+          argument: (string_literal)))
+      alternative: (string_literal))
+    message: (string_literal)))
 
 ==================
 Named arguments with non-ASCII keys
