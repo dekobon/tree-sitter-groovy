@@ -1756,3 +1756,27 @@ b''' }.baz 1
       field: (identifier)))
   (expression_statement
     (number_literal)))
+
+==================
+A slash with a space after it on the line after a lambda body divides
+==================
+
+def f = x -> { a }
+/ b /
+2
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (binary_expression
+          left: (binary_expression
+            left: (closure
+              (expression_statement
+                (identifier)))
+            right: (identifier))
+          right: (number_literal))))))
