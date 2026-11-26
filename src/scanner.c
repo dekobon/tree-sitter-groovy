@@ -2225,26 +2225,39 @@ static bool instanceof_test_follows(TSLexer *lexer, bool no_close_ahead) {
         && is_identifier_start(lexer->lookahead);
 }
 
+// The keyword that `expression_follows` decides, as each takes what follows
+// it in its own way (SPECIFICATION.md §6.16).
+typedef enum {
+    // `yield`, whose value starts on its line (Apache's `YIELD expression`
+    // has no `nls`), and where a `/` before whitespace divides
+    // (`yield / 2`).
+    EXPRESSION_AFTER_YIELD,
+    // The binary `in`, which takes `nls` after it, and after which no
+    // division may follow, so that a `/` opens a slashy string as where an
+    // operand starts (`x in / a/`).
+    EXPRESSION_AFTER_IN,
+} ExpressionAfter;
+
 // SPECIFICATION.md §6.16 — whether an expression starts here, after
-// Groovy's trivia, line breaks and comments included unless `line` is set:
-// what `in` needs after it to be a keyword, and `yield`, on its line. The characters are those an
-// expression of the grammar can start with, except that `instanceof` or
-// `!instanceof` with a type after it tests the word before it. `!`, `+`
-// and `-` start one unless they are `!=`, `+=`, `-=` or `->`. `++` and
-// `--` start one only when an operand follows them on their line, so
-// `in++` and `yield++` update a name, also when `foo()` follows on the
-// next line, as in Groovy; they are read in a loop, not by recursion,
-// which a long run of them would turn into a deep stack. `()` starts
-// none, so `yield()` is a call. A `/` starts a slashy string unless `=`
-// or a second `/` (a line comment, read on the line of a `++`) follows
-// it, or a space does after `yield`; after `in` a space may follow when
-// a closing `/` does (`slashy_operand_follows`, across lines).
+// Groovy's trivia, line breaks and comments included after `in`: what
+// `in` needs after it to be a keyword, and `yield`, on its line. The
+// characters are those an expression of the grammar can start with,
+// except that `instanceof` or `!instanceof` with a type after it tests the
+// word before it. `!`, `+` and `-` start one unless they are `!=`, `+=`,
+// `-=` or `->`. `++` and `--` start one only when an operand follows them
+// on their line, so `in++` and `yield++` update a name, also when `foo()`
+// follows on the next line, as in Groovy; they are read in a loop, not by
+// recursion, which a long run of them would turn into a deep stack. `()`
+// starts none, so `yield()` is a call. A `/` starts a slashy string unless
+// `=` or a second `/` (a line comment, read on the line of a `++`) follows
+// it, or a space does after `yield`; after `in` a space may follow when a
+// closing `/` does (`slashy_operand_follows`, across lines).
 static bool expression_follows(
     TSLexer *lexer,
-    bool line,
+    ExpressionAfter after,
     bool no_close_ahead
 ) {
-    bool same_line = line;
+    bool same_line = after == EXPRESSION_AFTER_YIELD;
     for (;;) {
         bool slash = false;
         if (!skip_header_trivia(lexer, !same_line, no_close_ahead, NULL,
@@ -2256,13 +2269,14 @@ static bool expression_follows(
             if (lexer->eof(lexer) || c == '=' || c == '/') {
                 return false;
             }
-            // After `in` (`line` unset) no division may follow, so the `/`
-            // opens a slashy string as where an operand starts: one that
-            // starts with a space or runs across lines (`x in / a/`), as
-            // Groovy's lexer reads it. After `yield` a space keeps the
-            // division (`yield / 2`).
+            // After `in` no division may follow, so the `/` opens a slashy
+            // string as where an operand starts: one that starts with a
+            // space or runs across lines (`x in / a/`), as Groovy's lexer
+            // reads it. After `yield` a space keeps the division
+            // (`yield / 2`).
             return !is_whitespace(c)
-                || (!line && slashy_operand_follows(lexer));
+                || (after == EXPRESSION_AFTER_IN
+                    && slashy_operand_follows(lexer));
         }
         if (c == 'i') {
             return !instanceof_test_follows(lexer, no_close_ahead);
@@ -2496,12 +2510,14 @@ static bool scan_contextual_word(
     if (word_is(word, len, "yield")) {
         lexer->result_symbol = YIELD_KEYWORD;
         return valid_symbols[YIELD_KEYWORD]
-            && expression_follows(lexer, true, no_close_ahead);
+            && expression_follows(lexer, EXPRESSION_AFTER_YIELD,
+                                  no_close_ahead);
     }
     if (word_is(word, len, "in")) {
         lexer->result_symbol = IN_KEYWORD;
         return valid_symbols[IN_KEYWORD]
-            && expression_follows(lexer, false, no_close_ahead);
+            && expression_follows(lexer, EXPRESSION_AFTER_IN,
+                                  no_close_ahead);
     }
     if (word_is(word, len, "as")) {
         lexer->result_symbol = AS_KEYWORD;
@@ -5867,7 +5883,8 @@ static bool scan_lambda_body_end(
             && (as ? skip_header_trivia(lexer, true, no_close_ahead, NULL,
                                         NULL)
                          && is_identifier_start(lexer->lookahead)
-                   : expression_follows(lexer, false, no_close_ahead))) {
+                   : expression_follows(lexer, EXPRESSION_AFTER_IN,
+                                        no_close_ahead))) {
             return lambda_body_continues(scanner, lexer, mode, true);
         }
         lexer->result_symbol = end;
@@ -6608,7 +6625,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // again and break the reused type down. No branch above took the name.
     if (lexer->lookahead == 'i' && !valid_symbols[ERROR_SENTINEL]) {
         if (consume_keyword(lexer, "in")) {
-            expression_follows(lexer, false, no_close_ahead);
+            expression_follows(lexer, EXPRESSION_AFTER_IN, no_close_ahead);
         }
         return false;
     }
