@@ -6849,18 +6849,18 @@ bool tree_sitter_groovy_external_scanner_scan(
     if (!wants_slashy || (expression_ends && !later_line)) {
         return false;
     }
-    // After a body block's `}` NOT_IN is valid too, as the braces may be a
-    // closure: on the `}`'s line Groovy's lexer reads the `/` as division,
-    // so the string must start with no space and close on its line, as
-    // before (`if (c) { a } / 2` then `x = y / z` keeps the second line).
-    // The same holds on the line of the `)` of a condition or of a method's
-    // parameters and of the `}` of a block or a type's body, where no
-    // expression ends but SLASH_DIVIDES, never emitted, is valid
-    // (`if (x) / 2`, `def f() { a } / 2`, `class A { } / 2`): the set of
-    // valid symbols is otherwise the one after `;`, `else` or a label's
-    // `:`, where Groovy opens a regex.
-    bool division_line = valid_symbols[NOT_IN] || valid_symbols[SLASH_DIVIDES];
-    bool lines = slashy_operand && (!division_line || later_line);
+    // On the line of the `)` of a condition or of a method's parameters,
+    // and of the `}` of a block or a type's body, no expression ends, but
+    // Groovy's lexer reads a `/` there as division, so the string must start
+    // with no space and close on its line (`if (x) / 2`, `def f() { a } / 2`
+    // and `if (c) { a } / 2`, then `x = y / z`, keep the second line).
+    // SLASH_DIVIDES, never emitted, is valid there: the set of valid symbols
+    // is otherwise the one after `;`, `else` or a label's `:`, where Groovy
+    // opens a regex. The body of `if` or a loop is a `block`, so the token
+    // is valid after its `}` too, where NOT_IN also is, as the braces may be
+    // a closure.
+    bool lines = slashy_operand
+        && (!valid_symbols[SLASH_DIVIDES] || later_line);
     // `lexer->mark_end` records the position where the slashy opener
     // token ends; advancing past it during the look-ahead does not extend
     // the token range as long as we do not call `mark_end` again.
