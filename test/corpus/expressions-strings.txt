@@ -1566,3 +1566,38 @@ b / 3
       (string_fragment)))
   (expression_statement
     (number_literal)))
+
+==================
+A slashy string after `in` may start with a space and run across lines
+==================
+
+def m = x in / a/
+def n = x in / a
+b/
+def f = { yield / 2 }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (identifier)
+        collection: (string_literal
+          (string_fragment)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (membership_expression
+        element: (identifier)
+        collection: (string_literal
+          (string_fragment)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (closure
+        (expression_statement
+          (binary_expression
+            left: (identifier)
+            right: (number_literal)))))))

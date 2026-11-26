@@ -2234,9 +2234,10 @@ static bool instanceof_test_follows(TSLexer *lexer, bool no_close_ahead) {
 // `in++` and `yield++` update a name, also when `foo()` follows on the
 // next line, as in Groovy; they are read in a loop, not by recursion,
 // which a long run of them would turn into a deep stack. `()` starts
-// none, so `yield()` is a call. A `/` starts a slashy string unless a
-// space, `=` or a second `/` (a line comment, read on the line of a `++`)
-// follows it.
+// none, so `yield()` is a call. A `/` starts a slashy string unless `=`
+// or a second `/` (a line comment, read on the line of a `++`) follows
+// it, or a space does after `yield`; after `in` a space may follow when
+// a closing `/` does (`slashy_body_follows`, across lines).
 static bool expression_follows(
     TSLexer *lexer,
     bool line,
@@ -2251,8 +2252,16 @@ static bool expression_follows(
         }
         int32_t c = lexer->lookahead;
         if (slash) {
-            return !lexer->eof(lexer) && !is_whitespace(c) && c != '='
-                && c != '/';
+            if (lexer->eof(lexer) || c == '=' || c == '/') {
+                return false;
+            }
+            // After `in` (`line` unset) no division may follow, so the `/`
+            // opens a slashy string as where an operand starts: one that
+            // starts with a space or runs across lines (`x in / a/`), as
+            // Groovy's lexer reads it. After `yield` a space keeps the
+            // division (`yield / 2`).
+            return !is_whitespace(c)
+                || (!line && slashy_body_follows(lexer, true));
         }
         if (c == 'i') {
             return !instanceof_test_follows(lexer, no_close_ahead);
