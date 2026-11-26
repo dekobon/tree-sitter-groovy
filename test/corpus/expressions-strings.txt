@@ -1536,14 +1536,17 @@ z = e / f
       (ERROR)
       name: (qualified_name
         (identifier)))
-    type: (type_identifier)
-    (ERROR
-      (identifier)
-      (identifier))
-    name: (identifier)
-    value: (binary_expression
+    (variable_declarator
+      name: (identifier)
+      value: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (expression_statement
+    (assignment_expression
       left: (identifier)
-      right: (identifier))))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
 
 ==================
 A slash on the line after a body block opens a slashy string
