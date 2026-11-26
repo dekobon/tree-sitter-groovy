@@ -4128,7 +4128,8 @@ module.exports = grammar({
     // §5.7 — slashy regex `/.../`. The opening `/` is emitted by
     // the external scanner (after the context guard from §5.4 / §6.2
     // and a lookahead that confirms a closing `/` follows, on the same
-    // line where a division may follow, across lines where none may). The body is parsed as `gstringPart` so `$identifier` and
+    // line where a division may follow, across lines where none may).
+    // The body is parsed as `gstringPart` so `$identifier` and
     // `${expr}` segments expose the same structured children as
     // double-quoted GStrings. The closing `/` is `token.immediate`
     // so it cannot skip whitespace between the body and the closer.

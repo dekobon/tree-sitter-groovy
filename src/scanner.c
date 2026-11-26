@@ -1181,8 +1181,9 @@ static bool parameters_follow(
             }
             // Where an operand may start, Groovy's lexer reads a slashy
             // string, one item, which the scan function opens where no `=`
-            // follows the `/` and the string closes on its line
-            // (`slashy_body_follows`): an `->` in it ends no list
+            // follows the `/` and a closing `/` does, across lines where an
+            // operand starts (`slashy_body_follows`): an `->` in it ends no
+            // list
             // (`foo a, /->/`, `{ foo a, b = /->/ }`), and a line break after
             // it ends the list as after any string (`foo a, /re/`).
             if (continued && lexer->lookahead != '='
@@ -4731,10 +4732,10 @@ static bool skip_lambda_tokens(
     bool type_name = false;
     // An operand may start here, as in `parentheses_open_statement`: a `/`
     // there opens a slashy string, one item, which the scan function opens
-    // where no `=` follows the `/` and the string closes on its line
-    // (`slashy_body_follows`), so that its `,` and `)` end nothing
-    // (`(a = /x,y/) -> a`). One that does not close on its line ends the
-    // look-ahead.
+    // where no `=` follows the `/` and a closing `/` does, across lines
+    // where an operand starts (`slashy_body_follows`), so that its `,` and
+    // `)` end nothing (`(a = /x,y/) -> a`). One with no closing `/` ends
+    // the look-ahead.
     SlashState state = {.operand = true};
     while (spend_lambda_item(items)) {
         bool slash = false;
@@ -5237,10 +5238,10 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
             }
             int32_t c = lexer->lookahead;
             // The slashy string is one token, opened as the scan function
-            // opens one: no `=` after the `/` and a closing `/` on its line
-            // (`slashy_body_follows`). Its `,` and `:` are none of the
-            // element's (`(text =~ /a, b/)`); one that does not close on its
-            // line ends the reading.
+            // opens one where an operand starts: no `=` after the `/` and a
+            // closing `/`, across lines (`slashy_body_follows`). Its `,` and
+            // `:` are none of the element's (`(text =~ /a, b/)`); one with
+            // no closing `/` ends the reading.
             if (slash && state.operand && angles == 0 && c != '=') {
                 if (!slashy_body_follows(lexer, true)) {
                     known = false;
@@ -6763,14 +6764,17 @@ bool tree_sitter_groovy_external_scanner_scan(
     //       `/` is a closing `/`) — `//` is already a line comment
     //       and `/=` is already trapped above, so an empty slashy
     //       is excluded.
-    //   (2) Reject a body that starts with whitespace — `a / b`
-    //       has a space immediately after the operator `/`, but
-    //       every legal slashy regex starts with a non-whitespace
-    //       char.
-    //   (3) Look ahead through the body to confirm there is a
-    //       closing `/` on the same line. Without this, `a / b\nc`
-    //       at end of file would emit a slashy opener and leave
-    //       the body unterminated.
+    //   (2) Where a division may follow, reject a body that starts
+    //       with whitespace — `a / b` has a space right after the
+    //       operator `/`. Where an operand starts, Groovy's
+    //       `SlashyStringCharacter` takes one (`foo(/ a/)`), and so
+    //       does the look-ahead below.
+    //   (3) Look ahead through the body to confirm a closing `/`
+    //       follows: on the same line where a division may follow,
+    //       across lines where an operand starts
+    //       (`slashy_body_follows`). Without this, `a / b\nc` at end
+    //       of file would emit a slashy opener and leave the body
+    //       unterminated.
     // §6.2 — after an operand Groovy's lexer reads `/` as division
     // (GroovyLexer.g4 `isRegexAllowed`: after a name, a literal, `this`,
     // `)`, `]`, `}`, `++`, `--` or the end of a string). NOT_IN is valid
