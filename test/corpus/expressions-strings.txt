@@ -1609,6 +1609,7 @@ def m = x in / a/
 def n = x in / a
 b/
 def f = { yield / 2 }
+def g = x -> { a } in / a/
 def p = x in / 2
 y = b / 3
 
@@ -1637,6 +1638,17 @@ y = b / 3
           (binary_expression
             left: (identifier)
             right: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (membership_expression
+          element: (closure
+            (expression_statement
+              (identifier)))
+          collection: (string_literal
+            (string_fragment))))))
   (local_variable_declaration
     (variable_declarator
       name: (identifier)
