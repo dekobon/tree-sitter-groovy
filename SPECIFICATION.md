@@ -1685,7 +1685,10 @@ a parenthesis-free call's receiver (§6.24); `UNREACHABLE` (§5.2), never
 emitted, which ends the error production for a `case` label outside a
 switch, so that error recovery inserts it as a missing `switch`; the
 `<` of a generic type's arguments where they close or run past the
-read (§3.2.2); the `)` of a cast before a name on its line (§6.11); and
+read (§3.2.2); the `)` of a cast before a name on its line (§6.11);
+`SLASH_DIVIDES` (§6.2), never emitted, which marks the `)` of a
+condition or of a method's parameters and the `}` of a block or a
+type's body, on whose line a `/` divides; and
 `ERROR_SENTINEL`, never emitted, which no rule references and which
 only signals error recovery. The tokens listed after the enum in §6.1
 are met in-grammar, see `docs/divergences-from-spec.md`.
@@ -1737,6 +1740,7 @@ enum TokenType {
   UNREACHABLE,            // §5.2 — never emitted; ends the error production for a `case` label outside a switch
   TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
+  SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -1802,7 +1806,28 @@ may start with whitespace and run
 across lines (`slashy_operand_follows`), as Groovy's
 `SlashyStringCharacter` takes both:
 `x = /a` then `b/` on the next line, and
-`s.replaceFirst(/ in [ \dms]+/, '')`. During error recovery, where
+`s.replaceFirst(/ in [ \dms]+/, '')`. No expression ends after the `)`
+of the condition of `if` or a loop or of the parameters of a method
+with no body, nor after the `}` of a method's, a `try`'s or another
+statement's block or of a type's body, where a statement may start;
+Groovy's lexer reads a `/` on the line of a `)` or `}` as division
+(`isRegexAllowed`), so `if (x) / 2` and `def f() { a } / 2` are
+invalid, and the multi-line rule read each, with `x = y / z` on the
+next line, as one string from the first `/` to the second and then
+`z`, with no `ERROR`. The valid tokens there are those after `;`, `else`, a
+label's `:` and a closure's `->`, where Groovy opens a regex
+(`a; / b/`, `{ -> / a/ }`), so a token of its own marks the closers:
+SLASH_DIVIDES, never emitted, which the grammar makes valid after
+such a `)` (`_condition_close`, `formal_parameters`) and `}` (`block`,
+`class_body`, the bodies of a record and an annotation type, and after
+an enum's body). Where it is valid the one-line rule holds on the
+closer's line, and the multi-line rule on a later line, as after a
+body block: `if (x)` then `/ a` then `b/` is a string. The token ends
+each of these rules, and `_condition_close` is a rule of its own for
+the `)`, so no state before a statement's start is copied: it costs 81
+parse states (5,235 to 5,316) and 1.7% of `parser.c`. A `/` after
+`import a.b`, `package a.b`, `break lbl` or `def x` on its line is not
+marked: Groovy reads division after a name too. During error recovery, where
 every symbol is valid, the one-line rule holds, so a stray `/` does not
 turn the lines after it into string text (`x = a ?? / b` then
 `y = c / d`). A slashy string that is not closed yet, where an

@@ -1641,6 +1641,355 @@ b
     (identifier)))
 
 ==================
+A slash on the line of a condition's parenthesis opens no slashy string across lines
+==================
+
+if (x) / 2
+x = y / z
+while (x) / 2
+x = y / z
+for (a in b) / 2
+x = y / z
+for (;;) / 2
+x = y / z
+do { } while (x) / 2
+x = y / z
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    (ERROR)
+    consequence: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (while_statement
+    condition: (identifier)
+    (ERROR)
+    body: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (for_in_statement
+    variable: (identifier)
+    value: (identifier)
+    (ERROR)
+    body: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (for_statement
+    (ERROR)
+    body: (expression_statement
+      (number_literal)))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (do_while_statement
+    body: (block)
+    condition: (identifier))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+A slash on the line of the parenthesis of a method with no body opens no slashy string across lines
+==================
+
+def f() / 2
+x = y / z
+abstract int g(int a) / 2
+x = y / z
+def h()
+/ a
+b/
+def k = (a) -> / a
+b/
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (method_declaration
+    return_type: (type_identifier)
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        type: (type_identifier)
+        name: (identifier))))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            name: (identifier)))
+        body: (string_literal
+          (string_fragment))))))
+
+==================
+A slash on the line of a block's brace opens no slashy string across lines
+==================
+
+def f() { a } / 2
+x = y / z
+try { } finally { } / 2
+x = y / z
+try { } catch (e) { } / 2
+x = y / z
+synchronized (x) { } / 2
+x = y / z
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (identifier))))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (try_statement
+    body: (block)
+    (finally_clause
+      body: (block)))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (try_statement
+    body: (block)
+    (catch_clause
+      parameter: (catch_formal_parameter
+        name: (identifier))
+      body: (block)))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (synchronized_statement
+    lock: (identifier)
+    body: (block))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+A slash on the line of a type body's brace opens no slashy string across lines
+==================
+
+class A { } / 2
+x = y / z
+interface I { } / 2
+x = y / z
+enum E { A } / 2
+x = y / z
+record R(int a) { } / 2
+x = y / z
+@interface N { } / 2
+x = y / z
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (interface_declaration
+    name: (identifier)
+    body: (class_body))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body))
+  (ERROR)
+  (expression_statement
+    (number_literal))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+==================
+A slashy string on the line after a condition or a brace may run across lines
+==================
+
+if (x)
+/ a
+b/
+def f() { a }
+/ a
+b/
+class A { }
+/ a
+b/
+def g() { / a
+b/ }
+if (x) a else / b
+c/
+
+---
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (string_literal
+        (string_fragment))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (identifier))))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (expression_statement
+    (string_literal
+      (string_fragment)))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (expression_statement
+        (string_literal
+          (string_fragment)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (expression_statement
+      (identifier))
+    alternative: (expression_statement
+      (string_literal
+        (string_fragment)))))
+
+==================
 A slashy string after `in` may start with a space and run across lines
 ==================
 

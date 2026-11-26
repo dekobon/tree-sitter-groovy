@@ -54,15 +54,18 @@
 // `continue` before a block comment, to carry a decision past the token
 // that follows.
 // STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
-// (§6.21), TYPE_ONLY_CLOSE (§6.11) and BODY_BLOCK_END (§6.17) are never
-// emitted; they are valid only inside a string body, where the scanner
-// emits nothing, where a type may start, where closure parameters may
-// start, before the `)` of a cast of an array or generic type whose operand
-// is on a later line and after the `}` of the block that is the body of
-// `if`, `else`, a loop or an arrow case. UNREACHABLE is never emitted and
-// never read: it ends the grammar's error production for a `case` label
-// outside a switch (§5.2). ERROR_SENTINEL is never emitted either;
-// the parser marks it valid only during error recovery, where
+// (§6.21), TYPE_ONLY_CLOSE (§6.11), BODY_BLOCK_END (§6.17) and
+// SLASH_DIVIDES (§6.2) are never emitted; they are valid only inside a
+// string body, where the scanner emits nothing, where a type may start,
+// where closure parameters may start, before the `)` of a cast of an array
+// or generic type whose operand is on a later line, after the `}` of the
+// block that is the body of `if`, `else`, a loop or an arrow case, and
+// after the `)` of a condition or of a method's parameters and the `}` of
+// a block or a type's body.
+// UNREACHABLE is never emitted and never read: it ends the grammar's error
+// production for a `case` label outside a switch (§5.2). ERROR_SENTINEL is
+// never emitted either; the parser marks it valid only during error
+// recovery, where
 // COMMAND_NAMED_KEY, CONTEXTUAL_KEY, COMMAND_VALUE_START, COMMAND_PATH_START,
 // COMMAND_STATEMENT_START, SUBSCRIPT_OPEN, STATEMENT_PAREN,
 // ARRAY_VALUE_START, CAST_CLOSE, CAST_WORD_CLOSE, RELATIONAL_CLOSE,
@@ -152,6 +155,7 @@ enum TokenType {
     TYPE_ARGUMENTS_OPEN,
     CAST_WORD_CLOSE,
     EXCLUDED_METHOD_NAME,
+    SLASH_DIVIDES,
     ERROR_SENTINEL,
 };
 
@@ -6849,7 +6853,14 @@ bool tree_sitter_groovy_external_scanner_scan(
     // closure: on the `}`'s line Groovy's lexer reads the `/` as division,
     // so the string must start with no space and close on its line, as
     // before (`if (c) { a } / 2` then `x = y / z` keeps the second line).
-    bool lines = slashy_operand && (!valid_symbols[NOT_IN] || later_line);
+    // The same holds on the line of the `)` of a condition or of a method's
+    // parameters and of the `}` of a block or a type's body, where no
+    // expression ends but SLASH_DIVIDES, never emitted, is valid
+    // (`if (x) / 2`, `def f() { a } / 2`, `class A { } / 2`): the set of
+    // valid symbols is otherwise the one after `;`, `else` or a label's
+    // `:`, where Groovy opens a regex.
+    bool division_line = valid_symbols[NOT_IN] || valid_symbols[SLASH_DIVIDES];
+    bool lines = slashy_operand && (!division_line || later_line);
     // `lexer->mark_end` records the position where the slashy opener
     // token ends; advancing past it during the look-ahead does not extend
     // the token range as long as we do not call `mark_end` again.

@@ -1022,7 +1022,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   is a membership test of a string, where it was two statements, the
   name `in` and a division, with no `ERROR`. After the `}` of an `if` or
   loop body a `/` on the next line opens a string too, as in Groovy
-  (`if (c) { a }` then `/ 2 /`), where it divided the body. Where a `/`
+  (`if (c) { a }` then `/ 2 /`), where it divided the body. On the line
+  of the `)` of a condition or of a method with no body, and of the `}`
+  of a block or a type's body, a `/` divides, as in Groovy's lexer, so
+  `if (x) / 2` and `def f() { a } / 2` stay an `ERROR` and keep the
+  lines after them (`_slash_divides`, a token the scanner never emits;
+  81 parse states). Where a `/`
   may divide, and during error recovery, a string still needs a body
   that does not start with whitespace and closes on its line, so `a`
   then `/ 2` on the next line stays a division, `yield / 2` in a
