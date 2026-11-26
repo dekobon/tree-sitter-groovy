@@ -27,10 +27,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (each element's field) and `people*.name` (each getter) stay apart.
   Each was an `ERROR` under the access without `@`, as at v0.6.0. They
   join a parenthesis-free call's receiver (`obj?.@handler 1`), which the
-  scanner reads for the statement's start and after a closure call
-  (`SPECIFICATION.md` §6.14, §6.24). `highlights.scm` captures the
-  operators as `@operator` and the field as `@property`. No corpus tree
-  changes; 12 of 21,667 real files parse without an `ERROR`, and every
+  scanner reads for the statement's start (`SPECIFICATION.md` §6.14),
+  after a closure call or a name after one (`foo { }.bar?.@baz 1`,
+  §6.24) and in parentheses that open a line (`(obj?.@h 1, 2)`, §6.18).
+  `highlights.scm` captures the operators as `@operator` and the field
+  as `@property`. No corpus tree changes; 12 of 21,667 real files parse without an `ERROR`, and every
   tree that changes had an `ERROR` before (`SPECIFICATION.md` §3.2)
   (#112).
 - An interpolation takes the lazy form `"${-> x}"`, a closure without

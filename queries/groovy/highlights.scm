@@ -254,7 +254,8 @@
 ; A call through `.`, `?.`, `??.` or `*.` names its method in the
 ; access's last name, which layer 5 made a @property. A call through
 ; `.&` keeps @function, as the name is a method pointer; a call through
-; `.@` keeps @property, as it calls the value of the field.
+; `.@`, `?.@`, `??.@` or `*.@` keeps @property, as it calls the value of
+; the field.
 (method_invocation
   function: (identifier) @function.call)
 

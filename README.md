@@ -66,7 +66,7 @@ closes
 | Conditional | `? :` (ternary) `?:` (Elvis) |
 | Assignment | `=` `+=` `-=` `*=` `/=` `%=` `**=` `<<=` `>>=` `>>>=` `&=` `^=` `\|=` `?=` (Elvis assign) |
 | Range | `..` `..<` `<..` `<..<` |
-| Member access | `.` `?.` `??.` (safe chain dot) `*.` (spread-dot) `.&` (method pointer) `.@` (direct field) `::` (method reference) |
+| Member access | `.` `?.` `??.` (safe chain dot) `*.` (spread-dot) `.&` (method pointer) `.@` (direct field) `?.@` `??.@` `*.@` (direct field after `?.`, `??.`, `*.`) `::` (method reference) |
 | Subscript | `[]` `?[]` (safe index) |
 | Spread | `*args` `*:` (spread-map) |
 | Membership | `in` `!in` `instanceof` `!instanceof` |

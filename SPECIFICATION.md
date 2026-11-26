@@ -5074,8 +5074,8 @@ Emits CLOSURE_COMMAND_START, empty and before the name, iff a first
 argument that `obj.m 1` takes (§6.14, any name included) follows the
 last name on its line, or parentheses after it hold a
 parenthesis-free call (`.bar(baz 1)`), no brackets come before, and
-every access is one of `.`, `?.`, `??.`, `*.`, `.&`, `.@` with a plain
-name.
+every access is one of `.`, `?.`, `??.`, `*.`, `.&`, `.@`, `?.@`,
+`??.@`, `*.@` with a plain name.
 Emits nothing where such an argument, or a name after brackets, follows
 brackets or a later access's name, or a name follows `new` as the last
 name.
@@ -5161,7 +5161,7 @@ line breaks and comments, which Groovy's lexer hides before an access.
 holds the name and the closure, which the access then takes as its
 object like any other expression: `foo { }.bar()`, `foo { } .bar(1)`,
 `foo { }` then `.bar()` or `// c` and `.bar()` on later lines,
-`foo { }?.bar()`, `*.`, `??.`, `.&bar`, `.@bar`, `::bar`,
+`foo { }?.bar()`, `*.`, `??.`, `.&bar`, `.@bar`, `?.@bar`, `::bar`,
 `l: foo { }.bar()`, `if (c) foo { }.bar() else baz { }`,
 `a { }.b { }.c()`, `foo { }.bar { }`, `foo { }.bar = 1`,
 `foo { }.bar + 1`, `foo { }.bar[1]`, and `foo { }.bar` then `1` on the

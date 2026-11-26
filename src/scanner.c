@@ -4304,7 +4304,8 @@ static bool skip_closure_tokens(
 
 // SPECIFICATION.md §6.24 — consumes a member access that may follow the `}`
 // of a closure or a name after it: `.` other than `..`, `?.`, `??.`, `*.`,
-// `.&`, `.@` and `::`. `*receiver` is cleared at `::`, which
+// `.&`, `.@`, `?.@`, `??.@`, `*.@` and `::`. `*receiver` is cleared at
+// `::`, which
 // `_closure_command_path` does not take.
 static bool read_closure_access(TSLexer *lexer, bool *receiver) {
     if (lexer->lookahead == ':') {

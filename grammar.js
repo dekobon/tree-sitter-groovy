@@ -77,7 +77,7 @@ const PREC = {
   // no binary operator, so `(int) a ** b` is `((int) a) ** b`.
   CAST: 18,                   // (T) x
   POSTFIX: 19,                // postfix ++ --, []
-  ACCESS: 20,                 // . ?. ??. *. .& .@ ::
+  ACCESS: 20,                 // . ?. ??. *. .& .@ ?.@ ??.@ *.@ ::
   PRIMARY: 21,                // literals, identifiers, ()
   // Type-context only — never competes with the expression ladder
   // above. Shares CONDITIONAL's numeric value by accident; the two
@@ -3414,7 +3414,7 @@ module.exports = grammar({
       )),
     ),
 
-    // §3.1 ACCESS tier / §3.2 — seven distinct node kinds for the
+    // §3.1 ACCESS tier / §3.2 — ten distinct node kinds for the
     // dot family. All at PREC.ACCESS left-associative so chains like
     // `a.b.c` parse `(a.b).c`. Right operand is the property /
     // field / method name (an identifier; method_reference also
