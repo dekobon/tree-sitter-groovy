@@ -1804,7 +1804,7 @@ across lines (`slashy_operand_follows`), as Groovy's
 `x = /a` then `b/` on the next line, and
 `s.replaceFirst(/ in [ \dms]+/, '')`. During error recovery, where
 every symbol is valid, the one-line rule holds, so a stray `/` does not
-turn the lines after it into string text (`x = a @@ / b` then
+turn the lines after it into string text (`x = a ?? / b` then
 `y = c / d`). A slashy string that is not closed yet, where an
 operand starts, runs on to the next unescaped `/` in the file, as
 Groovy's lexer reads it: `def r = /abc` then `def total = price / count`
@@ -2770,8 +2770,9 @@ A name argument: after spaces, tabs and line escapes, on the line:
         then Groovy's tokens up to `->` (closure parameters): with
         brackets counted; comments, strings, `++` and `--` read whole (a
         string's `${…}` with the strings in it, §6.17), a slashy string
-        where an operand may start, no `=` follows its `/` and it closes
-        on its line read whole, and a dollar-slashy string read whole,
+        where an operand may start, no `=` follows its `/` and a closing
+        `/` does, across lines (§6.2), read whole, and a dollar-slashy
+        string read whole,
         across lines, within 1,024 characters (§5.7; one that does not
         close within them ends the list with no `->`); an element, the
         first item after a `,` outside brackets, that is `(` or a key
@@ -3692,7 +3693,8 @@ call's arguments), and:
     `${…}` read as code with the strings in it, a dollar-slashy one
     across lines within 1,024 characters, §5.7), a slashy string where
     an operand may start and no `=` follows its `/` skipped whole when
-    it closes on its line (one that does not turns the token down), and
+    a closing `/` follows, across lines (§6.2; one with none turns the
+    token down), and
     the `,` of type arguments that a `<` right after a capitalized name
     opens taken for theirs, to the `,` or `)` that ends it. A
     parameter with no such name (`(int)`, `(a.b.C)`, `(String[])`) is
@@ -3928,12 +3930,13 @@ here) and STATEMENT_PAREN is, and:
     a line break continuing a single-quoted or double-quoted one, a
     `${…}` read as code with the strings in it, §6.17), inside an
     element a slashy string where an operand may start and no `=`
-    follows its `/` read whole to its close on its line, so that its
-    `,` and `:` are none of the element's (`(text =~ /a, b/)`), and
+    follows its `/` read whole to its close, across lines (§6.2), so
+    that its `,` and `:` are none of the element's
+    (`(text =~ /a, b/)`), and
     comments skipped, within LAMBDA_PARAMETERS_LOOKAHEAD_ITEMS (256)
     items (§6.17). Where the reading cannot go on, at the end of the
     budget or the input, at a string or comment that does not close, at
-    such a slashy string that does not close on its line, at a bracket
+    such a slashy string that no closing `/` follows, at a bracket
     that does not match, at a `/` that opens an element, and at the
     `$/` of a dollar-slashy string anywhere in one, which this reading
     does not enter (`(foo $/a/$, 2)`, §5.7), the parentheses are judged
