@@ -122,6 +122,18 @@ list*.@field
 list*.@field
 //  ^ operator
 
+obj?.@field(x)
+//    ^ property
+
+list*.@field 'x'
+//     ^ property
+
+obj??.@field
+//  ^ operator
+
+obj?.@field
+//  ^ operator
+
 String::length
 //      ^ function
 
