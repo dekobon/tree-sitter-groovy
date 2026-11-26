@@ -1791,12 +1791,13 @@ As implemented, the grammar's valid tokens stand in for `last_token`,
 and the scanner emits only SLASHY_STRING_START, after the `/`; the
 grammar reads the body and the closing `/`. The opener needs a body
 that is not empty and reaches a closing `/`, an escaped character
-(`\/` among them) read as one (`slashy_body_follows`). Where no
+(`\/` among them) read as one. Where no
 expression ends, which is where NOT_IN is not valid (an operand
 starts, below) or BODY_BLOCK_END is (after the `}` of an `if` or loop
 body, where Groovy's lexer reads a string too: `if (c) { a }` then
 `/ 2` on the next line), the body may start with whitespace and run
-across lines, as Groovy's `SlashyStringCharacter` takes both:
+across lines (`slashy_operand_follows`), as Groovy's
+`SlashyStringCharacter` takes both:
 `x = /a` then `b/` on the next line, and
 `s.replaceFirst(/ in [ \dms]+/, '')`. During error recovery, where
 every symbol is valid, the one-line rule holds, so a stray `/` does not
@@ -1808,8 +1809,9 @@ is the string `abc`, the line break and `def total = price` up to the
 `/`, then the statement `count`, with no `ERROR`, where a string that had to
 close on its line left one `ERROR` on the first line. In an editor a
 regex that is still being typed recolours the code up to the next `/`.
-Where a division may follow, the `/` starts a string only with a body that does not start with
-whitespace and closes on its line: a `/` that starts the next
+Where a division may follow, the `/` starts a string only with a body
+that does not start with whitespace and closes on its line
+(`slashy_line_follows`): a `/` that starts the next
 statement on a later line, after an expression (`next_line_continues`,
 §6.21), after a lambda body's `}` or after a comment and a line break,
 so that `a` then `/ 2` on the next line stays a division, and
@@ -4487,7 +4489,7 @@ an annotation, then `>`, `,` or `extends`: `String s` then
 `!instanceof` before
 what makes them operators (§6.12), `+=`, `-=`, `->`, `/=`, the word
 `instanceof`, a `/` that opens no comment and no slashy string (the
-string needs a closing `/` on the line, `slashy_body_follows`:
+string needs a closing `/` on the line, `slashy_line_follows`:
 `Foo foo` then `/ 2` is Groovy's `Foo(foo / 2)`), and `(` when the
 parentheses hold parameters (`call_arguments_follow`, §6.14: `Foo f`
 then `(int a) { }`), where a call in parentheses, unlike after a name
