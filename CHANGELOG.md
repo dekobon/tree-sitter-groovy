@@ -1018,14 +1018,22 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   division may follow, as Groovy's `SlashyStringCharacter` takes both:
   `def a = /a` then `b/` on the next line, `foo(/x` then `y/, 1)` and
   `s.replaceFirst(/ in [ \dms]+/, '')` parse. Each was an `ERROR`, as
-  at v0.6.0. Where a `/` may divide, a string still needs a body that
-  does not start with whitespace and closes on its line, so `a` then
-  `/ 2` on the next line stays a division, and `yield / 2` in a closure
-  a division by 2. The look-ahead stops at the first unescaped `/`, and
-  the bound on escaped slashes holds across lines
-  (`bindings/rust/tests/slashy_string_cost.rs`). 13 of 21,667 real
-  files parse without an `ERROR`, none gains one, and every tree that
-  changes had an `ERROR` before (`SPECIFICATION.md` §6.2). (#119)
+  at v0.6.0. After the keyword `in` the same holds: `def m = x in / a/`
+  is a membership test of a string, where it was two statements, the
+  name `in` and a division, with no `ERROR`. After the `}` of an `if` or
+  loop body a `/` on the next line opens a string too, as in Groovy
+  (`if (c) { a }` then `/ 2 /`), where it divided the body. Where a `/`
+  may divide, and during error recovery, a string still needs a body
+  that does not start with whitespace and closes on its line, so `a`
+  then `/ 2` on the next line stays a division, `yield / 2` in a
+  closure a division by 2, and a stray `/` in invalid code does not
+  turn the lines after it into string text. A string that is not closed
+  yet where an operand starts runs on to the next `/` in the file, as
+  in Groovy's lexer. The look-ahead stops at the first unescaped `/`,
+  and the bound on escaped slashes holds across lines
+  (`bindings/rust/tests/slashy_string_cost.rs`). Of 21,667 real files,
+  14 trees change, all of which had an `ERROR` before: 13 parse without
+  one, none gains one (`SPECIFICATION.md` §6.2). (#119)
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
   on the next line in a CRLF file is one string, as Groovy reads it
