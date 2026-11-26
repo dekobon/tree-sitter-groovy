@@ -1896,3 +1896,167 @@ class O { default @interface X { } }
       (annotation_type_declaration
         name: (identifier)
         body: (class_body)))))
+
+==================
+An annotation among the modifiers of a multi-assignment field
+==================
+
+class C {
+  private @Lazy (int x, String y) = load()
+  private @Lazy def (a, b) = [1, 2]
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        (variable_declarator
+          type: (type_identifier)
+          name: (identifier))
+        value: (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal))))))
+
+==================
+Annotations with arguments among the modifiers of members
+==================
+
+class C {
+  private @Foo(1) int x
+  public @Bean(name = 'x') Foo foo() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (string_literal))))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+Annotations among the modifiers of other declarations
+==================
+
+interface I { default @Override void b() { } }
+record R(int a) { public @Foo R { } }
+public @A sealed class T { }
+public @A non-sealed class V { }
+non-sealed @A final class W { }
+sealed @A trait X { }
+@A public @B def f() { }
+enum E { A; private @Foo int x }
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))))
+  (record_declaration
+    name: (identifier)
+    components: (record_components
+      (record_component
+        type: (type_identifier)
+        name: (identifier)))
+    body: (class_body
+      (compact_constructor_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (block))))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (trait_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (enum_declaration
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
