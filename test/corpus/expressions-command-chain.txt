@@ -980,13 +980,206 @@ foo 'a',
       value: (number_literal))))
 
 ==================
-String key in a command chain that is a value is an error
-:error
+String keys in a command chain that is a value
 ==================
 
-def m = foo 'a': 1
+def m = foo 'a': 1, 'b': 2
+x = foo "$k": 1, b: 2
+y += foo a: 1, 'b': 2
+x = foo 'b': c = 2
+def r = obj.m 'Main-Class': 'a.B'
+def s = obj?.@f 'k': 1
+def t = Foo 'a': 1
+@Field final @A z = foo 'a': 1
+def api = toApi 'A': '''x'''
+def n = foo 'a':
+    1
 
 ---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal
+            (gstring_dollar_interpolation
+              value: (identifier)))
+          value: (number_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (assignment_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (named_argument
+          key: (string_literal)
+          value: (string_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (safe_direct_field_access_expression
+          object: (identifier)
+          field: (identifier))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (string_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal))))))
+
+==================
+A string key in a command chain inside another construct
+==================
+
+(a, b) = f 'k': 1
+x = (foo 'a': 1).size()
+println((foo 'a': 1))
+"${foo 'a': 1}"
+def f = y -> foo 'a': 1
+m = [k: x = foo 1, 'b': 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (field_access
+          object: (parenthesized_expression
+            (command_chain
+              receiver: (identifier)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal))))
+          field: (identifier))
+        arguments: (argument_list))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (command_chain
+          receiver: (identifier)
+          argument: (named_argument
+            key: (string_literal)
+            value: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (command_chain
+          receiver: (identifier)
+          argument: (named_argument
+            key: (string_literal)
+            value: (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (number_literal)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal)))))))))
 
 ==================
 A string before the colon of a ternary stays an argument

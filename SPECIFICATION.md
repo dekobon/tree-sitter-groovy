@@ -943,10 +943,11 @@ The resolution we adopt:
    `foo *a, 1`, which Groovy calls with the spread first, is an `ERROR`.
    A spread map is taken after a comma (`foo a: 1, *:m`, §5.11) and is
    no first argument either (`foo *:m`, an `ERROR`).
-   A named-arg key is an identifier or, in a statement, a string
-   (`foo 'a': 1`, `foo "$k": 1`), as in Apache's `namedArgPrimary`. A
-   string key needs no scanner token; in a call that is a value it is
-   an `ERROR` (§6.8). Disallowed:
+   A named-arg key is an identifier or a string (`foo 'a': 1`,
+   `foo "$k": 1`, `def m = foo 'a': 1`), as in Apache's
+   `namedArgPrimary`. A string key needs no scanner token; where a `:`
+   may also follow a call that is a value, the string stays an argument
+   (§6.8). Disallowed:
    nested command chains, other than as the value of an assignment
    (`bar 1, x = foo 2`, item 1). Not yet accepted, though Groovy calls each
    (observed with Groovy 3): `new` after a keyword of the grammar that
@@ -2210,17 +2211,45 @@ Known limitations:
 - A string key (`foo 'a': 1`, `foo "$k": 1`) is matched in the
   grammar, after the receiver or a comma, with no scanner token, and
   `prec.right` keeps `foo 'b': c = 2` one argument, as for a name. It
-  is taken in a statement command only (`command_chain`,
-  `_path_command_chain`), where no other construct's `:` follows, so
-  the key has one reading. In a call that is a value
-  (`def m = foo 'a': 1`, `x = foo 'a': 1`) it is an `ERROR`, where
-  Groovy takes it. There the `:` after a string argument may be a
-  ternary's (`y = c ? x = foo 'a' : 'b'`) or an `assert` message's
-  (`assert x = foo 'a' : 'msg'`), and in the `assert` both readings
-  complete; Apache lists `expressionListElement` before `namedArg`, so
-  it keeps the positional string and the message. Taking the key there
-  would need a `conflicts` entry whose forks multiply with nesting and
-  mark each such statement fragile on every edit.
+  is taken in every command: a statement (`command_chain`,
+  `_path_command_chain`) and a value (`def m = foo 'a': 1`,
+  `x = foo 'a': 1`, `def f = y -> foo 'a': 1`, `(foo 'a': 1)`).
+  After a statement and after most values no other construct's `:`
+  follows, so the key has one reading. A `:` after a string argument may
+  also be the `:` of the construct around a value: a ternary's
+  (`y = c ? x = foo 'a' : 'b'`), an `assert` message's
+  (`assert x = foo 'a' : 'msg'`), a `case` label's
+  (`case x = foo 'a':`), or that of a map entry or a named argument
+  whose key is the assignment (`[x = foo 'a': 1]`,
+  `bar(x = foo 'a': 1)`). There the parse table has a shift-reduce
+  conflict on `:`, which a precedence resolves the same way in every
+  one of these contexts: a precedence of -1 on the key and its `:` gives
+  the `:` to the construct. No `conflicts` entry is needed and nothing
+  forks: 6,111 states and 2,348 large on the branch that took it (+218
+  and +180). The `conflicts` entry and dynamic precedence first tried
+  for #113 cost about as many states (+216 and +181 on its base), and
+  its forks multiplied with nesting. Apache lists `expressionListElement`
+  before `namedArg` and `namedPropertyArg` (4.0.x, 6.0.x and master),
+  and ALL(*) takes the first alternative where both readings complete
+  and the key where only the key does. So the ternary, the `assert`
+  (both readings complete; Groovy keeps the message) and the `case`
+  read as in Groovy. Where they differ:
+  - `[x = foo 'a': 1]`, `bar(x = foo 'a': 1)` and
+    `bar(x = foo 1, 'b': 2)` are a `map_entry` or a `named_argument`
+    whose key is the assignment, as before string keys. Groovy calls
+    `foo` with the key there, since its `mapEntryLabel` and
+    `namedPropertyArgLabel` take no assignment. Taking the key would
+    need a narrower `map_entry` key.
+  - `y = c ? x = foo 'a' : 'b' : 'd'` is an `ERROR`, where only the key
+    reading completes and Groovy takes it.
+  - A name key goes the other way in the same places: the scanner emits
+    `_command_named_key` before a name and a single `:` on its line, and
+    `prec.right(1)` gives a name after a comma to the key. So
+    `[x = foo a: 1]` is a list where `[x = foo 'a': 1]` is a map, and
+    `y = c ? x = foo a : 'b'` is an `ERROR`.
+
+  A key after a comma in a value goes to the call, as Apache's greedy
+  argument list does: `[k: x = foo 1, 'b': 2]` passes `'b': 2` to `foo`.
 - `default` cannot be a key as the first argument. Apache's
   `namedArgLabel` accepts every keyword, so `foo default: 1` is a
   named-argument call there and an expression statement plus a label here.

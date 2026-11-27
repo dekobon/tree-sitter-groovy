@@ -685,18 +685,14 @@ function multiAssignmentNames($, open = '(') {
  * comma a named argument, any expression or a spread argument, Apache's
  * `argumentListElement` (`expressionListElement[true]` takes `*`).
  *
- * A string key is taken only where `stringKeys` is set: in a statement
- * command, which no other construct's `:` follows (§6.8).
- *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
- * @param {boolean} stringKeys Whether a key may be a string.
  * @returns {RepeatRule} The repeated comma and argument.
  */
-function commandArgumentsAfterFirst($, stringKeys) {
+function commandArgumentsAfterFirst($) {
   return repeat(seq(',', field('argument', choice(
     alias($._command_named_argument, $.named_argument),
     alias($._command_continued_named_argument, $.named_argument),
-    ...(stringKeys ? [alias($._command_string_named_argument, $.named_argument)] : []),
+    alias($._command_string_named_argument, $.named_argument),
     $._expression,
     $.spread_arguments,
     $.spread_map_entry,
@@ -709,17 +705,16 @@ function commandArgumentsAfterFirst($, stringKeys) {
  * Apache's `argumentList`, then the arguments after it.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
- * @param {boolean} stringKeys Whether a key may be a string (§6.8).
  * @returns {SeqRule} The argument list rule.
  */
-function commandArguments($, stringKeys) {
+function commandArguments($) {
   return seq(
     field('argument', choice(
       $._expression,
       alias($._command_named_argument, $.named_argument),
-      ...(stringKeys ? [alias($._command_string_named_argument, $.named_argument)] : []),
+      alias($._command_string_named_argument, $.named_argument),
     )),
-    commandArgumentsAfterFirst($, stringKeys),
+    commandArgumentsAfterFirst($),
   );
 }
 
@@ -1467,7 +1462,7 @@ module.exports = grammar({
         alias($._command_named_argument, $.named_argument),
         alias($._command_string_named_argument, $.named_argument),
       )),
-      commandArgumentsAfterFirst($, true),
+      commandArgumentsAfterFirst($),
     )),
 
     // §5.5 — a parenthesis-free call as the value of a declarator or an
@@ -1488,7 +1483,7 @@ module.exports = grammar({
     _value_command_chain: $ => prec.right(seq(
       $._command_value_start,
       field('receiver', choice($.identifier, $._command_path)),
-      commandArguments($, false),
+      commandArguments($),
     )),
 
     // `enhancedStatementExpression` as one symbol, for the condition of `if`,
@@ -1528,7 +1523,7 @@ module.exports = grammar({
         field('receiver', $._statement_command_path),
         seq($._command_statement_start, field('receiver', $.identifier)),
       ),
-      commandArguments($, true),
+      commandArguments($),
     ),
 
     // The receivers with member accesses of a value and of a statement.
@@ -1580,18 +1575,22 @@ module.exports = grammar({
     ),
 
     // A string key (`attributes 'Main-Class': 'a.B'`, Apache's
-    // `namedArgPrimary`) needs no token. It is taken in a statement
-    // command only (`command_chain`, `_path_command_chain`): no other
-    // construct's `:` follows a statement, so a `:` after a string
-    // argument there is a key's, with one reading. In a command that is
-    // a value (`_value_command_chain`) the `:` may be a ternary's
-    // (`y = c ? x = foo 'a' : 'b'`) or an `assert` message's
-    // (`assert x = foo 'a' : 'msg'`), and both readings complete in the
-    // `assert`, so a string key there stays an `ERROR` (§6.8).
-    // `prec.right` keeps `foo 'b': c = 2` one argument, as for a name.
+    // `namedArgPrimary`) needs no token. After a statement, and after most
+    // values (`def m = foo 'a': 1`), no other construct's `:` follows, so
+    // the `:` has one reading. Where the call is in a ternary's
+    // consequence, an `assert` condition, a `case` value or the key of a
+    // map entry or a named argument, the `:` may be that construct's
+    // (`y = c ? x = foo 'a' : 'b'`, `assert x = foo 'a' : 'msg'`). The -1
+    // ranks the shift of that `:` below the reduction of the string to an
+    // argument, so those keep the string as an argument. That is Apache's
+    // order, `expressionListElement` before `namedArg`; with no precedence
+    // the two tie and the conflict is unresolved, and a key that won
+    // (tried first for #113) broke the ternary (§6.8). A step's precedence
+    // holds for the position after it, so the -1 covers the key and the
+    // `:`, and the value is back at 0, where `prec.right` keeps
+    // `foo 'b': c = 2` one argument, as for a name.
     _command_string_named_argument: $ => prec.right(seq(
-      field('key', $.string_literal),
-      ':',
+      prec(-1, seq(field('key', $.string_literal), ':')),
       field('value', $._expression),
     )),
 
