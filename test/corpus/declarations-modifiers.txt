@@ -2060,3 +2060,168 @@ enum E { A; private @Foo int x }
         type: (type_identifier)
         (variable_declarator
           name: (identifier))))))
+
+==================
+Default and annotations before other modifiers of an interface method
+==================
+
+interface I {
+  default @A public @B static void m() { }
+  public default @A void n() { }
+}
+
+---
+
+(source_file
+  (interface_declaration
+    name: (identifier)
+    body: (class_body
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        return_type: (type_identifier)
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block)))))
+
+==================
+The @ of @interface may stand apart from the keyword after modifiers
+==================
+
+public @ interface X { }
+private @/* c */
+interface Y { }
+class C { private @interfaceStability int z }
+
+---
+
+(source_file
+  (annotation_type_declaration
+    name: (identifier)
+    body: (class_body))
+  (annotation_type_declaration
+    (block_comment)
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+Parentheses after an annotation among modifiers: its arguments, or the names before an =
+==================
+
+class C {
+  private @Foo(x)
+  int y
+  private @A (x) = 1
+  private @B(a, b) = l
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (identifier)))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        value: (number_literal))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+An annotation after final before the names of a local multi-assignment
+==================
+
+def m() {
+  final @A (a, b) = [1, 2]
+  final @A var (c, d) = l
+}
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+A modifier other than final before an annotated local in a script (error recovery)
+==================
+
+public @Foo
+int x
+println x
+
+---
+
+(source_file
+  (ERROR
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (type_identifier)
+    (identifier)
+    (identifier)
+    (identifier)))
