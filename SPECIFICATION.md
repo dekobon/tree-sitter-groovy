@@ -1742,6 +1742,8 @@ enum TokenType {
   TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
+  ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
+  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone, before names and `)` then `=`, or two or more names
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -5297,6 +5299,64 @@ tree and none of 11,476 real files changes; of invalid inputs probed,
 before, is an `ERROR`. `bindings/rust/tests/incremental_reparse.rs`
 checks every single edit of five texts that mix these words with the
 names around them.
+
+### 6.26 ANNOTATION_TYPE_AT and MULTI_ASSIGNMENT_OPEN — implementation contract
+
+```text
+Where ANNOTATION_TYPE_AT is valid (before the `@interface` of an
+annotation type; no error recovery) and the next character is `@`:
+  consume `@` and end the token;
+  skip spaces, tabs, line escapes, line breaks and comments;
+  if the word `interface` follows, whole: emit ANNOTATION_TYPE_AT;
+  otherwise emit nothing, and the in-grammar lexer reads the `@` of an
+    annotation.
+Where MULTI_ASSIGNMENT_OPEN is valid (after modifiers alone, before the
+names of a multi-assignment field, or after `final` and annotations
+before those of a local; no error recovery) and the next character is
+`(`:
+  consume `(` and end the token;
+  read what a list of names holds, as for `var` alone (§6.16);
+  at `)`, if a `,` came: emit MULTI_ASSIGNMENT_OPEN;
+  otherwise, if `=` follows past trivia, not `==` or `=~`: emit it;
+  otherwise emit nothing, and the in-grammar lexer reads the `(` of an
+    annotation's arguments.
+```
+
+Annotations come among the modifiers after the first one
+(`private @Autowired Foo foo`, §5.9 of `docs/divergences-from-spec.md`).
+With the `@` of `@interface` and the `(` of a multi-assignment read by
+the in-grammar lexer, both were valid after a complete list of
+modifiers and also continued it, as an annotation and its arguments.
+The table then needed two forks, one at every `@` after a modifier and
+one over the arguments of an annotation after a modifier
+(`private @Foo(a0 = 0, …) int x`: 8 forked steps per argument). And a
+reparse could reuse a list that the parser had completed before another
+token, then take an annotation inserted after it (`private` then
+`@A int b`) as the start of `@interface` or the names: the member before
+the edit changed its reading (`public String a() { }` a field and a
+constructor), with no `ERROR` in either tree. With the two tokens, the
+`@` of an annotation and the `(` of its arguments are not valid after a
+complete list, so the parser breaks a reused list down and reads them
+into it, and the table has no fork there.
+
+Groovy reads one value or a list of pairs as an annotation's arguments
+(Apache's `elementValues`), never two names, so after a modifier
+`private @B(a, b) = l` and `private (e, f)` without its `=` are
+multi-assignments, and `private @Foo(x)` before a field is an
+annotation with an argument. One name without an `=` is never the names
+(`private @A (x)` then `int y`). The list of modifiers is no node of its
+own (`_modifiers` is inlined): a reparse reuses the modifiers' leaves,
+as at v0.6.0, so that every stack version after the member before them
+reuses the same nodes and the versions merge where they did
+(`bindings/rust/tests/modifiers_cost.rs`).
+
+Measured against the grammar before the two tokens (#92 at `360ea5d`):
+STATE_COUNT 5716 to 5817, against 5316 on `main`; the conflicts
+`[$._modifiers]`, `[$._type_modifiers, $._default_method_declaration]`
+and `[$.annotation]` are gone, so #92 declares no conflict. Of the
+21,667 real files, no tree without an `ERROR` changes.
+`bindings/rust/tests/incremental_reparse.rs` checks every single edit of
+eight texts with annotations among modifiers.
 
 ---
 
