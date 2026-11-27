@@ -1070,6 +1070,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   No corpus tree changes. 61 of 21,667 real files parse without an
   `ERROR`. In that sample 62 trees change, and each had an `ERROR`
   before (`SPECIFICATION.md` §4) (#114).
+- A parenthesis-free call that is a statement takes a string key, as
+  Apache's `namedArgPrimary` does: Gradle's
+  `attributes 'Main-Class': 'a.B'`, `foo "$k": 1`, `foo a: 1, 'b': 2`
+  and after a dotted receiver (`obj.m 'a': 1`). Each was an `ERROR`, as
+  at v0.6.0. The key needs no scanner token and adds no conflict: no
+  other construct's `:` follows a statement. In a call that is a value
+  (`def m = foo 'a': 1`) a string key stays an `ERROR`, since there the
+  `:` may be a ternary's (`y = c ? x = foo 'a' : 'b'`) or an `assert`
+  message's (`assert x = foo 'a' : 'msg'`); both keep their trees. A
+  number key (`foo 1: 'a'`) and a key after a comma that is an
+  expression in parentheses, a list or a map (`foo x: 1, (k): 2`,
+  `foo x: 1, [1]: 2`) are still an `ERROR`. The two corpus tests that
+  pinned string keys as unsupported now pin the tree. 22 of 21,667 real
+  files parse without an `ERROR`, and no tree that was clean changes
+  (`SPECIFICATION.md` §6.8) (#113).
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
   on the next line in a CRLF file is one string, as Groovy reads it

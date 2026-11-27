@@ -664,13 +664,18 @@ function multiAssignmentNames($) {
  * comma a named argument, any expression or a spread argument, Apache's
  * `argumentListElement` (`expressionListElement[true]` takes `*`).
  *
+ * A string key is taken only where `stringKeys` is set: in a statement
+ * command, which no other construct's `:` follows (§6.8).
+ *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {boolean} stringKeys Whether a key may be a string.
  * @returns {RepeatRule} The repeated comma and argument.
  */
-function commandArgumentsAfterFirst($) {
+function commandArgumentsAfterFirst($, stringKeys) {
   return repeat(seq(',', field('argument', choice(
     alias($._command_named_argument, $.named_argument),
     alias($._command_continued_named_argument, $.named_argument),
+    ...(stringKeys ? [alias($._command_string_named_argument, $.named_argument)] : []),
     $._expression,
     $.spread_arguments,
     $.spread_map_entry,
@@ -683,15 +688,17 @@ function commandArgumentsAfterFirst($) {
  * Apache's `argumentList`, then the arguments after it.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {boolean} stringKeys Whether a key may be a string (§6.8).
  * @returns {SeqRule} The argument list rule.
  */
-function commandArguments($) {
+function commandArguments($, stringKeys) {
   return seq(
     field('argument', choice(
       $._expression,
       alias($._command_named_argument, $.named_argument),
+      ...(stringKeys ? [alias($._command_string_named_argument, $.named_argument)] : []),
     )),
-    commandArgumentsAfterFirst($),
+    commandArgumentsAfterFirst($, stringKeys),
   );
 }
 
@@ -1422,8 +1429,12 @@ module.exports = grammar({
     // (`foo a bar`) are not taken. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
-      commandArgumentsAfterFirst($),
+      field('argument', choice(
+        $._command_argument,
+        alias($._command_named_argument, $.named_argument),
+        alias($._command_string_named_argument, $.named_argument),
+      )),
+      commandArgumentsAfterFirst($, true),
     )),
 
     // §5.5 — a parenthesis-free call as the value of a declarator or an
@@ -1444,7 +1455,7 @@ module.exports = grammar({
     _value_command_chain: $ => prec.right(seq(
       $._command_value_start,
       field('receiver', choice($.identifier, $._command_path)),
-      commandArguments($),
+      commandArguments($, false),
     )),
 
     // `enhancedStatementExpression` as one symbol, for the condition of `if`,
@@ -1484,7 +1495,7 @@ module.exports = grammar({
         field('receiver', $._statement_command_path),
         seq($._command_statement_start, field('receiver', $.identifier)),
       ),
-      commandArguments($),
+      commandArguments($, true),
     ),
 
     // The receivers with member accesses of a value and of a statement.
@@ -1534,6 +1545,22 @@ module.exports = grammar({
       ':',
       field('value', $._expression),
     ),
+
+    // A string key (`attributes 'Main-Class': 'a.B'`, Apache's
+    // `namedArgPrimary`) needs no token. It is taken in a statement
+    // command only (`command_chain`, `_path_command_chain`): no other
+    // construct's `:` follows a statement, so a `:` after a string
+    // argument there is a key's, with one reading. In a command that is
+    // a value (`_value_command_chain`) the `:` may be a ternary's
+    // (`y = c ? x = foo 'a' : 'b'`) or an `assert` message's
+    // (`assert x = foo 'a' : 'msg'`), and both readings complete in the
+    // `assert`, so a string key there stays an `ERROR` (§6.8).
+    // `prec.right` keeps `foo 'b': c = 2` one argument, as for a name.
+    _command_string_named_argument: $ => prec.right(seq(
+      field('key', $.string_literal),
+      ':',
+      field('value', $._expression),
+    )),
 
     // After a comma a newline cannot end the statement, so a key on a
     // continuation line (`sh script: 'make',` then `returnStdout: true`)
