@@ -964,7 +964,7 @@ module.exports = grammar({
   // call `(Foo)(y)(z)`. With the element directly in the list the cast
   // wins, as at v0.6.0 and as in Groovy; a hidden `_list_element` node
   // made the runtime keep the call. Inlined, it costs 3 parse states.
-  inline: $ => [$._list_element],
+  inline: $ => [$._list_element, $._modifiers],
 
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
   // lexes it as `identifier` wherever the keyword has no action,
@@ -1984,8 +1984,12 @@ module.exports = grammar({
     // come before its annotation, as may a method's `public`. Annotations
     // before the first modifier stay in the declaration's own
     // `repeat($.annotation)`, so each annotation has one place to go.
-    // Every declaration takes its modifiers through this rule. The `@`
-    // of `@interface` and the `(` of a multi-assignment
+    // Every declaration takes its modifiers through this rule. It is
+    // inlined, so the modifiers are leaves of the declaration, as at
+    // v0.6.0: a reparse reuses them leaf by leaf, and the stack versions
+    // after the member before them merge where they did (as a node of
+    // its own, the list was reused by one version and read again by the
+    // others). The `@` of `@interface` and the `(` of a multi-assignment
     // after modifiers alone are scanner tokens (§6.26), so after a
     // complete list neither the `@` of an annotation nor the `(` of its
     // arguments is valid, and the table has no fork at either.

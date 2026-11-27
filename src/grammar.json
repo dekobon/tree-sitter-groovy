@@ -15198,7 +15198,8 @@
     }
   ],
   "inline": [
-    "_list_element"
+    "_list_element",
+    "_modifiers"
   ],
   "supertypes": [],
   "reserved": {
