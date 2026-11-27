@@ -71,7 +71,8 @@
 // ARRAY_VALUE_START, CAST_CLOSE, CAST_WORD_CLOSE, RELATIONAL_CLOSE,
 // CAST_TYPE_ARGUMENTS_OPEN, TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
 // LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
-// JUMP_STATEMENT_END and the STRING_BODY check are suppressed. The keywords
+// JUMP_STATEMENT_END, ANNOTATION_TYPE_AT, MULTI_ASSIGNMENT_OPEN and the
+// STRING_BODY check are suppressed. The keywords
 // `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
 // decided there, by the same look-aheads, as are the comments,
 // UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
@@ -156,6 +157,8 @@ enum TokenType {
     CAST_WORD_CLOSE,
     EXCLUDED_METHOD_NAME,
     SLASH_DIVIDES,
+    ANNOTATION_TYPE_AT,
+    MULTI_ASSIGNMENT_OPEN,
     ERROR_SENTINEL,
 };
 
@@ -2325,8 +2328,58 @@ static bool expression_follows(
 // Groovy's trivia. Any other character ends the look-ahead, so it reads
 // no `(` and cannot read the same text twice. Line breaks are allowed
 // inside the parentheses and before the `=`, as in Groovy.
+static bool names_after_paren_follow(TSLexer *lexer, bool no_close_ahead);
+
 static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
     advance(lexer);
+    return names_after_paren_follow(lexer, no_close_ahead);
+}
+
+// §4 — the names of a multi-assignment after modifiers alone, after its
+// `(` (`private @Lazy (int x, String y) = load()`). They are the names
+// when `)` and `=` follow, as for `var` alone, or when they are two or
+// more, which an annotation's arguments never are in Groovy (Apache's
+// `elementValues` is one value or a list of pairs): `private (e, f)`
+// while its `=` is not typed yet keeps the error productions of
+// `_multi_assignment_tail`. Only what a list of names holds is read, as in
+// `names_after_paren_follow`.
+static bool modified_names_follow(TSLexer *lexer, bool no_close_ahead) {
+    bool several = false;
+    for (;;) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (is_identifier_start(c)) {
+            if (read_dollar_slashy_open(lexer)) {
+                return false;
+            }
+            continue;
+        }
+        if (c == ')') {
+            break;
+        }
+        if (c != ',' && c != '*' && c != ':' && c != '.' && c != '<'
+            && c != '>' && c != '?' && c != '[' && c != ']') {
+            return false;
+        }
+        several = several || c == ',';
+        advance(lexer);
+    }
+    if (several) {
+        return true;
+    }
+    advance(lexer);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        || lexer->lookahead != '=') {
+        return false;
+    }
+    advance(lexer);
+    return lexer->lookahead != '=' && lexer->lookahead != '~';
+}
+
+// The look-ahead of `names_assignment_follows` after the `(`.
+static bool names_after_paren_follow(TSLexer *lexer, bool no_close_ahead) {
     for (;;) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
@@ -6427,7 +6480,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]
-        && !valid_symbols[EXCLUDED_METHOD_NAME]) {
+        && !valid_symbols[EXCLUDED_METHOD_NAME]
+        && !valid_symbols[ANNOTATION_TYPE_AT]
+        && !valid_symbols[MULTI_ASSIGNMENT_OPEN]) {
         return false;
     }
 
@@ -6449,6 +6504,36 @@ bool tree_sitter_groovy_external_scanner_scan(
     // rewinds to the token start and the in-grammar lexer reads the
     // word as an identifier.
     bool no_close_ahead = no_comment_close_ahead(scanner);
+    // §4 — the `@` of `@interface`: an `@` with the keyword `interface`
+    // after it, past the trivia Groovy's lexer hides between the two
+    // tokens. No other token of the scanner starts with `@`, so on any
+    // other word the in-grammar lexer reads the `@` of an annotation.
+    if (valid_symbols[ANNOTATION_TYPE_AT] && !valid_symbols[ERROR_SENTINEL]
+        && lexer->lookahead == '@') {
+        advance(lexer);
+        lexer->mark_end(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        char word[10];
+        unsigned len = read_word(lexer, word, sizeof word);
+        if (!word_is(word, len, "interface")) {
+            return false;
+        }
+        lexer->result_symbol = ANNOTATION_TYPE_AT;
+        return true;
+    }
+    // §4 — the `(` of a multi-assignment after modifiers alone: the token
+    // ends at the `(`, and the names, `)` and `=` must follow, read as for
+    // `var` alone (`names_assignment_follows`). Any other `(` there is the
+    // in-grammar lexer's, the arguments of an annotation.
+    if (valid_symbols[MULTI_ASSIGNMENT_OPEN] && !valid_symbols[ERROR_SENTINEL]
+        && lexer->lookahead == '(') {
+        advance(lexer);
+        lexer->mark_end(lexer);
+        lexer->result_symbol = MULTI_ASSIGNMENT_OPEN;
+        return modified_names_follow(lexer, no_close_ahead);
+    }
     // §6.14 — a statement's first name; it decides the keywords and the
     // array type below as well.
     if (wants_statement_start && !body_continues
