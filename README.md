@@ -197,16 +197,14 @@ These are documented in detail in
   `private String trait` and `return sealed` parse as names. A line
   break is whitespace, though, so `private boolean sealed` followed by
   `class Inner { }` on the next line is a field `boolean` and a sealed
-  class, where Groovy reads a field `sealed` and a class. `sealed`
-  must come directly before `class`, `interface` or `trait`:
-  `sealed abstract class S { }` is an `ERROR`.
+  class, where Groovy reads a field `sealed` and a class.
 - **A member after an enum's trailing comma must start with a
   modifier, `def` or a keyword** -- Groovy up to 4.x takes any member
   there. `A,` followed by `String x` or by `E() { }` is an `ERROR`
   (#97).
-- **Parameter modifiers have one order** -- annotations, then `final`,
-  then `def`, `var` or a type. `def String x`, `final @A x` and a
-  varargs parameter with no type (`... xs`) are an `ERROR` (#98).
+- **Parameter modifiers have one order** -- annotations and `final`,
+  then `def`, `var` or a type. `def String x` and a varargs parameter
+  with no type (`... xs`) are an `ERROR` (#98).
 - **A line break ends a statement only in some places** -- after
   `return`, `break` and `continue`, before a `(` that can open a
   statement, and after a typed local declaration with no initializer.
@@ -221,8 +219,6 @@ These are documented in detail in
 - **A method with modifiers and no return type is a constructor** --
   `static f() { }` in a class body is a `constructor_declaration`,
   and `abstract m()` is an `ERROR` (#91).
-- **Annotations come before modifiers** -- `private @Autowired Foo
-  foo` and `public @interface X { }` are an `ERROR` (#92).
 
 ## Contributing
 

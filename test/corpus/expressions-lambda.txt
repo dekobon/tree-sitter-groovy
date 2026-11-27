@@ -3550,3 +3550,58 @@ def i = (a = $/ ${f($/b/$)} /$) -> a
                       (string_fragment)))))
               (string_fragment))))
         body: (identifier)))))
+
+==================
+Lambda parameters with annotations after final
+==================
+
+def j = (final @A x) -> x
+def k = (final @A String x) -> x
+def l = (final @A(1) @B String x, int y) -> x
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier)))
+        body: (identifier))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (formal_parameters
+          (formal_parameter
+            (annotation
+              name: (qualified_name
+                (identifier))
+              arguments: (argument_list
+                (number_literal)))
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            type: (type_identifier)
+            name: (identifier))
+          (formal_parameter
+            type: (type_identifier)
+            name: (identifier)))
+        body: (identifier)))))

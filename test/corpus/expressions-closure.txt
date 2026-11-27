@@ -1220,13 +1220,28 @@ xs.each { def String x -> x }
 ---
 
 ==================
-Closure parameter with an annotation after final is not accepted (divergence 14)
-:error
+Closure parameter with an annotation after final
 ==================
 
 xs.each { final @Deprecated x -> x }
 
 ---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier))))))
 
 ==================
 Closure varargs parameter with no type is not accepted (divergence 14)
@@ -1469,5 +1484,31 @@ xs.each { String a = $/*x/$ -> a }
             name: (identifier)
             default: (string_literal
               (string_fragment))))
+        (expression_statement
+          (identifier))))))
+
+==================
+Closure body opening with a final local with annotations after final
+==================
+
+xs.each { final @Foo String s = "a"; s }
+
+---
+
+(source_file
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (local_variable_declaration
+          (annotation
+            name: (qualified_name
+              (identifier)))
+          type: (type_identifier)
+          name: (identifier)
+          value: (string_literal
+            (string_fragment)))
         (expression_statement
           (identifier))))))

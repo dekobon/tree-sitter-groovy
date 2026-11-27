@@ -490,7 +490,7 @@ fix relative to *both* parent grammars.
 |---|---|---|
 | `package` declaration | port from amaanq | both grammars have it; trim trailing-`;` requirement to optional |
 | `import` (including static and aliased) | port from amaanq | `import static a.b.C.*`, `import a.b.C as D`. Annotations may come first (`@Grab('g:a:1') import a.B`), on `package` too. |
-| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, multi-assignment declarations (`def (a, b) = …`, see Multi-assignment below), methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). `record`, `trait` and `sealed` stay usable names next to the nested declarations because their keywords come from the scanner (§6.7, §6.13; `docs/divergences-from-spec.md` §12). An `@interface` element may take a default, as in Apache's `methodDeclaration` (`DEFAULT elementValue`): `String value() default 'x'` is a `method_declaration` whose `default` field holds an expression, an annotation, or a `list_literal` of annotations (#101). Only in an `@interface` body may `default` follow the `()`, on the same line or the next: in an interface, Groovy reads `void a()` followed by `default void b() { }` on the next line as two methods, telling them apart by the line break, which is whitespace here. A method takes the `default` modifier (Apache's `classOrInterfaceModifier`), in any type body and at the start of a statement: `default void b() { }`, with annotations before it, other modifiers before or after it, type parameters, and `def`, a return type or neither; with neither it is a method, not a constructor (`default m() { }`). The modifier is an anonymous `default` child of `method_declaration` before the `name`, and an element's default is the `default` field after the parameters; no method has both. A class, interface, trait, enum or record declaration takes it among its modifiers too, at the top level or nested (`default class C { }`). Fields, constructors, compact constructors and local variables do not take it, and each is an `ERROR` with it. `default` is a keyword wherever a member or a statement can start, as Groovy reserves it, so a member or statement on the line before ends there; as a name in those positions (`default = 1`, `return default`, `String default`) it is an `ERROR`, and `default:` there is still a label (`docs/divergences-from-spec.md` §20). |
+| `class` / `interface` / `@interface` declaration | port from murtaza64 | Body members: fields, multi-assignment declarations (`def (a, b) = …`, see Multi-assignment below), methods, constructors, `static { … }`, nested `class` / `interface` / `trait` / `enum` / `record` / `@interface` declarations, and instance initializers — a bare `block` child of `class_body` (#60, #68). `record`, `trait` and `sealed` stay usable names next to the nested declarations because their keywords come from the scanner (§6.7, §6.13; `docs/divergences-from-spec.md` §12). An `@interface` element may take a default, as in Apache's `methodDeclaration` (`DEFAULT elementValue`): `String value() default 'x'` is a `method_declaration` whose `default` field holds an expression, an annotation, or a `list_literal` of annotations (#101). Only in an `@interface` body may `default` follow the `()`, on the same line or the next: in an interface, Groovy reads `void a()` followed by `default void b() { }` on the next line as two methods, telling them apart by the line break, which is whitespace here. A method takes the `default` modifier (Apache's `classOrInterfaceModifier`), in any type body and at the start of a statement: `default void b() { }`, with annotations before it, other modifiers before or after it, type parameters, and `def`, a return type or neither; with neither it is a method, not a constructor (`default m() { }`). The modifier is an anonymous `default` child of `method_declaration` before the `name`, and an element's default is the `default` field after the parameters; no method has both. A class, interface, trait, enum, record or `@interface` declaration takes it among its modifiers too, at the top level or nested (`default class C { }`, `default @interface Z { }`). Fields, constructors, compact constructors and local variables do not take it, and each is an `ERROR` with it. `default` is a keyword wherever a member or a statement can start, as Groovy reserves it, so a member or statement on the line before ends there; as a name in those positions (`default = 1`, `return default`, `String default`) it is an `ERROR`, and `default:` there is still a label (`docs/divergences-from-spec.md` §20). |
 | `trait` declaration | **new** | identical body to `class`; distinct node kind `trait_declaration`. Closes the `trait` row in #247. |
 | `enum` declaration | **new** | optional `implements` clause (`super_interfaces`, as on classes); constants list (each constant may carry annotations and arguments), then class members after `;`, `,;`, or nothing (the newline Groovy reads is whitespace here, #55). A member may also follow a trailing `,` directly, which Groovy accepts up to 4.x and Groovy 5 rejects (#88). This grammar takes a narrower set than Groovy there: a member that starts with a modifier, `def` or a declaration keyword, with annotations before it allowed; a constructor needs an access modifier. A member that starts with a bare name is not accepted: `A,` then `String x` or `E() { }` is an `ERROR`, the second because it reads as a constant with an anonymous class body (`docs/divergences-from-spec.md` §13). Arrow switch is the typical use site (#36). |
 | `record` declaration | **new** | `[modifiers] record Name[<T>](Type a, Type b) [implements I] { … }`, after Apache's `classDeclaration`. Groovy 4+. Top-level and as a class member (#60). The body is optional here where Groovy requires it; records cannot `extends`. The body takes the members of a class body plus a compact canonical constructor, Apache's `compactConstructorDeclaration`: `public Name { … }`, with annotations, modifiers, `def` after the modifiers, or none of them, and the `{` on the same line or the next, is a `compact_constructor_declaration` with `name` and `body` (#72). The body node is still `class_body`. Only a record body takes it; Apache's parser takes it in any class body and rejects it afterwards outside a record. Its name is not compared with the record's, so any `Name { … }` there is one. A modifier-only field followed by a block (`static count`, then `{ … }` on the next line) reads as a compact constructor too, and a `;` after the field keeps the field and the block. `static count` followed by `Name { … }` is that field and a compact constructor, by a dynamic precedence, so `static Foo bar { … }` is a field `Foo` and a constructor `bar`. A type nested in a record carries a dynamic precedence too, so after a typed field with modifiers (`private String y`, then `class C extends B { }` on the next line) it stays a type declaration rather than splitting into fields named by its keywords and a compact constructor (`docs/divergences-from-spec.md` §6). A string-literal name is not supported (`docs/divergences-from-spec.md` §17). |
@@ -1175,8 +1175,9 @@ is a dollar-slashy string with a `MISSING` `/$` here, as at v0.6.0.
 
 `{ a, b -> … }` declares parameters; `{ … }` with no `->` implicitly
 binds `it`. A parameter has the shape of a method parameter, as in
-Apache's grammar (`formalParameterList`): annotations, `final`, then
-`def`, `var` or a type (varargs included), the name, and a default
+Apache's grammar (`formalParameterList`): annotations, `final` and
+annotations after it, then `def`, `var` or a type (varargs included),
+the name, and a default
 (`{ String sep = ',', def xs -> … }`). `grammar.js` builds
 `formal_parameter` and `closure_parameter` from one helper,
 `parameter()`. `def` and `var` are keywords there, so such a parameter
@@ -1747,6 +1748,8 @@ enum TokenType {
   TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
+  ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
+  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone, before names and `)` then `=`, or two or more names
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -2634,20 +2637,16 @@ literals. `non-sealed` is not an identifier in Apache's grammar and
 stays an in-grammar token.
 
 Groovy's parser takes `sealed` among the other class modifiers in any
-order, and before an annotation. The grammar accepts no modifier after
-`sealed`, nor `sealed record` or `sealed enum` (which Groovy rejects
-later), so `sealed abstract class S { }`, `sealed @A class S { }` and
-`class O { sealed static class C { } }` are an `ERROR` at `sealed`
-until modifiers are accepted in any order. The keyword is still
-emitted there, so that the `ERROR` stays at the word and the
-declaration keeps its node: read as a name, the word gave trees with
-no `ERROR`, such as a field of type `sealed` named `static`, or lost
-the class to the `ERROR`. That is done only on the same line. Across a
-line break the same words also start the member after a field named
-`sealed` (`private boolean sealed`, then `static class D { }` or
-`public int size`), which the keyword would turn into an `ERROR`; a
-modifier after `sealed` can only be an `ERROR` while the order is
-fixed, so the field keeps its reading.
+order, and before an annotation, and so does the grammar:
+`sealed abstract class S { }`, `sealed @A class S { }` and
+`class O { sealed static class C { } }` are declarations, `sealed`
+among their modifiers (`sealedModifier` in `grammar.js`). `sealed record`
+and `sealed enum`, which Groovy rejects later, stay an `ERROR` at
+`sealed`, as before. A modifier or an annotation after `sealed` makes it the
+keyword only on the same line. Across a line break the same words also
+start the member after a field named `sealed` (`private boolean sealed`,
+then `static class D { }` or `public int size`), which the keyword
+would fold into one sealed declaration, so the field keeps its reading.
 
 A line break is whitespace to the grammar, so the scanner's look-ahead
 is what tells a declaration from a name. Groovy also sees the line
@@ -5326,6 +5325,64 @@ tree and none of 11,476 real files changes; of invalid inputs probed,
 before, is an `ERROR`. `bindings/rust/tests/incremental_reparse.rs`
 checks every single edit of five texts that mix these words with the
 names around them.
+
+### 6.26 ANNOTATION_TYPE_AT and MULTI_ASSIGNMENT_OPEN — implementation contract
+
+```text
+Where ANNOTATION_TYPE_AT is valid (before the `@interface` of an
+annotation type; no error recovery) and the next character is `@`:
+  consume `@` and end the token;
+  skip spaces, tabs, line escapes, line breaks and comments;
+  if the word `interface` follows, whole: emit ANNOTATION_TYPE_AT;
+  otherwise emit nothing, and the in-grammar lexer reads the `@` of an
+    annotation.
+Where MULTI_ASSIGNMENT_OPEN is valid (after modifiers alone, before the
+names of a multi-assignment field, or after `final` and annotations
+before those of a local; no error recovery) and the next character is
+`(`:
+  consume `(` and end the token;
+  read what a list of names holds, as for `var` alone (§6.16);
+  at `)`, if a `,` came: emit MULTI_ASSIGNMENT_OPEN;
+  otherwise, if `=` follows past trivia, not `==` or `=~`: emit it;
+  otherwise emit nothing, and the in-grammar lexer reads the `(` of an
+    annotation's arguments.
+```
+
+Annotations come among the modifiers after the first one
+(`private @Autowired Foo foo`, §5.9 of `docs/divergences-from-spec.md`).
+With the `@` of `@interface` and the `(` of a multi-assignment read by
+the in-grammar lexer, both were valid after a complete list of
+modifiers and also continued it, as an annotation and its arguments.
+The table then needed two forks, one at every `@` after a modifier and
+one over the arguments of an annotation after a modifier
+(`private @Foo(a0 = 0, …) int x`: 8 forked steps per argument). And a
+reparse could reuse a list that the parser had completed before another
+token, then take an annotation inserted after it (`private` then
+`@A int b`) as the start of `@interface` or the names: the member before
+the edit changed its reading (`public String a() { }` a field and a
+constructor), with no `ERROR` in either tree. With the two tokens, the
+`@` of an annotation and the `(` of its arguments are not valid after a
+complete list, so the parser breaks a reused list down and reads them
+into it, and the table has no fork there.
+
+Groovy reads one value or a list of pairs as an annotation's arguments
+(Apache's `elementValues`), never two names, so after a modifier
+`private @B(a, b) = l` and `private (e, f)` without its `=` are
+multi-assignments, and `private @Foo(x)` before a field is an
+annotation with an argument. One name without an `=` is never the names
+(`private @A (x)` then `int y`). The list of modifiers is no node of its
+own (`_modifiers` is inlined): a reparse reuses the modifiers' leaves,
+as at v0.6.0, so that every stack version after the member before them
+reuses the same nodes and the versions merge where they did
+(`bindings/rust/tests/modifiers_cost.rs`).
+
+Measured against the grammar before the two tokens (#92 at `360ea5d`):
+STATE_COUNT 5716 to 5817, against 5316 on `main`; the conflicts
+`[$._modifiers]`, `[$._type_modifiers, $._default_method_declaration]`
+and `[$.annotation]` are gone, so #92 declares no conflict. Of the
+21,667 real files, no tree without an `ERROR` changes.
+`bindings/rust/tests/incremental_reparse.rs` checks every single edit of
+eight texts with annotations among modifiers.
 
 ---
 

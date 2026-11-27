@@ -435,16 +435,22 @@ function typeDeclarations($) {
 
 /**
  * The optional Groovy 4 `sealed` or `non-sealed` before `class`,
- * `interface` or `trait`. `sealed` comes from the scanner, which emits
- * it only when one of those words follows (SPECIFICATION.md §6.13).
- * `non-sealed` is a single token so that its dash is not lexed as
- * subtraction.
+ * `interface` or `trait`, with the modifiers and annotations that may
+ * follow it (`sealed abstract class W { }`, Groovy's own
+ * `SealedSpecificationTest`): Apache's `classOrInterfaceModifiers` takes
+ * them in any order. `sealed` comes from the scanner, which emits it
+ * before one of those words, a modifier or an annotation on its line
+ * (SPECIFICATION.md §6.13). `non-sealed` is a single token so that its
+ * dash is not lexed as subtraction.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The optional modifier.
  */
 function sealedModifier($) {
-  return optional(choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')));
+  return optional(seq(
+    choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')),
+    optional($._annotated_modifiers),
+  ));
 }
 
 /**
@@ -501,14 +507,14 @@ function constructorDeclaration($, modifiers) {
 function methodHead($, beforeParameters = choice(
   seq(
     repeat($.annotation),
-    repeat($._modifier),
+    optional($._modifiers),
     optional(field('type_parameters', $.method_type_parameters)),
     choice('def', field('return_type', $._type)),
     field('name', $._property_name),
   ),
   seq(
     repeat($.annotation),
-    repeat1($._modifier),
+    $._modifiers,
     $._untyped_method_name,
   ),
 )) {
@@ -543,7 +549,7 @@ function untypedMethodHead($) {
       ),
       seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        $._modifiers,
         field('type_parameters', $.method_type_parameters),
       ),
     ),
@@ -569,14 +575,28 @@ function methodDeclaration($, head, bodyRequired = false) {
 }
 
 /**
+ * `final` before a parameter or a local, with the annotations that may
+ * follow it. Apache's `variableModifier` takes `final` and annotations
+ * in any order; annotations before `final` stay in the declaration's
+ * own `repeat($.annotation)`, so each annotation has one place to go.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} `final` and its annotations.
+ */
+function finalModifier($) {
+  return seq('final', repeat($.annotation));
+}
+
+/**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
- * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
- * included), the name, and a default value.
+ * annotations, `final` and annotations after it (`finalModifier`), then
+ * `def`, `var` or a type (a `varargs_type` included), the name, and a
+ * default value.
  *
- * Apache's `variableModifiersOpt` is wider: annotations and modifiers
- * in any order, `def` or `var` together with a type, and `...` with no
- * type. Those are not accepted (divergence 14).
+ * Apache's `variableModifiersOpt` is wider: `def` or `var` together
+ * with a type, and `...` with no type. Those are not accepted
+ * (divergence 14).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} [value] The rule of a default value.
@@ -587,7 +607,7 @@ function parameter($, value = $._expression) {
   return choice(
     seq(
       repeat($.annotation),
-      optional('final'),
+      optional(finalModifier($)),
       optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
       defaultValue,
@@ -648,11 +668,12 @@ function multiAssignmentName($) {
  * parser has reduced (`_multi_assignment_tail`).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} [open] The opening parenthesis.
  * @returns {RuleOrLiteral[]} The parentheses and what they hold, in order.
  */
-function multiAssignmentNames($) {
+function multiAssignmentNames($, open = '(') {
   return [
-    '(',
+    open,
     $._multi_assignment_list,
     repeat(seq(',', multiAssignmentName($))),
     ')',
@@ -953,7 +974,7 @@ module.exports = grammar({
   // call `(Foo)(y)(z)`. With the element directly in the list the cast
   // wins, as at v0.6.0 and as in Groovy; a hidden `_list_element` node
   // made the runtime keep the call. Inlined, it costs 3 parse states.
-  inline: $ => [$._list_element],
+  inline: $ => [$._list_element, $._modifiers],
 
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
   // lexes it as `identifier` wherever the keyword has no action,
@@ -1213,6 +1234,16 @@ module.exports = grammar({
     // division, so the scanner opens no slashy string there that starts
     // with a space or runs across lines.
     $._slash_divides,
+    // §4 — the `@` of `@interface`, emitted only when the keyword
+    // `interface` follows it. A separate token from the `@` of an
+    // annotation, so that after a complete list of modifiers the `@` of
+    // an annotation is not valid: a reparse that reuses the list before
+    // an inserted annotation (`private` then `@A int b`) breaks it down
+    // and reads the annotation into it.
+    $._annotation_type_at,
+    // §4 — the `(` of a multi-assignment after modifiers alone, emitted
+    // only when names, `)` and `=` follow (`_modified_multi_assignment_tail`).
+    $._multi_assignment_open,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1294,7 +1325,9 @@ module.exports = grammar({
     // the first token that only one reading accepts.
     //
     // `{ final x -> }` vs. a body opening with a final local (#56) or
-    // with a modified declaration; all three stay alive at `final`.
+    // with a modified declaration; all three stay alive at `final`, and
+    // past the annotations that may follow it (`{ final @A x -> }`, a
+    // final local `final @A String s = …`, Apache `variableModifiers`).
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
     // `{ final def (a, b) = … }`: the same fork, no wider.
     [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration, $.closure_parameter],
@@ -1963,10 +1996,41 @@ module.exports = grammar({
     // in each declaration: the modifiers reduce to it at the
     // declaration keyword, so the header after it has one production
     // whether or not `default` is there.
-    _type_modifiers: $ => choice(
-      repeat1($._modifier),
-      seq(repeat($._modifier), 'default', repeat($._modifier)),
+    _type_modifiers: $ => choice($._modifiers, $._default_modifiers),
+
+    // Modifiers with `default` among them, which a type (divergence 20)
+    // and an interface method (`_default_method_declaration`) may carry:
+    // one rule for both, so that the list after `default` is one
+    // production whichever declaration follows.
+    _default_modifiers: $ => seq(
+      optional($._modifiers),
+      'default',
+      optional($._annotated_modifiers),
     ),
+
+    // One or more modifiers, with annotations among them after the
+    // first: Apache's `modifiers` and `classOrInterfaceModifiers` take
+    // annotations and modifiers in any order, so a field's `private` may
+    // come before its annotation, as may a method's `public`. Annotations
+    // before the first modifier stay in the declaration's own
+    // `repeat($.annotation)`, so each annotation has one place to go.
+    // Every declaration takes its modifiers through this rule. It is
+    // inlined, so the modifiers are leaves of the declaration, as at
+    // v0.6.0: a reparse reuses them leaf by leaf, and the stack versions
+    // after the member before them merge where they did (as a node of
+    // its own, the list was reused by one version and read again by the
+    // others). The `@` of `@interface` and the `(` of a multi-assignment
+    // after modifiers alone are scanner tokens (§6.26), so after a
+    // complete list neither the `@` of an annotation nor the `(` of its
+    // arguments is valid, and the table has no fork at either.
+    _modifiers: $ => seq($._modifier, optional($._annotated_modifiers)),
+
+    // Modifiers and annotations in any order: what follows the first
+    // modifier in `_modifiers`, and what follows `sealed`
+    // (`sealedModifier`) or `default` (`_type_modifiers`,
+    // `_default_method_declaration`). One rule holds that list
+    // everywhere.
+    _annotated_modifiers: $ => repeat1(choice($._modifier, $.annotation)),
 
     permits_clause: $ => seq(
       'permits',
@@ -1981,7 +2045,8 @@ module.exports = grammar({
     // cannot fire here.
     annotation_type_declaration: $ => seq(
       repeat($.annotation),
-      '@',
+      optional($._type_modifiers),
+      alias($._annotation_type_at, '@'),
       'interface',
       field('name', $.identifier),
       field('body', alias($._annotation_type_body, $.class_body)),
@@ -2067,17 +2132,29 @@ module.exports = grammar({
     // tell constructors apart from methods. `prec(3, …)` wins over
     // both field and method when the identifier is followed by `(`
     // and no return type precedes it.
-    constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
+    constructor_declaration: $ => constructorDeclaration($, optional($._modifiers)),
 
     // The constructor form for the member directly after an enum's
     // trailing comma (see `enum_declaration`). Only access modifiers
-    // qualify: `static f() { }` there is a method. The weight is above
+    // qualify, with annotations among them after the first
+    // (`private @Foo F() { }`): `static f() { }` and
+    // `private @Foo static f() { }` there are methods. The access
+    // modifiers before the first annotation stay a `repeat1`, so that
+    // `private` forks with `_modifier` as before (see `conflicts`); a
+    // `choice` there lets the rule's precedence settle the fork for the
+    // constructor. The weight is above
     // a method with a body, which matches the same text through its
     // modifier-only form.
-    _modified_constructor_declaration: $ => weighted(4, constructorDeclaration(
-      $,
-      repeat1(choice('public', 'private', 'protected')),
-    )),
+    _modified_constructor_declaration: $ => {
+      // The access modifiers, the subset of `_modifier` a constructor
+      // takes here; a change to the modifiers of `_modifiers` may need to
+      // reach this list too.
+      const access = choice('public', 'private', 'protected');
+      return weighted(4, constructorDeclaration(
+        $,
+        seq(repeat1(access), repeat(seq($.annotation, repeat(access)))),
+      ));
+    },
 
     // §4 — `static { … }` class-body initializer block. Runs once
     // when the class is loaded. Distinct node kind so downstream
@@ -2095,9 +2172,9 @@ module.exports = grammar({
     //
     // A modifier alone (no `def`, no type) also introduces a field —
     // `static MEDIUM_TTL = 900` infers Object, a common constant-field
-    // idiom. Gated behind `repeat1($._modifier)` (not `repeat`) so this
-    // alternative can't match a bare, modifier-less identifier, which
-    // would collide with a plain expression_statement.
+    // idiom. Gated behind `_modifiers`, which needs at least one
+    // modifier, so this alternative can't match a bare, modifier-less
+    // identifier, which would collide with a plain expression_statement.
     field_declaration: $ => choice(
       // Prefer the typed field when both parses succeed, rather than
       // splitting `private final int v\n C() {}` after `int`. The
@@ -2105,7 +2182,7 @@ module.exports = grammar({
       // method (`v C() {}`), which would otherwise tie.
       weighted(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat($._modifier),
+        optional($._modifiers),
         // `def` is a modifier in Apache's `variableDeclaration`, so a type
         // may follow it (`private def Foo foo`). The scanner opens that
         // type as it opens a typed local's (§6.21), so `def x` keeps its
@@ -2128,7 +2205,7 @@ module.exports = grammar({
       // a comment between the two members made the split win.
       weighted(MODIFIER_ONLY_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        $._modifiers,
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
@@ -2206,9 +2283,7 @@ module.exports = grammar({
     // outrank it.
     _default_method_declaration: $ => methodDeclaration($, methodHead($, seq(
       repeat($.annotation),
-      repeat($._modifier),
-      'default',
-      repeat($._modifier),
+      $._default_modifiers,
       optional(field('type_parameters', $.method_type_parameters)),
       optional(choice('def', field('return_type', $._type))),
       field('name', $._property_name),
@@ -2443,7 +2518,7 @@ module.exports = grammar({
     // then `R { }`; see COMPACT_CONSTRUCTOR_WEIGHT for its value.
     compact_constructor_declaration: $ => weighted(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._modifiers),
       optional('def'),
       field('name', $.identifier),
       field('body', $.block),
@@ -2543,21 +2618,21 @@ module.exports = grammar({
     local_variable_declaration: $ => prec.right(choice(
       seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         choice('def', varKeyword($)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._typed_declarator)),
       )),
       seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
@@ -2566,7 +2641,7 @@ module.exports = grammar({
       // (§6.14); `final String s new Foo()` still declares `s`.
       weighted(2, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2578,7 +2653,7 @@ module.exports = grammar({
       // the closure with two parameters, and the declaration won.
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2604,7 +2679,7 @@ module.exports = grammar({
       // (Apache's `modifier` lists `VAR`): `var String s = 'a'`.
       seq(
         repeat($.annotation),
-        optional(seq(optional('final'), choice('def', varKeyword($)))),
+        optional(seq(optional(finalModifier($)), choice('def', varKeyword($)))),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,
@@ -2716,11 +2791,20 @@ module.exports = grammar({
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
       choice(
-        seq(optional('final'), 'def'),
-        seq('final', optional(varKeyword($))),
-        alias($._var_names_keyword, 'var'),
+        seq(
+          choice(
+            seq(optional(finalModifier($)), 'def'),
+            seq('final', optional(varKeyword($))),
+            seq('final', repeat1($.annotation), varKeyword($)),
+            alias($._var_names_keyword, 'var'),
+          ),
+          $._multi_assignment_tail,
+        ),
+        // Annotations after `final` and no `var`: the `(` is the token of
+        // `_modified_multi_assignment_tail`, so that a plain `(` there
+        // opens the last annotation's arguments.
+        seq('final', repeat1($.annotation), $._modified_multi_assignment_tail),
       ),
-      $._multi_assignment_tail,
     ),
 
     // The same in a type body, Apache `fieldDeclaration`, with the
@@ -2731,10 +2815,45 @@ module.exports = grammar({
     _multi_assignment_field: $ => seq(
       repeat($.annotation),
       choice(
-        seq(repeat($._modifier), choice('def', alias($._var_names_keyword, 'var'))),
-        repeat1($._modifier),
+        seq(
+          optional($._modifiers),
+          choice('def', alias($._var_names_keyword, 'var')),
+          $._multi_assignment_tail,
+        ),
+        seq($._modifiers, $._modified_multi_assignment_tail),
       ),
-      $._multi_assignment_tail,
+    ),
+
+    // The names after modifiers alone (`private @Lazy (int x, String y) =
+    // load()`), opened by a `(` of its own that the scanner emits only
+    // when the names, `)` and `=` follow, as for `var` alone (§6.16).
+    // After an annotation among the modifiers a plain `(` opens the
+    // annotation's arguments, so the table needs no fork there; and after
+    // a list of modifiers that a reparse reuses, a plain `(` is not valid,
+    // so the parser breaks the list down and reads an annotation's
+    // arguments into it. Without an `=`, as while the declaration is
+    // typed, two or more names are still the names (`private (e, f)`),
+    // as an annotation's arguments never are; one name is not.
+    _modified_multi_assignment_tail: $ => {
+      const names = multiAssignmentNames($, alias($._multi_assignment_open, '('));
+      return choice(
+        seq(...names, '=', field('value', enhancedStatementExpression($))),
+        // The error productions of `_multi_assignment_valueless`.
+        seq(
+          choice(
+            weighted(MISSING_VALUE_WEIGHT, seq(
+              $._modified_multi_assignment_names,
+              field('value', alias($._missing_value, $.identifier)),
+            )),
+            seq(...names, '=', field('value', alias($._missing_value, $.identifier))),
+          ),
+          optional(','),
+        ),
+      );
+    },
+
+    _modified_multi_assignment_names: $ => seq(
+      ...multiAssignmentNames($, alias($._multi_assignment_open, '(')),
     ),
 
     // The names in their parentheses, then the `=` and the value, which
@@ -3933,8 +4052,8 @@ module.exports = grammar({
     // has no `->` and an implicit `it` parameter (we do NOT emit a
     // synthetic `it` per §5.8). A parameter takes what a method
     // parameter does (Apache's closure uses `formalParameterList`):
-    // annotations, `final`, then `def`, `var` or a type (varargs
-    // included), and a default; both rules are `parameter()`. The
+    // annotations, `final` and annotations after it, then `def`, `var`
+    // or a type (varargs included), and a default; both rules are `parameter()`. The
     // body may open with the same words, so the `->` decides between
     // the two readings.
     closure: $ => seq(

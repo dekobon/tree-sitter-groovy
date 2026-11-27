@@ -253,6 +253,35 @@ fn reparse_after_slashy_comment_edits_matches_parse_from_scratch() {
     );
 }
 
+/// Annotations among modifiers (§6.13). An edit after a member's modifiers
+/// must not change the member before it. A reparse reuses the modifiers'
+/// leaves, which `_modifiers` (inlined) does not wrap; and the `@` of
+/// `@interface` and the `(` of a multi-assignment after modifiers are
+/// tokens of their own, so the `@` of an annotation and the `(` of its
+/// arguments are not valid after a reused list that they would extend.
+#[test]
+fn reparse_after_annotation_among_modifier_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "class C {\n  public String a() { }\n  private int b\n}\n",
+            "class C {\n  public String a() { }\n  protected C() { }\n}\n",
+            "class C {\n  private @Autowired Foo foo\n  public @Override String toString() { \"c\" }\n  protected @Deprecated C() { }\n  static @Lazy final x = 1\n}\n",
+            "interface I {\n  default @Override void b() { }\n  public @Deprecated @interface X { }\n}\n",
+            "default @A class K { }\nsealed @A class S { }\npublic @interface Y { }\n",
+            "enum F { A, private @Foo F() { } }\n",
+            "class D {\n  private @Lazy (int x, String y) = load()\n  private static (e, f)\n  private @Foo(a = 1) int z\n}\n",
+        ],
+        &["", " ", "\n", "@A ", "final ", "public ", "(", "{", ";", "x"],
+    );
+    // No `{`: one after a multi-assignment's value reparses to another
+    // tree than a parse from scratch on `main` too
+    // (`final (a, b) = 1` then `{`).
+    assert_every_edit_reparses(
+        &["final @Foo String s = 'a'\nfinal @A (a, b) = 1\n"],
+        &["", " ", "\n", "@A ", "final ", "public ", "(", ";", "x"],
+    );
+}
+
 /// Texts whose look-aheads tell a slashy string from a division by the token
 /// before the `/` (§6.2): a lambda's default value (§6.17), the parentheses
 /// after a closure call's access (§6.24), a `(` that opens a line (§6.18)

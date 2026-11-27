@@ -4665,3 +4665,61 @@ class C {
         name: (identifier)
         parameters: (formal_parameters)
         body: (block)))))
+
+==================
+Final local with annotations after final
+==================
+
+final @Foo String s
+println s
+def g() {
+  final @Foo String t = "a"
+  @A final @B def x = 1
+  final @A def (a, b) = [1, 2]
+}
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier))
+  (command_chain
+    receiver: (identifier)
+    argument: (identifier))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        type: (type_identifier)
+        name: (identifier)
+        value: (string_literal
+          (string_fragment)))
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (list_literal
+          (number_literal)
+          (number_literal))))))
