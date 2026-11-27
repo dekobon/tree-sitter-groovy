@@ -244,7 +244,7 @@ inside `postfixExpression` rather than the `expression` alternatives:
 | Tier | Constructs | Associativity |
 |---|---|---|
 | POSTFIX | postfix `++` `--`, subscript `[]`, safe-index `?[]`, call `()` | left |
-| ACCESS | `.` `?.` `??.` (safe chain dot) `*.` `.&` `.@` `::` | left |
+| ACCESS | `.` `?.` `??.` (safe chain dot) `*.` `.&` `.@` `?.@` `??.@` `*.@` `::` | left |
 | PRIMARY | literal, identifier, `()`, `new`, closure, list, map | n/a |
 
 Notes on the corrected ordering versus v1 of this spec:
@@ -329,6 +329,9 @@ issue #246's "Suggested fix" path 1.
 | `.` | `field_access` | `object`, `field` | The plain dot. |
 | `.&` | `method_pointer_expression` | `object`, `method` | Distinct kind. |
 | `.@` | `direct_field_access_expression` | `object`, `field` | Distinct kind. |
+| `?.@` | `safe_direct_field_access_expression` | `object`, `field` | Distinct kind. Apache `pathElement` takes the `@` after `SAFE_DOT`, `SAFE_CHAIN_DOT` and `SPREAD_DOT` as after `DOT`. |
+| `??.@` | `safe_chain_direct_field_access_expression` | `object`, `field` | Distinct kind. |
+| `*.@` | `spread_direct_field_access_expression` | `object`, `field` | Distinct kind: `people*.@name` reads the field of each element, where `people*.name` calls each getter. |
 | `*.` | `spread_dot_expression` | `object`, `property` | Property/method access. |
 | `*` (prefix in arg) | `spread_arguments` | `value` | Only valid inside argument lists, list literals and subscripts. |
 | `*:` (prefix in map) | `spread_map_entry` | `value` | Only valid inside map literals. |
@@ -805,8 +808,9 @@ The resolution we adopt:
 2. **The receiver is a name, or a name followed by member accesses**,
    not any expression: `(x + y) z` is two expression statements, not a
    juxt-call on a parenthesised expression. The accesses are `.`, `?.`,
-   `??.`, `*.`, `.&` and `.@`, each followed by a name, written without
-   spaces (`obj.method 1`, `a?.b.c 'x'`, `System.out.println 'x'`), and
+   `??.`, `*.`, `.&`, `.@`, `?.@`, `??.@` and `*.@`, each followed by a
+   name, written without spaces (`obj.method 1`, `a?.b.c 'x'`,
+   `System.out.println 'x'`), and
    each is the node it is in any other expression: the receiver of
    `obj.method 1` is a `field_access`. Groovy calls the last name in
    every one of these (observed with Groovy 3). A dotted receiver holds
@@ -2740,8 +2744,8 @@ A value keyword: a keyword of grammar.js that Groovy reserves, which
 includes `new`, `switch`, `true`, `false` and `null`, the words that
 start a value as keywords. `super`, `permits`, `pipeline` and `_` are
 names to Groovy and are none, and so is `static` before a `.`.
-Member accesses: each `.`, `?.`, `??.`, `*.`, `.&` or `.@` followed by
-a name, with no space anywhere.
+Member accesses: each `.`, `?.`, `??.`, `*.`, `.&`, `.@`, `?.@`, `??.@`
+or `*.@` followed by a name, with no space anywhere.
 The first argument: after spaces, tabs and line escapes, but no line
 break and no comment, a digit, `'`, `"`, the `$/` of a dollar-slashy
 string (§5.7), the word `true`, `false` or
@@ -5060,7 +5064,8 @@ scanner decides there, and that `{` follows on its line:
   CLOSURE_CALL_LOOKAHEAD_CHARACTERS (128) characters:
   - the braces must close on the name's line;
   - past spaces, line breaks and comments a member access must follow
-    the `}`: `.` other than `..`, `?.`, `??.`, `*.`, `.&`, `.@` or `::`;
+    the `}`: `.` other than `..`, `?.`, `??.`, `*.`, `.&`, `.@`, `?.@`,
+    `??.@`, `*.@` or `::`;
   - then each access's name (trivia and line breaks between them), the
     brackets after it (`(…)`, `[…]`, `?[…]`, `{…}`, read past to the
     one that closes them, line breaks included), and after the last
@@ -5069,8 +5074,8 @@ Emits CLOSURE_COMMAND_START, empty and before the name, iff a first
 argument that `obj.m 1` takes (§6.14, any name included) follows the
 last name on its line, or parentheses after it hold a
 parenthesis-free call (`.bar(baz 1)`), no brackets come before, and
-every access is one of `.`, `?.`, `??.`, `*.`, `.&`, `.@` with a plain
-name.
+every access is one of `.`, `?.`, `??.`, `*.`, `.&`, `.@`, `?.@`,
+`??.@`, `*.@` with a plain name.
 Emits nothing where such an argument, or a name after brackets, follows
 brackets or a later access's name, or a name follows `new` as the last
 name.
@@ -5156,7 +5161,7 @@ line breaks and comments, which Groovy's lexer hides before an access.
 holds the name and the closure, which the access then takes as its
 object like any other expression: `foo { }.bar()`, `foo { } .bar(1)`,
 `foo { }` then `.bar()` or `// c` and `.bar()` on later lines,
-`foo { }?.bar()`, `*.`, `??.`, `.&bar`, `.@bar`, `::bar`,
+`foo { }?.bar()`, `*.`, `??.`, `.&bar`, `.@bar`, `?.@bar`, `::bar`,
 `l: foo { }.bar()`, `if (c) foo { }.bar() else baz { }`,
 `a { }.b { }.c()`, `foo { }.bar { }`, `foo { }.bar = 1`,
 `foo { }.bar + 1`, `foo { }.bar[1]`, and `foo { }.bar` then `1` on the

@@ -572,9 +572,9 @@ static inline bool is_member_access_start(int32_t c) {
 }
 
 // Consumes one of the operators that join the names of a
-// parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&` and
-// `.@`, and clears `dot` unless it is `.`. Returns false, with input
-// consumed, on anything else.
+// parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&`, `.@`,
+// `?.@`, `??.@` and `*.@`, and clears `dot` unless it is `.`. Returns
+// false, with input consumed, on anything else.
 static bool read_member_access(TSLexer *lexer, bool *dot) {
     if (lexer->lookahead != '.') {
         *dot = false;
@@ -603,6 +603,9 @@ static bool read_member_access(TSLexer *lexer, bool *dot) {
         return false;
     }
     lexer->advance(lexer, false);
+    if (lexer->lookahead == '@') {
+        lexer->advance(lexer, false);
+    }
     return true;
 }
 
@@ -4301,7 +4304,8 @@ static bool skip_closure_tokens(
 
 // SPECIFICATION.md §6.24 — consumes a member access that may follow the `}`
 // of a closure or a name after it: `.` other than `..`, `?.`, `??.`, `*.`,
-// `.&`, `.@` and `::`. `*receiver` is cleared at `::`, which
+// `.&`, `.@`, `?.@`, `??.@`, `*.@` and `::`. `*receiver` is cleared at
+// `::`, which
 // `_closure_command_path` does not take.
 static bool read_closure_access(TSLexer *lexer, bool *receiver) {
     if (lexer->lookahead == ':') {
@@ -4462,7 +4466,8 @@ static AccessRest read_closure_access_rest(
     if (c == '?') {
         advance(input);
         if (input->lookahead != '[') {
-            // `?.` or `??.`, as `read_member_access` reads them.
+            // `?.`, `??.`, `?.@` or `??.@`, as `read_member_access` reads
+            // them.
             if (input->lookahead == '?') {
                 advance(input);
             }
@@ -4470,6 +4475,9 @@ static AccessRest read_closure_access_rest(
                 return ACCESS_STOP;
             }
             advance(input);
+            if (input->lookahead == '@') {
+                advance(input);
+            }
             return NEXT_ACCESS;
         }
         c = '[';
@@ -5385,6 +5393,9 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                     if (dot) {
                         advance(lexer);
                     }
+                }
+                if (dot && lexer->lookahead == '@') {
+                    advance(lexer);
                 }
                 if (dot) {
                     state.operand = false;

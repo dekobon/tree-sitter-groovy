@@ -77,7 +77,7 @@ const PREC = {
   // no binary operator, so `(int) a ** b` is `((int) a) ** b`.
   CAST: 18,                   // (T) x
   POSTFIX: 19,                // postfix ++ --, []
-  ACCESS: 20,                 // . ?. ??. *. .& .@ ::
+  ACCESS: 20,                 // . ?. ??. *. .& .@ ?.@ ??.@ *.@ ::
   PRIMARY: 21,                // literals, identifiers, ()
   // Type-context only — never competes with the expression ladder
   // above. Shares CONDITIONAL's numeric value by accident; the two
@@ -707,6 +707,9 @@ const COMMAND_PATH_ACCESSES = [
   ['spread_dot_expression', '*.', 'property'],
   ['method_pointer_expression', '.&', 'method'],
   ['direct_field_access_expression', '.@', 'field'],
+  ['safe_direct_field_access_expression', '?.@', 'field'],
+  ['safe_chain_direct_field_access_expression', '??.@', 'field'],
+  ['spread_direct_field_access_expression', '*.@', 'field'],
 ];
 
 /**
@@ -2948,6 +2951,9 @@ module.exports = grammar({
       $.spread_dot_expression,
       $.method_pointer_expression,
       $.direct_field_access_expression,
+      $.safe_direct_field_access_expression,
+      $.safe_chain_direct_field_access_expression,
+      $.spread_direct_field_access_expression,
       $.method_reference_expression,
       $.object_creation_expression,
       $.array_creation_expression,
@@ -3408,7 +3414,7 @@ module.exports = grammar({
       )),
     ),
 
-    // §3.1 ACCESS tier / §3.2 — seven distinct node kinds for the
+    // §3.1 ACCESS tier / §3.2 — ten distinct node kinds for the
     // dot family. All at PREC.ACCESS left-associative so chains like
     // `a.b.c` parse `(a.b).c`. Right operand is the property /
     // field / method name (an identifier; method_reference also
@@ -3452,6 +3458,26 @@ module.exports = grammar({
     direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
       field('object', $._expression),
       '.@',
+      field('field', $._property_name),
+    )),
+
+    // Apache `pathElement` takes the `@` of a direct field access after
+    // `?.`, `??.` and `*.` as well as after `.`.
+    safe_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '?.@',
+      field('field', $._property_name),
+    )),
+
+    safe_chain_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '??.@',
+      field('field', $._property_name),
+    )),
+
+    spread_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '*.@',
       field('field', $._property_name),
     )),
 

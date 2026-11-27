@@ -1371,11 +1371,11 @@ an upper-case letter or `c` is followed by `=`: `a.b.C x` and
 `a.b c = 1` are declarations.
 
 **Current implementation** (#52): the receiver of `command_chain` may be
-a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`)
-written without spaces, built of the same nodes as in an expression. A
-statement with such a receiver holds `_command_path_start`, an empty
-token between the first name and the first access that the scanner
-emits only when a literal, a key, a `new`, an array type value or a
+a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`,
+`?.@`, `??.@`, `*.@`) written without spaces, built of the same nodes
+as in an expression. A statement with such a receiver holds
+`_command_path_start`, an empty token between the first name and the
+first access that the scanner emits only when a literal, a key, a `new`, an array type value or a
 name follows the receiver on its line (spec §6.14); the value form's
 `_command_value_start` reads the same receivers before them. The
 arguments are those of the value form: the first is a whole expression
@@ -2732,3 +2732,26 @@ in a type body (`_untyped_method_declaration`).
 **Action**: none planned here. Taking the older forms out of blocks
 and closures, or requiring their body in a script, changes trees that
 parse with no `ERROR` today.
+
+## 35. Space between a member access and `@`
+
+**Apache `GroovyParser.g4`** (master): `pathElement` takes `NL*`
+between the operator and the `@` (`DOT NL* (AT | …)?` and
+`(SPREAD_DOT | SAFE_DOT | SAFE_CHAIN_DOT) NL* (AT | …)?`), and the
+lexer hides spaces and comments between tokens, so Groovy takes
+spaces, comments and line breaks between the operator and the `@`, and
+spaces after the `@`.
+
+**Current implementation**: `.@`, `?.@`, `??.@` and `*.@` are each one
+token, so nothing may stand between the operator and the `@`. A space
+after the `@` is trivia, as after any other token.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `obj.@f`, `obj?.@f`, `obj??.@f`, `obj*.@f`, `obj?.@ f` | a direct field access | the same |
+| `obj. @f`, `obj?. @f`, `obj*. @f`, `obj?.` then `@f` on the next line | a direct field access | an `ERROR` at the `@` |
+
+**Action**: none planned. Reading the `@` apart from the operator
+would need the scanner to tell it from an annotation that opens the
+next line; real code writes the operator whole (none of the 21,667
+files of the real-code comparison has a space or a line break there).
