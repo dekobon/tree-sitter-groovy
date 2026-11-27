@@ -123,7 +123,16 @@ The default branch is **`main`**.
     no return type may come and `(` follows on the line, which makes
     that name an error, as Groovy's `methodName` takes none of these
     words and they are identifiers here, so no reserved set can hold
-    them (§6.25).
+    them (§6.25);
+  - the `@` of `@interface` where an annotation type may start, when
+    the word `interface` follows, and the `(` of a multi-assignment's
+    names after modifiers alone or after `final` and annotations, when
+    the parentheses hold two or more names, or names and then `=`
+    (`private @B(a, b) = l`). With the two tokens, the `@` of an
+    annotation and the `(` of its arguments do not continue a complete
+    list of modifiers, so the arguments of an annotation after a
+    modifier do not fork, and a reparse reads an annotation inserted
+    after a modifier into that list (§6.26).
 
   Eight externals are never emitted. `_unreachable` ends
   `_stray_case`, the error production for a `case` label where a
