@@ -4723,3 +4723,119 @@ def g() {
         value: (list_literal
           (number_literal)
           (number_literal))))))
+
+==================
+A declaration after final and annotations where a statement starts
+==================
+
+final @A class X { }
+final @CompileStatic class Foo {
+  int x
+}
+final @A enum E { A }
+final @A interface I { }
+final @A trait T { }
+final @A @interface N { }
+class K { }
+final @A public class P { }
+final @A public @B def f() { }
+class J { }
+def m() {
+  final @A class Local { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))))
+  (enum_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (enum_body
+      (enum_constant
+        name: (identifier))))
+  (interface_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (trait_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (annotation_type_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (class_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    body: (class_body))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block))
+  (class_declaration
+    name: (identifier)
+    body: (class_body))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (class_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        body: (class_body)))))
+
+==================
+A modifier after final and annotations where a statement starts is an error
+:error
+==================
+
+final @A static int x = 1
+
+---
+
+==================
+A keyword after final and annotations where a statement starts is an error
+:error
+==================
+
+final @A while = 1
+
+---

@@ -1,9 +1,12 @@
-//! Cost tests for annotations among modifiers (`SPECIFICATION.md` §6.13).
+//! Cost tests for annotations among modifiers (`SPECIFICATION.md` §6.26).
 //!
-//! After a modifier, the `(` of an annotation's arguments has one reading:
-//! the `(` of a multi-assignment after modifiers alone is a token of its
-//! own (`_multi_assignment_open`), so the parser does not fork over the
-//! arguments. And the modifiers of a declaration are no node of their
+//! After a modifier in a type body, the `(` of an annotation's arguments
+//! has one reading: the `(` of a multi-assignment after modifiers alone is
+//! a token of its own (`_multi_assignment_open`), so the parser does not
+//! fork over the arguments. Where a statement starts, `final` and the
+//! annotations after it may open a declaration or a local, so the
+//! arguments of those annotations do fork, a few steps per argument, as
+//! the conflict at `final` keeps both readings alive. And the modifiers of a declaration are no node of their
 //! own (`_modifiers` is inlined): a reparse reuses them as the leaves they
 //! were at v0.6.0, so after an edit every stack version reuses the same
 //! nodes and the versions merge where they did. Time is not measured: the
@@ -26,6 +29,12 @@ const SCALE: usize = 8;
 /// at 400 and at 3,200 arguments, as with the annotation before the
 /// modifier. A fork over the arguments took 8 steps per argument.
 const ANNOTATION_ARGUMENT_FORKS: usize = 3;
+
+/// Nodes a reparse reuses per member at least: its modifiers and its type.
+const REUSED_NODES_PER_MEMBER: usize = 2;
+
+/// Characters of an input that a failed assertion's message shows.
+const SOURCE_PREVIEW_CHARS: usize = 120;
 
 fn parser() -> Parser {
     let mut parser = Parser::new();
@@ -91,7 +100,7 @@ fn work(parser: &mut Parser, source: &str, old: Option<&Tree>) -> (Tree, Work) {
     let tree = parser.parse(source, old).expect("parse");
     parser.set_logger(None);
     assert!(logged.load(Ordering::Relaxed) > 0, "the log gave no version counts");
-    assert!(!tree.root_node().has_error(), "{source:.120}");
+    assert!(!tree.root_node().has_error(), "{source:.SOURCE_PREVIEW_CHARS$}");
     let work = Work {
         forked_steps: forked.load(Ordering::Relaxed),
         lexed: lexed.load(Ordering::Relaxed),
@@ -181,7 +190,7 @@ fn a_reparse_in_a_class_of_fields_and_methods_reuses_their_modifiers() {
             // Each member's modifiers and type, at least, are reused; with
             // the modifiers a node of their own, a method's were not.
             assert!(
-                reparse.reused >= 2 * count,
+                reparse.reused >= REUSED_NODES_PER_MEMBER * count,
                 "{modifiers}: {} nodes reused of {count} members",
                 reparse.reused,
             );

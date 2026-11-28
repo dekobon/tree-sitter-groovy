@@ -56,14 +56,15 @@
 // `continue` before a block comment, to carry a decision past the token
 // that follows.
 // STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
-// (§6.21), TYPE_ONLY_CLOSE (§6.11), BODY_BLOCK_END (§6.17) and
-// SLASH_DIVIDES (§6.2) are never emitted; they are valid only inside a
-// string body, where the scanner emits nothing, where a type may start,
-// where closure parameters may start, before the `)` of a cast of an array
-// or generic type whose operand is on a later line, after the `}` of the
-// block that is the body of `if`, `else`, a loop or an arrow case, and
-// after the `)` of a condition or of a method's parameters and the `}` of
-// a block or a type's body.
+// (§6.21), TYPE_ONLY_CLOSE (§6.11), BODY_BLOCK_END (§6.17),
+// SLASH_DIVIDES (§6.2) and ANNOTATION_ARGUMENTS_MAY_FOLLOW (§6.26) are
+// never emitted; they are valid only inside a string body, where the
+// scanner emits nothing, where a type may start, where closure parameters
+// may start, before the `)` of a cast of an array or generic type whose
+// operand is on a later line, after the `}` of the block that is the body
+// of `if`, `else`, a loop or an arrow case, after the `)` of a condition
+// or of a method's parameters and the `}` of a block or a type's body,
+// and right after an annotation's name, where its arguments may follow.
 // UNREACHABLE is never emitted and never read: it ends the grammar's error
 // production for a `case` label outside a switch (§5.2). ERROR_SENTINEL is
 // never emitted either; the parser marks it valid only during error
@@ -162,6 +163,7 @@ enum TokenType {
     ANNOTATION_TYPE_AT,
     MULTI_ASSIGNMENT_OPEN,
     COMMAND_KEY_VALUE_START,
+    ANNOTATION_ARGUMENTS_MAY_FOLLOW,
     ERROR_SENTINEL,
 };
 
@@ -2193,20 +2195,22 @@ static bool is_modifier_word(const char *word, unsigned len) {
         || word_is(word, len, "transient") || word_is(word, len, "volatile");
 }
 
-// SPECIFICATION.md §6.13 — `sealed` is a keyword only before `class`,
-// `interface` or `trait`, the words the grammar accepts after it.
-// Apache's modifiers end in `nls`, so line breaks and comments may come
-// between. Everywhere else the word is an identifier. The scanner has
-// already consumed `sealed` when this is called.
+// SPECIFICATION.md §6.13 — `sealed` is a keyword before `class`,
+// `interface` or `trait`. Apache's modifiers end in `nls`, so line breaks
+// and comments may come between. Everywhere else the word is an
+// identifier. The scanner has already consumed `sealed` when this is
+// called.
 //
 // Groovy's parser also takes `sealed` before another modifier, an
-// annotation, `record` or `enum`. The grammar accepts none of them
-// after it, so the keyword there only keeps the `ERROR` at the word.
-// Read as a name, the word gave a tree with no `ERROR` that dropped the
-// modifier, or lost the declaration to an `ERROR` that began at `sealed`.
-// The keyword is taken only on the same line: across a line break the
+// annotation, `non-sealed`, `record` or `enum`. The grammar takes the
+// modifiers but `default`, and the annotations, after it
+// (`sealedModifier`); before `default`, `non-sealed`, `record` or `enum`
+// the keyword only keeps the `ERROR` at the word. Read as a name, the
+// word gave a tree with no `ERROR` that dropped the modifier, or lost the
+// declaration to an `ERROR` that began at `sealed`. Before these words
+// the keyword is taken only on the same line: across a line break the
 // same words also start the member after a field named `sealed`, which
-// the keyword would turn into an `ERROR`.
+// the keyword would fold into the declaration after it.
 static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
     lexer->mark_end(lexer);
     bool crossed_line = false;
@@ -2347,16 +2351,19 @@ static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
     return names_after_paren_follow(lexer, no_close_ahead);
 }
 
-// §4 — the names of a multi-assignment after modifiers alone, after its
+// §6.26 — the names of a multi-assignment after modifiers alone, after its
 // `(` (`private @Lazy (int x, String y) = load()`). They are the names
 // when `)` and `=` follow, as for `var` alone, or when they are two or
 // more, which an annotation's arguments never are in Groovy (Apache's
 // `elementValues` is one value or a list of pairs): `private (e, f)`
 // while its `=` is not typed yet keeps the error productions of
 // `_multi_assignment_tail`. Only what a list of names holds is read, as in
-// `names_after_paren_follow`.
+// `names_after_paren_follow`. A `,` inside `[…]` or `<…>` separates no
+// names: it is in a list, an annotation's argument (`@Mixin([A, B])`), or
+// in the type arguments of one name's type (`Map<K, V> m`).
 static bool modified_names_follow(TSLexer *lexer, bool no_close_ahead) {
     bool several = false;
+    unsigned brackets = 0;
     for (;;) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
@@ -2375,8 +2382,19 @@ static bool modified_names_follow(TSLexer *lexer, bool no_close_ahead) {
             && c != '>' && c != '?' && c != '[' && c != ']') {
             return false;
         }
-        several = several || c == ',';
+        if (c == '[' || c == '<') {
+            brackets++;
+        } else if (c == ']' || c == '>') {
+            if (brackets == 0) {
+                return false;
+            }
+            brackets--;
+        }
+        several = several || (c == ',' && brackets == 0);
         advance(lexer);
+    }
+    if (brackets > 0) {
+        return false;
     }
     if (several) {
         return true;
@@ -6524,7 +6542,7 @@ bool tree_sitter_groovy_external_scanner_scan(
     // rewinds to the token start and the in-grammar lexer reads the
     // word as an identifier.
     bool no_close_ahead = no_comment_close_ahead(scanner);
-    // §4 — the `@` of `@interface`: an `@` with the keyword `interface`
+    // §6.26 — the `@` of `@interface`: an `@` with the keyword `interface`
     // after it, past the trivia Groovy's lexer hides between the two
     // tokens. No other token of the scanner starts with `@`, so on any
     // other word the in-grammar lexer reads the `@` of an annotation.
@@ -6535,7 +6553,7 @@ bool tree_sitter_groovy_external_scanner_scan(
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
         }
-        char word[10];
+        char word[sizeof "interface"];
         unsigned len = read_word(lexer, word, sizeof word);
         if (!word_is(word, len, "interface")) {
             return false;
@@ -6543,15 +6561,24 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->result_symbol = ANNOTATION_TYPE_AT;
         return true;
     }
-    // §4 — the `(` of a multi-assignment after modifiers alone: the token
-    // ends at the `(`, and the names, `)` and `=` must follow, read as for
-    // `var` alone (`names_assignment_follows`). Any other `(` there is the
-    // in-grammar lexer's, the arguments of an annotation.
+    // §6.26 — the `(` of a multi-assignment after modifiers alone, or after
+    // `final` and annotations: the token ends at the `(`. Right after an
+    // annotation's name two or more names, or names, `)` and `=`, must
+    // follow (`modified_names_follow`); any other `(` there is the
+    // in-grammar lexer's, the arguments of the annotation.
     if (valid_symbols[MULTI_ASSIGNMENT_OPEN] && !valid_symbols[ERROR_SENTINEL]
         && lexer->lookahead == '(') {
         advance(lexer);
         lexer->mark_end(lexer);
         lexer->result_symbol = MULTI_ASSIGNMENT_OPEN;
+        // After a modifier keyword or an annotation's arguments no
+        // annotation's arguments can open, so the `(` is the names', as
+        // the plain `(` was before the token: `private (a)` while its `=`
+        // is not typed yet misses the value rather than reading a method
+        // with no name.
+        if (!valid_symbols[ANNOTATION_ARGUMENTS_MAY_FOLLOW]) {
+            return true;
+        }
         return modified_names_follow(lexer, no_close_ahead);
     }
     // §6.14 — a statement's first name; it decides the keywords and the

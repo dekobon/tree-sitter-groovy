@@ -2170,6 +2170,211 @@ class C {
         value: (identifier)))))
 
 ==================
+A list with commas in the arguments of an annotation among modifiers
+==================
+
+class C {
+  private @Mixin([A, B]) int x
+  public @Target([ElementType.METHOD, ElementType.TYPE]) @interface X { }
+  private @A([a, b]) (c, d) = l
+}
+def m() {
+  final @SuppressWarnings([A, B]) List y = []
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (list_literal
+              (identifier)
+              (identifier))))
+        type: (type_identifier)
+        (variable_declarator
+          name: (identifier)))
+      (annotation_type_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (list_literal
+              (field_access
+                object: (identifier)
+                field: (identifier))
+              (field_access
+                object: (identifier)
+                field: (identifier)))))
+        name: (identifier)
+        body: (class_body))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (list_literal
+              (identifier)
+              (identifier))))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (local_variable_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (list_literal
+              (identifier)
+              (identifier))))
+        type: (type_identifier)
+        name: (identifier)
+        value: (list_literal)))))
+
+==================
+A multi-assignment after modifiers before a comma in place of its value, or of its = and its value, misses the value and keeps the next member (error recovery)
+==================
+
+class C {
+  private (a, b) =,
+  def c = 1
+  private (d, e),
+  class D { }
+  private @A (f, g) =,
+  def h = 1
+}
+def m() {
+  final @A (i, j) =,
+  def k = 1
+  final @A (l, n),
+  foo()
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (class_declaration
+        name: (identifier)
+        body: (class_body))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (local_variable_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list))))))
+
+==================
+One name in parentheses after a modifier or an annotation's arguments, while its = is not typed, misses the value (error recovery)
+==================
+
+class C {
+  static (x)
+  private (a)
+  def c = 1
+  private final (y)
+  private @A(1) (z)
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (multi_assignment_declaration
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (number_literal)))
+        (variable_declarator
+          name: (identifier))
+        value: (MISSING identifier)))))
+
+==================
 An annotation after final before the names of a local multi-assignment
 ==================
 

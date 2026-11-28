@@ -131,13 +131,16 @@ The default branch is **`main`**.
     the word `interface` follows, and the `(` of a multi-assignment's
     names after modifiers alone or after `final` and annotations, when
     the parentheses hold two or more names, or names and then `=`
-    (`private @B(a, b) = l`). With the two tokens, the `@` of an
+    (`private @B(a, b) = l`), and with no look-ahead where no
+    annotation's arguments may follow, after a modifier keyword or an
+    annotation's arguments (`private (a)` while its `=` is not typed
+    yet). With the two tokens, the `@` of an
     annotation and the `(` of its arguments do not continue a complete
     list of modifiers, so the arguments of an annotation after a
-    modifier do not fork, and a reparse reads an annotation inserted
-    after a modifier into that list (§6.26).
+    modifier in a type body do not fork, and a reparse reads an
+    annotation inserted after a modifier into that list (§6.26).
 
-  Eight externals are never emitted. `_unreachable` ends
+  Nine externals are never emitted. `_unreachable` ends
   `_stray_case`, the error production for a `case` label where a
   statement starts, so that error recovery inserts it as a missing
   `switch` and each such line recovers on its own (§5.2); the scanner
@@ -161,7 +164,10 @@ The default branch is **`main`**.
   after the `}` of a block or a type's body, where no expression ends
   but Groovy's lexer reads a `/` on that line as division, so that the
   slashy opener keeps the one-line rule there (`if (x) / 2`,
-  `def f() { a } / 2`) (§6.2); and `_error_sentinel`, valid
+  `def f() { a } / 2`) (§6.2); `_annotation_arguments_may_follow`
+  right after an annotation's name, where its arguments may follow,
+  the one place the `(` of a multi-assignment after modifiers needs
+  the look-ahead above (§6.26); and `_error_sentinel`, valid
   only during error recovery, where the scanner emits only the
   comments, the marker of an unterminated `/*`, the slashy opener and
   the contextual keywords.

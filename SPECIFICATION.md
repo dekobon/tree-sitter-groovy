@@ -946,8 +946,10 @@ The resolution we adopt:
    A named-arg key is an identifier or a string (`foo 'a': 1`,
    `foo "$k": 1`, `def m = foo 'a': 1`), as in Apache's
    `namedArgPrimary`. A string key needs no scanner token; where a `:`
-   may also follow a call that is a value, the string stays an argument
-   (§6.8). Disallowed:
+   may also follow a call that is a value, as in a ternary's consequence,
+   an `assert` message or a `case` value, the string stays an argument
+   (§6.8), but in a list element or a call's argument the call takes the
+   key (`[x = foo 'a': 1]`, §6.27). Disallowed:
    nested command chains, other than as the value of an assignment
    (`bar 1, x = foo 2`, item 1). Not yet accepted, though Groovy calls each
    (observed with Groovy 3): `new` after a keyword of the grammar that
@@ -1694,9 +1696,15 @@ emitted, which ends the error production for a `case` label outside a
 switch, so that error recovery inserts it as a missing `switch`; the
 `<` of a generic type's arguments where they close or run past the
 read (§3.2.2); the `)` of a cast before a name on its line (§6.11);
+the empty token before a word that names no method (§6.25);
 `SLASH_DIVIDES` (§6.2), never emitted, which marks the `)` of a
 condition or of a method's parameters and the `}` of a block or a
-type's body, on whose line a `/` divides; and
+type's body, on whose line a `/` divides; the `@` of `@interface` and
+the `(` of a multi-assignment's names after modifiers or after `final`
+and annotations (§6.26); `COMMAND_VALUE_START` where an assignment's
+value in a list element or a call's argument may start (§6.27);
+`ANNOTATION_ARGUMENTS_MAY_FOLLOW` (§6.26), never emitted, which marks
+where an annotation's arguments may follow its name; and
 `ERROR_SENTINEL`, never emitted, which no rule references and which
 only signals error recovery. The tokens listed after the enum in §6.1
 are met in-grammar, see `docs/divergences-from-spec.md`.
@@ -1748,10 +1756,12 @@ enum TokenType {
   UNREACHABLE,            // §5.2 — never emitted; ends the error production for a `case` label outside a switch
   TYPE_ARGUMENTS_OPEN,    // §3.2.2 — `<` after a generic type's name, where the type arguments close or run past the read
   CAST_WORD_CLOSE,        // §6.11 — `)` of a cast before a name on its line
+  EXCLUDED_METHOD_NAME,   // §6.25 — empty; before a word that names no method (`this`, `void`, a primitive type, `goto`, `const`, `threadsafe`)
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
-  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone, before names and `)` then `=`, or two or more names
+  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone or after `final` and annotations, before names and `)` then `=`, or two or more names
   COMMAND_KEY_VALUE_START, // §6.27 — COMMAND_VALUE_START where an assignment's value in a list element or a call's argument may start
+  ANNOTATION_ARGUMENTS_MAY_FOLLOW, // §6.26 — never emitted; valid only right after an annotation's name, where its arguments may follow
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -2652,10 +2662,11 @@ Emit SEALED_KEYWORD when, from the current position:
     identifier character; then
   - any mix of the trivia above, line breaks included (Apache's
     modifiers end in `nls`); then
-  - the word `class`, `interface` or `trait`, the words the grammar
-    accepts after the modifier; or, when no line break was crossed,
-    `@`, `non-sealed`, `record`, `enum`, `default` or a word of
-    `_modifier`.
+  - the word `class`, `interface` or `trait`; or, when no line break
+    was crossed, `@`, `non-sealed`, `record`, `enum`, `default` or a
+    word of `_modifier`. The grammar accepts the three words, the
+    annotations and the words of `_modifier` after the modifier
+    (`sealedModifier`), and none of the other four.
 Each token is the keyword alone; the look-ahead is not kept. On any
 other input return false; the in-grammar lexer then reads the word as
 `identifier`.
@@ -5375,8 +5386,12 @@ names of a multi-assignment field, or after `final` and annotations
 before those of a local; no error recovery) and the next character is
 `(`:
   consume `(` and end the token;
+  if ANNOTATION_ARGUMENTS_MAY_FOLLOW is not valid (after a modifier
+    keyword or an annotation's arguments, where no annotation's
+    arguments can open): emit MULTI_ASSIGNMENT_OPEN;
   read what a list of names holds, as for `var` alone (§6.16);
-  at `)`, if a `,` came: emit MULTI_ASSIGNMENT_OPEN;
+  at `)`, if a `,` came outside `[…]` and `<…>`: emit
+    MULTI_ASSIGNMENT_OPEN;
   otherwise, if `=` follows past trivia, not `==` or `=~`: emit it;
   otherwise emit nothing, and the in-grammar lexer reads the `(` of an
     annotation's arguments.
@@ -5403,12 +5418,37 @@ Groovy reads one value or a list of pairs as an annotation's arguments
 (Apache's `elementValues`), never two names, so after a modifier
 `private @B(a, b) = l` and `private (e, f)` without its `=` are
 multi-assignments, and `private @Foo(x)` before a field is an
-annotation with an argument. One name without an `=` is never the names
-(`private @A (x)` then `int y`). The list of modifiers is no node of its
+annotation with an argument. Right after an annotation's name one name
+without an `=` is never the names (`private @A (x)` then `int y`), and
+neither is a list of names, whose commas are inside its brackets
+(`private @Mixin([A, B]) int x`). After a modifier keyword or an
+annotation's arguments no annotation's arguments can open, so there the
+`(` is the names' with no look-ahead, as the plain `(` was before the
+token: `private (a)` while its `=` is not typed yet misses its value. A
+look-ahead there turned it down, and recovery read a method whose name
+was a missing string, which neither an `ERROR` nor a `MISSING` node
+showed. `ANNOTATION_ARGUMENTS_MAY_FOLLOW`, never emitted, is valid right
+after an annotation's name, which tells the two places apart. The
+list of modifiers is no node of its
 own (`_modifiers` is inlined): a reparse reuses the modifiers' leaves,
 as at v0.6.0, so that every stack version after the member before them
 reuses the same nodes and the versions merge where they did
 (`bindings/rust/tests/modifiers_cost.rs`).
+
+Where a statement starts, `final` and the annotations after it may also
+open a local (`finalModifier` in `grammar.js`), and that reading is a
+stack version of its own past the annotations. It had no action for a
+modifier or a declaration keyword there, so keyword extraction lexed the
+word as a name, and the local took it as its type or name, with no
+`ERROR`: `final @A class X { }` was a local `X` of type `class` and a
+block, and `final @A static int x = 1` a local `static`. An error
+production of `local_variable_declaration` gives each of those words an
+action after the annotations, so it lexes as the keyword: the
+declaration's reading takes it (`final @A class X { }` is a class), or
+the statement is an `ERROR` (`final @A static int x = 1`). The
+annotations' arguments still fork there (about three steps with more
+than one stack version per argument), as the conflict at `final` keeps
+both readings alive; in a type body and in parameters they do not.
 
 Measured against the grammar before the two tokens (#92 at `360ea5d`):
 STATE_COUNT 5716 to 5817, against 5316 on `main`; the conflicts
@@ -5467,7 +5507,8 @@ parsed alone, as before) and changes none of their trees. STATE_COUNT
 unchanged.
 
 An assignment whose value is a call is no key there
-(`[x = foo 1: 2]` is an `ERROR`, as in Groovy). These keep the assignment
+(`[x = foo 1: 2]` is an `ERROR`, as a number is no key of a call here,
+§6.8, where Groovy reads `[x = foo(1: 2)]`). These keep the assignment
 as the key: a multi-assignment (`[(a, b) = foo 'a': 1]`), a lambda value
 (`[x = y -> foo 'a': 1]`), an assignment after a map entry
 (`[k: 1, x = foo 'a': 1]`) and an annotation's argument

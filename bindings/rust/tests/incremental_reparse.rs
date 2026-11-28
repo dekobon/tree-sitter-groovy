@@ -253,7 +253,7 @@ fn reparse_after_slashy_comment_edits_matches_parse_from_scratch() {
     );
 }
 
-/// Annotations among modifiers (§6.13). An edit after a member's modifiers
+/// Annotations among modifiers (§6.26). An edit after a member's modifiers
 /// must not change the member before it. A reparse reuses the modifiers'
 /// leaves, which `_modifiers` (inlined) does not wrap; and the `@` of
 /// `@interface` and the `(` of a multi-assignment after modifiers are
@@ -279,6 +279,15 @@ fn reparse_after_annotation_among_modifier_edits_matches_parse_from_scratch() {
     assert_every_edit_reparses(
         &["final @Foo String s = 'a'\nfinal @A (a, b) = 1\n"],
         &["", " ", "\n", "@A ", "final ", "public ", "(", ";", "x"],
+    );
+    // `final` typed before annotations and modifiers where a statement
+    // starts. The local that `final @A` may open took `public` for its name,
+    // so the text had two readings, and a parse from scratch read a local
+    // and a method where the reparse read one method. No `;`: one after the
+    // `@` reparses to another tree than a parse from scratch on `main` too.
+    assert_every_edit_reparses(
+        &["class I { }\n@A public @B def f() { }\nclass J { }\n"],
+        &["", " ", "\n", "@A ", "final ", "public ", "x"],
     );
 }
 
