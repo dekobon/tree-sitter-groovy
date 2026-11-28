@@ -1106,7 +1106,11 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `enum F { A, private @Foo F() { } }`, and `final @A x` in a method's,
   a closure's or a lambda's parameters and in a local
   (`final @Foo String s = 'a'`) parse. Each was an `ERROR`, as at
-  v0.6.0. A type with `default` (divergence 20) takes annotations after
+  v0.6.0. A for-in loop's variable takes annotations before and after
+  `final`, as Apache's `variableModifiersOpt` does (`for (@A x in xs)`,
+  `for (final @A x : xs)`); they are children of the
+  `for_in_statement`, after the loop's own. At v0.6.0 both were an
+  `ERROR`. A type with `default` (divergence 20) takes annotations after
   it, so `default @interface Z { }` is an annotation type too.
   Annotations after the first modifier are children of the declaration,
   as those before it are, so no node kind changes. `_modifiers` (inlined)

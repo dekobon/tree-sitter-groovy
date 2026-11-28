@@ -504,7 +504,7 @@ fix relative to *both* parent grammars.
 | `while` / `do-while` | port | Annotations may come first (`@A while (x) { … }`), as in Groovy 6's `loopStatement`, and are children of the loop; Groovy 4 and 5 reject them. The same goes for both `for` forms below. |
 | `synchronized` statement | **new** | `synchronized (lock) { … }`; the body must be a block. Apache `#synchronizedStmtAlt`. |
 | `for(;;)` | port | `init` accepts a single expression (`i = 0`), a `local_variable_declaration` (`int i = 0`, `def i = 0`, incl. multiple declarators) or a `multi_assignment_declaration` (`def (i, n) = [0, 5]`). Apache `forInit: localVariableDeclaration \| expressionList` also allows a comma expression list (`i = 0, j = 1`) — not yet supported. |
-| `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`). |
+| `for (x in xs)` | port | The loop variable takes `final` and `def`, `var` or a type (`for (var x : xs)`), and annotations before and after `final`, as Apache's `variableModifiersOpt` does (`for (@A final @B x in xs)`); they are children of the `for_in_statement`, after the loop's own. |
 | `switch` with `case … :` | port | A case takes several values (`case 1, 2:`), as below. |
 | `switch` with `case … -> …` | **new** | arrow form. Closes murtaza64 #36 (second half). A case takes several values, a `value` field each (`case 1, 2 ->`, `case String, Integer ->`), as Apache's `switchExpressionLabel` is `CASE expressionList[true]` before `->` or `:` (4.0.x to master; master also takes a pattern). Its `switchLabel`, a switch statement's, takes one expression, but a statement may be a switch expression; Groovy 3 has no switch expressions and rejects both. A spread value (`case *xs ->`, which `expressionList[true]` allows) is not taken. |
 | `try` / `catch` / `finally` | port | |
@@ -3670,7 +3670,7 @@ word, and the look-ahead decides as it does on valid input.
 Known residuals, each an `ERROR` as before:
 
 - `for (var in xs)`, a loop variable named `var`: the keyword takes
-  `var` because a name follows.
+  `var` because a name follows. So does `for (final @A var in xs)`.
 - A method named `in` with a return type where a statement starts,
   `int in(int x) { x }`: before `(` the word is the operator, as in
   `a in (b)`. Groovy declares the method (observed). In a type body

@@ -280,6 +280,138 @@ for (final x : xs) { }
     body: (block)))
 
 ==================
+For-in with annotations on the loop variable
+==================
+
+for (@A x in xs) { }
+for (final @A x in xs) { }
+for (@A final @B String x : xs) { }
+for (@A var x in xs) { }
+@L for (final @A def x in xs) { }
+for (final @A(k = 1) x in xs) { }
+for (final @A(1) String x : xs) { }
+for (final @A int i = 0; i < n; i++) { }
+
+---
+
+(source_file
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (number_literal))))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (number_literal)))
+    type: (type_identifier)
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (for_statement
+    init: (local_variable_declaration
+      (annotation
+        name: (qualified_name
+          (identifier)))
+      type: (type_identifier)
+      name: (identifier)
+      value: (number_literal))
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    update: (update_expression
+      operand: (identifier))
+    body: (block)))
+
+==================
+A for-in with an annotated final variable keeps the statements after it
+==================
+
+def m() {
+  for (final @A x in xs) {
+    println x
+  }
+  a()
+}
+b()
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block
+      (for_in_statement
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        variable: (identifier)
+        value: (identifier)
+        body: (block
+          (command_chain
+            receiver: (identifier)
+            argument: (identifier))))
+      (expression_statement
+        (method_invocation
+          function: (identifier)
+          arguments: (argument_list)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list))))
+
+==================
 Classic for with a final typed init
 ==================
 

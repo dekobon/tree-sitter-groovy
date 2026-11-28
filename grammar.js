@@ -2079,10 +2079,10 @@ module.exports = grammar({
     // `repeat($.annotation)`, so each annotation has one place to go.
     // Every member and type declaration takes its modifiers through this
     // rule, but for the constructor after an enum's trailing comma
-    // (`_modified_constructor_declaration`, access modifiers only); locals
-    // and parameters take `finalModifier`. It is inlined, so the
-    // modifiers are leaves of the declaration, as at v0.6.0: a reparse
-    // reuses them leaf by leaf, and the stack versions
+    // (`_modified_constructor_declaration`, access modifiers only); locals,
+    // parameters and a for-in variable take `finalModifier`. It is
+    // inlined, so the modifiers are leaves of the declaration, as at
+    // v0.6.0: a reparse reuses them leaf by leaf, and the stack versions
     // after the member before them merge where they did (as a node of
     // its own, the list was reused by one version and read again by the
     // others). The `@` of `@interface` and the `(` of a multi-assignment
@@ -3147,11 +3147,18 @@ module.exports = grammar({
     // for-header is not an expression position. The `in` is the
     // operator's scanner token (§6.16), so the loop variable and an
     // expression in a classic `for` init still fork on one token.
+    // The variable takes annotations before and after `final`, as
+    // Apache's `variableModifiersOpt` does (`for (@A final @B x in xs)`).
+    // They are children of the statement, after the `(`, as the loop's own
+    // are before `for`: with a field of their own the annotations would
+    // be another repeat than those of the classic for's local, whose
+    // tokens are the same up to `in` or `:`, and that conflicts.
     for_in_statement: $ => seq(
       repeat($.annotation),
       'for',
       '(',
-      optional('final'),
+      repeat($.annotation),
+      optional(finalModifier($)),
       optional(choice('def', varKeyword($), field('type', $._type))),
       field('variable', $.identifier),
       choice(alias($._in_keyword, 'in'), ':'),

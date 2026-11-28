@@ -292,6 +292,13 @@ fn reparse_after_annotation_among_modifier_edits_matches_parse_from_scratch() {
         &["class I { }\n@A public @B def f() { }\nclass J { }\n"],
         &["", " ", "\n", "@A ", "final ", "public ", "(", "x"],
     );
+    // A for-in variable's annotations and a classic for's local share
+    // their tokens up to `in` or `:`, and after `final @A` the `(` of a
+    // classic for's multi-assignment names is valid too.
+    assert_every_edit_reparses(
+        &["for (final @A x in xs) { a() }\nfor (@A int i = 0; i < n; i++) { }\n"],
+        &["", " ", "\n", "@A ", "@A(k = 1) ", "final ", "(", ";", ":", "x"],
+    );
 }
 
 /// A parenthesis-free call that is the value of an assignment in a list
