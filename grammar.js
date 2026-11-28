@@ -2934,16 +2934,18 @@ module.exports = grammar({
     ),
 
     // The names after modifiers alone (`private @Lazy (int x, String y) =
-    // load()`), opened by a `(` of its own that the scanner emits only
-    // when the names, `)` and `=` follow, as for `var` alone (§6.16), or
-    // two or more names do (below; §6.26).
-    // After an annotation among the modifiers a plain `(` opens the
-    // annotation's arguments, so the table needs no fork there; and after
-    // a list of modifiers that a reparse reuses, a plain `(` is not valid,
-    // so the parser breaks the list down and reads an annotation's
-    // arguments into it. Without an `=`, as while the declaration is
-    // typed, two or more names are still the names (`private (e, f)`),
-    // as an annotation's arguments never are; one name is not.
+    // load()`), opened by a `(` of its own (§6.26). Right after an
+    // annotation's name, where the `(` may open the annotation's
+    // arguments, the scanner emits it only when the names, `)` and `=`
+    // follow, as for `var` alone (§6.16), or two or more names do: a plain
+    // `(` there opens the arguments, so the table needs no fork. Without an
+    // `=`, as while the declaration is typed, two or more names are still
+    // the names (`private @A(e, f)`), as an annotation's arguments never
+    // are; one name is not. After a modifier keyword or an annotation's
+    // arguments no arguments can open, and the scanner emits it before any
+    // names (`private (a)` misses its value). After a list of modifiers
+    // that a reparse reuses, a plain `(` is not valid, so the parser
+    // breaks the list down and reads an annotation's arguments into it.
     _modified_multi_assignment_tail: $ => choice(
       seq(
         ...multiAssignmentNames($, alias($._multi_assignment_open, '(')),

@@ -1759,7 +1759,7 @@ enum TokenType {
   EXCLUDED_METHOD_NAME,   // §6.25 — empty; before a word that names no method (`this`, `void`, a primitive type, `goto`, `const`, `threadsafe`)
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
-  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone or after `final` and annotations, before names and `)` then `=`, or two or more names
+  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone or after `final` and annotations; right after an annotation's name only before names and `)` then `=`, or two or more names
   COMMAND_KEY_VALUE_START, // §6.27 — COMMAND_VALUE_START where an assignment's value in a list element or a call's argument may start
   ANNOTATION_ARGUMENTS_MAY_FOLLOW, // §6.26 — never emitted; valid only right after an annotation's name, where its arguments may follow
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
