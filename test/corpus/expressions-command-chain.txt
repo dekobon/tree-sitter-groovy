@@ -934,13 +934,458 @@ foo *a, 1
 ---
 
 ==================
-String key in a command chain is unsupported
+String keys in a command chain
+==================
+
+attributes 'Main-Class': 'a.B', 'X-Y': 'z'
+foo "$k": 1, b: 2
+foo a: 1, 'b': 2
+foo 'a',
+    'b': 2
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal))
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (string_literal
+        (gstring_dollar_interpolation
+          value: (identifier)))
+      value: (number_literal))
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (string_literal)
+      value: (number_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (string_literal)
+      value: (number_literal))))
+
+==================
+String keys in a command chain that is a value
+==================
+
+def m = foo 'a': 1, 'b': 2
+x = foo "$k": 1, b: 2
+y += foo a: 1, 'b': 2
+x = foo 'b': c = 2
+def r = obj.m 'Main-Class': 'a.B'
+def s = obj?.@f 'k': 1
+def t = Foo 'a': 1
+@Field final @A z = foo 'a': 1
+def api = toApi 'A': '''x'''
+def n = foo 'a':
+    1
+
+---
+
+(source_file
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal
+            (gstring_dollar_interpolation
+              value: (identifier)))
+          value: (number_literal))
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (identifier)
+          value: (number_literal))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (assignment_expression
+            left: (identifier)
+            right: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (field_access
+          object: (identifier)
+          field: (identifier))
+        argument: (named_argument
+          key: (string_literal)
+          value: (string_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (safe_direct_field_access_expression
+          object: (identifier)
+          field: (identifier))
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (string_literal)))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal))))))
+
+==================
+A string key in a command chain inside another construct
+==================
+
+(a, b) = f 'k': 1
+x = (foo 'a': 1).size()
+println((foo 'a': 1))
+"${foo 'a': 1}"
+def f = y -> foo 'a': 1
+m = [k: x = foo 1, 'b': 2]
+
+---
+
+(source_file
+  (expression_statement
+    (multi_assignment_expression
+      name: (identifier)
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (string_literal)
+          value: (number_literal)))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (method_invocation
+        function: (field_access
+          object: (parenthesized_expression
+            (command_chain
+              receiver: (identifier)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal))))
+          field: (identifier))
+        arguments: (argument_list))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (parenthesized_expression
+          (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (string_literal
+      (gstring_brace_interpolation
+        value: (command_chain
+          receiver: (identifier)
+          argument: (named_argument
+            key: (string_literal)
+            value: (number_literal))))))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (lambda_expression
+        parameters: (identifier)
+        body: (command_chain
+          receiver: (identifier)
+          argument: (named_argument
+            key: (string_literal)
+            value: (number_literal))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (map_literal
+        (map_entry
+          key: (identifier)
+          value: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (number_literal)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal)))))))))
+
+==================
+A string key in a command chain that is a list element or an argument
+==================
+
+l = [x = foo 'a': 1]
+bar(x = foo 'a': 1)
+bar(x = foo 1, 'b': 2)
+bar(1, x = foo 'a': 1)
+l = [x = y = foo 'a': 1]
+bar(x += obj.m 'a': 1, 2)
+new Foo(x = bar 'a': 1)
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal))
+            argument: (number_literal))))))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal))))))))
+
+==================
+A string before the colon of a ternary in a list or an argument stays an argument
+==================
+
+l = [c ? x = foo 'a' : 'b']
+bar(c ? x = foo 'a' : 'b')
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (ternary_expression
+          condition: (identifier)
+          consequence: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (string_literal)))
+          alternative: (string_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (ternary_expression
+          condition: (identifier)
+          consequence: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (string_literal)))
+          alternative: (string_literal))))))
+
+==================
+An assignment whose value is a command chain is no map key
 :error
 ==================
 
-foo 'a': 1
+l = [x = foo 1: 2]
 
 ---
+
+==================
+A string before the colon of a ternary stays an argument
+==================
+
+y = c ? x = foo 'a' : 'b'
+y = c ? x = foo 1, 'a' : 'b'
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (identifier)
+        consequence: (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (string_literal)))
+        alternative: (string_literal))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (ternary_expression
+        condition: (identifier)
+        consequence: (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)
+            argument: (string_literal)))
+        alternative: (string_literal)))))
+
+==================
+A string before the colon of an assert message stays an argument
+==================
+
+assert x = foo 'a' : 'msg'
+assert c ? x = foo 'a' : 'b' : 'msg'
+
+---
+
+(source_file
+  (assert_statement
+    (assignment_expression
+      left: (identifier)
+      right: (command_chain
+        receiver: (identifier)
+        argument: (string_literal)))
+    message: (string_literal))
+  (assert_statement
+    (ternary_expression
+      condition: (identifier)
+      consequence: (assignment_expression
+        left: (identifier)
+        right: (command_chain
+          receiver: (identifier)
+          argument: (string_literal)))
+      alternative: (string_literal))
+    message: (string_literal)))
 
 ==================
 Named arguments with non-ASCII keys
@@ -3869,13 +4314,21 @@ obj.m 1, *xs
       value: (identifier))))
 
 ==================
-String key in a command chain with a dotted receiver is unsupported
-:error
+String key in a command chain with a dotted receiver
 ==================
 
-obj.m 'a': 1
+manifest.attributes 'Main-Class': 'a.B'
 
 ---
+
+(source_file
+  (command_chain
+    receiver: (field_access
+      object: (identifier)
+      field: (identifier))
+    argument: (named_argument
+      key: (string_literal)
+      value: (string_literal))))
 
 ==================
 Capitalized last name before a string with no parenthesis is a command chain

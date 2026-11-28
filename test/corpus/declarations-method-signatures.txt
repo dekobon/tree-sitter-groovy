@@ -595,13 +595,23 @@ def m(def String y) { }
 ---
 
 ==================
-Parameter with an annotation after final is not accepted (divergence 14)
-:error
+Parameter with an annotation after final
 ==================
 
 def m(final @Deprecated w) { }
 
 ---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))
+    body: (block)))
 
 ==================
 Varargs parameter with no type is not accepted (divergence 14)

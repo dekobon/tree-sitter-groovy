@@ -12,7 +12,9 @@
 // Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
-// empty token before the receiver of such a call that is a value,
+// empty token before the receiver of such a call that is a value, and
+// §6.27 COMMAND_KEY_VALUE_START, the same token where the value is an
+// assignment's that is a list element or a call's argument,
 // COMMAND_PATH_START, one between the first name of a dotted receiver
 // and its first member access, and COMMAND_STATEMENT_START, one before
 // a statement's one-name receiver whose first argument is a `new`, an
@@ -54,14 +56,15 @@
 // `continue` before a block comment, to carry a decision past the token
 // that follows.
 // STRING_BODY (§6.10), TYPE_START (§6.15), CLOSURE_PARAMETERS_START
-// (§6.21), TYPE_ONLY_CLOSE (§6.11), BODY_BLOCK_END (§6.17) and
-// SLASH_DIVIDES (§6.2) are never emitted; they are valid only inside a
-// string body, where the scanner emits nothing, where a type may start,
-// where closure parameters may start, before the `)` of a cast of an array
-// or generic type whose operand is on a later line, after the `}` of the
-// block that is the body of `if`, `else`, a loop or an arrow case, and
-// after the `)` of a condition or of a method's parameters and the `}` of
-// a block or a type's body.
+// (§6.21), TYPE_ONLY_CLOSE (§6.11), BODY_BLOCK_END (§6.17),
+// SLASH_DIVIDES (§6.2) and ANNOTATION_ARGUMENTS_MAY_FOLLOW (§6.26) are
+// never emitted; they are valid only inside a string body, where the
+// scanner emits nothing, where a type may start, where closure parameters
+// may start, before the `)` of a cast of an array or generic type whose
+// operand is on a later line, after the `}` of the block that is the body
+// of `if`, `else`, a loop or an arrow case, after the `)` of a condition
+// or of a method's parameters and the `}` of a block or a type's body,
+// and right after an annotation's name, where its arguments may follow.
 // UNREACHABLE is never emitted and never read: it ends the grammar's error
 // production for a `case` label outside a switch (§5.2). ERROR_SENTINEL is
 // never emitted either; the parser marks it valid only during error
@@ -71,7 +74,8 @@
 // ARRAY_VALUE_START, CAST_CLOSE, CAST_WORD_CLOSE, RELATIONAL_CLOSE,
 // CAST_TYPE_ARGUMENTS_OPEN, TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
 // LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
-// JUMP_STATEMENT_END and the STRING_BODY check are suppressed. The keywords
+// JUMP_STATEMENT_END, ANNOTATION_TYPE_AT, MULTI_ASSIGNMENT_OPEN,
+// COMMAND_KEY_VALUE_START and the STRING_BODY check are suppressed. The keywords
 // `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
 // decided there, by the same look-aheads, as are the comments,
 // UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
@@ -156,6 +160,10 @@ enum TokenType {
     CAST_WORD_CLOSE,
     EXCLUDED_METHOD_NAME,
     SLASH_DIVIDES,
+    ANNOTATION_TYPE_AT,
+    MULTI_ASSIGNMENT_OPEN,
+    COMMAND_KEY_VALUE_START,
+    ANNOTATION_ARGUMENTS_MAY_FOLLOW,
     ERROR_SENTINEL,
 };
 
@@ -572,9 +580,9 @@ static inline bool is_member_access_start(int32_t c) {
 }
 
 // Consumes one of the operators that join the names of a
-// parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&` and
-// `.@`, and clears `dot` unless it is `.`. Returns false, with input
-// consumed, on anything else.
+// parenthesis-free call's receiver: `.`, `?.`, `??.`, `*.`, `.&`, `.@`,
+// `?.@`, `??.@` and `*.@`, and clears `dot` unless it is `.`. Returns
+// false, with input consumed, on anything else.
 static bool read_member_access(TSLexer *lexer, bool *dot) {
     if (lexer->lookahead != '.') {
         *dot = false;
@@ -603,6 +611,9 @@ static bool read_member_access(TSLexer *lexer, bool *dot) {
         return false;
     }
     lexer->advance(lexer, false);
+    if (lexer->lookahead == '@') {
+        lexer->advance(lexer, false);
+    }
     return true;
 }
 
@@ -1886,7 +1897,13 @@ static bool scan_value_start(
                                          no_close_ahead)) {
         return false;
     }
-    lexer->result_symbol = COMMAND_VALUE_START;
+    // §6.27 — where an assignment is a list element or a call's argument,
+    // the grammar's twin of the assignment (`_element_assignment`) makes
+    // COMMAND_KEY_VALUE_START valid beside COMMAND_VALUE_START. Its call is
+    // no map entry's or named argument's key, so a `:` after a string
+    // argument there is the call's string key (`[x = foo 'a': 1]`).
+    lexer->result_symbol = valid_symbols[COMMAND_KEY_VALUE_START]
+        ? COMMAND_KEY_VALUE_START : COMMAND_VALUE_START;
     return true;
 }
 
@@ -2178,20 +2195,22 @@ static bool is_modifier_word(const char *word, unsigned len) {
         || word_is(word, len, "transient") || word_is(word, len, "volatile");
 }
 
-// SPECIFICATION.md §6.13 — `sealed` is a keyword only before `class`,
-// `interface` or `trait`, the words the grammar accepts after it.
-// Apache's modifiers end in `nls`, so line breaks and comments may come
-// between. Everywhere else the word is an identifier. The scanner has
-// already consumed `sealed` when this is called.
+// SPECIFICATION.md §6.13 — `sealed` is a keyword before `class`,
+// `interface` or `trait`. Apache's modifiers end in `nls`, so line breaks
+// and comments may come between. Everywhere else the word is an
+// identifier. The scanner has already consumed `sealed` when this is
+// called.
 //
 // Groovy's parser also takes `sealed` before another modifier, an
-// annotation, `record` or `enum`. The grammar accepts none of them
-// after it, so the keyword there only keeps the `ERROR` at the word.
-// Read as a name, the word gave a tree with no `ERROR` that dropped the
-// modifier, or lost the declaration to an `ERROR` that began at `sealed`.
-// The keyword is taken only on the same line: across a line break the
+// annotation, `non-sealed`, `record` or `enum`. The grammar takes the
+// modifiers but `default`, and the annotations, after it
+// (`sealedModifier`); before `default`, `non-sealed`, `record` or `enum`
+// the keyword only keeps the `ERROR` at the word. Read as a name, the
+// word gave a tree with no `ERROR` that dropped the modifier, or lost the
+// declaration to an `ERROR` that began at `sealed`. Before these words
+// the keyword is taken only on the same line: across a line break the
 // same words also start the member after a field named `sealed`, which
-// the keyword would turn into an `ERROR`.
+// the keyword would fold into the declaration after it.
 static bool scan_sealed_target(TSLexer *lexer, bool no_close_ahead) {
     lexer->mark_end(lexer);
     bool crossed_line = false;
@@ -2325,8 +2344,72 @@ static bool expression_follows(
 // Groovy's trivia. Any other character ends the look-ahead, so it reads
 // no `(` and cannot read the same text twice. Line breaks are allowed
 // inside the parentheses and before the `=`, as in Groovy.
+static bool names_after_paren_follow(TSLexer *lexer, bool no_close_ahead);
+
 static bool names_assignment_follows(TSLexer *lexer, bool no_close_ahead) {
     advance(lexer);
+    return names_after_paren_follow(lexer, no_close_ahead);
+}
+
+// §6.26 — the names of a multi-assignment after modifiers alone, after its
+// `(` (`private @Lazy (int x, String y) = load()`). They are the names
+// when `)` and `=` follow, as for `var` alone, or when they are two or
+// more, which an annotation's arguments never are in Groovy (Apache's
+// `elementValues` is one value or a list of pairs): `private (e, f)`
+// while its `=` is not typed yet keeps the error productions of
+// `_multi_assignment_tail`. Only what a list of names holds is read, as in
+// `names_after_paren_follow`. A `,` inside `[…]` or `<…>` separates no
+// names: it is in a list, an annotation's argument (`@Mixin([A, B])`), or
+// in the type arguments of one name's type (`Map<K, V> m`).
+static bool modified_names_follow(TSLexer *lexer, bool no_close_ahead) {
+    bool several = false;
+    unsigned brackets = 0;
+    for (;;) {
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        int32_t c = lexer->lookahead;
+        if (is_identifier_start(c)) {
+            if (read_dollar_slashy_open(lexer)) {
+                return false;
+            }
+            continue;
+        }
+        if (c == ')') {
+            break;
+        }
+        if (c != ',' && c != '*' && c != ':' && c != '.' && c != '<'
+            && c != '>' && c != '?' && c != '[' && c != ']') {
+            return false;
+        }
+        if (c == '[' || c == '<') {
+            brackets++;
+        } else if (c == ']' || c == '>') {
+            if (brackets == 0) {
+                return false;
+            }
+            brackets--;
+        }
+        several = several || (c == ',' && brackets == 0);
+        advance(lexer);
+    }
+    if (brackets > 0) {
+        return false;
+    }
+    if (several) {
+        return true;
+    }
+    advance(lexer);
+    if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)
+        || lexer->lookahead != '=') {
+        return false;
+    }
+    advance(lexer);
+    return lexer->lookahead != '=' && lexer->lookahead != '~';
+}
+
+// The look-ahead of `names_assignment_follows` after the `(`.
+static bool names_after_paren_follow(TSLexer *lexer, bool no_close_ahead) {
     for (;;) {
         if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
             return false;
@@ -4301,7 +4384,8 @@ static bool skip_closure_tokens(
 
 // SPECIFICATION.md §6.24 — consumes a member access that may follow the `}`
 // of a closure or a name after it: `.` other than `..`, `?.`, `??.`, `*.`,
-// `.&`, `.@` and `::`. `*receiver` is cleared at `::`, which
+// `.&`, `.@`, `?.@`, `??.@`, `*.@` and `::`. `*receiver` is cleared at
+// `::`, which
 // `_closure_command_path` does not take.
 static bool read_closure_access(TSLexer *lexer, bool *receiver) {
     if (lexer->lookahead == ':') {
@@ -4462,7 +4546,8 @@ static AccessRest read_closure_access_rest(
     if (c == '?') {
         advance(input);
         if (input->lookahead != '[') {
-            // `?.` or `??.`, as `read_member_access` reads them.
+            // `?.`, `??.`, `?.@` or `??.@`, as `read_member_access` reads
+            // them.
             if (input->lookahead == '?') {
                 advance(input);
             }
@@ -4470,6 +4555,9 @@ static AccessRest read_closure_access_rest(
                 return ACCESS_STOP;
             }
             advance(input);
+            if (input->lookahead == '@') {
+                advance(input);
+            }
             return NEXT_ACCESS;
         }
         c = '[';
@@ -4844,25 +4932,12 @@ static bool skip_lambda_tokens(
     return false;
 }
 
-// Reads one parameter of a lambda, with the trivia around it, and leaves
-// what follows it: annotations, each a name and arguments in parentheses;
-// words (`final`, `def`, a type's names, the parameter's name) and the
-// punctuation of a type (`.`, `...`, `[]`, type arguments in `<…>`); then a
-// default value after `=`. Apart from the name being last, it does not check
-// the order: what it takes and `formal_parameter` does not is an `ERROR`
-// either way. Returns false where no parameter can be, as at the operator of
-// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
-// keyword is in it (`(if)`) other than a wildcard's bound in type arguments
-// (`(List<? super T> l)`). Where no name ends it (`(String[])`, `(a.b)`,
-// `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
-// types, and the caller reads on past the `)` all the same. A dollar-slashy
-// string where a name may be is a literal as well (`($/a/$)`); there, and
-// inside one that a default value or an annotation's arguments do not read
-// past, it sets `*in_string`.
-static bool lambda_parameter_follows(
+// Skips the annotations of a lambda parameter, each a name and arguments in
+// parentheses, with the trivia around them, for `lambda_parameter_follows`.
+// Returns false where no parameter can be.
+static bool skip_lambda_annotations(
     TSLexer *lexer,
     unsigned *items,
-    bool *named_parameter,
     bool no_close_ahead,
     bool *in_string
 ) {
@@ -4871,7 +4946,7 @@ static bool lambda_parameter_follows(
             return false;
         }
         if (lexer->lookahead != '@') {
-            break;
+            return true;
         }
         if (!spend_lambda_item(items)) {
             return false;
@@ -4903,14 +4978,46 @@ static bool lambda_parameter_follows(
             advance(lexer);
         }
     }
+}
+
+// Reads one parameter of a lambda, with the trivia around it, and leaves
+// what follows it: annotations, each a name and arguments in parentheses
+// (`skip_lambda_annotations`), also after an opening `final` (`final @A x`);
+// words (`final`, `def`, a type's names, the parameter's name) and the
+// punctuation of a type (`.`, `...`, `[]`, type arguments in `<…>`); then a
+// default value after `=`. Apart from the name being last, it does not check
+// the order: what it takes and `formal_parameter` does not is an `ERROR`
+// either way. Returns false where no parameter can be, as at the operator of
+// `(a + b)`, the call of `(a.b())` and the literal of `(1)`, and where a
+// keyword is in it (`(if)`) other than a wildcard's bound in type arguments
+// (`(List<? super T> l)`). Where no name ends it (`(String[])`, `(a.b)`,
+// `(int)`, `(final)`), it clears `*named` and goes on: those are a cast's
+// types, and the caller reads on past the `)` all the same. A dollar-slashy
+// string where a name may be is a literal as well (`($/a/$)`); there, and
+// inside one that a default value or an annotation's arguments do not read
+// past, it sets `*in_string`.
+static bool lambda_parameter_follows(
+    TSLexer *lexer,
+    unsigned *items,
+    bool *named_parameter,
+    bool no_close_ahead,
+    bool *in_string
+) {
+    if (!skip_lambda_annotations(lexer, items, no_close_ahead, in_string)) {
+        return false;
+    }
     unsigned angles = 0;
     // Whether the last item is a word that may name the parameter, and how
     // many dots come right before the current item: after one, a word is
     // part of a qualified type (`a.b.C`); after three, a name (`String... a`).
     bool named = false;
     unsigned dots = 0;
+    // Whether the word just read is a `final` that opens the parameter,
+    // which annotations may follow (`final @A x`), as in `parameter()`.
+    bool first_word = true;
     for (;;) {
         int32_t c = lexer->lookahead;
+        bool opening_final = false;
         if (is_identifier_start(c)) {
             char word[sizeof "synchronized"];
             unsigned len = read_word(lexer, word, sizeof word);
@@ -4932,6 +5039,7 @@ static bool lambda_parameter_follows(
             }
             named = !modifier && angles == 0 && dots != 1
                 && !is_reserved_lambda_name(word, len);
+            opening_final = first_word && word_is(word, len, "final");
             dots = 0;
         } else if (c == '.') {
             named = false;
@@ -4952,6 +5060,12 @@ static bool lambda_parameter_follows(
         }
         if (!spend_lambda_item(items)
             || !skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        first_word = false;
+        if (opening_final && lexer->lookahead == '@'
+            && !skip_lambda_annotations(lexer, items, no_close_ahead,
+                                        in_string)) {
             return false;
         }
     }
@@ -5385,6 +5499,9 @@ static bool parentheses_open_statement(TSLexer *lexer, bool no_close_ahead) {
                     if (dot) {
                         advance(lexer);
                     }
+                }
+                if (dot && lexer->lookahead == '@') {
+                    advance(lexer);
                 }
                 if (dot) {
                     state.operand = false;
@@ -6401,7 +6518,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         && !valid_symbols[VAR_KEYWORD] && !valid_symbols[VAR_NAMES_KEYWORD]
         && !valid_symbols[YIELD_KEYWORD] && !valid_symbols[IN_KEYWORD]
         && !valid_symbols[AS_KEYWORD]
-        && !valid_symbols[EXCLUDED_METHOD_NAME]) {
+        && !valid_symbols[EXCLUDED_METHOD_NAME]
+        && !valid_symbols[ANNOTATION_TYPE_AT]
+        && !valid_symbols[MULTI_ASSIGNMENT_OPEN]) {
         return false;
     }
 
@@ -6423,6 +6542,45 @@ bool tree_sitter_groovy_external_scanner_scan(
     // rewinds to the token start and the in-grammar lexer reads the
     // word as an identifier.
     bool no_close_ahead = no_comment_close_ahead(scanner);
+    // §6.26 — the `@` of `@interface`: an `@` with the keyword `interface`
+    // after it, past the trivia Groovy's lexer hides between the two
+    // tokens. No other token of the scanner starts with `@`, so on any
+    // other word the in-grammar lexer reads the `@` of an annotation.
+    if (valid_symbols[ANNOTATION_TYPE_AT] && !valid_symbols[ERROR_SENTINEL]
+        && lexer->lookahead == '@') {
+        advance(lexer);
+        lexer->mark_end(lexer);
+        if (!skip_header_trivia(lexer, true, no_close_ahead, NULL, NULL)) {
+            return false;
+        }
+        char word[sizeof "interface"];
+        unsigned len = read_word(lexer, word, sizeof word);
+        if (!word_is(word, len, "interface")) {
+            return false;
+        }
+        lexer->result_symbol = ANNOTATION_TYPE_AT;
+        return true;
+    }
+    // §6.26 — the `(` of a multi-assignment after modifiers alone, or after
+    // `final` and annotations: the token ends at the `(`. Right after an
+    // annotation's name two or more names, or names, `)` and `=`, must
+    // follow (`modified_names_follow`); any other `(` there is the
+    // in-grammar lexer's, the arguments of the annotation.
+    if (valid_symbols[MULTI_ASSIGNMENT_OPEN] && !valid_symbols[ERROR_SENTINEL]
+        && lexer->lookahead == '(') {
+        advance(lexer);
+        lexer->mark_end(lexer);
+        lexer->result_symbol = MULTI_ASSIGNMENT_OPEN;
+        // After a modifier keyword or an annotation's arguments no
+        // annotation's arguments can open, so the `(` is the names', as
+        // the plain `(` was before the token: `private (a)` while its `=`
+        // is not typed yet misses the value rather than reading a method
+        // with no name.
+        if (!valid_symbols[ANNOTATION_ARGUMENTS_MAY_FOLLOW]) {
+            return true;
+        }
+        return modified_names_follow(lexer, no_close_ahead);
+    }
     // §6.14 — a statement's first name; it decides the keywords and the
     // array type below as well.
     if (wants_statement_start && !body_continues

@@ -63,7 +63,10 @@ The default branch is **`main`**.
     makes the statement no declaration (`foo bar`, not `String s`),
     and a literal only where the argument goes on past it
     (`println "a" + b`, not `foo 1` then `-x` on the next line)
-    (§6.14);
+    (§6.14); where the value is an assignment's that is a list element
+    or a call's argument, the same decision emits a twin of the value
+    start, which opens a call that no map entry or named argument takes
+    as its key, so `[x = foo 'a': 1]` passes `'a': 1` to `foo` (§6.27);
   - a subscript `[` on the same line as the expression before it
     (§6.9), a `(` that opens a line after an expression where a
     statement may start and the parentheses can open one, so that it
@@ -123,9 +126,21 @@ The default branch is **`main`**.
     no return type may come and `(` follows on the line, which makes
     that name an error, as Groovy's `methodName` takes none of these
     words and they are identifiers here, so no reserved set can hold
-    them (§6.25).
+    them (§6.25);
+  - the `@` of `@interface` where an annotation type may start, when
+    the word `interface` follows, and the `(` of a multi-assignment's
+    names after modifiers alone or after `final` and annotations, when
+    the parentheses hold two or more names, or names and then `=`
+    (`private @B(a, b) = l`), and with no look-ahead where no
+    annotation's arguments may follow, after a modifier keyword or an
+    annotation's arguments (`private (a)` while its `=` is not typed
+    yet). With the two tokens, the `@` of an
+    annotation and the `(` of its arguments do not continue a complete
+    list of modifiers, so the arguments of an annotation after a
+    modifier in a type body do not fork, and a reparse reads an
+    annotation inserted after a modifier into that list (§6.26).
 
-  Eight externals are never emitted. `_unreachable` ends
+  Nine externals are never emitted. `_unreachable` ends
   `_stray_case`, the error production for a `case` label where a
   statement starts, so that error recovery inserts it as a missing
   `switch` and each such line recovers on its own (§5.2); the scanner
@@ -149,7 +164,10 @@ The default branch is **`main`**.
   after the `}` of a block or a type's body, where no expression ends
   but Groovy's lexer reads a `/` on that line as division, so that the
   slashy opener keeps the one-line rule there (`if (x) / 2`,
-  `def f() { a } / 2`) (§6.2); and `_error_sentinel`, valid
+  `def f() { a } / 2`) (§6.2); `_annotation_arguments_may_follow`
+  right after an annotation's name, where its arguments may follow,
+  the one place the `(` of a multi-assignment after modifiers needs
+  the look-ahead above (§6.26); and `_error_sentinel`, valid
   only during error recovery, where the scanner emits only the
   comments, the marker of an unterminated `/*`, the slashy opener and
   the contextual keywords.

@@ -21,11 +21,11 @@ reasoning here.
 | §5.2 Contextual keywords | **Mostly done** | `non-sealed` and `permits` are grammar literals, each with an action only where no name can stand. `record`, `trait` and `sealed` are scanner tokens emitted only before the declaration each opens (§6.7, §6.13), and `var`, `yield`, `in` and `as` scanner tokens emitted only before what each opens or takes (§6.16), so each is an identifier everywhere else (see #12 and #22 below). The Groovy 6 keywords `async`, `await`, `defer` and `val` have no construct and parse as names; grammar literals for them were attempted and reverted. See divergence #10. |
 | §5.3 Label vs map vs ternary | **Done** | grammar-precedence resolution; pinned in `expressions-quoted-identifier.txt`. |
 | §5.4 Slashy vs division | **Done** | scanner context guards + look-ahead to the closing `/`, on the same line where a division may follow. |
-| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). String keys (`foo 'a': 1`) are not; `default` is not accepted as a key as the first argument, a deliberate divergence from Apache; a spread argument or a spread map is accepted after a comma (`foo 'a', *args`, `foo a: 1, *:m`), not first (`foo *a, 1`, `foo *:m`); an argument after a comma continues onto a following line that can continue an expression, a spread too (`foo 1, *a` then `+ 1` is `*(a + 1)`, where Groovy reads `foo(1, *a)` and the statement `+1`), and a `*` that ends a line or a `,` that opens the next one go on with the call without an `ERROR` (`foo 1, *` then `a`; `foo 1, *a` or `foo 1, a` then `, 2`), where Groovy rejects both (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. A name, `!` or `~` is a first argument too (`println x`, `obj.m arg`, `def r = foo bar`), told from a declaration (`String s`) by Apache's rule; see #25 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), a name after a receiver that may name a type in a value (`def x = Foo bar`), the chain continuations (`foo a bar`), with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19, #23 and #25 below. A receiver may start with a call of a name with a closure that closes on its line (`foo { }.bar 1`, see #30 below). |
+| §5.5 Command chains | **Mostly done** | multi-arg and named-argument forms supported, as a statement, as the value of a declaration or an assignment (#95), in parentheses, also those of a condition, in an interpolation, and in parentheses as the first argument of another (`println(foo 1)`; see #24 below). A key may be a string (`foo 'a': 1`, `def m = foo 'a': 1`; where a `:` may also follow a call that is a value, as in a ternary's consequence, the string stays an argument, see spec §6.8, but in a list element or a call's argument the call takes the key, `[x = foo 'a': 1]`, see spec §6.27), not a number or, after a comma, an expression in parentheses, a list or a map (`foo 1: 'a'`, `foo x: 1, (k): 2`, `foo x: 1, [1]: 2`); `default` is not accepted as a key as the first argument, a deliberate divergence from Apache; a spread argument or a spread map is accepted after a comma (`foo 'a', *args`, `foo a: 1, *:m`), not first (`foo *a, 1`, `foo *:m`); an argument after a comma continues onto a following line that can continue an expression, a spread too (`foo 1, *a` then `+ 1` is `*(a + 1)`, where Groovy reads `foo(1, *a)` and the statement `+1`), and a `*` that ends a line or a `,` that opens the next one go on with the call without an `ERROR` (`foo 1, *` then `a`; `foo 1, *a` or `foo 1, a` then `, 2`), where Groovy rejects both (see spec §6.8). An object or array creation (`println new Date()`) or an array type value (`foo String[].class`) is a first argument on the receiver's line, in every form; see #23 below. A name, `!` or `~` is a first argument too (`println x`, `obj.m arg`, `def r = foo bar`), told from a declaration (`String s`) by Apache's rule; see #25 below. Not accepted where Groovy takes one: as the argument of such an argument (`println(bar(foo 1))`), a name after a receiver that may name a type in a value (`def x = Foo bar`), the chain continuations (`foo a bar`), with a receiver that is not a name or names joined by member accesses written without spaces (`foo().bar 1`, `obj . m 1`); see #18, #19, #23 and #25 below. A receiver may start with a call of a name with a closure that closes on its line (`foo { }.bar 1`, see #30 below). |
 | §5.6 Optional parentheses | **Done** | command_chain as a statement, as the value of a declaration or an assignment, in parentheses and in an interpolation. |
 | §5.7 GString interpolation | **Done** | structured `gstring_dollar_interpolation` + `gstring_brace_interpolation` for `"…"`, `"""…"""`, `/…/`, `$/…/$`. The lazy form `"${-> x}"` takes its `->` as a `closure_parameters` leaf; a closure with parameters (`"${w -> w << x}"`, which Groovy passes the writer) is an `ERROR` (spec §5.5 item 1). |
 | §5.8 Closure params / it | **Mostly done** | typed and untyped, with annotations, `final`, `def`, `var`, varargs and a default; no synthetic `it`. The shape is the one of a method parameter (`parameter()` in `grammar.js`); the orders it does not accept are in #14 below. |
-| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations, and on `for`, `while` and `do` loops, as in Groovy 6 (Groovy 4 and 5 reject an annotated loop). Not supported, each an `ERROR`: an annotation on a `catch` parameter (`catch (@A Exception e)`), a for-in variable (`for (@A x in xs)`), a record component (`record R(@A int a)`) or a type parameter (`class C<@A T>`). An annotated typed local with no initializer parses (`@Field String x`, `@Field int a, b`), as one without annotations does (see #27 below). An annotation must come before the modifiers (`private @Autowired Foo foo` is an `ERROR`, #92), and after annotations alone a local takes the name `_`, with a value or without, and a local or a field takes another name with a value (`@Field FOO = [a: 1]`, `@Subject svc = new Svc()`), not one without (`@A x`; in a type body `@A _` is the type of a field with a missing name); a lowercase type after annotations takes no name either (`@A foo bar`, Groovy's declaration). An annotation's arguments, the value of each `name = value` in them, and an `@interface` element's `default` (#101) take Apache's `elementValue`: an expression, an annotation, or a list of annotations, nested to any depth (`@Foo(x = [@Bar(@Baz)])`). A list that mixes annotations and expressions (`[@A, 1]`) or holds a list of annotations inside a list (`[[@A]]`) is an `ERROR`: Apache's parser takes both, and Groovy rejects them when it checks the annotation. Outside those three places an annotation is not a value, so `foo(@A)` and `x = [@A]` stay `ERROR`s. The arguments also take the forms of a call's arguments that Apache's one value or list of pairs does not (`@Foo(1, 2)`, `@Foo(x: 1)`, a trailing comma), and an annotation goes wherever an expression does among them (`@A(@B, @C)`, `@A(@B, a = 1)`, `@A(@B,)`), except as the value of `x:`, which stays an expression. One call form is not taken: in a call, `x = a: 1` is a named argument whose key is the assignment `x = a`, while in an annotation `name =` starts a pair, so `@Foo(x = a: 1)` is an `ERROR`, as it is in Groovy. Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
+| §5.9 Annotations | **Mostly done** | `@`, `@Foo(args)`, `@a.b.Foo`, stacked; on type, member, parameter, local variable, `import` and `package` declarations, and on `for`, `while` and `do` loops, as in Groovy 6 (Groovy 4 and 5 reject an annotated loop). A for-in variable takes annotations before and after `final` (`for (@A final @B x in xs)`), as children of the `for_in_statement` after the loop's own, but not after `def` or `var` (`for (def @A x in xs)`, an `ERROR`, as `def @A x = 1` is). Not supported, each an `ERROR`: an annotation on a `catch` parameter (`catch (@A Exception e)`), a record component (`record R(@A int a)`) or a type parameter (`class C<@A T>`). An annotated typed local with no initializer parses (`@Field String x`, `@Field int a, b`), as one without annotations does (see #27 below). Annotations and modifiers come in any order (`private @Autowired Foo foo`, `public @interface X { }`, #92); after a modifier, parentheses with two or more names, or names and then `=`, are a multi-assignment's names, not an annotation's arguments (`private @B(a, b) = l`; Groovy's `elementValues` takes no list of names), see spec §6.26, and after annotations alone a local takes the name `_`, with a value or without, and a local or a field takes another name with a value (`@Field FOO = [a: 1]`, `@Subject svc = new Svc()`), not one without (`@A x`; in a type body `@A _` is the type of a field with a missing name); a lowercase type after annotations takes no name either (`@A foo bar`, Groovy's declaration). An annotation's arguments, the value of each `name = value` in them, and an `@interface` element's `default` (#101) take Apache's `elementValue`: an expression, an annotation, or a list of annotations, nested to any depth (`@Foo(x = [@Bar(@Baz)])`). A list that mixes annotations and expressions (`[@A, 1]`) or holds a list of annotations inside a list (`[[@A]]`) is an `ERROR`: Apache's parser takes both, and Groovy rejects them when it checks the annotation. Outside those three places an annotation is not a value, so `foo(@A)` and `x = [@A]` stay `ERROR`s. The arguments also take the forms of a call's arguments that Apache's one value or list of pairs does not (`@Foo(1, 2)`, `@Foo(x: 1)`, a trailing comma), and an annotation goes wherever an expression does among them (`@A(@B, @C)`, `@A(@B, a = 1)`, `@A(@B,)`), except as the value of `x:`, which stays an expression. One call form is not taken: in a call, `x = a: 1` is a named argument whose key is the assignment `x = a`, while in an annotation `name =` starts a pair, so `@Foo(x = a: 1)` is an `ERROR`, as it is in Groovy. Groovy needs `default` on the line of the `()`; here a line break before it is accepted. |
 | §5.10 Statement terminators | **Equivalent** | newline-as-terminator via `repeat($._statement)` rather than a scanner token (see #3 below). |
 | §5.11 Spread (three positions) | **Done** | `spread_arguments`, also as a list literal's element (`[*a, *b]`) and a subscript's index (`y[1, *a]`), `spread_dot_expression`, `spread_map_entry`, also as an argument (`foo(*:m, x: 1)`). The first argument of a parenthesis-free call is neither (`foo *a, 1`, `foo *:m`; see §5.5 above). |
 | §5.12 `def` positions | **Mostly done** | a typed local without an initializer (`String x`, `int a, b`) is a declaration by Apache's rule (see #27 below); `def` before a type declares a typed local or field (`def String s`, `private def Foo foo`), where the scanner reads the declaration after `def` (spec §6.21). Not taken: a lowercase type with no `<` or `[` (`def foo bar`), a modifier after `def` (`def final String x`), a return type after `def` (`def String m() { }`), and `def` with a type in a parameter (§14 below), each read as before. `var` and `final var` before a type declare as `def` does (`var String s = 'a'`). |
@@ -953,12 +953,11 @@ same line and then `{`, `<`, `extends`, `implements` or `permits`;
 line, another modifier, an annotation, `record` or `enum`. Everywhere
 else the word is an `identifier`.
 
-Groovy takes the class modifiers in any order. The grammar accepts no
-modifier after `sealed`, so `sealed abstract class S { }`,
-`sealed @A class S { }` and `sealed static class C { }` in a class body
-are an `ERROR` at `sealed`, as at v0.6.0, until modifiers are accepted
-in any order. `sealed record` and `sealed enum`, which Groovy rejects
-too, stay an `ERROR` as well.
+Groovy takes the class modifiers in any order, and so does the
+grammar: `sealed abstract class S { }`, `sealed @A class S { }` and
+`sealed static class C { }` in a class body are declarations (#92);
+they were an `ERROR` at `sealed` at v0.6.0. `sealed record` and
+`sealed enum`, which Groovy rejects too, stay an `ERROR`.
 
 v0.5.0 and v0.6.0 spelled both words as grammar literals. With
 `word: $.identifier` the lexer returns a keyword wherever the parser
@@ -993,11 +992,12 @@ so where Groovy relies on those the readings differ:
 | `private sealed` then `def run() { }` or `int x = 1` on the next line, in a class body | Groovy 4 to 6: that member with the modifiers `private sealed`, as `modifiers` takes line breaks between modifiers (read off the 4.0.x, 6 and master grammars); Groovy 3, where `sealed` is no keyword: field `sealed` and the member (observed) | field `sealed` and the member, Groovy 3's reading, as the grammar takes `sealed` only before `class`, `interface` or `trait`; at v0.6.0 the member with `sealed` an `ERROR` in it |
 | `private boolean sealed` then `static class D { }` on the next line | field `sealed` and a class (read off the 4.0.x grammar) | the same; `ERROR` at v0.6.0 |
 
-A modifier after `sealed` is an `ERROR` while the modifier order is
-fixed, so across a line break the scanner leaves the word a name and
-the last row keeps its field. Once modifiers are accepted in any order,
-looking past them to `class`, `interface` or `trait` would read the
-`sealed` then `public class` row correctly as well.
+Across a line break the scanner leaves the word a name before a
+modifier, so the last row keeps its field rather than folding it into a
+sealed class. Looking past the modifiers to `class`, `interface` or
+`trait` would read the `sealed` then `public class` row as Groovy does,
+but the last row then as one sealed class too, where Groovy reads a
+field; nothing in the look-ahead tells the two apart.
 
 `trait T(int x) { }` is a method `T` with return type `trait` and no
 `ERROR`; Groovy 3 rejects it (observed), and v0.6.0 gave an `ERROR`.
@@ -1060,20 +1060,21 @@ number and order.
 
 **Current implementation**: `formal_parameter` and `closure_parameter`
 share the helper `parameter()` in `grammar.js`: annotations, then
-`final`, then `def`, `var` or a type, the name, and a default.
+`final` and annotations after it, then `def`, `var` or a type, the
+name, and a default.
 
 | Parameter | Groovy 4.0.32 | This grammar |
 |---|---|---|
 | `@A final String x = 1`, `def x`, `var x`, `final def x`, `String... xs` | accepted | accepted |
 | `def String x` | accepted | `ERROR` |
-| `final @A x` | accepted | `ERROR` |
+| `final @A x`, `@A final @B String x`, in a method, a closure or a lambda | accepted | accepted; `final @A x` was an `ERROR` at v0.6.0 (#92) |
 | `... xs`, `def ... xs` | accepted | `ERROR` |
 
 `def` and `var` are keywords in a parameter, so `def f(def x)` has no
 `type`. `catch` parameters and `try` resources take `final` and `def`,
 `var` or a type, with no annotations.
 
-**Action**: accept the modifiers in any order and `...` with no type.
+**Action**: accept `def` before a type and `...` with no type.
 A closure body can open with the same words, so each added form has to
 be checked against the forks listed in §5.8 of the spec. Tracked in
 #98.
@@ -1371,11 +1372,11 @@ an upper-case letter or `c` is followed by `=`: `a.b.C x` and
 `a.b c = 1` are declarations.
 
 **Current implementation** (#52): the receiver of `command_chain` may be
-a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`)
-written without spaces, built of the same nodes as in an expression. A
-statement with such a receiver holds `_command_path_start`, an empty
-token between the first name and the first access that the scanner
-emits only when a literal, a key, a `new`, an array type value or a
+a name followed by member accesses (`.`, `?.`, `??.`, `*.`, `.&`, `.@`,
+`?.@`, `??.@`, `*.@`) written without spaces, built of the same nodes
+as in an expression. A statement with such a receiver holds
+`_command_path_start`, an empty token between the first name and the
+first access that the scanner emits only when a literal, a key, a `new`, an array type value or a
 name follows the receiver on its line (spec §6.14); the value form's
 `_command_value_start` reads the same receivers before them. The
 arguments are those of the value form: the first is a whole expression
@@ -1416,7 +1417,7 @@ The Groovy column was observed by running Groovy 3.
 | `x.y 2` then `++i` on the next line | `x.y(2)`, then `++i` | the call with the argument `2++`, then `i`: the line goes on with the first argument |
 | `obj.Bar $/$a/$() { }`, or `"$a"`, `"${a}"` or `"""$a"""` in place of the string, with `def` typed on the line before and deleted again | a call with the argument `$/$a/$(…)` | a call from scratch; the reparse after the deletion reads a method that returns `obj.Bar` and is named by the string, neither with an `ERROR`: the runtime ignores an empty token during the error recovery of the text with `def`, and the reparse reuses the `.` after `obj` without calling the scanner, so `_command_path_start` is not emitted (spec §6.14). v0.6.0 reads the method from scratch too. `bindings/rust/tests/incremental_reparse.rs` pins both trees |
 | `obj.m 1, *xs` | a call | a call; before, an `ERROR` |
-| `obj.m 'a': 1` | a call | `ERROR` |
+| `obj.m 'a': 1`, `def r = obj.m 'a': 1` | a call | a call; before, an `ERROR` |
 
 **Action**: none planned for the spaced and multi-line receivers. A
 receiver that ends in a call or a subscript needs the scanner to read
@@ -1449,16 +1450,16 @@ it elsewhere.
 modifiers, in a type body or as a statement. The rule,
 `_default_method_declaration`, is aliased to `method_declaration` and
 has its weights (§6). Other modifiers may come before and after
-`default`, as they come in any order among themselves. After them the
-return type is optional, and a member with none is a method, where
+`default`, and annotations after the first of them, as they come in
+any order among themselves. After them the return type is optional, and a member with none is a method, where
 after other modifiers it is a constructor (`public m() { }`): the
 modifier is meaningless on a constructor. The modifier is an anonymous
 `default` child before the `name`; an `@interface` element's default
 is the `default` field after the parameters, and no method has both.
 A class, interface, trait, enum or record declaration takes `default`
 among its modifiers too, at the top level or nested, through the
-hidden `_type_modifiers`. An `@interface` declaration takes no
-modifiers. Fields, constructors, compact constructors, initializers
+hidden `_type_modifiers`, and so does an `@interface` declaration
+(`public @interface X { }`, `default @interface Z { }`; #92). Fields, constructors, compact constructors, initializers
 and local variables do not take it, and each is an `ERROR` with it.
 
 `default` is therefore a keyword wherever a member or a statement can
@@ -1537,7 +1538,7 @@ parse records; the rows marked `.g4` are read off the grammar.
 | `final default int X = 1`, `default final int X = 1` | a field `X` | `ERROR`; before, a field `default`, or one of type `default`, and the field `X` |
 | `default static { }` | rejected | `ERROR`; before, a field `static` of type `default` and an initializer |
 | `default int x = 1` in a block | a local variable | `ERROR`; before, the expression `default` and a declaration |
-| `default @Override void b() { }` | a method | `ERROR`, as is any annotation after a modifier (#92) |
+| `default @Override void b() { }` | a method | a method; before, an `ERROR`, as was any annotation after a modifier (#92) |
 | `default = 1`, `default.x()`, `return default`, `break default`, `String default`, `final default = 1`, `void default() { }`, `{ default -> 1 }`, `println default`, `if (x) a() else default`, `static default = 1` and `private default` in a class, `enum E { default }` | rejected: `default` is reserved | `ERROR`; before, `default` was a name |
 | `x = default`, `foo(default)`, `[default]`, `throw default`, `assert default`, `def default = 1`, `def default() { }`, `def f(default) { }`, `for (default in xs) { }`, `void default() { }` in a class | rejected | `default` is a name, as before |
 | `foo.default`, `[default: 1]`, `foo(default: 1)`, `foo 'a', default: 1` | a property, a key | the same, as before |
@@ -2732,3 +2733,26 @@ in a type body (`_untyped_method_declaration`).
 **Action**: none planned here. Taking the older forms out of blocks
 and closures, or requiring their body in a script, changes trees that
 parse with no `ERROR` today.
+
+## 35. Space between a member access and `@`
+
+**Apache `GroovyParser.g4`** (master): `pathElement` takes `NL*`
+between the operator and the `@` (`DOT NL* (AT | …)?` and
+`(SPREAD_DOT | SAFE_DOT | SAFE_CHAIN_DOT) NL* (AT | …)?`), and the
+lexer hides spaces and comments between tokens, so Groovy takes
+spaces, comments and line breaks between the operator and the `@`, and
+spaces after the `@`.
+
+**Current implementation**: `.@`, `?.@`, `??.@` and `*.@` are each one
+token, so nothing may stand between the operator and the `@`. A space
+after the `@` is trivia, as after any other token.
+
+| Input | Groovy | This grammar |
+|---|---|---|
+| `obj.@f`, `obj?.@f`, `obj??.@f`, `obj*.@f`, `obj?.@ f` | a direct field access | the same |
+| `obj. @f`, `obj?. @f`, `obj*. @f`, `obj?.` then `@f` on the next line | a direct field access | an `ERROR` at the `@` |
+
+**Action**: none planned. Reading the `@` apart from the operator
+would need the scanner to tell it from an annotation that opens the
+next line; real code writes the operator whole (none of the 21,667
+files of the real-code comparison has a space or a line break there).

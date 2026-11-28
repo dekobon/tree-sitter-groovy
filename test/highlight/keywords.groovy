@@ -109,6 +109,8 @@ default enum Level { LOW }
 // <- keyword.modifier
 default record Pair(int a) { }
 // <- keyword.modifier
+default @interface Note { }
+// <- keyword.modifier
 
 default void script() { }
 // <- keyword.modifier

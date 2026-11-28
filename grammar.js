@@ -77,7 +77,7 @@ const PREC = {
   // no binary operator, so `(int) a ** b` is `((int) a) ** b`.
   CAST: 18,                   // (T) x
   POSTFIX: 19,                // postfix ++ --, []
-  ACCESS: 20,                 // . ?. ??. *. .& .@ ::
+  ACCESS: 20,                 // . ?. ??. *. .& .@ ?.@ ??.@ *.@ ::
   PRIMARY: 21,                // literals, identifiers, ()
   // Type-context only — never competes with the expression ladder
   // above. Shares CONDITIONAL's numeric value by accident; the two
@@ -435,16 +435,22 @@ function typeDeclarations($) {
 
 /**
  * The optional Groovy 4 `sealed` or `non-sealed` before `class`,
- * `interface` or `trait`. `sealed` comes from the scanner, which emits
- * it only when one of those words follows (SPECIFICATION.md §6.13).
- * `non-sealed` is a single token so that its dash is not lexed as
- * subtraction.
+ * `interface` or `trait`, with the modifiers and annotations that may
+ * follow it (`sealed abstract class W { }`, Groovy's own
+ * `SealedSpecificationTest`): Apache's `classOrInterfaceModifiers` takes
+ * them in any order. `sealed` comes from the scanner, which emits it
+ * before one of those words, a modifier or an annotation on its line
+ * (SPECIFICATION.md §6.13). `non-sealed` is a single token so that its
+ * dash is not lexed as subtraction.
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @returns {ChoiceRule} The optional modifier.
  */
 function sealedModifier($) {
-  return optional(choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')));
+  return optional(seq(
+    choice(alias($._sealed_keyword, 'sealed'), token('non-sealed')),
+    optional($._annotated_modifiers),
+  ));
 }
 
 /**
@@ -501,14 +507,14 @@ function constructorDeclaration($, modifiers) {
 function methodHead($, beforeParameters = choice(
   seq(
     repeat($.annotation),
-    repeat($._modifier),
+    optional($._modifiers),
     optional(field('type_parameters', $.method_type_parameters)),
     choice('def', field('return_type', $._type)),
     field('name', $._property_name),
   ),
   seq(
     repeat($.annotation),
-    repeat1($._modifier),
+    $._modifiers,
     $._untyped_method_name,
   ),
 )) {
@@ -543,7 +549,7 @@ function untypedMethodHead($) {
       ),
       seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        $._modifiers,
         field('type_parameters', $.method_type_parameters),
       ),
     ),
@@ -569,14 +575,28 @@ function methodDeclaration($, head, bodyRequired = false) {
 }
 
 /**
+ * `final` before a parameter or a local, with the annotations that may
+ * follow it. Apache's `variableModifier` takes `final` and annotations
+ * in any order; annotations before `final` stay in the declaration's
+ * own `repeat($.annotation)`, so each annotation has one place to go.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {SeqRule} `final` and its annotations.
+ */
+function finalModifier($) {
+  return seq('final', repeat($.annotation));
+}
+
+/**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
- * annotations, `final`, then `def`, `var` or a type (a `varargs_type`
- * included), the name, and a default value.
+ * annotations, `final` and annotations after it (`finalModifier`), then
+ * `def`, `var` or a type (a `varargs_type` included), the name, and a
+ * default value.
  *
- * Apache's `variableModifiersOpt` is wider: annotations and modifiers
- * in any order, `def` or `var` together with a type, and `...` with no
- * type. Those are not accepted (divergence 14).
+ * Apache's `variableModifiersOpt` is wider: `def` or `var` together
+ * with a type, and `...` with no type. Those are not accepted
+ * (divergence 14).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
  * @param {RuleOrLiteral} [value] The rule of a default value.
@@ -587,7 +607,7 @@ function parameter($, value = $._expression) {
   return choice(
     seq(
       repeat($.annotation),
-      optional('final'),
+      optional(finalModifier($)),
       optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
       defaultValue,
@@ -648,11 +668,12 @@ function multiAssignmentName($) {
  * parser has reduced (`_multi_assignment_tail`).
  *
  * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @param {RuleOrLiteral} [open] The opening parenthesis.
  * @returns {RuleOrLiteral[]} The parentheses and what they hold, in order.
  */
-function multiAssignmentNames($) {
+function multiAssignmentNames($, open = '(') {
   return [
-    '(',
+    open,
     $._multi_assignment_list,
     repeat(seq(',', multiAssignmentName($))),
     ')',
@@ -671,6 +692,7 @@ function commandArgumentsAfterFirst($) {
   return repeat(seq(',', field('argument', choice(
     alias($._command_named_argument, $.named_argument),
     alias($._command_continued_named_argument, $.named_argument),
+    alias($._command_string_named_argument, $.named_argument),
     $._expression,
     $.spread_arguments,
     $.spread_map_entry,
@@ -690,6 +712,7 @@ function commandArguments($) {
     field('argument', choice(
       $._expression,
       alias($._command_named_argument, $.named_argument),
+      alias($._command_string_named_argument, $.named_argument),
     )),
     commandArgumentsAfterFirst($),
   );
@@ -707,6 +730,9 @@ const COMMAND_PATH_ACCESSES = [
   ['spread_dot_expression', '*.', 'property'],
   ['method_pointer_expression', '.&', 'method'],
   ['direct_field_access_expression', '.@', 'field'],
+  ['safe_direct_field_access_expression', '?.@', 'field'],
+  ['safe_chain_direct_field_access_expression', '??.@', 'field'],
+  ['spread_direct_field_access_expression', '*.@', 'field'],
 ];
 
 /**
@@ -927,6 +953,19 @@ function argumentList(argument) {
   );
 }
 
+/**
+ * The operators of `assignment_expression`: plain `=`, every augmented
+ * form and Elvis-assign `?=`, as in Apache's `#assignmentExprAlt`.
+ * `_element_assignment` takes the same ones.
+ */
+const ASSIGNMENT_OPERATORS = [
+  '=',
+  '+=', '-=', '*=', '/=', '%=', '**=',
+  '<<=', '>>=', '>>>=',
+  '&=', '^=', '|=',
+  '?=',
+];
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -943,7 +982,7 @@ module.exports = grammar({
   // call `(Foo)(y)(z)`. With the element directly in the list the cast
   // wins, as at v0.6.0 and as in Groovy; a hidden `_list_element` node
   // made the runtime keep the call. Inlined, it costs 3 parse states.
-  inline: $ => [$._list_element],
+  inline: $ => [$._list_element, $._modifiers],
 
   // §5.2 — `new` is a hard keyword. Keyword extraction alone still
   // lexes it as `identifier` wherever the keyword has no action,
@@ -1018,13 +1057,15 @@ module.exports = grammar({
   // orders must match. No rule references `_lambda_body_reread` either:
   // the scanner emits it where no rule takes it (§6.19, §6.22). The scanner
   // never emits `_string_body`, `_type_start`, `_closure_parameters_start`,
-  // `_type_only_close`, `_body_block_end` or `_slash_divides`, nor
-  // `_error_sentinel`: a string body, a type, closure parameters, the cast
-  // of an array or generic type whose operand is on a later line, the block
-  // that is the body of `if`, `else`, a loop or an arrow case, and the `)`
-  // of a condition or of a method's parameters and the `}` of a block or a
-  // type's body reference the first six so that the scanner can tell it is
-  // inside one or where one may start or end.
+  // `_type_only_close`, `_body_block_end`, `_slash_divides` or
+  // `_annotation_arguments_may_follow`, nor `_error_sentinel`: a string
+  // body, a type, closure parameters, the cast of an array or generic type
+  // whose operand is on a later line, the block that is the body of `if`,
+  // `else`, a loop or an arrow case, the `)` of a condition or of a
+  // method's parameters and the `}` of a block or a type's body, and an
+  // annotation whose arguments may follow its name reference the first
+  // seven so that the scanner can tell it is inside one or where one may
+  // start or end.
   // New tokens go last but for the sentinel, so that they renumber no
   // symbol before them: `_statement_paren`, first listed after
   // `_subscript_open`, renumbered the symbols after it there, which changed
@@ -1203,6 +1244,27 @@ module.exports = grammar({
     // division, so the scanner opens no slashy string there that starts
     // with a space or runs across lines.
     $._slash_divides,
+    // §6.26 — the `@` of `@interface`, emitted only when the keyword
+    // `interface` follows it. A separate token from the `@` of an
+    // annotation, so that after a complete list of modifiers the `@` of
+    // an annotation is not valid: a reparse that reuses the list before
+    // an inserted annotation (`private` then `@A int b`) breaks it down
+    // and reads the annotation into it.
+    $._annotation_type_at,
+    // §6.26 — the `(` of a multi-assignment after modifiers alone, or after
+    // `final` and annotations (`_modified_multi_assignment_tail`); right
+    // after an annotation's name it is emitted only when two or more names,
+    // or names, `)` and `=`, follow.
+    $._multi_assignment_open,
+    // §6.27 — `_command_value_start` where `_element_assignment` is valid
+    // too, which then takes the call.
+    $._command_key_value_start,
+    // §6.26 — never emitted: valid only right after an annotation's
+    // name, where its arguments may follow. The scanner reads the `(` of
+    // a multi-assignment after modifiers with a look-ahead only there;
+    // after a modifier keyword or an annotation's arguments no
+    // annotation's arguments can open, so the `(` is the names'.
+    $._annotation_arguments_may_follow,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1284,7 +1346,9 @@ module.exports = grammar({
     // the first token that only one reading accepts.
     //
     // `{ final x -> }` vs. a body opening with a final local (#56) or
-    // with a modified declaration; all three stay alive at `final`.
+    // with a modified declaration; all three stay alive at `final`, and
+    // past the annotations that may follow it (`{ final @A x -> }`, a
+    // final local `final @A String s = …`, Apache `variableModifiers`).
     [$._modifier, $.local_variable_declaration, $.closure_parameter],
     // `{ final def (a, b) = … }`: the same fork, no wider.
     [$._modifier, $.local_variable_declaration, $.multi_assignment_declaration, $.closure_parameter],
@@ -1419,7 +1483,11 @@ module.exports = grammar({
     // (`foo a bar`) are not taken. Closes a subset of murtaza64 #5.
     command_chain: $ => prec(2, seq(
       field('receiver', $.identifier),
-      field('argument', choice($._command_argument, alias($._command_named_argument, $.named_argument))),
+      field('argument', choice(
+        $._command_argument,
+        alias($._command_named_argument, $.named_argument),
+        alias($._command_string_named_argument, $.named_argument),
+      )),
       commandArgumentsAfterFirst($),
     )),
 
@@ -1440,6 +1508,42 @@ module.exports = grammar({
     // (`def r = obj.method 1`), which the scanner reads with the name.
     _value_command_chain: $ => prec.right(seq(
       $._command_value_start,
+      field('receiver', choice($.identifier, $._command_path)),
+      commandArguments($),
+    )),
+
+    // §6.27 — an assignment whose value is a parenthesis-free call, as a
+    // list element or a call's argument (`[x = foo 'a': 1]`,
+    // `bar(x = foo 'a': 1)`), aliased to `assignment_expression`. There an
+    // assignment may also be the key of a map entry or a named argument
+    // (`map_entry` takes any `_expression`), so a `:` may follow its value,
+    // and the -1 of `_command_string_named_argument` gave the `:` after a
+    // string argument to that key: `[x = foo 'a': 1]` was a map entry keyed
+    // by `x = foo 'a'`. Groovy takes no assignment as a key
+    // (`mapEntryLabel`, `namedPropertyArgLabel`) and calls `foo` with
+    // `'a': 1`. This twin is live beside `assignment_expression` there, and
+    // the scanner emits `_command_key_value_start` in place of
+    // `_command_value_start` where it is valid, so the call is the twin's,
+    // which is no key: only the string key's `:` follows the string. Both
+    // shift the same tokens up to the call, so it costs no reduction and no
+    // fork. A key narrowed to exclude assignments cost a reduction per list
+    // element and argument instead. An assignment whose value is a call is
+    // then no key: `[x = foo 1: 2]` is an `ERROR`, as a number is no key of
+    // a call here (§6.8), where Groovy reads `[x = foo(1: 2)]`.
+    _element_assignment: $ => choice(...ASSIGNMENT_OPERATORS.map(op =>
+      prec.right(PREC.ASSIGN, seq(
+        field('left', $._expression),
+        field('operator', op),
+        field('right', choice(
+          alias($._key_value_command_chain, $.command_chain),
+          alias($._element_assignment, $.assignment_expression),
+        )),
+      )))),
+
+    // §6.27 — `_value_command_chain` opened by `_command_key_value_start`,
+    // the value of `_element_assignment`.
+    _key_value_command_chain: $ => prec.right(seq(
+      $._command_key_value_start,
       field('receiver', choice($.identifier, $._command_path)),
       commandArguments($),
     )),
@@ -1531,6 +1635,28 @@ module.exports = grammar({
       ':',
       field('value', $._expression),
     ),
+
+    // A string key (`attributes 'Main-Class': 'a.B'`, Apache's
+    // `namedArgPrimary`) needs no token. After a statement, and after most
+    // values (`def m = foo 'a': 1`), no other construct's `:` follows, so
+    // the `:` has one reading. Where the call is in a ternary's
+    // consequence, an `assert` condition, a `case` value or the key of a
+    // map entry or a named argument, the `:` may be that construct's
+    // (`y = c ? x = foo 'a' : 'b'`, `assert x = foo 'a' : 'msg'`). The -1
+    // ranks the shift of that `:` below the reduction of the string to an
+    // argument, so those keep the string as an argument. That is Apache's
+    // order, `expressionListElement` before `namedArg`; with no precedence
+    // the two tie and the conflict is unresolved, and a key that won
+    // (tried first for #113) broke the ternary (§6.8). In a list element
+    // or a call's argument, `_element_assignment` takes the call, which no
+    // key is, so the key is the call's there (§6.27). A step's precedence
+    // holds for the position after it, so the -1 covers the key and the
+    // `:`, and the value is back at 0, where `prec.right` keeps
+    // `foo 'b': c = 2` one argument, as for a name.
+    _command_string_named_argument: $ => prec.right(seq(
+      prec(-1, seq(field('key', $.string_literal), ':')),
+      field('value', $._expression),
+    )),
 
     // After a comma a newline cannot end the statement, so a key on a
     // continuation line (`sh script: 'make',` then `returnStdout: true`)
@@ -1933,10 +2059,44 @@ module.exports = grammar({
     // in each declaration: the modifiers reduce to it at the
     // declaration keyword, so the header after it has one production
     // whether or not `default` is there.
-    _type_modifiers: $ => choice(
-      repeat1($._modifier),
-      seq(repeat($._modifier), 'default', repeat($._modifier)),
+    _type_modifiers: $ => choice($._modifiers, $._default_modifiers),
+
+    // Modifiers with `default` among them, which a type (divergence 20)
+    // and an interface method (`_default_method_declaration`) may carry:
+    // one rule for both, so that the list after `default` is one
+    // production whichever declaration follows.
+    _default_modifiers: $ => seq(
+      optional($._modifiers),
+      'default',
+      optional($._annotated_modifiers),
     ),
+
+    // One or more modifiers, with annotations among them after the
+    // first: Apache's `modifiers` and `classOrInterfaceModifiers` take
+    // annotations and modifiers in any order, so a field's `private` may
+    // come before its annotation, as may a method's `public`. Annotations
+    // before the first modifier stay in the declaration's own
+    // `repeat($.annotation)`, so each annotation has one place to go.
+    // Every member and type declaration takes its modifiers through this
+    // rule, but for the constructor after an enum's trailing comma
+    // (`_modified_constructor_declaration`, access modifiers only); locals,
+    // parameters and a for-in variable take `finalModifier`. It is
+    // inlined, so the modifiers are leaves of the declaration, as at
+    // v0.6.0: a reparse reuses them leaf by leaf, and the stack versions
+    // after the member before them merge where they did (as a node of
+    // its own, the list was reused by one version and read again by the
+    // others). The `@` of `@interface` and the `(` of a multi-assignment
+    // after modifiers alone are scanner tokens (§6.26), so after a
+    // complete list neither the `@` of an annotation nor the `(` of its
+    // arguments is valid, and the table has no fork at either.
+    _modifiers: $ => seq($._modifier, optional($._annotated_modifiers)),
+
+    // Modifiers and annotations in any order: what follows the first
+    // modifier in `_modifiers`, and what follows `sealed`
+    // (`sealedModifier`) or `default` (`_type_modifiers`,
+    // `_default_method_declaration`). One rule holds that list
+    // everywhere.
+    _annotated_modifiers: $ => repeat1(choice($._modifier, $.annotation)),
 
     permits_clause: $ => seq(
       'permits',
@@ -1951,7 +2111,8 @@ module.exports = grammar({
     // cannot fire here.
     annotation_type_declaration: $ => seq(
       repeat($.annotation),
-      '@',
+      optional($._type_modifiers),
+      alias($._annotation_type_at, '@'),
       'interface',
       field('name', $.identifier),
       field('body', alias($._annotation_type_body, $.class_body)),
@@ -2037,17 +2198,29 @@ module.exports = grammar({
     // tell constructors apart from methods. `prec(3, …)` wins over
     // both field and method when the identifier is followed by `(`
     // and no return type precedes it.
-    constructor_declaration: $ => constructorDeclaration($, repeat($._modifier)),
+    constructor_declaration: $ => constructorDeclaration($, optional($._modifiers)),
 
     // The constructor form for the member directly after an enum's
     // trailing comma (see `enum_declaration`). Only access modifiers
-    // qualify: `static f() { }` there is a method. The weight is above
+    // qualify, with annotations among them after the first
+    // (`private @Foo F() { }`): `static f() { }` and
+    // `private @Foo static f() { }` there are methods. The access
+    // modifiers before the first annotation stay a `repeat1`, so that
+    // `private` forks with `_modifier` as before (see `conflicts`); a
+    // `choice` there lets the rule's precedence settle the fork for the
+    // constructor. The weight is above
     // a method with a body, which matches the same text through its
     // modifier-only form.
-    _modified_constructor_declaration: $ => weighted(4, constructorDeclaration(
-      $,
-      repeat1(choice('public', 'private', 'protected')),
-    )),
+    _modified_constructor_declaration: $ => {
+      // The access modifiers, the subset of `_modifier` a constructor
+      // takes here; a change to the modifiers of `_modifiers` may need to
+      // reach this list too.
+      const access = choice('public', 'private', 'protected');
+      return weighted(4, constructorDeclaration(
+        $,
+        seq(repeat1(access), repeat(seq($.annotation, repeat(access)))),
+      ));
+    },
 
     // §4 — `static { … }` class-body initializer block. Runs once
     // when the class is loaded. Distinct node kind so downstream
@@ -2065,9 +2238,9 @@ module.exports = grammar({
     //
     // A modifier alone (no `def`, no type) also introduces a field —
     // `static MEDIUM_TTL = 900` infers Object, a common constant-field
-    // idiom. Gated behind `repeat1($._modifier)` (not `repeat`) so this
-    // alternative can't match a bare, modifier-less identifier, which
-    // would collide with a plain expression_statement.
+    // idiom. Gated behind `_modifiers`, which needs at least one
+    // modifier, so this alternative can't match a bare, modifier-less
+    // identifier, which would collide with a plain expression_statement.
     field_declaration: $ => choice(
       // Prefer the typed field when both parses succeed, rather than
       // splitting `private final int v\n C() {}` after `int`. The
@@ -2075,7 +2248,7 @@ module.exports = grammar({
       // method (`v C() {}`), which would otherwise tie.
       weighted(TYPED_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat($._modifier),
+        optional($._modifiers),
         // `def` is a modifier in Apache's `variableDeclaration`, so a type
         // may follow it (`private def Foo foo`). The scanner opens that
         // type as it opens a typed local's (§6.21), so `def x` keeps its
@@ -2098,7 +2271,7 @@ module.exports = grammar({
       // a comment between the two members made the split win.
       weighted(MODIFIER_ONLY_FIELD_WEIGHT, seq(
         repeat($.annotation),
-        repeat1($._modifier),
+        $._modifiers,
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       )),
@@ -2176,9 +2349,7 @@ module.exports = grammar({
     // outrank it.
     _default_method_declaration: $ => methodDeclaration($, methodHead($, seq(
       repeat($.annotation),
-      repeat($._modifier),
-      'default',
-      repeat($._modifier),
+      $._default_modifiers,
       optional(field('type_parameters', $.method_type_parameters)),
       optional(choice('def', field('return_type', $._type))),
       field('name', $._property_name),
@@ -2413,7 +2584,7 @@ module.exports = grammar({
     // then `R { }`; see COMPACT_CONSTRUCTOR_WEIGHT for its value.
     compact_constructor_declaration: $ => weighted(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
       repeat($.annotation),
-      repeat($._modifier),
+      optional($._modifiers),
       optional('def'),
       field('name', $.identifier),
       field('body', $.block),
@@ -2513,21 +2684,21 @@ module.exports = grammar({
     local_variable_declaration: $ => prec.right(choice(
       seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         choice('def', varKeyword($)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        optional('final'),
+        optional(finalModifier($)),
         field('type', $._type),
         $._initialized_declarator,
         repeat(seq(',', $._typed_declarator)),
       )),
       seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
@@ -2536,7 +2707,7 @@ module.exports = grammar({
       // (§6.14); `final String s new Foo()` still declares `s`.
       weighted(2, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2548,7 +2719,7 @@ module.exports = grammar({
       // the closure with two parameters, and the declaration won.
       weighted(TYPED_LOCAL_WEIGHT, seq(
         repeat($.annotation),
-        'final',
+        finalModifier($),
         field('type', $._type),
         optional($._command_statement_start),
         field('name', $.identifier),
@@ -2574,13 +2745,56 @@ module.exports = grammar({
       // (Apache's `modifier` lists `VAR`): `var String s = 'a'`.
       seq(
         repeat($.annotation),
-        optional(seq(optional('final'), choice('def', varKeyword($)))),
+        optional(seq(optional(finalModifier($)), choice('def', varKeyword($)))),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,
         repeat(seq(',', $._typed_declarator)),
       ),
+      // An error production: `_missing_value` matches no input, so only
+      // recovery completes it. After annotations that follow `final`, the
+      // declaration that the same words may open (`_modifiers`, §6.26) is a
+      // stack version of its own, and the local's had no action for a
+      // modifier or a declaration keyword, so the keyword lexed as a name:
+      // `final @A class X { }` was a local `X` of type `class` and a block,
+      // and `final @A static int x = 1` a local `static`. Here each of those
+      // words has an action, so it lexes as the keyword, and this reading
+      // ends at the token after it. The scanner's keywords are among them,
+      // as no reserved set holds a word the scanner decides.
+      // `_final_reserved_name` makes every other keyword of Groovy one here
+      // too (`final @A while = 1`).
+      seq(
+        repeat($.annotation),
+        'final',
+        repeat1($.annotation),
+        choice(
+          seq(
+            choice(
+              $._modifier,
+              'default',
+              'class',
+              'interface',
+              'enum',
+              alias($._trait_keyword, 'trait'),
+              alias($._record_keyword, 'record'),
+              alias($._sealed_keyword, 'sealed'),
+              token('non-sealed'),
+              alias($._annotation_type_at, '@'),
+            ),
+            field('name', alias($._missing_value, $.identifier)),
+          ),
+          seq(field('name', $._final_reserved_name), $._missing_value),
+        ),
+      ),
     )),
+
+    // A name of the error production above, with the reserved set of a
+    // method's name. A rule of its own: the token after the annotations
+    // is lexed in the state that completes the last of them, whose
+    // reserved set comes from the rules that may follow it, never from a
+    // token's own `reserved`. After `final` alone the state holds the items
+    // of an untyped method's name, which carry that set already.
+    _final_reserved_name: $ => reserved('untyped_method_name', $.identifier),
 
     // A declarator of a typed form, with or without an initializer. The
     // name and the value are fields of the declaration, as in
@@ -2686,11 +2900,20 @@ module.exports = grammar({
     multi_assignment_declaration: $ => seq(
       repeat($.annotation),
       choice(
-        seq(optional('final'), 'def'),
-        seq('final', optional(varKeyword($))),
-        alias($._var_names_keyword, 'var'),
+        seq(
+          choice(
+            seq(optional(finalModifier($)), 'def'),
+            seq('final', optional(varKeyword($))),
+            seq('final', repeat1($.annotation), varKeyword($)),
+            alias($._var_names_keyword, 'var'),
+          ),
+          $._multi_assignment_tail,
+        ),
+        // Annotations after `final` and no `var`: the `(` is the token of
+        // `_modified_multi_assignment_tail`, so that a plain `(` there
+        // opens the last annotation's arguments.
+        seq('final', repeat1($.annotation), $._modified_multi_assignment_tail),
       ),
-      $._multi_assignment_tail,
     ),
 
     // The same in a type body, Apache `fieldDeclaration`, with the
@@ -2701,10 +2924,57 @@ module.exports = grammar({
     _multi_assignment_field: $ => seq(
       repeat($.annotation),
       choice(
-        seq(repeat($._modifier), choice('def', alias($._var_names_keyword, 'var'))),
-        repeat1($._modifier),
+        seq(
+          optional($._modifiers),
+          choice('def', alias($._var_names_keyword, 'var')),
+          $._multi_assignment_tail,
+        ),
+        seq($._modifiers, $._modified_multi_assignment_tail),
       ),
-      $._multi_assignment_tail,
+    ),
+
+    // The names after modifiers alone (`private @Lazy (int x, String y) =
+    // load()`), opened by a `(` of its own (§6.26). Right after an
+    // annotation's name, where the `(` may open the annotation's
+    // arguments, the scanner emits it only when the names, `)` and `=`
+    // follow, as for `var` alone (§6.16), or two or more names do: a plain
+    // `(` there opens the arguments, so the table needs no fork. Without an
+    // `=`, as while the declaration is typed, two or more names are still
+    // the names (`private @A(e, f)`), as an annotation's arguments never
+    // are; one name is not. After a modifier keyword or an annotation's
+    // arguments no arguments can open, and the scanner emits it before any
+    // names (`private (a)` misses its value). After a list of modifiers
+    // that a reparse reuses, a plain `(` is not valid, so the parser
+    // breaks the list down and reads an annotation's arguments into it.
+    _modified_multi_assignment_tail: $ => choice(
+      seq(
+        ...multiAssignmentNames($, alias($._multi_assignment_open, '(')),
+        '=',
+        field('value', enhancedStatementExpression($)),
+      ),
+      seq($._modified_multi_assignment_valueless, optional(',')),
+    ),
+
+    // The error productions of `_multi_assignment_valueless`, with the `(`
+    // of `_modified_multi_assignment_tail`. A rule of their own for the
+    // reason that one is: the runtime inserts the missing value only where
+    // the next token then reduces a rule, so that a `,` after the `=`
+    // (`private (a, b) =,` before the next member) recovers with the value
+    // missing rather than in an `ERROR` that takes the next member.
+    _modified_multi_assignment_valueless: $ => choice(
+      weighted(MISSING_VALUE_WEIGHT, seq(
+        $._modified_multi_assignment_names,
+        field('value', alias($._missing_value, $.identifier)),
+      )),
+      seq(
+        ...multiAssignmentNames($, alias($._multi_assignment_open, '(')),
+        '=',
+        field('value', alias($._missing_value, $.identifier)),
+      ),
+    ),
+
+    _modified_multi_assignment_names: $ => seq(
+      ...multiAssignmentNames($, alias($._multi_assignment_open, '(')),
     ),
 
     // The names in their parentheses, then the `=` and the value, which
@@ -2814,7 +3084,10 @@ module.exports = grammar({
     annotation: $ => seq(
       '@',
       field('name', $.qualified_name),
-      optional(field('arguments', alias($._annotation_arguments, $.argument_list))),
+      optional(choice(
+        field('arguments', alias($._annotation_arguments, $.argument_list)),
+        $._annotation_arguments_may_follow,
+      )),
     ),
 
     // Apache's `elementValues` is one element value or a list of pairs.
@@ -2874,11 +3147,18 @@ module.exports = grammar({
     // for-header is not an expression position. The `in` is the
     // operator's scanner token (§6.16), so the loop variable and an
     // expression in a classic `for` init still fork on one token.
+    // The variable takes annotations before and after `final`, as
+    // Apache's `variableModifiersOpt` does (`for (@A final @B x in xs)`).
+    // They are children of the statement, after the `(`, as the loop's own
+    // are before `for`: with a field of their own the annotations would
+    // be another repeat than those of the classic for's local, whose
+    // tokens are the same up to `in` or `:`, and that conflicts.
     for_in_statement: $ => seq(
       repeat($.annotation),
       'for',
       '(',
-      optional('final'),
+      repeat($.annotation),
+      optional(finalModifier($)),
       optional(choice('def', varKeyword($), field('type', $._type))),
       field('variable', $.identifier),
       choice(alias($._in_keyword, 'in'), ':'),
@@ -2948,6 +3228,9 @@ module.exports = grammar({
       $.spread_dot_expression,
       $.method_pointer_expression,
       $.direct_field_access_expression,
+      $.safe_direct_field_access_expression,
+      $.safe_chain_direct_field_access_expression,
+      $.spread_direct_field_access_expression,
       $.method_reference_expression,
       $.object_creation_expression,
       $.array_creation_expression,
@@ -3408,7 +3691,7 @@ module.exports = grammar({
       )),
     ),
 
-    // §3.1 ACCESS tier / §3.2 — seven distinct node kinds for the
+    // §3.1 ACCESS tier / §3.2 — ten distinct node kinds for the
     // dot family. All at PREC.ACCESS left-associative so chains like
     // `a.b.c` parse `(a.b).c`. Right operand is the property /
     // field / method name (an identifier; method_reference also
@@ -3452,6 +3735,26 @@ module.exports = grammar({
     direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
       field('object', $._expression),
       '.@',
+      field('field', $._property_name),
+    )),
+
+    // Apache `pathElement` takes the `@` of a direct field access after
+    // `?.`, `??.` and `*.` as well as after `.`.
+    safe_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '?.@',
+      field('field', $._property_name),
+    )),
+
+    safe_chain_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '??.@',
+      field('field', $._property_name),
+    )),
+
+    spread_direct_field_access_expression: $ => prec.left(PREC.ACCESS, seq(
+      field('object', $._expression),
+      '*.@',
       field('field', $._property_name),
     )),
 
@@ -3604,6 +3907,7 @@ module.exports = grammar({
 
     _argument: $ => choice(
       enhancedExpression($),
+      alias($._element_assignment, $.assignment_expression),
       alias($.map_entry, $.named_argument),
       $.spread_arguments,
       // Apache `namedArg: … | MUL COLON nls expression`: `foo(*:m, x: 1)`.
@@ -3685,20 +3989,12 @@ module.exports = grammar({
     // and Elvis-assign `?=`. The operator field distinguishes them.
     // Right-associative per Apache. ASSIGN is the loosest precedence
     // tier and binds looser than CONDITIONAL above it.
-    assignment_expression: $ => {
-      const ops = [
-        '=',
-        '+=', '-=', '*=', '/=', '%=', '**=',
-        '<<=', '>>=', '>>>=',
-        '&=', '^=', '|=',
-        '?=',
-      ];
-      return choice(...ops.map(op => prec.right(PREC.ASSIGN, seq(
+    assignment_expression: $ => choice(...ASSIGNMENT_OPERATORS.map(op =>
+      prec.right(PREC.ASSIGN, seq(
         field('left', $._expression),
         field('operator', op),
         field('right', enhancedStatementExpression($)),
-      ))));
-    },
+      )))),
 
     // §4 — `(a, b) = expr`, Apache `#multipleAssignmentExprAlt`: two or
     // more names and `=` alone. Apache lists it in `expression`, so it
@@ -3880,8 +4176,8 @@ module.exports = grammar({
     // has no `->` and an implicit `it` parameter (we do NOT emit a
     // synthetic `it` per §5.8). A parameter takes what a method
     // parameter does (Apache's closure uses `formalParameterList`):
-    // annotations, `final`, then `def`, `var` or a type (varargs
-    // included), and a default; both rules are `parameter()`. The
+    // annotations, `final` and annotations after it, then `def`, `var`
+    // or a type (varargs included), and a default; both rules are `parameter()`. The
     // body may open with the same words, so the `->` decides between
     // the two readings.
     closure: $ => seq(
@@ -4048,7 +4344,11 @@ module.exports = grammar({
     // Apache `list: LBRACK expressionList[true]? COMMA? RBRACK`: an element
     // may be a spread (`[*a, 1]`), the `spread_arguments` of a call.
     // Inlined (see `inline` above).
-    _list_element: $ => choice($._expression, $.spread_arguments),
+    _list_element: $ => choice(
+      $._expression,
+      alias($._element_assignment, $.assignment_expression),
+      $.spread_arguments,
+    ),
 
     // §3.2 PRIMARY / §5.3 — map literal. `[:]` is the empty map;
     // anything else is one-or-more `key: value` entries. The

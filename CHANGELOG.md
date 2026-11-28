@@ -17,6 +17,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   annotated loop. At v0.6.0 `@A while (x) { }` was a method with the
   return type `while` and a missing name, and `@A for (x in xs) { }` an
   `ERROR`. (#106)
+- `?.@`, `??.@` and `*.@`, a direct field access after a safe
+  navigation, a safe chain dot or a spread dot, as Apache's
+  `pathElement` takes `@` after `SAFE_DOT`, `SAFE_CHAIN_DOT` and
+  `SPREAD_DOT`: a node kind each, `safe_direct_field_access_expression`,
+  `safe_chain_direct_field_access_expression` and
+  `spread_direct_field_access_expression`, with the `object` and
+  `field` of `direct_field_access_expression`, so that `people*.@name`
+  (each element's field) and `people*.name` (each getter) stay apart.
+  Each was an `ERROR` under the access without `@`, as at v0.6.0. They
+  join a parenthesis-free call's receiver (`obj?.@handler 1`), which the
+  scanner reads for the statement's start (`SPECIFICATION.md` §6.14),
+  after a closure call or a name after one (`foo { }.bar?.@baz 1`,
+  §6.24) and in parentheses that open a line (`(obj?.@h 1, 2)`, §6.18).
+  `highlights.scm` captures the operators as `@operator` and the field
+  as `@property`. No corpus tree changes; 12 of 21,667 real files parse without an `ERROR`, and every
+  tree that changes had an `ERROR` before (`SPECIFICATION.md` §3.2)
+  (#112).
 - An interpolation takes the lazy form `"${-> x}"`, a closure without
   parameters, as Apache's `gstringValue` takes a `closure`: the `->` is a
   `closure_parameters` leaf before the `value`
@@ -1053,6 +1070,79 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   No corpus tree changes. 61 of 21,667 real files parse without an
   `ERROR`. In that sample 62 trees change, and each had an `ERROR`
   before (`SPECIFICATION.md` §4) (#114).
+- A parenthesis-free call takes a string key, as Apache's
+  `namedArgPrimary` does: Gradle's `attributes 'Main-Class': 'a.B'`,
+  `foo "$k": 1`, `foo a: 1, 'b': 2`, after a dotted receiver
+  (`obj.m 'a': 1`), and in a call that is a value
+  (`def api = toApi 'A': '''…'''`, `x = foo 'a': 1`,
+  `def f = y -> foo 'a': 1`, `(foo 'a': 1)`, `"${foo 'a': 1}"`). Each
+  was an `ERROR`, as at v0.6.0. The key adds no `conflicts` entry and
+  no fork. Where a `:` may also follow a call that is a value, a
+  precedence keeps the string an argument, as Apache's order of
+  alternatives does: `y = c ? x = foo 'a' : 'b'` and
+  `assert x = foo 'a' : 'msg'` keep their trees. In a list element or a
+  call's argument (`[x = foo 'a': 1]`, `bar(x = foo 'a': 1)`,
+  `bar(x = foo 1, 'b': 2)`) the key goes to `foo`, as in Groovy, by a
+  twin of the scanner's value-start token, whose call no map entry or
+  named argument takes as its key; `[x = foo 1: 2]` is an `ERROR`, as a
+  number key is not supported (Groovy reads `[x = foo(1: 2)]`). A
+  multi-assignment, a lambda value, an assignment after a map entry and
+  an annotation's argument
+  (`[(a, b) = foo 'a': 1]`, `[k: 1, x = foo 'a': 1]`) keep the
+  assignment as the key. A number key (`foo 1: 'a'`) and a key after a
+  comma that is an expression in parentheses, a list or a map
+  (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`) are still an `ERROR`. The
+  corpus tests that pinned string keys as unsupported now pin the tree.
+  With keys in statements only, 22 of 21,667 real files parsed without
+  an `ERROR` and no tree that was clean changed; that sample was not run
+  again with keys in values (`SPECIFICATION.md` §6.8, §6.27) (#113).
+- Annotations and modifiers come in any order, as Apache's `modifiers`,
+  `classOrInterfaceModifiers` and `variableModifiers` take them, but for
+  an annotation after `def` or `var` (`def @A x = 1`, still an `ERROR`):
+  `private @Autowired Foo foo`, `public @Override String m()`,
+  `protected final @Delegate` then `Adapter a` on the next line,
+  `public @interface X { }`, `sealed abstract class W permits V { }`,
+  `sealed @A class S { }`, `default @Override void b() { }`,
+  `enum F { A, private @Foo F() { } }`, and `final @A x` in a method's,
+  a closure's or a lambda's parameters and in a local
+  (`final @Foo String s = 'a'`) parse. Each was an `ERROR`, as at
+  v0.6.0. A for-in loop's variable takes annotations before and after
+  `final`, as Apache's `variableModifiersOpt` does (`for (@A x in xs)`,
+  `for (final @A x : xs)`); they are children of the
+  `for_in_statement`, after the loop's own. At v0.6.0 both were an
+  `ERROR`. A type with `default` (divergence 20) takes annotations after
+  it, so `default @interface Z { }` is an annotation type too.
+  Annotations after the first modifier are children of the declaration,
+  as those before it are, so no node kind changes. `_modifiers` (inlined)
+  holds the modifiers of every declaration, one rule,
+  `_annotated_modifiers`, the modifiers and annotations after its first
+  modifier, after `sealed` and after `default`, and one rule,
+  `_default_modifiers`, a type's or an interface method's list with
+  `default`. The `@` of `@interface` and the `(` of a multi-assignment
+  after modifiers alone are scanner tokens, so the rules add no conflict:
+  a reparse after an edit among modifiers that leaves no `ERROR` gives
+  the tree of a parse from scratch, and an annotation's arguments after
+  a modifier in a type body do not fork (`SPECIFICATION.md` §6.26);
+  where a statement starts they still fork after `final`, a few steps
+  per argument. After `final` and annotations where a statement starts,
+  a keyword or a modifier is read as the keyword, so
+  `final @A class X { }` is a class and `final @A static int x = 1` an
+  `ERROR`. After a modifier, parentheses holding two
+  or more names, or names and then `=`, are a multi-assignment's names
+  (`private @B(a, b) = l`), never an annotation's arguments, which
+  Groovy takes as one value or pairs. `sealed record`, `sealed enum`,
+  `def String x` and `... xs` in parameters, and modifiers other than
+  `final` before a declaration where a statement starts
+  (`@Field public static Integer x = 2` in a script, which Groovy's
+  parser takes and its AST builder rejects), stay an `ERROR`; there it
+  recovers as `public int x` does at v0.6.0: the `ERROR` runs to where
+  the declaration could no longer be a method's head, which can take
+  several statements, and a call on a later line can become that
+  method's name (`public @Foo int x` then `println x` and `foo()`).
+  37 of 21,667 real files parse without an `ERROR` and
+  none gains one; of the files that had an `ERROR`, one has a longer
+  one, a script with such a declaration (`SPECIFICATION.md` §6.13,
+  `docs/divergences-from-spec.md` §12, §14). (#92)
 - A line escape before a CRLF line break continues a single-quoted,
   double-quoted or slashy string, as before an LF one: `'a\` then `b'`
   on the next line in a CRLF file is one string, as Groovy reads it
@@ -1079,9 +1169,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `trait = x` and `sealed(1)` parse. Each was an `ERROR`, or opened a
   `trait_declaration` that swallowed the following members. Like
   `record`, both keywords now come from the external scanner
-  (`SPECIFICATION.md` §6.13). `sealed` before another modifier
-  (`sealed abstract class S { }`) is still an `ERROR`; other residuals
-  are in `docs/divergences-from-spec.md` §12. (#73)
+  (`SPECIFICATION.md` §6.13). Other residuals are in
+  `docs/divergences-from-spec.md` §12. (#73)
 - A file with many unterminated `/*` is no longer read once per `/*`:
   the scanner, and the `record` header look-ahead, read to the end of
   input each time, so parse time grew with the square of the count.
