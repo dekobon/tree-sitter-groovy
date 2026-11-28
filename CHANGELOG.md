@@ -1076,20 +1076,25 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   (`obj.m 'a': 1`), and in a call that is a value
   (`def api = toApi 'A': '''…'''`, `x = foo 'a': 1`,
   `def f = y -> foo 'a': 1`, `(foo 'a': 1)`, `"${foo 'a': 1}"`). Each
-  was an `ERROR`, as at v0.6.0. The key needs no scanner token and adds
-  no `conflicts` entry. Where a `:` may also follow a call that is a
-  value, a precedence keeps the string an argument, as Apache's order of
+  was an `ERROR`, as at v0.6.0. The key adds no `conflicts` entry and
+  no fork. Where a `:` may also follow a call that is a value, a
+  precedence keeps the string an argument, as Apache's order of
   alternatives does: `y = c ? x = foo 'a' : 'b'` and
-  `assert x = foo 'a' : 'msg'` keep their trees. So do
-  `[x = foo 'a': 1]` and `bar(x = foo 'a': 1)`, a map entry or a named
-  argument whose key is the assignment, where Groovy calls `foo` with
-  the key. A number key (`foo 1: 'a'`) and a key after a comma that is
-  an expression in parentheses, a list or a map (`foo x: 1, (k): 2`,
-  `foo x: 1, [1]: 2`) are still an `ERROR`. The corpus tests that
-  pinned string keys as unsupported now pin the tree. With keys in
-  statements only, 22 of 21,667 real files parsed without an `ERROR` and
-  no tree that was clean changed; that sample was not run again with
-  keys in values (`SPECIFICATION.md` §6.8) (#113).
+  `assert x = foo 'a' : 'msg'` keep their trees. In a list element or a
+  call's argument (`[x = foo 'a': 1]`, `bar(x = foo 'a': 1)`,
+  `bar(x = foo 1, 'b': 2)`) the key goes to `foo`, as in Groovy, by a
+  twin of the scanner's value-start token, whose call no map entry or
+  named argument takes as its key; `[x = foo 1: 2]`, which Groovy
+  rejects, is an `ERROR`. A multi-assignment, a lambda value, an
+  assignment after a map entry and an annotation's argument
+  (`[(a, b) = foo 'a': 1]`, `[k: 1, x = foo 'a': 1]`) keep the
+  assignment as the key. A number key (`foo 1: 'a'`) and a key after a
+  comma that is an expression in parentheses, a list or a map
+  (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`) are still an `ERROR`. The
+  corpus tests that pinned string keys as unsupported now pin the tree.
+  With keys in statements only, 22 of 21,667 real files parsed without
+  an `ERROR` and no tree that was clean changed; that sample was not run
+  again with keys in values (`SPECIFICATION.md` §6.8, §6.27) (#113).
 - Annotations and modifiers come in any order, as Apache's `modifiers`,
   `classOrInterfaceModifiers` and `variableModifiers` take them:
   `private @Autowired Foo foo`, `public @Override String m()`,

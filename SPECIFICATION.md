@@ -1751,6 +1751,7 @@ enum TokenType {
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
   MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone, before names and `)` then `=`, or two or more names
+  COMMAND_KEY_VALUE_START, // §6.27 — COMMAND_VALUE_START where an assignment's value in a list element or a call's argument may start
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
 };
 ```
@@ -2220,8 +2221,8 @@ Known limitations:
   (`y = c ? x = foo 'a' : 'b'`), an `assert` message's
   (`assert x = foo 'a' : 'msg'`), a `case` label's
   (`case x = foo 'a':`), or that of a map entry or a named argument
-  whose key is the assignment (`[x = foo 'a': 1]`,
-  `bar(x = foo 'a': 1)`). There the parse table has a shift-reduce
+  whose key is the assignment (`[k: 1, x = foo 'a': 1]`; but see below
+  for a list element or an argument). There the parse table has a shift-reduce
   conflict on `:`, which a precedence resolves the same way in every
   one of these contexts: a precedence of -1 on the key and its `:` gives
   the `:` to the construct. No `conflicts` entry is needed and nothing
@@ -2233,20 +2234,21 @@ Known limitations:
   and ALL(*) takes the first alternative where both readings complete
   and the key where only the key does. So the ternary, the `assert`
   (both readings complete; Groovy keeps the message) and the `case`
-  read as in Groovy. Where they differ:
-  - `[x = foo 'a': 1]`, `bar(x = foo 'a': 1)` and
-    `bar(x = foo 1, 'b': 2)` are a `map_entry` or a `named_argument`
-    whose key is the assignment, as before string keys. Groovy calls
-    `foo` with the key there, since its `mapEntryLabel` and
-    `namedPropertyArgLabel` take no assignment. Taking the key would
-    need a narrower `map_entry` key.
+  read as in Groovy. Where an assignment is a list element or a call's
+  argument, its call is `_element_assignment`'s, which no key is, so
+  `[x = foo 'a': 1]`, `bar(x = foo 'a': 1)` and `bar(x = foo 1, 'b': 2)`
+  pass the key to `foo`, as in Groovy (§6.27). Where they differ:
+  - A multi-assignment, a lambda value, an assignment after a map entry
+    and an annotation's argument (`[(a, b) = foo 'a': 1]`,
+    `[x = y -> foo 'a': 1]`, `[k: 1, x = foo 'a': 1]`,
+    `@A(x.y = foo 'a': 1)`) keep the assignment as the key of a
+    `map_entry` or a `named_argument`, as before string keys (§6.27).
   - `y = c ? x = foo 'a' : 'b' : 'd'` is an `ERROR`, where only the key
     reading completes and Groovy takes it.
-  - A name key goes the other way in the same places: the scanner emits
-    `_command_named_key` before a name and a single `:` on its line, and
-    `prec.right(1)` gives a name after a comma to the key. So
-    `[x = foo a: 1]` is a list where `[x = foo 'a': 1]` is a map, and
-    `y = c ? x = foo a : 'b'` is an `ERROR`.
+  - A name key goes the other way in a ternary, an `assert` and a `case`:
+    the scanner emits `_command_named_key` before a name and a single `:`
+    on its line, and `prec.right(1)` gives a name after a comma to the
+    key, so `y = c ? x = foo a : 'b'` is an `ERROR`.
 
   A key after a comma in a value goes to the call, as Apache's greedy
   argument list does: `[k: x = foo 1, 'b': 2]` passes `'b': 2` to `foo`.
@@ -2744,6 +2746,9 @@ the statement at the line break. Nor can the grammar tell
 `println(foo 1)` from `println(x)` at the `(`, where it must already
 have made `println` the receiver or an expression, nor `foo bar` from
 `String s` at `bar`.
+
+Where an assignment is a list element or a call's argument, the same
+decision emits COMMAND_KEY_VALUE_START instead (§6.27).
 
 ```text
 Emit COMMAND_VALUE_START, empty, where a value may start, when:
@@ -5412,6 +5417,63 @@ and `[$.annotation]` are gone, so #92 declares no conflict. Of the
 21,667 real files, no tree without an `ERROR` changes.
 `bindings/rust/tests/incremental_reparse.rs` checks every single edit of
 eight texts with annotations among modifiers.
+
+### 6.27 COMMAND_KEY_VALUE_START — implementation contract
+
+```text
+Where COMMAND_KEY_VALUE_START is valid (the value of `_element_assignment`
+may start: after the operator of an assignment that is a list element or
+a call's argument, or the value of such an assignment; no error
+recovery), COMMAND_VALUE_START is valid too. Decide as for
+COMMAND_VALUE_START (§6.14), and emit COMMAND_KEY_VALUE_START in its
+place.
+```
+
+A parenthesis-free call takes a string key (§6.8). In a list element or a
+call's argument, an assignment may also be the key of a map entry or a
+named argument, as `map_entry` takes any `_expression`, so a `:` may follow
+the value of the assignment. After a string argument of a call there, the
+`:` is then the call's string key or the outer key's, and the -1 of
+`_command_string_named_argument`, which keeps a ternary's `:` and an
+`assert` message's after the string, gave it to the outer key:
+`[x = foo 'a': 1]` was a map entry keyed by `x = foo 'a'`. Apache's
+`mapEntryLabel` and `namedPropertyArgLabel` take no assignment, so Groovy
+calls `foo` with `'a': 1`.
+
+`_element_assignment` is an assignment whose value is such a call, opened
+by COMMAND_KEY_VALUE_START, or another such assignment, aliased to
+`assignment_expression` and `command_chain`, so the tree is the one of an
+assignment anywhere else. `_list_element` and `_argument` take it beside
+`_expression`. The two readings shift the same tokens up to the value, so
+both are items of the same parse states and nothing forks. At the value
+the scanner emits the twin's token wherever it is valid, so the call is
+the twin's. The twin is no key, so no `:` follows its call but the string
+key's, and the precedence has no conflict to decide there. Inside a
+ternary, an `assert` condition or a `case` value the twin is not valid,
+and the string stays an argument. A value that is no such call ends the
+twin's reading at its first token.
+
+A map entry's key narrowed to exclude assignments was tried first. It
+gives the same trees, but after `[`, `(` or `,` and an expression every
+state then shifts the key's `:` as well as reducing the expression, so
+the runtime no longer drops the hidden `_expression` reduction there:
+4.1% more reductions over the corpus inputs, one per list element and
+argument. The extra hidden node also turned the cast of a cast
+`[(Foo)` then `(y)(z)]` into calls (see `inline` in `grammar.js`). The
+twin costs no reduction and no fork on the corpus inputs (34,112
+reductions and 9,738 steps with more than one stack version, each input
+parsed alone, as before) and changes none of their trees. STATE_COUNT
+6111 to 6159, LARGE_STATE_COUNT 2348 to 2378, and `node-types.json` is
+unchanged.
+
+An assignment whose value is a call is no key there
+(`[x = foo 1: 2]` is an `ERROR`, as in Groovy). These keep the assignment
+as the key: a multi-assignment (`[(a, b) = foo 'a': 1]`), a lambda value
+(`[x = y -> foo 'a': 1]`), an assignment after a map entry
+(`[k: 1, x = foo 'a': 1]`) and an annotation's argument
+(`@A(x.y = foo 'a': 1)`). A twin for the first costs 55 more states and
+one for the last 113. `bindings/rust/tests/incremental_reparse.rs` checks
+every single edit of three texts with such calls, a ternary's included.
 
 ---
 

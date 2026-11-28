@@ -63,7 +63,10 @@ The default branch is **`main`**.
     makes the statement no declaration (`foo bar`, not `String s`),
     and a literal only where the argument goes on past it
     (`println "a" + b`, not `foo 1` then `-x` on the next line)
-    (§6.14);
+    (§6.14); where the value is an assignment's that is a list element
+    or a call's argument, the same decision emits a twin of the value
+    start, which opens a call that no map entry or named argument takes
+    as its key, so `[x = foo 'a': 1]` passes `'a': 1` to `foo` (§6.27);
   - a subscript `[` on the same line as the expression before it
     (§6.9), a `(` that opens a line after an expression where a
     statement may start and the parentheses can open one, so that it

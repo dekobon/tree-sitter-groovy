@@ -953,6 +953,19 @@ function argumentList(argument) {
   );
 }
 
+/**
+ * The operators of `assignment_expression`: plain `=`, every augmented
+ * form and Elvis-assign `?=`, as in Apache's `#assignmentExprAlt`.
+ * `_element_assignment` takes the same ones.
+ */
+const ASSIGNMENT_OPERATORS = [
+  '=',
+  '+=', '-=', '*=', '/=', '%=', '**=',
+  '<<=', '>>=', '>>>=',
+  '&=', '^=', '|=',
+  '?=',
+];
+
 module.exports = grammar({
   name: 'groovy',
 
@@ -1239,6 +1252,9 @@ module.exports = grammar({
     // §4 — the `(` of a multi-assignment after modifiers alone, emitted
     // only when names, `)` and `=` follow (`_modified_multi_assignment_tail`).
     $._multi_assignment_open,
+    // §6.27 — `_command_value_start` where `_element_assignment` is valid
+    // too, which then takes the call.
+    $._command_key_value_start,
     // Never referenced by a rule: valid only during error recovery, when
     // the scanner must not emit context-sensitive tokens.
     $._error_sentinel,
@@ -1486,6 +1502,41 @@ module.exports = grammar({
       commandArguments($),
     )),
 
+    // §6.27 — an assignment whose value is a parenthesis-free call, as a
+    // list element or a call's argument (`[x = foo 'a': 1]`,
+    // `bar(x = foo 'a': 1)`), aliased to `assignment_expression`. There an
+    // assignment may also be the key of a map entry or a named argument
+    // (`map_entry` takes any `_expression`), so a `:` may follow its value,
+    // and the -1 of `_command_string_named_argument` gave the `:` after a
+    // string argument to that key: `[x = foo 'a': 1]` was a map entry keyed
+    // by `x = foo 'a'`. Groovy takes no assignment as a key
+    // (`mapEntryLabel`, `namedPropertyArgLabel`) and calls `foo` with
+    // `'a': 1`. This twin is live beside `assignment_expression` there, and
+    // the scanner emits `_command_key_value_start` in place of
+    // `_command_value_start` where it is valid, so the call is the twin's,
+    // which is no key: only the string key's `:` follows the string. Both
+    // shift the same tokens up to the call, so it costs no reduction and no
+    // fork. A key narrowed to exclude assignments cost a reduction per list
+    // element and argument instead. An assignment whose value is a call is
+    // then no key (`[x = foo 1: 2]` is an `ERROR`, as in Groovy).
+    _element_assignment: $ => choice(...ASSIGNMENT_OPERATORS.map(op =>
+      prec.right(PREC.ASSIGN, seq(
+        field('left', $._expression),
+        field('operator', op),
+        field('right', choice(
+          alias($._key_value_command_chain, $.command_chain),
+          alias($._element_assignment, $.assignment_expression),
+        )),
+      )))),
+
+    // §6.27 — `_value_command_chain` opened by `_command_key_value_start`,
+    // the value of `_element_assignment`.
+    _key_value_command_chain: $ => prec.right(seq(
+      $._command_key_value_start,
+      field('receiver', choice($.identifier, $._command_path)),
+      commandArguments($),
+    )),
+
     // `enhancedStatementExpression` as one symbol, for the condition of `if`,
     // `while` and `do`, a `switch` value and a `synchronized` lock. Inline,
     // its choice would give each alternative its own copy of the states for
@@ -1585,7 +1636,9 @@ module.exports = grammar({
     // argument, so those keep the string as an argument. That is Apache's
     // order, `expressionListElement` before `namedArg`; with no precedence
     // the two tie and the conflict is unresolved, and a key that won
-    // (tried first for #113) broke the ternary (§6.8). A step's precedence
+    // (tried first for #113) broke the ternary (§6.8). In a list element
+    // or a call's argument, `_element_assignment` takes the call, which no
+    // key is, so the key is the call's there (§6.27). A step's precedence
     // holds for the position after it, so the -1 covers the key and the
     // `:`, and the value is back at 0, where `prec.right` keeps
     // `foo 'b': c = 2` one argument, as for a name.
@@ -3775,6 +3828,7 @@ module.exports = grammar({
 
     _argument: $ => choice(
       enhancedExpression($),
+      alias($._element_assignment, $.assignment_expression),
       alias($.map_entry, $.named_argument),
       $.spread_arguments,
       // Apache `namedArg: … | MUL COLON nls expression`: `foo(*:m, x: 1)`.
@@ -3856,20 +3910,12 @@ module.exports = grammar({
     // and Elvis-assign `?=`. The operator field distinguishes them.
     // Right-associative per Apache. ASSIGN is the loosest precedence
     // tier and binds looser than CONDITIONAL above it.
-    assignment_expression: $ => {
-      const ops = [
-        '=',
-        '+=', '-=', '*=', '/=', '%=', '**=',
-        '<<=', '>>=', '>>>=',
-        '&=', '^=', '|=',
-        '?=',
-      ];
-      return choice(...ops.map(op => prec.right(PREC.ASSIGN, seq(
+    assignment_expression: $ => choice(...ASSIGNMENT_OPERATORS.map(op =>
+      prec.right(PREC.ASSIGN, seq(
         field('left', $._expression),
         field('operator', op),
         field('right', enhancedStatementExpression($)),
-      ))));
-    },
+      )))),
 
     // §4 — `(a, b) = expr`, Apache `#multipleAssignmentExprAlt`: two or
     // more names and `=` alone. Apache lists it in `expression`, so it
@@ -4219,7 +4265,11 @@ module.exports = grammar({
     // Apache `list: LBRACK expressionList[true]? COMMA? RBRACK`: an element
     // may be a spread (`[*a, 1]`), the `spread_arguments` of a call.
     // Inlined (see `inline` above).
-    _list_element: $ => choice($._expression, $.spread_arguments),
+    _list_element: $ => choice(
+      $._expression,
+      alias($._element_assignment, $.assignment_expression),
+      $.spread_arguments,
+    ),
 
     // §3.2 PRIMARY / §5.3 — map literal. `[:]` is the empty map;
     // anything else is one-or-more `key: value` entries. The

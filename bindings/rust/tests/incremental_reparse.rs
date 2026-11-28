@@ -282,6 +282,24 @@ fn reparse_after_annotation_among_modifier_edits_matches_parse_from_scratch() {
     );
 }
 
+/// A parenthesis-free call that is the value of an assignment in a list
+/// element or a call's argument (§6.27). The scanner opens it with
+/// `_command_key_value_start` where `_element_assignment` is valid, and
+/// with `_command_value_start` elsewhere, so an edit that moves the call
+/// into or out of such an assignment, or the assignment into a ternary,
+/// must not reuse a call that the other token opened.
+#[test]
+fn reparse_after_element_command_edits_matches_parse_from_scratch() {
+    assert_every_edit_reparses(
+        &[
+            "l = [x = foo 'a': 1, 2]\n",
+            "bar(x = foo 1, 'b': 2)\nbar(k: x = foo 'a': 1)\n",
+            "l = [c ? x = foo 'a' : 'b']\ny = x = foo 'a': 1\n",
+        ],
+        &["", " ", "\n", "=", ":", ",", "'a'", "(", "x"],
+    );
+}
+
 /// Texts whose look-aheads tell a slashy string from a division by the token
 /// before the `/` (§6.2): a lambda's default value (§6.17), the parentheses
 /// after a closure call's access (§6.24), a `(` that opens a line (§6.18)

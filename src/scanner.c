@@ -12,7 +12,9 @@
 // Also handles §6.8
 // COMMAND_NAMED_KEY, an empty token before the key of a named
 // argument in a parenthesis-free call; §6.14 COMMAND_VALUE_START, an
-// empty token before the receiver of such a call that is a value,
+// empty token before the receiver of such a call that is a value, and
+// §6.27 COMMAND_KEY_VALUE_START, the same token where the value is an
+// assignment's that is a list element or a call's argument,
 // COMMAND_PATH_START, one between the first name of a dotted receiver
 // and its first member access, and COMMAND_STATEMENT_START, one before
 // a statement's one-name receiver whose first argument is a `new`, an
@@ -71,8 +73,8 @@
 // ARRAY_VALUE_START, CAST_CLOSE, CAST_WORD_CLOSE, RELATIONAL_CLOSE,
 // CAST_TYPE_ARGUMENTS_OPEN, TYPE_ARGUMENTS_OPEN, NOT_IN, LAMBDA_START, BARE_LAMBDA_START,
 // LAMBDA_BODY_END, LAMBDA_BODY_REREAD, MULTI_ASSIGNMENT_COMMA, DECLARATION_START, STATEMENT_BLOCK_END,
-// JUMP_STATEMENT_END, ANNOTATION_TYPE_AT, MULTI_ASSIGNMENT_OPEN and the
-// STRING_BODY check are suppressed. The keywords
+// JUMP_STATEMENT_END, ANNOTATION_TYPE_AT, MULTI_ASSIGNMENT_OPEN,
+// COMMAND_KEY_VALUE_START and the STRING_BODY check are suppressed. The keywords
 // `record`, `trait`, `sealed`, `var`, `yield`, `in` and `as` are still
 // decided there, by the same look-aheads, as are the comments,
 // UNTERMINATED_COMMENT and SLASHY_STRING_START. The order in which the scan
@@ -159,6 +161,7 @@ enum TokenType {
     SLASH_DIVIDES,
     ANNOTATION_TYPE_AT,
     MULTI_ASSIGNMENT_OPEN,
+    COMMAND_KEY_VALUE_START,
     ERROR_SENTINEL,
 };
 
@@ -1892,7 +1895,13 @@ static bool scan_value_start(
                                          no_close_ahead)) {
         return false;
     }
-    lexer->result_symbol = COMMAND_VALUE_START;
+    // §6.27 — where an assignment is a list element or a call's argument,
+    // the grammar's twin of the assignment (`_element_assignment`) makes
+    // COMMAND_KEY_VALUE_START valid beside COMMAND_VALUE_START. Its call is
+    // no map entry's or named argument's key, so a `:` after a string
+    // argument there is the call's string key (`[x = foo 'a': 1]`).
+    lexer->result_symbol = valid_symbols[COMMAND_KEY_VALUE_START]
+        ? COMMAND_KEY_VALUE_START : COMMAND_VALUE_START;
     return true;
 }
 

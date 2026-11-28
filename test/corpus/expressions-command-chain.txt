@@ -1182,6 +1182,150 @@ m = [k: x = foo 1, 'b': 2]
                 value: (number_literal)))))))))
 
 ==================
+A string key in a command chain that is a list element or an argument
+==================
+
+l = [x = foo 'a': 1]
+bar(x = foo 'a': 1)
+bar(x = foo 1, 'b': 2)
+bar(1, x = foo 'a': 1)
+l = [x = y = foo 'a': 1]
+bar(x += obj.m 'a': 1, 2)
+new Foo(x = bar 'a': 1)
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (number_literal)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (number_literal)
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal)))))))
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (named_argument
+                key: (string_literal)
+                value: (number_literal))))))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (field_access
+              object: (identifier)
+              field: (identifier))
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal))
+            argument: (number_literal))))))
+  (expression_statement
+    (object_creation_expression
+      type: (type_identifier)
+      arguments: (argument_list
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (string_literal)
+              value: (number_literal))))))))
+
+==================
+A string before the colon of a ternary in a list or an argument stays an argument
+==================
+
+l = [c ? x = foo 'a' : 'b']
+bar(c ? x = foo 'a' : 'b')
+
+---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (ternary_expression
+          condition: (identifier)
+          consequence: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (string_literal)))
+          alternative: (string_literal)))))
+  (expression_statement
+    (method_invocation
+      function: (identifier)
+      arguments: (argument_list
+        (ternary_expression
+          condition: (identifier)
+          consequence: (assignment_expression
+            left: (identifier)
+            right: (command_chain
+              receiver: (identifier)
+              argument: (string_literal)))
+          alternative: (string_literal))))))
+
+==================
+An assignment whose value is a command chain is no map key
+:error
+==================
+
+l = [x = foo 1: 2]
+
+---
+
+==================
 A string before the colon of a ternary stays an argument
 ==================
 
