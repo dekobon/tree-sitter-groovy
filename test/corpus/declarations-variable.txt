@@ -3857,11 +3857,29 @@ y = 1
       right: (number_literal))))
 
 ==================
-A def with a lowercase type, before another modifier or before a method is not a typed declaration (known divergence)
+A def before final is a modifier of a typed declaration
+==================
+
+def final String x = 1
+def final y = 2
+
+---
+
+(source_file
+  (local_variable_declaration
+    type: (type_identifier)
+    name: (identifier)
+    value: (number_literal))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal))))
+
+==================
+A def with a lowercase type or before a method is not a typed declaration (known divergence)
 ==================
 
 def foo bar
-def final String x = 1
 def String m() { }
 
 ---
@@ -3872,13 +3890,6 @@ def String m() { }
       name: (identifier)))
   (expression_statement
     (identifier))
-  (local_variable_declaration
-    (variable_declarator
-      name: (identifier)))
-  (local_variable_declaration
-    type: (type_identifier)
-    name: (identifier)
-    value: (number_literal))
   (local_variable_declaration
     (variable_declarator
       name: (identifier)))

@@ -299,6 +299,19 @@ fn reparse_after_annotation_among_modifier_edits_matches_parse_from_scratch() {
         &["for (final @A x in xs) { a() }\nfor (@A int i = 0; i < n; i++) { }\n"],
         &["", " ", "\n", "@A ", "@A(k = 1) ", "final ", "(", ";", ":", "x"],
     );
+    // `def` and `var` are modifiers: annotations and modifiers follow them
+    // in a script, a type body, parameters and a for-in variable, and after
+    // `def` the `(` of a multi-assignment is the token of names after
+    // modifiers.
+    assert_every_edit_reparses(
+        &[
+            "def @A x = 1\ndef @A foo() { }\nfor (def @A z in xs) { }\n",
+            "class C {\n  def @A x\n  def static next() { }\n  def final y = 1\n  private def @A z\n}\n",
+            "def f(def @A x) { }\nxs.each { def @A y -> y }\ndef @A (a, b) = l\n",
+            "var @A x = 1\nfor (var @A y in xs) { }\nclass C { private var @A static w = 1 }\n",
+        ],
+        &["", " ", "\n", "@A ", "@A(k = 1) ", "final ", "static ", "def ", "(", "x", ";", "{", "@", ","],
+    );
 }
 
 /// A parenthesis-free call that is the value of an assignment in a list

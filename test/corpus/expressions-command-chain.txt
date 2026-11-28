@@ -980,6 +980,49 @@ foo 'a',
       value: (number_literal))))
 
 ==================
+Number keys in a command chain
+==================
+
+foo 1: 'a', 2: 'b'
+foo a: 1, 3: 'c'
+def m = foo 1.5: 'a'
+bar 'k', 0x10: true
+
+---
+
+(source_file
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (number_literal)
+      value: (string_literal))
+    argument: (named_argument
+      key: (number_literal)
+      value: (string_literal)))
+  (command_chain
+    receiver: (identifier)
+    argument: (named_argument
+      key: (identifier)
+      value: (number_literal))
+    argument: (named_argument
+      key: (number_literal)
+      value: (string_literal)))
+  (local_variable_declaration
+    (variable_declarator
+      name: (identifier)
+      value: (command_chain
+        receiver: (identifier)
+        argument: (named_argument
+          key: (number_literal)
+          value: (string_literal)))))
+  (command_chain
+    receiver: (identifier)
+    argument: (string_literal)
+    argument: (named_argument
+      key: (number_literal)
+      value: (boolean_literal))))
+
+==================
 String keys in a command chain that is a value
 ==================
 
@@ -1317,13 +1360,25 @@ bar(c ? x = foo 'a' : 'b')
           alternative: (string_literal))))))
 
 ==================
-An assignment whose value is a command chain is no map key
-:error
+A number key in a command that is an assignment's value in a list element
 ==================
 
 l = [x = foo 1: 2]
 
 ---
+
+(source_file
+  (expression_statement
+    (assignment_expression
+      left: (identifier)
+      right: (list_literal
+        (assignment_expression
+          left: (identifier)
+          right: (command_chain
+            receiver: (identifier)
+            argument: (named_argument
+              key: (number_literal)
+              value: (number_literal))))))))
 
 ==================
 A string before the colon of a ternary stays an argument

@@ -2450,7 +2450,8 @@ static bool names_after_paren_follow(TSLexer *lexer, bool no_close_ahead) {
 // Right after `return`, `break` or `continue` on their line, where
 // JUMP_STATEMENT_END is valid, it is the value or the label (§6.23), as
 // Groovy takes no declaration there: `return var` then `x` on the next
-// line returns `var`. Before `(` it opens a multi-assignment: where `var`
+// line returns `var`. Before `@` it is the keyword, which annotations may
+// follow (`var @A x = 1`). Before `(` it opens a multi-assignment: where `var`
 // alone may open one (VAR_NAMES_KEYWORD valid), only when the names, `)`
 // and `=` follow; after `final`, always. Anywhere else the word is a name.
 // In a type body a name and `(` after `var` make it a method's return type,
@@ -2489,6 +2490,13 @@ static bool scan_var(
                    && lexer->lookahead == '(') {
             return false;
         }
+        lexer->result_symbol = VAR_KEYWORD;
+        return valid_symbols[VAR_KEYWORD];
+    }
+    // An annotation after `var`, a modifier in Apache's `modifier`:
+    // `var @A x = 1`, `for (var @A x in xs)`. No expression goes on from a
+    // name with `@`, so the word is the keyword.
+    if (lexer->lookahead == '@') {
         lexer->result_symbol = VAR_KEYWORD;
         return valid_symbols[VAR_KEYWORD];
     }
@@ -6561,8 +6569,9 @@ bool tree_sitter_groovy_external_scanner_scan(
         lexer->result_symbol = ANNOTATION_TYPE_AT;
         return true;
     }
-    // §6.26 — the `(` of a multi-assignment after modifiers alone, or after
-    // `final` and annotations: the token ends at the `(`. Right after an
+    // §6.26 — the `(` of a multi-assignment after modifiers alone, after
+    // `final` and annotations, or after `def` and annotations or modifiers:
+    // the token ends at the `(`. Right after an
     // annotation's name two or more names, or names, `)` and `=`, must
     // follow (`modified_names_follow`); any other `(` there is the
     // in-grammar lexer's, the arguments of the annotation.

@@ -2430,3 +2430,212 @@ println x
     (identifier)
     (identifier)
     (identifier)))
+
+==================
+Annotations after def on a local, a multi-assignment and a method
+==================
+
+def @A x = 1
+final def @A y = 2
+def @A(1) String s = 'a'
+def @A (a, b) = [1, 2]
+def @A foo() { }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier))
+      arguments: (argument_list
+        (number_literal)))
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (multi_assignment_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier))
+    value: (list_literal
+      (number_literal)
+      (number_literal)))
+  (method_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    name: (identifier)
+    parameters: (formal_parameters)
+    body: (block)))
+
+==================
+Annotations after def on a field, a method and a field after a modifier
+==================
+
+class C {
+  def @A x
+  private def @A y = 1
+  def @A m() { }
+  def @A(v = 1) static z
+  private def @A (a, b) = l
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (method_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier))
+          arguments: (argument_list
+            (assignment_expression
+              left: (identifier)
+              right: (number_literal))))
+        (variable_declarator
+          name: (identifier)))
+      (multi_assignment_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))
+        (variable_declarator
+          name: (identifier))
+        value: (identifier)))))
+
+==================
+Annotations after def on a parameter, a closure parameter and a for-in variable
+==================
+
+def f(def @A x) { }
+xs.each { def @A y -> y }
+for (def @A z in xs) { }
+
+---
+
+(source_file
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))
+    body: (block))
+  (expression_statement
+    (method_invocation
+      function: (field_access
+        object: (identifier)
+        field: (identifier))
+      closure: (closure
+        (closure_parameters
+          (closure_parameter
+            (annotation
+              name: (qualified_name
+                (identifier)))
+            name: (identifier)))
+        (expression_statement
+          (identifier)))))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block)))
+
+==================
+Annotations and modifiers after var, as after def
+==================
+
+var @A x = 1
+var @A String s = 'a'
+for (var @A y in xs) { }
+def f(var @A z) { }
+class C { private var @A static w = 1 }
+
+---
+
+(source_file
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    (variable_declarator
+      name: (identifier)
+      value: (number_literal)))
+  (local_variable_declaration
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    type: (type_identifier)
+    name: (identifier)
+    value: (string_literal))
+  (for_in_statement
+    (annotation
+      name: (qualified_name
+        (identifier)))
+    variable: (identifier)
+    value: (identifier)
+    body: (block))
+  (method_declaration
+    name: (identifier)
+    parameters: (formal_parameters
+      (formal_parameter
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        name: (identifier)))
+    body: (block))
+  (class_declaration
+    name: (identifier)
+    body: (class_body
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal))))))
