@@ -1084,21 +1084,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   call's argument (`[x = foo 'a': 1]`, `bar(x = foo 'a': 1)`,
   `bar(x = foo 1, 'b': 2)`) the key goes to `foo`, as in Groovy, by a
   twin of the scanner's value-start token, whose call no map entry or
-  named argument takes as its key; `[x = foo 1: 2]` is an `ERROR`, as a
-  number key is not supported (Groovy reads `[x = foo(1: 2)]`). A
+  named argument takes as its key. A number key takes the string key's
+  rule, so it goes wherever a string key does (`foo 1: 'a'`,
+  `foo a: 1, 2: 'b'`, `[x = foo 1: 2]`, Groovy's `[x = foo(1: 2)]`),
+  as Apache's `namedArgPrimary` takes any literal. A
   multi-assignment, a lambda value, an assignment after a map entry and
   an annotation's argument
   (`[(a, b) = foo 'a': 1]`, `[k: 1, x = foo 'a': 1]`) keep the
-  assignment as the key. A number key (`foo 1: 'a'`) and a key after a
-  comma that is an expression in parentheses, a list or a map
-  (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`) are still an `ERROR`. The
+  assignment as the key. A key after a comma that is an expression in
+  parentheses, a list or a map (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`)
+  is still an `ERROR`. The
   corpus tests that pinned string keys as unsupported now pin the tree.
   With keys in statements only, 22 of 21,667 real files parsed without
   an `ERROR` and no tree that was clean changed; that sample was not run
-  again with keys in values (`SPECIFICATION.md` §6.8, §6.27) (#113).
+  again with keys in values. Number keys change 2 trees of 21,667, each
+  with a shorter `ERROR`, and no other (`SPECIFICATION.md` §6.8, §6.27)
+  (#113).
 - Annotations and modifiers come in any order, as Apache's `modifiers`,
-  `classOrInterfaceModifiers` and `variableModifiers` take them, but for
-  an annotation after `def` or `var` (`def @A x = 1`, still an `ERROR`):
+  `classOrInterfaceModifiers` and `variableModifiers` take them:
   `private @Autowired Foo foo`, `public @Override String m()`,
   `protected final @Delegate` then `Adapter a` on the next line,
   `public @interface X { }`, `sealed abstract class W permits V { }`,
@@ -1110,7 +1113,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `final`, as Apache's `variableModifiersOpt` does (`for (@A x in xs)`,
   `for (final @A x : xs)`); they are children of the
   `for_in_statement`, after the loop's own. At v0.6.0 both were an
-  `ERROR`. A type with `default` (divergence 20) takes annotations after
+  `ERROR`. `def` and `var` are modifiers too (Apache's `modifier`), so
+  modifiers and annotations follow them in any order, in each declaration
+  that takes them: `def @A x = 1`, `def @A foo() { }`, `def f(def @A x)`,
+  `for (def @A x in xs)`, `{ def @A y -> }`, `def @A (a, b) = l`,
+  `var @A x = 1`, `def final String x = 1`, and in a type body
+  `def static next() { }`, `def static final X = 1` and
+  `def transient t`. An annotation after `def` was an `ERROR`, as at
+  v0.6.0; `var @A x = 1` was the statement `var` and a local, and a
+  modifier after `def` a misreading with no `ERROR`: `def final` and the
+  statement `x = 1`, the fields `def static` and `final X = 1`, or a
+  field `def static` and a constructor `next() { }`. 5 more of the
+  21,667 real files parse without an `ERROR`, and 11 that had none change
+  their trees, each such a misreading. STATE_COUNT 6286 to 6476.
+  A return type after `def` (`def String m() { }`) is still read as
+  before (divergence §5.12). A type with `default` (divergence 20) takes annotations after
   it, so `default @interface Z { }` is an annotation type too.
   Annotations after the first modifier are children of the declaration,
   as those before it are, so no node kind changes. `_modifiers` (inlined)

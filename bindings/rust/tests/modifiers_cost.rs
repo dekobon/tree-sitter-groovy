@@ -141,6 +141,31 @@ fn annotation_arguments_after_a_modifier_fork_a_bounded_number_of_steps() {
     }
 }
 
+/// After `def`, an annotation's arguments are read once, wherever the
+/// declaration is: the forked steps over them do not grow with their
+/// number. Measured: 0 for a local and a field, 3 for a method, 5 for a
+/// parameter, at 400 and at 3,200 arguments.
+#[test]
+fn annotation_arguments_after_def_fork_a_bounded_number_of_steps() {
+    let forms = |a: &str| {
+        [
+            format!("def @Foo({a}) x = 1\n"),
+            format!("class C {{ def @Foo({a}) x }}\n"),
+            format!("def @Foo({a}) m() {{ }}\n"),
+            format!("def f(def @Foo({a}) x) {{ }}\n"),
+        ]
+    };
+    let small = forms(&arguments(SMALL_ELEMENTS));
+    let large = forms(&arguments(SMALL_ELEMENTS * SCALE));
+    for (small, large) in small.iter().zip(&large) {
+        let (few, many) = (forked_steps(small), forked_steps(large));
+        assert!(
+            many <= few && many <= 2 * ANNOTATION_ARGUMENT_FORKS,
+            "{few} forked steps over {SMALL_ELEMENTS} arguments after def, {many} over eight times as many: {small:.40}",
+        );
+    }
+}
+
 fn point_at(text: &str, byte: usize) -> Point {
     let before = &text[..byte];
     let row = before.matches('\n').count();

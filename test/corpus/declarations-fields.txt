@@ -918,12 +918,14 @@ class C {
           value: (number_literal))))))
 
 ==================
-A def before another modifier or a method's return type is not a typed member (known divergence)
+A def before another modifier is a modifier of a typed member
 ==================
 
 class C {
   def static String s = 1
-  def String m() { }
+  def static next() { }
+  def final x = 1
+  def @A static y
 }
 
 ---
@@ -933,13 +935,39 @@ class C {
     name: (identifier)
     body: (class_body
       (field_declaration
-        (variable_declarator
-          name: (identifier)))
-      (field_declaration
         type: (type_identifier)
         (variable_declarator
           name: (identifier)
           value: (number_literal)))
+      (method_declaration
+        name: (identifier)
+        parameters: (formal_parameters)
+        body: (block))
+      (field_declaration
+        (variable_declarator
+          name: (identifier)
+          value: (number_literal)))
+      (field_declaration
+        (annotation
+          name: (qualified_name
+            (identifier)))
+        (variable_declarator
+          name: (identifier))))))
+
+==================
+A def before a method's return type is not a typed member (known divergence)
+==================
+
+class C {
+  def String m() { }
+}
+
+---
+
+(source_file
+  (class_declaration
+    name: (identifier)
+    body: (class_body
       (field_declaration
         (variable_declarator
           name: (identifier)))

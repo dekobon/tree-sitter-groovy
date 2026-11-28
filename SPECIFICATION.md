@@ -1759,7 +1759,7 @@ enum TokenType {
   EXCLUDED_METHOD_NAME,   // §6.25 — empty; before a word that names no method (`this`, `void`, a primitive type, `goto`, `const`, `threadsafe`)
   SLASH_DIVIDES,          // §6.2 — never emitted; valid only after the `)` of a condition or of a method's parameters and the `}` of a block or a type's body
   ANNOTATION_TYPE_AT,     // §6.26 — the `@` of `@interface`, before the keyword `interface`
-  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone or after `final` and annotations; right after an annotation's name only before names and `)` then `=`, or two or more names
+  MULTI_ASSIGNMENT_OPEN,  // §6.26 — the `(` of a multi-assignment after modifiers alone, after `final` and annotations, or after `def` and annotations or modifiers; right after an annotation's name only before names and `)` then `=`, or two or more names
   COMMAND_KEY_VALUE_START, // §6.27 — COMMAND_VALUE_START where an assignment's value in a list element or a call's argument may start
   ANNOTATION_ARGUMENTS_MAY_FOLLOW, // §6.26 — never emitted; valid only right after an annotation's name, where its arguments may follow
   ERROR_SENTINEL,         // never in a rule; valid only during error recovery
@@ -2212,13 +2212,15 @@ as a plain identifier followed by `:` and needs no scanner token.
 
 Known limitations:
 
-- A key that is a number (`foo 1: 'a'`) is an `ERROR`. Apache takes
-  any literal: `namedArgPrimary` for the first argument and
-  `namedPropertyArgPrimary` after a comma. After a comma
+- A key may be a number (`foo 1: 'a'`, `foo a: 1, 2: 'b'`), as a string
+  may: Apache takes any literal, `namedArgPrimary` for the first argument
+  and `namedPropertyArgPrimary` after a comma, and Groovy 4.0.32 runs
+  `foo 1: 'a'`. The number key is matched by the string key's rule
+  (`_command_literal_named_argument`), with its precedence, so it is
+  taken wherever a string key is. After a comma
   `namedPropertyArgPrimary` also takes an expression in parentheses, a
   list or a map (`foo x: 1, (k): 2`, `foo x: 1, [1]: 2`); each is an
-  `ERROR` here. Groovy 4.0.32 runs `foo 1: 'a'` and
-  `foo x: 1, (k): 2`.
+  `ERROR` here. Groovy 4.0.32 runs `foo x: 1, (k): 2`.
 - A string key (`foo 'a': 1`, `foo "$k": 1`) is matched in the
   grammar, after the receiver or a comma, with no scanner token, and
   `prec.right` keeps `foo 'b': c = 2` one argument, as for a name. It
@@ -3492,7 +3494,9 @@ spaces, tabs, line escapes, line breaks, block and line comments:
                      no operand (`else`, `if`; §6.11), and in a type
                      body (VAR_NAMES_KEYWORD valid, DECLARATION_START
                      not) a name that `(` follows, past trivia and line
-                     breaks; or `(` follows where VAR_NAMES_KEYWORD is
+                     breaks; or `@` follows (an annotation after the
+                     modifier `var`, `var @A x = 1`); or `(` follows
+                     where VAR_NAMES_KEYWORD is
                      not valid and no expression may start (after
                      `final`, in a parameter). Never
                      where JUMP_STATEMENT_END is valid, right after
@@ -4670,12 +4674,19 @@ next line is two statements, as in Groovy), and one between `def` and the
 type does not, as in Groovy's `nls` (`def` then `long where = f()`). No
 call may start there, so the scan reads the type by the rule that holds
 after annotations: a lowercase type needs `<` or `[` (`def foo bar` is
-`def foo` and `bar`, where Groovy declares `bar`). Not taken: a modifier
-after `def` (`def final String x`, `def static String x`, Groovy's
-declarations, which stay `def final` and a declaration of `x`), a return
-type after `def` (`def String m() { }`, Groovy's method, which stays
-`def String` and a call, or a field and a constructor in a type body),
-and a parameter's (§5.12, `docs/divergences-from-spec.md` §14). The two
+`def foo` and `bar`, where Groovy declares `bar`). Modifiers and
+annotations may follow `def` in any order (`_def_modifier`), as after any
+other modifier (§6.26): `def final String x`, `def static String x`,
+`def static next() { }`, `def @A x = 1`, `def @A foo() { }`,
+`def f(def @A x)`, `for (def @A x in xs)` and `{ def @A y -> }`, and
+after `var` as well (`var @A x = 1`, where the scanner emits `var` before
+`@`, §6.16). After
+`def` and annotations or modifiers, the `(` of a multi-assignment is the
+token of names after modifiers (`def @A (a, b) = l`, §6.26). Not taken: a
+return type after `def` (`def String m() { }`, Groovy's method, which
+stays `def String` and a call, or a field and a constructor in a type
+body), and a parameter's type (§5.12, `docs/divergences-from-spec.md`
+§14). The two
 forms cost 34 parse states. `var`, also a modifier in Apache's `modifier`
 rule, and `final var` take the local's form as `def` does: where the
 scanner emits `var` (§6.16) and then the token,
@@ -5382,8 +5393,9 @@ annotation type; no error recovery) and the next character is `@`:
   otherwise emit nothing, and the in-grammar lexer reads the `@` of an
     annotation.
 Where MULTI_ASSIGNMENT_OPEN is valid (after modifiers alone, before the
-names of a multi-assignment field, or after `final` and annotations
-before those of a local; no error recovery) and the next character is
+names of a multi-assignment field, after `final` and annotations before
+those of a local, or after `def` and annotations or modifiers before
+either's; no error recovery) and the next character is
 `(`:
   consume `(` and end the token;
   if ANNOTATION_ARGUMENTS_MAY_FOLLOW is not valid (after a modifier
@@ -5474,7 +5486,7 @@ call's argument, an assignment may also be the key of a map entry or a
 named argument, as `map_entry` takes any `_expression`, so a `:` may follow
 the value of the assignment. After a string argument of a call there, the
 `:` is then the call's string key or the outer key's, and the -1 of
-`_command_string_named_argument`, which keeps a ternary's `:` and an
+`_command_literal_named_argument`, which keeps a ternary's `:` and an
 `assert` message's after the string, gave it to the outer key:
 `[x = foo 'a': 1]` was a map entry keyed by `x = foo 'a'`. Apache's
 `mapEntryLabel` and `namedPropertyArgLabel` take no assignment, so Groovy
@@ -5506,9 +5518,9 @@ parsed alone, as before) and changes none of their trees. STATE_COUNT
 6111 to 6159, LARGE_STATE_COUNT 2348 to 2378, and `node-types.json` is
 unchanged.
 
-An assignment whose value is a call is no key there
-(`[x = foo 1: 2]` is an `ERROR`, as a number is no key of a call here,
-§6.8, where Groovy reads `[x = foo(1: 2)]`). These keep the assignment
+An assignment whose value is a call is no key there, and a number key
+is the call's as a string key is (`[x = foo 1: 2]`, Groovy's
+`[x = foo(1: 2)]`, §6.8). These keep the assignment
 as the key: a multi-assignment (`[(a, b) = foo 'a': 1]`), a lambda value
 (`[x = y -> foo 'a': 1]`), an assignment after a map entry
 (`[k: 1, x = foo 'a': 1]`) and an annotation's argument

@@ -509,7 +509,7 @@ function methodHead($, beforeParameters = choice(
     repeat($.annotation),
     optional($._modifiers),
     optional(field('type_parameters', $.method_type_parameters)),
-    choice('def', field('return_type', $._type)),
+    choice(defModifier($), field('return_type', $._type)),
     field('name', $._property_name),
   ),
   seq(
@@ -588,6 +588,31 @@ function finalModifier($) {
 }
 
 /**
+ * `def` and the modifiers and annotations after it (`_def_modifier`).
+ * Apache's `modifier` and `variableModifier` count `def` as a modifier,
+ * and modifiers and annotations come in any order, so either may follow
+ * `def`, as they follow `final` (`finalModifier`). Annotations before
+ * `def` stay in the declaration's own `repeat($.annotation)`.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral} `def` and what follows it.
+ */
+function defModifier($) {
+  return $._def_modifier;
+}
+
+/**
+ * `var` and the modifiers and annotations after it (`_var_modifier`), as
+ * after `def` (`defModifier`): Apache's `modifier` lists `VAR`.
+ *
+ * @param {GrammarSymbols<string>} $ Grammar reference symbols.
+ * @returns {RuleOrLiteral} `var` and what follows it.
+ */
+function varModifier($) {
+  return $._var_modifier;
+}
+
+/**
  * A method parameter or a closure parameter. Apache's `closure` takes
  * the `formalParameterList` of a method, so the two have one shape:
  * annotations, `final` and annotations after it (`finalModifier`), then
@@ -608,7 +633,7 @@ function parameter($, value = $._expression) {
     seq(
       repeat($.annotation),
       optional(finalModifier($)),
-      optional(choice('def', varKeyword($), field('type', choice($._type, $.varargs_type)))),
+      optional(choice(defModifier($), varModifier($), field('type', choice($._type, $.varargs_type)))),
       field('name', $.identifier),
       defaultValue,
     ),
@@ -692,7 +717,7 @@ function commandArgumentsAfterFirst($) {
   return repeat(seq(',', field('argument', choice(
     alias($._command_named_argument, $.named_argument),
     alias($._command_continued_named_argument, $.named_argument),
-    alias($._command_string_named_argument, $.named_argument),
+    alias($._command_literal_named_argument, $.named_argument),
     $._expression,
     $.spread_arguments,
     $.spread_map_entry,
@@ -712,7 +737,7 @@ function commandArguments($) {
     field('argument', choice(
       $._expression,
       alias($._command_named_argument, $.named_argument),
-      alias($._command_string_named_argument, $.named_argument),
+      alias($._command_literal_named_argument, $.named_argument),
     )),
     commandArgumentsAfterFirst($),
   );
@@ -1486,7 +1511,7 @@ module.exports = grammar({
       field('argument', choice(
         $._command_argument,
         alias($._command_named_argument, $.named_argument),
-        alias($._command_string_named_argument, $.named_argument),
+        alias($._command_literal_named_argument, $.named_argument),
       )),
       commandArgumentsAfterFirst($),
     )),
@@ -1517,7 +1542,7 @@ module.exports = grammar({
     // `bar(x = foo 'a': 1)`), aliased to `assignment_expression`. There an
     // assignment may also be the key of a map entry or a named argument
     // (`map_entry` takes any `_expression`), so a `:` may follow its value,
-    // and the -1 of `_command_string_named_argument` gave the `:` after a
+    // and the -1 of `_command_literal_named_argument` gave the `:` after a
     // string argument to that key: `[x = foo 'a': 1]` was a map entry keyed
     // by `x = foo 'a'`. Groovy takes no assignment as a key
     // (`mapEntryLabel`, `namedPropertyArgLabel`) and calls `foo` with
@@ -1653,8 +1678,8 @@ module.exports = grammar({
     // holds for the position after it, so the -1 covers the key and the
     // `:`, and the value is back at 0, where `prec.right` keeps
     // `foo 'b': c = 2` one argument, as for a name.
-    _command_string_named_argument: $ => prec.right(seq(
-      prec(-1, seq(field('key', $.string_literal), ':')),
+    _command_literal_named_argument: $ => prec.right(seq(
+      prec(-1, seq(field('key', choice($.string_literal, $.number_literal)), ':')),
       field('value', $._expression),
     )),
 
@@ -2040,6 +2065,19 @@ module.exports = grammar({
     // in Groovy (§5.2). Here it is a keyword only where a modifier can
     // stand; anywhere else the word lexes as an identifier, and input
     // such as `foo(private)` parses with no ERROR (#93).
+    // `def` and the modifiers and annotations after it (`defModifier`), in
+    // any order: `def @A x = 1`, `def @A foo() { }`, `def f(def @A x)`,
+    // `for (def @A x in xs)`, `def final String x`, `def static next() { }`.
+    // A hidden rule rather than a `seq` in each declaration: it costs 167
+    // states, where a copy of `def` and its annotations in each cost 423.
+    // The compact constructor's `def` takes it too, or the two conflict at
+    // `def`.
+    _def_modifier: $ => seq('def', optional($._annotated_modifiers)),
+
+    // The same after `var` (`varModifier`): `var @A x = 1`,
+    // `for (var @A x in xs)`. The scanner emits the keyword before `@`.
+    _var_modifier: $ => seq(varKeyword($), optional($._annotated_modifiers)),
+
     _modifier: _ => choice(
       'public',
       'private',
@@ -2255,9 +2293,9 @@ module.exports = grammar({
         // name without a fork at every `def`. `var` is a modifier as well
         // (Apache's `modifier`), which the scanner emits before a name.
         choice(
-          choice('def', varKeyword($)),
+          choice(defModifier($), varModifier($)),
           field('type', $._type),
-          seq(choice('def', varKeyword($)), $._declaration_start,
+          seq(choice(defModifier($), varModifier($)), $._declaration_start,
             field('type', $._type)),
         ),
         $.variable_declarator,
@@ -2351,7 +2389,7 @@ module.exports = grammar({
       repeat($.annotation),
       $._default_modifiers,
       optional(field('type_parameters', $.method_type_parameters)),
-      optional(choice('def', field('return_type', $._type))),
+      optional(choice(defModifier($), field('return_type', $._type))),
       field('name', $._property_name),
     ))),
 
@@ -2585,7 +2623,7 @@ module.exports = grammar({
     compact_constructor_declaration: $ => weighted(COMPACT_CONSTRUCTOR_WEIGHT, prec(1, seq(
       repeat($.annotation),
       optional($._modifiers),
-      optional('def'),
+      optional($._def_modifier),
       field('name', $.identifier),
       field('body', $.block),
     ))),
@@ -2685,7 +2723,7 @@ module.exports = grammar({
       seq(
         repeat($.annotation),
         optional(finalModifier($)),
-        choice('def', varKeyword($)),
+        choice(defModifier($), varModifier($)),
         $.variable_declarator,
         repeat(seq(',', $.variable_declarator)),
       ),
@@ -2745,7 +2783,7 @@ module.exports = grammar({
       // (Apache's `modifier` lists `VAR`): `var String s = 'a'`.
       seq(
         repeat($.annotation),
-        optional(seq(optional(finalModifier($)), choice('def', varKeyword($)))),
+        optional(seq(optional(finalModifier($)), choice(defModifier($), varModifier($)))),
         $._declaration_start,
         field('type', $._type),
         $._typed_declarator,
@@ -2913,6 +2951,14 @@ module.exports = grammar({
         // `_modified_multi_assignment_tail`, so that a plain `(` there
         // opens the last annotation's arguments.
         seq('final', repeat1($.annotation), $._modified_multi_assignment_tail),
+        // The same after `def` and annotations or modifiers
+        // (`def @A (a, b) = l`).
+        seq(
+          optional(finalModifier($)),
+          'def',
+          $._annotated_modifiers,
+          $._modified_multi_assignment_tail,
+        ),
       ),
     ),
 
@@ -2930,6 +2976,12 @@ module.exports = grammar({
           $._multi_assignment_tail,
         ),
         seq($._modifiers, $._modified_multi_assignment_tail),
+        seq(
+          optional($._modifiers),
+          'def',
+          $._annotated_modifiers,
+          $._modified_multi_assignment_tail,
+        ),
       ),
     ),
 
@@ -3159,7 +3211,7 @@ module.exports = grammar({
       '(',
       repeat($.annotation),
       optional(finalModifier($)),
-      optional(choice('def', varKeyword($), field('type', $._type))),
+      optional(choice(defModifier($), varModifier($), field('type', $._type))),
       field('variable', $.identifier),
       choice(alias($._in_keyword, 'in'), ':'),
       field('value', $._expression),

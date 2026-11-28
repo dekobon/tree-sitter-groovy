@@ -127,14 +127,14 @@ The default branch is **`main`**.
     that name an error, as Groovy's `methodName` takes none of these
     words and they are identifiers here, so no reserved set can hold
     them (§6.25);
-  - the `@` of `@interface` where an annotation type may start, when
-    the word `interface` follows, and the `(` of a multi-assignment's
-    names after modifiers alone or after `final` and annotations, when
-    the parentheses hold two or more names, or names and then `=`
-    (`private @B(a, b) = l`), and with no look-ahead where no
-    annotation's arguments may follow, after a modifier keyword or an
-    annotation's arguments (`private (a)` while its `=` is not typed
-    yet). With the two tokens, the `@` of an
+  - the `@` of `@interface` where an annotation type may start, when the
+    word `interface` follows, and the `(` of a multi-assignment's names
+    after modifiers alone, after `final` and annotations, or after `def`
+    and annotations or modifiers, when the parentheses hold two or more
+    names, or names and then `=` (`private @B(a, b) = l`), and with no
+    look-ahead where no annotation's arguments may follow, after a
+    modifier keyword or an annotation's arguments (`private (a)` while
+    its `=` is not typed yet). With the two tokens, the `@` of an
     annotation and the `(` of its arguments do not continue a complete
     list of modifiers, so the arguments of an annotation after a
     modifier in a type body do not fork, and a reparse reads an
