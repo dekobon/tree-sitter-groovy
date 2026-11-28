@@ -202,6 +202,7 @@
   (trait_declaration "default" @keyword.modifier)
   (enum_declaration "default" @keyword.modifier)
   (record_declaration "default" @keyword.modifier)
+  (annotation_type_declaration "default" @keyword.modifier)
 ]
 
 (shebang) @keyword.directive
